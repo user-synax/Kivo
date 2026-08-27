@@ -25,10 +25,10 @@
 
     /* Typography — Font Families */
     --font-goga:
-        "Goga", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", Roboto, sans-serif;
+        var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-inter-variable:
-        "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+        var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
         BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
     /* Typography — Scale */
@@ -104,12 +104,68 @@
         rgba(0, 0, 0, 0.1) 0px 10px 15px -3px,
         rgba(0, 0, 0, 0.1) 0px 4px 6px -4px;
 
-    /* Surfaces */
     --surface-void: #000000;
     --surface-ground: #181818;
     --surface-carbon: #212525;
     --surface-mint-frost: #def0dd;
     --surface-lime-pulse: #7fee64;
+
+    /* ── Motion tokens — shared scale (transitions-dev) ─────────
+       Reference these with var(--…) for CSS-driven motion. The
+       React/Motion.dev usage mirrors these same values. */
+    /* Durations */
+    --duration-stagger: 40ms; /* per-item stagger offset */
+    --duration-micro: 80ms; /* tooltip/path delay, shake segment */
+    --duration-quick: 150ms; /* dropdown/panel close, text swap */
+    --duration-fast: 250ms; /* dropdown/panel open, tabs sliding */
+    --duration-medium: 350ms; /* panel close, toast close */
+    --duration-slow: 400ms; /* panel open, skeleton reveal */
+    --duration-very-slow: 500ms; /* emphasis moments, text reveal */
+
+    /* Easings */
+    --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: ease-in-out;
+    --ease-out: ease-out;
+    --ease-linear: linear;
+    --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
+
+    /* Distances */
+    --distance-micro: 4px;
+    --distance-small: 6px;
+    --distance-base: 8px;
+    --distance-medium: 12px;
+    --distance-large: 30px;
+
+    /* Scales */
+    --scale-large: 0.96;
+    --scale-medium: 0.97; /* dropdown/panel open */
+    --scale-small: 0.98;
+    --scale-tiny: 0.99; /* dropdown close */
+
+    /* Blur */
+    --blur-small: 2px;
+    --blur-medium: 3px;
+
+    /* ── Transition-specific tunables (transitions-dev) ───────── */
+    /* Navbar entrance — texts reveal */
+    --stagger-dur: 500ms;
+    --stagger-distance: 12px;
+    --stagger-stagger: 40ms;
+    --stagger-blur: 3px;
+    --stagger-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* Mobile menu — dropdown/panel hybrid */
+    --dropdown-open-dur: 250ms;
+    --dropdown-close-dur: 150ms;
+    --dropdown-pre-scale: 0.97;
+    --dropdown-closing-scale: 0.99;
+    --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --panel-blur: 2px;
+
+    /* Hamburger morph */
+    --morph-open-dur: 250ms;
+    --morph-close-dur: 200ms;
+    --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -165,10 +221,10 @@
 
     /* Typography */
     --font-goga:
-        "Goga", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", Roboto, sans-serif;
+        var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-inter-variable:
-        "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+        var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
         BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
     /* Typography — Scale */
@@ -220,6 +276,7 @@
     --radius-lg: 8px;
     --radius-xl: 12px;
     --radius-3xl: 25px;
+    --radius-pills: 9999px;
 
     /* Shadows */
     --shadow-md:
@@ -228,8 +285,8 @@
 }
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
+    --font-heading: var(--font-geist-sans);
+    --font-sans: var(--font-geist-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -314,4 +371,67 @@
   html {
     @apply font-sans;
     }
+}
+
+@layer components {
+  /* Floating pill navbar — translucent surface that tightens as the
+     page scrolls. data-scrolled is toggled imperatively (no React
+     re-render) so only the backdrop/surface shift, never layout. */
+  .kivo-nav-pill {
+    background-color: rgba(33, 37, 37, 0.7);
+    border-color: rgba(72, 83, 70, 0.45);
+    border-radius: 9999px;
+    transition:
+      background-color var(--duration-fast) var(--ease-smooth-out),
+      border-color var(--duration-fast) var(--ease-smooth-out);
+  }
+  .kivo-nav-pill[data-scrolled="true"] {
+    background-color: rgba(33, 37, 37, 0.9);
+    border-color: rgba(72, 83, 70, 0.8);
+  }
+
+  /* Understated nav link hover — a hairline phosphor wash, never lime. */
+  .kivo-nav-link {
+    transition:
+      color var(--duration-fast) var(--ease-smooth-out),
+      background-color var(--duration-fast) var(--ease-smooth-out);
+  }
+  .kivo-nav-link:hover {
+    color: var(--color-phosphor-white);
+    background-color: rgba(72, 83, 70, 0.22);
+  }
+
+  /* Primary CTA — restrained press feedback, no distracting scale-up. */
+  .kivo-cta {
+    transition:
+      transform var(--duration-quick) var(--ease-smooth-out),
+      background-color var(--duration-fast) var(--ease-smooth-out),
+      filter var(--duration-fast) var(--ease-smooth-out);
+  }
+  .kivo-cta:hover {
+    filter: brightness(1.06);
+  }
+  .kivo-cta:active {
+    transform: scale(0.97);
+  }
+
+  /* Visible keyboard focus — phosphor ring, kept off the lime ration. */
+  .kivo-focus:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(0, 0, 0, 0.6),
+      0 0 0 4px rgba(127, 238, 100, 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kivo-nav-pill,
+  .kivo-nav-link,
+  .kivo-cta {
+    /* biome-ignore lint/complexity/noImportantStyles: the transitions-dev skill requires an !important guard so the reduced-motion reset always wins. */
+    transition: none !important;
+  }
+  .kivo-cta:active {
+    transform: none;
+  }
 }
