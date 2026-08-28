@@ -130,6 +130,11 @@
   --surface-coral-feature: #ff764c;
   --surface-dark-preview: #1a1919;
 
+  /* Elevation (default = flat, border-driven; themes override) */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
   /* ── Motion tokens — shared scale (transitions-dev) ─────────
        Reference these with var(--…) for CSS-driven motion. The
        React/Motion.dev usage mirrors these same values. */
@@ -371,6 +376,13 @@
   --radius-badges: 6px;
   --radius-inputs: 6px;
   --radius-buttons: 100px;
+
+  /* Elevation — themeable so themes can go flat (border-driven) or floating */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
 }
 
 @theme inline {
@@ -485,7 +497,7 @@
   .kivo-nav-pill {
     background-color: rgba(250, 246, 241, 0.72);
     border-color: rgba(139, 140, 148, 0.35);
-    border-radius: 9999px;
+    border-radius: var(--radius-pills);
     transition:
       background-color var(--duration-fast) var(--ease-smooth-out),
       border-color var(--duration-fast) var(--ease-smooth-out);
@@ -824,9 +836,7 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow:
-      rgba(14, 14, 15, 0.08) 0px 10px 15px -3px,
-      rgba(14, 14, 15, 0.08) 0px 4px 6px -4px;
+    box-shadow: var(--shadow-md);
     overflow: hidden;
     transform-origin: bottom left;
     animation: t-panel-in var(--duration-fast) var(--ease-smooth-out) both;

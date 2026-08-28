@@ -131,7 +131,7 @@ export function Hero() {
         >
           <div className="relative mx-auto w-full max-w-full overflow-hidden sm:max-w-[560px] lg:mx-0 lg:ml-auto">
             {/* outer card - Code Window / chat mockup */}
-            <div className="relative w-full max-w-full overflow-hidden rounded-xl border border-stone/60 bg-fog shadow-md">
+            <div className="relative w-full max-w-full overflow-hidden rounded-cards border border-stone/60 bg-fog shadow-md">
               {/* top bar - traffic lights */}
               <div className="flex h-10 min-w-0 max-w-full items-center justify-between overflow-hidden border-b border-stone bg-fog px-4">
                 <div className="flex items-center gap-1.5">
