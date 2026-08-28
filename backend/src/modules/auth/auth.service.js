@@ -111,8 +111,12 @@ export async function loginUser({ identifier, password, deviceInfo }) {
 
 // Rotate the refresh token: verify the supplied refresh token, ensure its
 // session still exists in the store, then atomically delete the old session and
-// create a new one. If the session is gone (expired/revoked/already rotated),
-// reject — forcing a fresh login.
+// Mint a fresh access token from a still-valid refresh token. We intentionally
+// do NOT rotate the refresh token here: rotation destroys the session document
+// and re-issues a new httpOnly cookie, which is fragile in the browser (a
+// concurrent refresh race can leave the stored cookie pointing at a dead
+// session, causing an immediate logout on the next load). The single refresh
+// cookie stays valid for its full TTL and is only revoked on explicit logout.
 export async function refreshSession({ refreshToken }) {
   if (!refreshToken) {
     throw unauthorized("Missing refresh token", "NO_REFRESH_TOKEN");
@@ -132,18 +136,17 @@ export async function refreshSession({ refreshToken }) {
 
   const session = await getSession(sessionId);
   if (!session) {
-    // Session missing => expired, revoked, or already rotated. Force re-login.
+    // Session missing => expired or revoked. Force re-login.
     throw unauthorized("Session invalid or expired", "SESSION_GONE");
   }
 
-  // Rotation: destroy the old session before minting a new one.
-  await destroySession(sessionId, session.userId);
-
-  const { accessToken, refreshToken: newRefreshToken } = await issueSession(
-    session.userId,
-    session.deviceInfo
+  // Issue a new short-lived access token, but keep the same refresh token/cookie.
+  const accessToken = jwt.sign(
+    { userId: session.userId, sessionId },
+    env.accessTokenSecret,
+    { expiresIn: env.accessTokenTtl },
   );
-  return { accessToken, refreshToken: newRefreshToken };
+  return { accessToken, refreshToken };
 }
 
 // Log out a single session (the current one, identified by the access token).

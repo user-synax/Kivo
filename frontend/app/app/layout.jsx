@@ -1,4 +1,5 @@
 import { AuthGate } from "@/components/auth-guard";
+import { SocketProvider } from "@/components/socket-provider";
 import ThemeProvider from "@/components/theme-provider";
 
 export const metadata = {
@@ -8,10 +9,12 @@ export const metadata = {
 export default function AppLayout({ children }) {
   // AuthGate keeps unauthenticated visitors out of /app (redirects to /login);
   // ThemeProvider applies the single theme object as CSS variables at the root
-  // of /app. Everything below consumes colors only through those variables.
+  // of /app. SocketProvider opens one realtime connection for the session.
   return (
     <ThemeProvider>
-      <AuthGate>{children}</AuthGate>
+      <AuthGate>
+        <SocketProvider>{children}</SocketProvider>
+      </AuthGate>
     </ThemeProvider>
   );
 }

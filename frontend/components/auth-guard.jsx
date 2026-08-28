@@ -3,20 +3,21 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSession } from "@/lib/auth";
-import { appTheme } from "@/lib/theme";
+
+// Neutral loader shown briefly while the client confirms a session. Uses the
+// default (Phosphor) palette directly so it works even outside ThemeProvider
+// (e.g. the GuestGate on login), avoiding any flash of mis-themed colors.
+const LOADER = { base: "#000000", border: "#485346", accent: "#7fee64" };
 
 function Loader() {
   return (
     <div
       className="flex h-[100dvh] items-center justify-center"
-      style={{ backgroundColor: appTheme.colors.base }}
+      style={{ backgroundColor: LOADER.base }}
     >
       <div
         className="size-6 animate-spin rounded-full border-2"
-        style={{
-          borderColor: appTheme.colors.border,
-          borderTopColor: appTheme.colors.accent,
-        }}
+        style={{ borderColor: LOADER.border, borderTopColor: LOADER.accent }}
       />
     </div>
   );

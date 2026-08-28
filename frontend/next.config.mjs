@@ -10,6 +10,15 @@ const nextConfig = {
         source: "/api/v1/:path*",
         destination: `${backendUrl}/api/v1/:path*`,
       },
+      {
+        // Socket.IO transport upgrades share the backend origin.
+        source: "/socket.io/:path*",
+        destination: `${backendUrl}/socket.io/:path*`,
+      },
+      {
+        source: "/socket.io",
+        destination: `${backendUrl}/socket.io`,
+      },
     ];
   },
 };
