@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { formatTime, otherParticipant, participantName } from "@/lib/chat";
 import { ChatPanel } from "./chat-panel";
@@ -117,7 +117,7 @@ export function DashboardShell() {
         // this fetch resolved — clear its unread now so the badge doesn't stick.
         const restored = selectedIdRef.current;
         if (restored && list.some((c) => c.id === restored)) {
-          apiPost(`/api/v1/conversations/${restored}/read`, {}).catch(() => {});
+          apiPatch(`/api/v1/conversations/${restored}/read`, {}).catch(() => {});
           setConversations((prev) =>
             prev.map((c) => (c.id === restored ? { ...c, unreadCount: 0 } : c)),
           );
@@ -135,7 +135,7 @@ export function DashboardShell() {
   // mount (selectedId restored from localStorage) and on every selection change.
   useEffect(() => {
     if (!selectedId) return undefined;
-    apiPost(`/api/v1/conversations/${selectedId}/read`, {}).catch(() => {});
+    apiPatch(`/api/v1/conversations/${selectedId}/read`, {}).catch(() => {});
     setConversations((prev) =>
       prev.map((c) => (c.id === selectedId ? { ...c, unreadCount: 0 } : c)),
     );

@@ -189,7 +189,7 @@ export function ChatPanel({ conversation, onBack }) {
       reconcile(msg);
       socket.emit("message:delivered", { messageId: msg.id });
       if (msg.senderId !== userId) {
-        apiPost(`/api/v1/conversations/${convId}/read`, {
+        apiPatch(`/api/v1/conversations/${convId}/read`, {
           upToMessageId: msg.id,
         }).catch(() => {});
       }
