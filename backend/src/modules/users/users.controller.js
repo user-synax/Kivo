@@ -23,3 +23,8 @@ export const search = asyncHandler(async (req, res) => {
   const users = await usersService.searchUsers({ userId: req.user.userId, q });
   res.status(200).json({ success: true, data: users });
 });
+
+export const getUserById = asyncHandler(async (req, res) => {
+  const user = await usersService.getUserById({ otherId: req.params.id });
+  res.status(200).json({ success: true, data: user });
+});

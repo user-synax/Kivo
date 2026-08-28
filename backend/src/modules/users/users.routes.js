@@ -9,5 +9,6 @@ router.use(authenticate);
 router.get("/me", usersController.getMe);
 router.patch("/me", usersController.updateMe);
 router.get("/search", usersController.search);
+router.get("/:id", usersController.getUserById);
 
 export default router;

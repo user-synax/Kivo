@@ -15,6 +15,7 @@ function initials(name) {
 }
 
 const SIZE = {
+  lg: "size-20 text-3xl",
   md: "size-10 text-sm",
   sm: "size-9 text-[13px]",
 };

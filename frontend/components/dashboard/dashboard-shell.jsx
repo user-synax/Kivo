@@ -4,9 +4,15 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
+import { UserPanel } from "./user-panel";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
-import { formatTime, otherParticipant, participantName } from "@/lib/chat";
+import {
+  formatTime,
+  otherParticipant,
+  participantId,
+  participantName,
+} from "@/lib/chat";
 import { ChatPanel } from "./chat-panel";
 import { FriendsModal } from "./friends-modal";
 import { Sidebar } from "./sidebar";
@@ -63,6 +69,10 @@ export function DashboardShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [conversations, setConversations] = useState([]);
   const conversationsRef = useRef(conversations);
+  // Profile of the "other" participant in the open DM — powers the right-hand
+  // detail panel. Fetched on conversation switch, keyed by the other user id.
+  const [otherProfile, setOtherProfile] = useState(null);
+  const [otherLoading, setOtherLoading] = useState(false);
   useEffect(() => {
     conversationsRef.current = conversations;
   }, [conversations]);
@@ -72,6 +82,17 @@ export function DashboardShell() {
   // re-renders after the user saves a new avatar style in the edit modal.
   const [currentUser, setCurrentUser] = useState(() => getSession());
   const refreshUser = useCallback(() => setCurrentUser(getSession()), []);
+
+  // The "other" participant id of the currently open DM, derived from the
+  // conversation list so it's available to the profile-fetch effect (which runs
+  // before `selected` is computed later in render). Groups have no single
+  // "other", so we resolve null for them.
+  const selectedOtherId = (() => {
+    if (!selectedId) return null;
+    const conv = conversations.find((c) => c.id === selectedId);
+    if (!conv || conv.type !== "dm") return null;
+    return participantId(otherParticipant(conv, currentUser?.id));
+  })();
   const router = useRouter();
   const slide = reduce ? { duration: 0 } : { duration: 0.28, ease: EASE };
 
@@ -130,6 +151,32 @@ export function DashboardShell() {
       active = false;
     };
   }, [loadConversations]);
+
+  // Load the "other" participant's full profile whenever the open DM changes,
+  // so the right-hand detail panel stays in sync. Group conversations have no
+  // single "other", so we skip them.
+  useEffect(() => {
+    if (!selectedOtherId) {
+      setOtherProfile(null);
+      setOtherLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setOtherLoading(true);
+    apiGet(`/api/v1/users/${selectedOtherId}`)
+      .then((data) => {
+        if (active) setOtherProfile(data || null);
+      })
+      .catch(() => {
+        if (active) setOtherProfile(null);
+      })
+      .finally(() => {
+        if (active) setOtherLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedOtherId]);
 
   // Mark the opened conversation as read (clears its unread badge). Also runs on
   // mount (selectedId restored from localStorage) and on every selection change.
@@ -251,6 +298,16 @@ export function DashboardShell() {
   const selected = conversations.find((c) => c.id === selectedId) || null;
   const listItems = conversations.map((c) => toListItem(c, currentUser));
 
+  // The "other" participant of the open DM, used by the detail panel.
+  const selectedOtherOnline = selected
+    ? Array.isArray(selected.online)
+      ? Boolean(selected.online[0])
+      : Boolean(selected.online)
+    : false;
+  const showUserPanel = Boolean(
+    selected && selected.type === "dm" && selectedOtherId,
+  );
+
   // Mobile: stack navigation.
   if (!isDesktop) {
     return (
@@ -325,6 +382,18 @@ export function DashboardShell() {
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <ChatPanel conversation={selected} />
       </div>
+
+      <AnimatePresence mode="wait">
+        {showUserPanel ? (
+          <UserPanel
+            key={selectedOtherId}
+            profile={otherProfile}
+            loading={otherLoading}
+            online={selectedOtherOnline}
+            conversationCreatedAt={selected?.createdAt}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <FriendsModal
         open={showFriends}

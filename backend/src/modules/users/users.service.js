@@ -1,4 +1,5 @@
 import { unauthorized, notFound, conflict, badRequest } from "../../utils/errors.js";
+import mongoose from "mongoose";
 import User from "../../models/User.js";
 import FriendRequest from "../../models/FriendRequest.js";
 
@@ -13,6 +14,7 @@ function publicUser(user) {
     bio: u.bio || null,
     status: u.status || null,
     avatarStyle: u.avatarStyle || null,
+    createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
   };
 }
 
@@ -56,6 +58,18 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
+    "displayName username email bio status avatarStyle role createdAt",
+  );
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  return publicUser(user);
+}
+
+// Public profile of any user by id — used by the conversation detail panel.
+export async function getUserById({ otherId }) {
+  if (!mongoose.Types.ObjectId.isValid(otherId)) {
+    throw badRequest("Invalid user id", "INVALID_ID");
+  }
+  const user = await User.findById(otherId).select(
     "displayName username email bio status avatarStyle role createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
