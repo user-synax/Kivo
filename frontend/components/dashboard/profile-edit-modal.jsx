@@ -2,9 +2,9 @@
 
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
-import { apiPatch } from "@/lib/api";
+import { apiPatch, apiUpload, apiDelete } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import { AVATAR_STYLES } from "@/lib/avatar-styles";
 
@@ -39,6 +39,55 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
   const [avatarStyle, setAvatarStyle] = useState("default");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // Avatar / DP upload.
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const fileRef = useRef(null);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError("Image must be under 4MB.");
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("avatar", file);
+      const updated = await apiUpload("/api/v1/users/me/avatar", form);
+      // Persist + propagate (drives sidebar/profile/chat avatars everywhere).
+      setSession(updated, getToken());
+      onSaved?.(updated);
+      setPreviewUrl(null);
+    } catch (err) {
+      setError(err?.message || "Could not upload photo");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setError(null);
+    setUploading(true);
+    try {
+      const updated = await apiDelete("/api/v1/users/me/avatar");
+      setSession(updated, getToken());
+      onSaved?.(updated);
+      setPreviewUrl(null);
+    } catch (err) {
+      setError(err?.message || "Could not remove photo");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Mount/unmount with a one-frame delay so the open/close transitions play.
   useEffect(() => {
@@ -123,6 +172,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             <Avatar
               name={displayName || currentUser?.displayName || "?"}
               avatarStyle={avatarStyle}
+              url={previewUrl || currentUser?.avatarUrl}
               size="sm"
             />
             <div className="min-w-0">
@@ -185,6 +235,55 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
               placeholder="A little about you"
             />
           </Field>
+
+          {/* Display picture upload */}
+          <div>
+            <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">
+              Profile photo
+            </span>
+            <div className="flex items-center gap-4">
+              <Avatar
+                name={displayName || currentUser?.displayName || "?"}
+                avatarStyle={avatarStyle}
+                url={previewUrl || currentUser?.avatarUrl}
+                size="lg"
+              />
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] disabled:opacity-50"
+                >
+                  {uploading
+                    ? "Uploading…"
+                    : currentUser?.avatarUrl
+                      ? "Change photo"
+                      : "Upload photo"}
+                </button>
+                {currentUser?.avatarUrl ? (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={uploading}
+                    className="text-[12px] text-[var(--text-muted)] transition-colors duration-200 hover:text-[var(--text-primary)] disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <span className="mt-1.5 block text-[11px] text-[var(--text-muted)]">
+              JPG, PNG, WebP or GIF. Stored privately, up to 4MB.
+            </span>
+          </div>
 
           {/* Avatar customization */}
           <div>

@@ -31,6 +31,13 @@ const env = {
   // Refresh cookie hardening. "strict" or "lax".
   refreshCookieSameSite: process.env.REFRESH_COOKIE_SAMESITE || "strict",
   refreshCookiePath: "/api/v1/auth",
+
+  // Appwrite Storage (avatar uploads). All optional — the server runs without
+  // them; the avatar upload endpoint returns a clear error until they're set.
+  appwriteEndpoint: process.env.APPWRITE_ENDPOINT || "",
+  appwriteProjectId: process.env.APPWRITE_PROJECT_ID || "",
+  appwriteApiKey: process.env.APPWRITE_API_KEY || "",
+  appwriteBucketId: process.env.APPWRITE_BUCKET_ID || "",
 };
 
 // Convenience: seconds for the Redis session TTL, derived from refresh token TTL.

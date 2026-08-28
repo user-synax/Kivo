@@ -13,11 +13,13 @@ export class ApiError extends Error {
 
 async function request(path, options = {}, { retry } = { retry: true }) {
   const token = getToken();
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(path, {
     ...options,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      // FormData sets its own multipart boundary — never force JSON here.
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
@@ -85,4 +87,10 @@ export function apiDelete(path, body) {
     method: "DELETE",
     body: body ? JSON.stringify(body) : undefined,
   });
+}
+
+// Multipart upload (e.g. avatar image). Pass a FormData instance as `body`.
+// Content-Type is left unset so the browser sets the multipart boundary.
+export function apiUpload(path, body) {
+  return request(path, { method: "PATCH", body });
 }

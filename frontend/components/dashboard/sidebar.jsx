@@ -35,6 +35,7 @@ function ConversationItem({ conversation, selected, collapsed, onSelect }) {
                     selected={selected}
                     online={online}
                     avatarStyle={conversation.avatarStyle}
+                    url={conversation.avatarUrl}
                 />
                 {unread > 0 && collapsed && (
                     <span className="t-badge" data-open="true">
@@ -81,7 +82,7 @@ function ProfileNav({ currentUser, collapsed, onEditProfile }) {
                 collapsed ? "justify-center" : ""
             }`}
         >
-            <Avatar name={label} avatarStyle={currentUser.avatarStyle} />
+            <Avatar name={label} avatarStyle={currentUser.avatarStyle} url={currentUser.avatarUrl} />
             {!collapsed && (
                 <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">

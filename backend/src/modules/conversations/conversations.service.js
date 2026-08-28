@@ -22,6 +22,7 @@ function normalizeParticipant(p) {
     username: populated ? (p.username ?? null) : null,
     email: populated ? (p.email ?? null) : null,
     avatarStyle: populated ? (p.avatarStyle ?? null) : null,
+    avatarUrl: populated ? (p.avatarUrl ?? null) : null,
   };
 }
 
@@ -70,7 +71,7 @@ export async function createOrGetDm({ userId, participantId }) {
   const existing = await Conversation.findOne({
     type: "dm",
     participants: { $all: [userId, participantId] },
-  }).populate("participants", "id displayName username email avatarStyle");
+  }).populate("participants", "id displayName username email avatarStyle avatarUrl");
   if (existing) {
     return publicConversation(existing, userId, onlineSnapshot());
   }
@@ -79,7 +80,7 @@ export async function createOrGetDm({ userId, participantId }) {
     type: "dm",
     participants: [userId, participantId],
   });
-  await created.populate("participants", "id displayName username email avatarStyle");
+  await created.populate("participants", "id displayName username email avatarStyle avatarUrl");
 
   // Join both users' live sockets to the room immediately.
   const io = getIO();
@@ -101,7 +102,7 @@ export async function createOrGetDm({ userId, participantId }) {
 export async function listConversations({ userId }) {
   const conversations = await Conversation.find({ participants: userId })
     .sort({ lastMessageAt: -1, createdAt: -1 })
-    .populate("participants", "id displayName username email avatarStyle")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl")
     .lean();
 
   const lookup = onlineSnapshot();

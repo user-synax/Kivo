@@ -48,6 +48,7 @@ function toListItem(c, currentUser) {
     unread: c.unreadCount || 0,
     online,
     avatarStyle: other?.avatarStyle || null,
+    avatarUrl: other?.avatarUrl || null,
   };
 }
 

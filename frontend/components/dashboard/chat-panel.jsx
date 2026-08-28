@@ -443,6 +443,7 @@ export function ChatPanel({ conversation, onBack }) {
           name={participantAvatarName(other)}
           online={otherOnline}
           avatarStyle={other?.avatarStyle}
+          url={other?.avatarUrl}
           size="sm"
         />
         <div className="min-w-0">

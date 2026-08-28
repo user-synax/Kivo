@@ -256,7 +256,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
                   key={r.id}
                   className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
                 >
-                  <Avatar name={fullName(r.from)} />
+                  <Avatar name={fullName(r.from)} avatarStyle={r.from.avatarStyle} url={r.from.avatarUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                       {fullName(r.from)}
@@ -298,7 +298,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
                   key={f.id}
                   className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
                 >
-                  <Avatar name={fullName(f)} />
+                  <Avatar name={fullName(f)} avatarStyle={f.avatarStyle} url={f.avatarUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                       {fullName(f)}
@@ -384,7 +384,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
                       key={u.id}
                       className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
                     >
-                      <Avatar name={fullName(u)} />
+                      <Avatar name={fullName(u)} avatarStyle={u.avatarStyle} url={u.avatarUrl} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                           {fullName(u)}

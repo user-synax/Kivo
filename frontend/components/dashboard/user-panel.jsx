@@ -79,6 +79,7 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt }) {
               name={profile?.displayName || profile?.username || "?"}
               online={online}
               avatarStyle={profile?.avatarStyle}
+              url={profile?.avatarUrl}
               size="lg"
             />
           </div>

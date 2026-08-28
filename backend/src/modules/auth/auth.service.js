@@ -60,6 +60,7 @@ function publicUser(user) {
     bio: user.bio || null,
     status: user.status || null,
     avatarStyle: user.avatarStyle || null,
+    avatarUrl: user.avatarUrl || null,
     role: user.role,
     createdAt: user.createdAt,
   };

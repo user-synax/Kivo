@@ -41,6 +41,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Uploaded display picture (DP). A public Appwrite Storage view URL. Null
+    // until the user uploads one; the initials avatar is the fallback.
+    avatarUrl: {
+      type: String,
+      default: null,
+    },
+    // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
+    // so the previous file can be deleted on re-upload.
+    avatarFileId: {
+      type: String,
+      default: null,
+      select: false,
+    },
     // Never returned by default queries (select: false) and never logged.
     passwordHash: {
       type: String,

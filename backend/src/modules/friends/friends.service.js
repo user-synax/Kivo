@@ -10,6 +10,8 @@ function publicUser(user) {
     displayName: u.displayName || null,
     username: u.username || null,
     email: u.email,
+    avatarStyle: u.avatarStyle || null,
+    avatarUrl: u.avatarUrl || null,
   };
 }
 

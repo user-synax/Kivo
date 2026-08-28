@@ -72,7 +72,8 @@ export default function ProfilePage() {
           <Avatar
             name={user?.displayName || user?.email || "?"}
             avatarStyle={user?.avatarStyle}
-            size="md"
+            url={user?.avatarUrl}
+            size="lg"
           />
           <div className="min-w-0">
             <p className="truncate text-lg font-medium text-[var(--text-primary)]">
