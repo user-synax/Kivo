@@ -1,11 +1,14 @@
 import Hero from "@/components/Hero";
 import { Navbar } from "../components/navbar/navbar";
+import { GuestGate } from "@/components/auth-guard";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-void-black text-phosphor-white">
-      <Navbar />
-      <Hero />
-    </main>
+    <GuestGate>
+      <main className="min-h-screen bg-void-black text-phosphor-white">
+        <Navbar />
+        <Hero />
+      </main>
+    </GuestGate>
   );
 }
