@@ -22,6 +22,25 @@ const userSchema = new mongoose.Schema(
       sparse: true,
       trim: true,
     },
+    // Short free-text bio shown on the full profile page.
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 280,
+    },
+    // Custom status line (e.g. "Busy", "In a meeting") shown under the name.
+    status: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+    },
+    // Avatar border customization, broadcast to friends in the sidebar. One of
+    // the AVATAR_STYLE_IDS values (see users.validation.js), or null for the
+    // default border. Stored as an id so rendering stays client-driven.
+    avatarStyle: {
+      type: String,
+      default: null,
+    },
     // Never returned by default queries (select: false) and never logged.
     passwordHash: {
       type: String,

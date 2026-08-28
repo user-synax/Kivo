@@ -2,7 +2,7 @@ import { unauthorized, notFound, conflict, badRequest } from "../../utils/errors
 import User from "../../models/User.js";
 import FriendRequest from "../../models/FriendRequest.js";
 
-// Public user shape returned in search/friend results.
+// Public user shape returned in search/friend results and self profile.
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
   return {
@@ -10,6 +10,9 @@ function publicUser(user) {
     displayName: u.displayName || null,
     username: u.username || null,
     email: u.email,
+    bio: u.bio || null,
+    status: u.status || null,
+    avatarStyle: u.avatarStyle || null,
   };
 }
 
@@ -48,4 +51,45 @@ export async function searchUsers({ userId, q }) {
     }))
   );
   return withRel;
+}
+
+// Return the current user's own profile (self view).
+export async function getMe({ userId }) {
+  const user = await User.findById(userId).select(
+    "displayName username email bio status avatarStyle role createdAt",
+  );
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  return publicUser(user);
+}
+
+// Partial self-profile update. Validates username uniqueness when changed and
+// only writes keys that were actually provided.
+export async function updateMe({ userId, data }) {
+  const update = {};
+  if (data.displayName !== undefined) {
+    update.displayName = data.displayName || undefined;
+  }
+  if (data.username !== undefined) {
+    const uname = data.username || undefined;
+    if (uname) {
+      const taken = await User.findOne({
+        username: uname,
+        _id: { $ne: userId },
+      });
+      if (taken) throw conflict("Username already taken", "USERNAME_TAKEN");
+    }
+    update.username = uname;
+  }
+  if (data.bio !== undefined) update.bio = data.bio;
+  if (data.status !== undefined) update.status = data.status;
+  if (data.avatarStyle !== undefined) {
+    update.avatarStyle = data.avatarStyle || null;
+  }
+
+  const user = await User.findByIdAndUpdate(userId, update, {
+    new: true,
+    runValidators: true,
+  }).select("displayName username email bio status avatarStyle role createdAt");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  return publicUser(user);
 }

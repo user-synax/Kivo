@@ -57,6 +57,9 @@ function publicUser(user) {
     email: user.email,
     displayName: user.displayName || null,
     username: user.username || null,
+    bio: user.bio || null,
+    status: user.status || null,
+    avatarStyle: user.avatarStyle || null,
     role: user.role,
     createdAt: user.createdAt,
   };

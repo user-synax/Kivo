@@ -41,6 +41,7 @@ function toListItem(c, currentUser) {
     time: formatTime(c.lastMessageAt),
     unread: c.unreadCount || 0,
     online,
+    avatarStyle: other?.avatarStyle || null,
   };
 }
 
@@ -67,7 +68,10 @@ export function DashboardShell() {
   }, [conversations]);
   const [showFriends, setShowFriends] = useState(false);
   const socket = useSocket();
-  const currentUser = getSession();
+  // currentUser is state (not a bare getSession() read) so the sidebar avatar
+  // re-renders after the user saves a new avatar style in the edit modal.
+  const [currentUser, setCurrentUser] = useState(() => getSession());
+  const refreshUser = useCallback(() => setCurrentUser(getSession()), []);
   const router = useRouter();
   const slide = reduce ? { duration: 0 } : { duration: 0.28, ease: EASE };
 
@@ -283,6 +287,7 @@ export function DashboardShell() {
                 showToggle={false}
                 onCompose={handleCompose}
                 currentUser={currentUser}
+                onProfileUpdate={refreshUser}
               />
             </motion.div>
           )}
@@ -313,6 +318,7 @@ export function DashboardShell() {
           onToggle={() => setCollapsed((v) => !v)}
           onCompose={handleCompose}
           currentUser={currentUser}
+          onProfileUpdate={refreshUser}
         />
       </motion.div>
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Avatar } from "@/components/dashboard/avatar";
 import { clearSession, getSession, getToken } from "@/lib/auth";
 
 export default function ProfilePage() {
@@ -33,6 +34,7 @@ export default function ProfilePage() {
         { label: "Display name", value: user.displayName || "—" },
         { label: "Username", value: user.username || "—" },
         { label: "Email", value: user.email },
+        { label: "Status", value: user.status || "—" },
         { label: "Role", value: user.role },
       ]
     : [];
@@ -66,7 +68,26 @@ export default function ProfilePage() {
           Profile
         </h1>
 
-        <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
+        <div className="mt-6 flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
+          <Avatar
+            name={user?.displayName || user?.email || "?"}
+            avatarStyle={user?.avatarStyle}
+            size="md"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-lg font-medium text-[var(--text-primary)]">
+              {user?.displayName || "—"}
+            </p>
+            <p className="truncate text-[13px] text-[var(--text-muted)]">
+              {user?.status || user?.email}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
+          {user?.bio ? (
+            <p className="mb-4 text-sm text-[var(--text-primary)]">{user.bio}</p>
+          ) : null}
           {rows.map((row) => (
             <div
               key={row.label}

@@ -6,6 +6,8 @@ const router = Router();
 
 // User discovery for the "add friend" UI. Requires auth.
 router.use(authenticate);
+router.get("/me", usersController.getMe);
+router.patch("/me", usersController.updateMe);
 router.get("/search", usersController.search);
 
 export default router;

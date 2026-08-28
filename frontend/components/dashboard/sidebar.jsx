@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useTheme } from "@/components/theme-provider";
 import { PanelLeft } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Avatar } from "@/components/dashboard/avatar";
+import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
+import { useTheme } from "@/components/theme-provider";
 
 // Conversation list. On desktop it expands (names/previews) or collapses to an
 // icon-only avatar rail. On mobile it is always full-width and the toggle is
@@ -11,32 +12,6 @@ import { PanelLeft } from "lucide-react";
 //
 // A fixed profile nav is pinned to the bottom: it opens the user profile and
 // follows the same expand/collapse state as the rest of the sidebar.
-
-function initials(name) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function Avatar({ name, selected, online }) {
-  return (
-    <div
-      className={`relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm font-medium ${
-        selected
-          ? "bg-[var(--accent)] text-[var(--on-accent)]"
-          : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
-      }`}
-    >
-      {initials(name)}
-      {online && (
-        <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-[var(--online)] ring-2 ring-[var(--bg-elevated)]" />
-      )}
-    </div>
-  );
-}
 
 function ConversationItem({ conversation, selected, collapsed, onSelect }) {
   const { name, lastMessage, time, unread, online } = conversation;
@@ -55,7 +30,12 @@ function ConversationItem({ conversation, selected, collapsed, onSelect }) {
       )}
 
       <div className="relative shrink-0">
-        <Avatar name={name} selected={selected} online={online} />
+        <Avatar
+          name={name}
+          selected={selected}
+          online={online}
+          avatarStyle={conversation.avatarStyle}
+        />
         {unread > 0 && collapsed && (
           <span className="t-badge" data-open="true">
             <span className="t-badge-dot size-2.5 rounded-full bg-[var(--unread-badge)] ring-2 ring-[var(--bg-elevated)]" />
@@ -89,18 +69,19 @@ function ConversationItem({ conversation, selected, collapsed, onSelect }) {
   );
 }
 
-function ProfileNav({ currentUser, collapsed }) {
+function ProfileNav({ currentUser, collapsed, onEditProfile }) {
   if (!currentUser) return null;
   const label = currentUser.displayName || currentUser.email || "Account";
   return (
-    <Link
-      href="/app/profile"
-      aria-label="Open profile"
-      className={`flex items-center gap-3 border-t border-[var(--border)] px-3 py-2.5 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] ${
+    <button
+      type="button"
+      onClick={onEditProfile}
+      aria-label="Edit profile"
+      className={`flex w-full items-center gap-3 border-t border-[var(--border)] px-3 py-2.5 text-left transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] ${
         collapsed ? "justify-center" : ""
       }`}
     >
-      <Avatar name={label} selected={false} />
+      <Avatar name={label} avatarStyle={currentUser.avatarStyle} />
       {!collapsed && (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--text-primary)]">
@@ -111,7 +92,7 @@ function ProfileNav({ currentUser, collapsed }) {
           </p>
         </div>
       )}
-    </Link>
+    </button>
   );
 }
 
@@ -272,7 +253,10 @@ export function Sidebar({
   onToggle,
   onCompose,
   currentUser,
+  onProfileUpdate,
 }) {
+  const [profileOpen, setProfileOpen] = useState(false);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -317,22 +301,22 @@ export function Sidebar({
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               className="flex size-9 hover:cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
             >
-                <PanelLeft className="w-5 h-5"/>
-                {collapsed ? (
-                  <path
-                    d="M4 6h16M4 12h10M4 18h16"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                ) : (
-                  <path
-                    d="M4 6h16M4 12h16M4 18h16M9 6v12"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                )}
+              <PanelLeft className="w-5 h-5" />
+              {collapsed ? (
+                <path
+                  d="M4 6h16M4 12h10M4 18h16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <path
+                  d="M4 6h16M4 12h16M4 18h16M9 6v12"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              )}
             </button>
           )}
         </div>
@@ -359,7 +343,18 @@ export function Sidebar({
 
       {/* Theme switcher + fixed profile nav */}
       <ThemeSwitcher collapsed={collapsed} />
-      <ProfileNav currentUser={currentUser} collapsed={collapsed} />
+      <ProfileNav
+        currentUser={currentUser}
+        collapsed={collapsed}
+        onEditProfile={() => setProfileOpen(true)}
+      />
+
+      <ProfileEditModal
+        open={profileOpen}
+        currentUser={currentUser}
+        onClose={() => setProfileOpen(false)}
+        onSaved={() => onProfileUpdate?.()}
+      />
     </div>
   );
 }

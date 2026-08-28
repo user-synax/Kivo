@@ -1,6 +1,22 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
-import { parseQuery, searchQuerySchema } from "./users.validation.js";
+import {
+  parseBody,
+  parseQuery,
+  searchQuerySchema,
+  updateMeSchema,
+} from "./users.validation.js";
 import * as usersService from "./users.service.js";
+
+export const getMe = asyncHandler(async (req, res) => {
+  const user = await usersService.getMe({ userId: req.user.userId });
+  res.status(200).json({ success: true, data: user });
+});
+
+export const updateMe = asyncHandler(async (req, res) => {
+  const data = parseBody(updateMeSchema, req.body);
+  const user = await usersService.updateMe({ userId: req.user.userId, data });
+  res.status(200).json({ success: true, data: user });
+});
 
 export const search = asyncHandler(async (req, res) => {
   const { q } = parseQuery(searchQuerySchema, req.query);

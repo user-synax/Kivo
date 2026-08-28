@@ -2,6 +2,7 @@
 
 import { Smile } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { useSocket } from "@/components/socket-provider";
@@ -16,15 +17,6 @@ import {
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
 const GROUP_WINDOW_MS = 60000;
-
-function initials(name) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 // Online / Offline status label — uses the transitions-dev text-states-swap:
 // the keyed span remounts on change so it blur-rises in (reduced-motion safe).
@@ -447,16 +439,12 @@ export function ChatPanel({ conversation, onBack }) {
             </svg>
           </button>
         )}
-        <div className="relative lg:ml-14 flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-primary)]">
-          {initials(participantAvatarName(other))}
-          <span
-            className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-[var(--bg-base)] ${
-              otherOnline
-                ? "bg-[var(--online)]"
-                : "border border-[var(--text-muted)] bg-[var(--bg-surface)]"
-            }`}
-          />
-        </div>
+        <Avatar
+          name={participantAvatarName(other)}
+          online={otherOnline}
+          avatarStyle={other?.avatarStyle}
+          size="sm"
+        />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--text-primary)]">
             {otherName}
