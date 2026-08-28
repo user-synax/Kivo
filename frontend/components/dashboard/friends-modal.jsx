@@ -186,7 +186,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
   if (!render) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
       <button
         type="button"
         aria-label="Close"

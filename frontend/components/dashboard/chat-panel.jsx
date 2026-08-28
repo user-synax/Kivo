@@ -503,7 +503,6 @@ export function ChatPanel({ conversation, onBack }) {
                 <MessageBubble
                   message={m}
                   mine={mine}
-                  showTail={groupLast}
                   showMeta={groupLast}
                   reactionOpen={reactionFor === m.id}
                   isEditing={editingId === m.id}

@@ -2,21 +2,26 @@
 
 import { Check, CheckCheck, FaceGrinning, Pencil, Trash } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { formatTime } from "@/lib/chat";
+import { cn } from "@/lib/utils";
 
-// A single chat message bubble. Visuals are driven entirely by CSS variables
-// (see `.t-bubble` in globals.css) so a new bubble theme is just a
-// `[data-bubble-theme="…"]` override of `--bubble-sent` / `--bubble-received` —
-// no component changes required. Layout is responsive (relative max-width,
-// break-anywhere) and the component is presentational: all state lives in the
-// parent (chat-panel) and is passed in as props.
+// A single chat message bubble built on shadcn's `Bubble` primitive.
+//
+// Customization:
+//  - `mine`        controls side + default color (sent = primary, received = secondary)
+//  - `variant`     override the shadcn Bubble variant (default | secondary | muted |
+//                  tinted | outline | ghost | destructive) for full theming control
+//  - `contentClassName` / `className` extra classes for the content / bubble
+//
+// Behavior (edit, delete, reactions, receipts, retry) is unchanged from before —
+// all state lives in the parent (chat-panel) and is passed in as props.
 
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 export function MessageBubble({
   message,
   mine,
-  showTail = true,
   showMeta = true,
   reactionOpen = false,
   isEditing = false,
@@ -30,7 +35,9 @@ export function MessageBubble({
   onDelete,
   onRetry,
   receipt,
-  bubbleTheme,
+  variant,
+  className,
+  contentClassName,
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
@@ -39,49 +46,52 @@ export function MessageBubble({
     if (isEditing) editRef.current?.focus();
   }, [isEditing]);
 
-  const tailClass = showTail ? "with-tail" : "";
+  // Sent messages use the primary (accent) bubble, received use the secondary.
+  const bubbleVariant = variant ?? (mine ? "default" : "secondary");
 
   return (
     <>
-      <div
-        data-bubble-theme={bubbleTheme}
-        className={`t-bubble ${mine ? "is-mine" : "is-other"} ${
-          deleted ? "is-deleted" : ""
-        } ${tailClass}`}
+      <Bubble
+        variant={bubbleVariant}
+        align={mine ? "end" : "start"}
+        className={cn("group/bubble relative", className)}
       >
-        {isEditing ? (
-          <textarea
-            value={editText}
-            onChange={(e) => onEditTextChange?.(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSaveEdit?.();
-              }
-              if (e.key === "Escape") onCancelEdit?.();
-            }}
-            className="w-full resize-none bg-transparent text-sm text-[var(--text-primary)] focus:outline-none"
-            rows={2}
-            ref={editRef}
-          />
-        ) : deleted ? (
-          <span>This message was deleted</span>
-        ) : (
-          <span className="whitespace-pre-wrap">{message.content}</span>
-        )}
+        <BubbleContent className={cn(contentClassName)}>
+          {isEditing ? (
+            <textarea
+              value={editText}
+              onChange={(e) => onEditTextChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSaveEdit?.();
+                }
+                if (e.key === "Escape") onCancelEdit?.();
+              }}
+              className="w-full resize-none bg-transparent text-sm text-current focus:outline-none"
+              rows={2}
+              ref={editRef}
+            />
+          ) : deleted ? (
+            <span className="opacity-70">This message was deleted</span>
+          ) : (
+            <span className="whitespace-pre-wrap">{message.content}</span>
+          )}
+        </BubbleContent>
 
         {/* Hover actions (react / edit / delete) */}
         {!deleted && !isEditing && (
           <div
-            className={`absolute -top-3 ${
-              mine ? "left-0 -translate-x-full" : "right-0 translate-x-full"
-            } hidden items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-1 py-0.5 group-hover:flex`}
+            className={cn(
+              "absolute -top-3 hidden items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-1 py-0.5 group-hover/bubble:flex",
+              mine ? "left-0 -translate-x-full" : "right-0 translate-x-full",
+            )}
           >
             <button
               type="button"
               onClick={onToggleReactionPicker}
               aria-label="React"
-              className="flex size-6 hover:cursor-pointer items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
             >
               <FaceGrinning className="h-3 w-3" />
             </button>
@@ -90,7 +100,7 @@ export function MessageBubble({
                 type="button"
                 onClick={onEdit}
                 aria-label="Edit"
-                className="flex size-6 hover:cursor-pointer items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
               >
                 <Pencil className="h-3 w-3" />
               </button>
@@ -100,7 +110,7 @@ export function MessageBubble({
                 type="button"
                 onClick={onDelete}
                 aria-label="Delete"
-                className="flex hover:cursor-pointer size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
               >
                 <Trash className="h-3 w-3" />
               </button>
@@ -111,9 +121,10 @@ export function MessageBubble({
         {/* Reaction picker */}
         {reactionOpen && (
           <div
-            className={`absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 ${
-              mine ? "right-0" : "left-0"
-            }`}
+            className={cn(
+              "absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
+              mine ? "right-0" : "left-0",
+            )}
           >
             {REACTION_EMOJIS.map((e) => (
               <button
@@ -127,17 +138,16 @@ export function MessageBubble({
             ))}
           </div>
         )}
-      </div>
+      </Bubble>
 
-      {/* Reaction chips — sit in normal flow directly under the bubble, aligned
-          to its side and wrapping on narrow screens (no longer overlapping the
-          corner). The parent column's items-start / items-end keeps them pinned
-          to the same edge as the bubble. */}
+      {/* Reaction chips — in normal flow under the bubble, aligned to its side
+          so they never overlap the corner. */}
       {message.reactions && message.reactions.length > 0 && (
         <div
-          className={`mt-1 flex max-w-[78%] flex-wrap gap-1 ${
-            mine ? "justify-end" : "justify-start"
-          }`}
+          className={cn(
+            "mt-1 flex max-w-[78%] flex-wrap gap-1",
+            mine ? "justify-end" : "justify-start",
+          )}
         >
           {Object.entries(
             message.reactions.reduce((acc, r) => {
@@ -171,8 +181,6 @@ export function MessageBubble({
               failed · retry
             </button>
           )}
-          {/* Read receipt: single check until delivered, double check (colored)
-              once the recipient has actually seen the message. */}
           {receipt === "sent" && (
             <Check className="h-3 w-3" aria-label="Sent" />
           )}
@@ -190,3 +198,5 @@ export function MessageBubble({
     </>
   );
 }
+
+export default MessageBubble;

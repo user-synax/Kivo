@@ -6,6 +6,51 @@
 // only ever reference colors through var(--…), never hardcoded hex.
 
 export const themes = {
+  // Replit — the new default design system (warm workshop with coral sparks).
+  // Light, warm canvas (#faf6f1) with a single vivid ember-orange accent.
+  replit: {
+    id: "replit",
+    label: "Replit",
+    swatch: "#ff3c00",
+    colors: {
+      base: "#faf6f1",
+      surface: "#ffffff",
+      elevated: "#ffffff",
+      textPrimary: "#0e0e0f",
+      textMuted: "#52545a",
+      border: "#dfddd8",
+      accent: "#ff3c00",
+      hover: "rgba(14, 14, 15, 0.06)",
+      bubbleSent: "#ff764c",
+      bubbleReceived: "#ffffff",
+      unreadBadge: "#ff3c00",
+      onAccent: "#ffffff",
+      online: "#2492ff",
+    },
+  },
+
+  // Replit Ink — the Replit design system in its dark-preview variant.
+  replitInk: {
+    id: "replitInk",
+    label: "Replit Ink",
+    swatch: "#ff764c",
+    colors: {
+      base: "#1a1919",
+      surface: "#0e0e0f",
+      elevated: "#0e0e0f",
+      textPrimary: "#faf6f1",
+      textMuted: "#898c94",
+      border: "#312e2e",
+      accent: "#ff3c00",
+      hover: "rgba(255, 255, 255, 0.07)",
+      bubbleSent: "#ff764c",
+      bubbleReceived: "#212121",
+      unreadBadge: "#ff3c00",
+      onAccent: "#ffffff",
+      online: "#2492ff",
+    },
+  },
+
   // Phosphor — the original terminal palette (Void Black + rationed lime).
   phosphor: {
     id: "phosphor",
@@ -177,8 +222,8 @@ export const themes = {
   },
 };
 
-export const themeOrder = ["phosphor", "aurora", "daylight", "midnightOcean", "roseQuartz", "amberForge", "violetNebula", "arctic"];
-export const defaultThemeId = "phosphor";
+export const themeOrder = ["replit", "replitInk", "phosphor", "aurora", "daylight", "midnightOcean", "roseQuartz", "amberForge", "violetNebula", "arctic"];
+export const defaultThemeId = "replit";
 export const THEME_STORAGE_KEY = "kivo:theme";
 
 // Flat map of CSS custom property name -> value for a given theme id.

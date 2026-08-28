@@ -123,13 +123,13 @@ export default function LoginPage() {
           className="flex flex-col gap-5"
         >
           <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
-            <span className="font-sans text-[12px] font-medium uppercase tracking-[0.05em] text-moss-70">
+            <span className="font-sans text-[12px] font-medium uppercase tracking-[0.05em] text-pewter">
               Welcome
             </span>
-            <h1 className="font-goga text-[28px] font-medium leading-tight tracking-tight text-phosphor-white">
+            <h1 className="font-goga text-[28px] font-medium leading-tight tracking-tight text-ink-black">
               Log in to Kivo
             </h1>
-            <p className="font-sans text-[14px] leading-relaxed text-moss-80">
+            <p className="font-sans text-[14px] leading-relaxed text-pewter">
               Pick up where your conversations left off.
             </p>
           </motion.div>
@@ -173,7 +173,7 @@ export default function LoginPage() {
           <motion.div variants={itemVariants} className="flex justify-end">
             <a
               href="/forgot-password"
-              className="font-sans text-[13px] font-medium text-fern-link transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-phosphor-white"
+              className="font-sans text-[13px] font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
             >
               Forgot password?
             </a>
@@ -183,7 +183,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="kivo-cta h-auto w-full rounded-pills bg-lime-pulse px-6 py-3 text-[15px] font-medium text-ground-iron shadow-none transition-[transform,filter,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-lime-pulse hover:text-ground-iron disabled:opacity-60"
+              className="kivo-cta h-auto w-full rounded-pills bg-ember-orange px-6 py-3 text-[15px] font-medium text-white shadow-none transition-[transform,filter,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-ember-orange hover:text-white disabled:opacity-60"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -219,12 +219,12 @@ export default function LoginPage() {
 
           <motion.p
             variants={itemVariants}
-            className="text-center font-sans text-[14px] text-sage-60"
+            className="text-center font-sans text-[14px] text-pewter"
           >
             Don&apos;t have an account?{" "}
             <a
               href="/signup"
-              className="font-medium text-fern-link transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-phosphor-white"
+              className="font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
             >
               Sign up
             </a>

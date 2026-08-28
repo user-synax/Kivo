@@ -26,7 +26,7 @@ export function AuthInput({
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="font-sans text-[14px] font-medium text-phosphor-white"
+        className="font-sans text-[14px] font-medium text-ink-black"
       >
         {label}
       </label>
@@ -42,13 +42,13 @@ export function AuthInput({
           required={required}
           placeholder={placeholder}
           className={[
-            "w-full rounded-lg border bg-carbon-veil px-3.5 py-3 font-sans text-[15px] text-phosphor-white",
-            "placeholder:text-sage-40",
+            "w-full rounded-lg border bg-fog px-3.5 py-3 font-sans text-[15px] text-ink-black",
+            "placeholder:text-pewter",
             "outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
-            "focus:border-lime-pulse/50 focus:ring-2 focus:ring-lime-pulse/20",
+            "focus:border-ember-orange/50 focus:ring-2 focus:ring-ember-orange/20",
             error
               ? "border-red-400/60 focus:border-red-400/70 focus:ring-red-400/20"
-              : "border-circuit-border/60",
+              : "border-stone/60",
             isPassword ? "pr-11" : "",
           ].join(" ")}
         />
@@ -56,7 +56,7 @@ export function AuthInput({
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-sage-40 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-phosphor-white"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-pewter transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
             tabIndex={-1}
             aria-label={visible ? "Hide password" : "Show password"}
           >

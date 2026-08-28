@@ -1,63 +1,68 @@
-# Kivo — Style Reference
-> Phosphor terminal in a darkened server room — the vivid green is the only light source.
+# replit — Style Reference
+> warm workshop with coral sparks
 
-**Theme:** dark
+**Theme:** light
 
-Kivo operates as a phosphorescent terminal in a darkened server room: near-black canvas, phosphor-pale green type, and a single vivid lime accent that behaves like an LED status indicator. The design language is developer-native — monospaced code windows with traffic-light dots, isometric 3D icons rendered in the brand green, and generous negative space that lets one element per section glow. Typography is split between a custom display face (Goga) for headlines and a variable Inter for all UI chrome, both tuned with tight negative tracking. Color is rationed: most screens are achromatic, and the vivid lime green appears only on primary actions, the logo, 3D illustrations, and emphasis moments. Components are flat and borderless, relying on hairline green-tinted borders and backdrop blur rather than shadows for depth.
+Replit's design language is a warm, creator-friendly canvas: a soft cream background (#faf6f1) acts as a permanent stage for a single vivid orange (#ff3c00) that punctuates everything with energy. The system feels like a modern makerspace — generous whitespace, confident oversized type (60-69px displays), pill-shaped controls, and large rounded cards (40-60px radii) that float on the warm canvas. Color is used sparingly as functional emphasis: the orange owns CTAs, active states, and brand surfaces (the peach gradient cards), while the rest of the interface stays neutral in warm grays. Components are flat, border-driven rather than shadow-driven, with hairline #312e2 and #898c94 strokes carrying structure instead of elevation. The overall rhythm alternates between quiet monochrome informational blocks and vivid coral/orange feature bento cards, creating a visual conversation between calm and creative spark.
 
 ## Tokens — Colors
 
 | Name | Value | Token | Role |
 |------|-------|-------|------|
-| Void Black | `#000000` | `--color-void-black` | Page canvas, deepest background layer |
-| Ground Iron | `#181818` | `--color-ground-iron` | Primary button fill, card surfaces on dark sections, base UI surface |
-| Carbon Veil | `#212525` | `--color-carbon-veil` | Elevated surfaces, nav background, subtly lighter than ground |
-| Circuit Border | `#485346` | `--color-circuit-border` | Outlined/ghost action border, primary interactive hairline — muted green-tinted gray |
-| Phosphor Blue-Black | `#1f2a33` | `--color-phosphor-blue-black` | Secondary hairline borders, separator strokes between dark bands |
-| Charcoal Rust | `#231c1c` | `--color-charcoal-rust` | Subtle warm-tinted dark accent for code-window inner panels |
-| Lime Pulse | `#7fee64` | `--color-lime-pulse` | Primary brand accent — logo mark, hero CTA pill, tag fills, active states, illustration base color |
-| Phosphor White | `#ddffdc` | `--color-phosphor-white` | Primary text, heading color, icon strokes, filled button text — the dominant readable surface |
-| Mint Frost | `#def0dd` | `--color-mint-frost` | Card surface tint on light sections, secondary text on dark, soft highlight wash |
-| Sage 60 | `#8cab87` | `--color-sage-60` | Body copy default — readable muted green-gray for paragraphs on dark canvas |
-| Sage 40 | `#677d64` | `--color-sage-40` | Muted helper text, secondary descriptions, low-priority body content |
-| Moss 70 | `#9cbf93` | `--color-moss-70` | Eyebrow labels, category tags above section headings |
-| Moss 80 | `#aed2a4` | `--color-moss-80` | Lead paragraph text, hero subhead — the brightest muted green for lead copy |
-| Fern Link | `#859984` | `--color-fern-link` | Inline link text, tertiary navigation links on dark |
-| Deep Fern | `#697368` | `--color-deep-fern` | Small uppercase labels, micro-copy, footer text |
-| Pine 15 | `#3e4a3c` | `--color-pine-15` | Secondary outlined action border, low-emphasis interactive hairline |
+| Ember Orange | `#ff3c00` | `--color-ember-orange` | Primary CTAs, active nav indicators, brand accents, interactive icon strokes — vivid saturated orange that makes every action feel switched on |
+| Sunset Coral | `#ff764c` | `--color-sunset-coral` | Feature card backgrounds, decorative gradient fills, secondary accent surfaces |
+| Peach Blush | `#ffb199` | `--color-peach-blush` | Soft feature card backgrounds, heading accents, warm wash fills for highlighted sections |
+| Burnt Rust | `#ec4e02` | `--color-burnt-rust` | Orange outline accent for tags, dividers, and focused UI edges. Do not promote it to the primary CTA color |
+| Electric Blue | `#2492ff` | `--color-electric-blue` | Secondary nav highlight, link emphasis — used sparingly for differentiation from orange |
+| Warm Canvas | `#faf6f1` | `--color-warm-canvas` | Primary page background, nav surface, card resting surface — the dominant warm cream that defines the system |
+| Pure White | `#ffffff` | `--color-pure-white` | Card surface, input fields, button text, elevated content blocks — the brightest surface layer |
+| Ink Black | `#0e0e0f` | `--color-ink-black` | Primary text, dominant borders, strong structural strokes — the workhorse near-black |
+| Charcoal | `#312e2e` | `--color-charcoal` | Card borders, secondary text, button borders — warm dark gray for structure |
+| Slate | `#36373b` | `--color-slate` | Nav borders, heading borders, body text emphasis |
+| Deep Charcoal | `#1a1919` | `--color-deep-charcoal` | Dark surface text, card dark-mode text, button borders |
+| Gunmetal | `#2f3034` | `--color-gunmetal` | Icon borders, input borders, secondary button strokes |
+| Stone | `#898c94` | `--color-stone` | Muted borders, tertiary text, icon fills, decorative structure lines |
+| Pewter | `#52545a` | `--color-pewter` | Body text, secondary paragraph copy |
+| Warm Gray | `#76716f` | `--color-warm-gray` | Link borders, helper text, tertiary descriptive copy |
+| Mist | `#61646b` | `--color-mist` | Subtle body borders, very low-emphasis text |
+| Sand | `#dfddd8` | `--color-sand` | Light card backgrounds, soft dividers, warm-tinted borders |
+| Driftwood | `#cbc7c3` | `--color-driftwood` | Card borders, subtle background fills — warm light neutral |
+| Fog | `#efefef` | `--color-fog` | Alternate surface background, subtle wash fills |
 
 ## Tokens — Typography
 
-### Goga — Display and heading face — used for all H1–H4 and card titles. Goga is a custom geometric sans with tight apertures and slightly squared terminals. The medium weight (500) is reserved for emphasis on card-level titles; the regular weight (400) handles hero and section headings. Its 'ss01' stylistic set should be enabled to access alternate glyph forms that define Kivo's identity. Negative tracking tightens progressively from -0.007em at 48px to -0.017em at 21px. · `--font-goga`
-- **Substitute:** Inter Tight or Space Grotesk
+### ABC Diatype — Secondary usage for body copy, nav items, and interface micro-text where the variable version isn't needed. Normal letter-spacing, comfortable line-heights (1.38-1.60) for readable body paragraphs. · `--font-abc-diatype`
+- **Substitute:** Inter, Geist, or DM Sans
 - **Weights:** 400, 500
-- **Sizes:** 20, 21, 24, 28, 30, 36, 40, 42, 48, 54, 64
-- **Line height:** 1.00, 1.05, 1.10, 1.20, 1.25, 1.30, 1.50
-- **Letter spacing:** -0.017em at 21px, -0.013em at 24px, -0.012em at 30px, -0.009em at 36px, -0.008em at 42px, -0.007em at 48px
-- **OpenType features:** `"ss01"`
-- **Role:** Display and heading face — used for all H1–H4 and card titles. Goga is a custom geometric sans with tight apertures and slightly squared terminals. The medium weight (500) is reserved for emphasis on card-level titles; the regular weight (400) handles hero and section headings. Its 'ss01' stylistic set should be enabled to access alternate glyph forms that define Kivo's identity. Negative tracking tightens progressively from -0.007em at 48px to -0.017em at 21px.
+- **Sizes:** 12, 13, 14, 16, 32
+- **Line height:** 1.20, 1.25, 1.38, 1.50, 1.60
+- **Role:** Secondary usage for body copy, nav items, and interface micro-text where the variable version isn't needed. Normal letter-spacing, comfortable line-heights (1.38-1.60) for readable body paragraphs.
 
-### Inter Variable — UI and body face — nav, buttons, body copy, labels, footer. Medium weight (500) is the default for interactive elements and nav; regular (400) for paragraphs. Tracking is notably tight even at small sizes (-0.026em at 14px, -0.022em at 16px) giving the UI a compressed, terminal-like density. The 'cv11' character variant should be enabled for alternate punctuation. Uppercase eyebrow labels at 12px use +0.05em tracking as a counter-rhythm to the body tightness. · `--font-inter-variable`
-- **Substitute:** Inter
-- **Weights:** 400, 500
-- **Sizes:** 12, 14, 16, 20
-- **Line height:** 1.25, 1.33, 1.43, 1.50
-- **Letter spacing:** -0.026em at 14px, -0.022em at 16px, -0.018em at 20px, +0.05em at 12px (uppercase)
-- **OpenType features:** `"cv11"`
-- **Role:** UI and body face — nav, buttons, body copy, labels, footer. Medium weight (500) is the default for interactive elements and nav; regular (400) for paragraphs. Tracking is notably tight even at small sizes (-0.026em at 14px, -0.022em at 16px) giving the UI a compressed, terminal-like density. The 'cv11' character variant should be enabled for alternate punctuation. Uppercase eyebrow labels at 12px use +0.05em tracking as a counter-rhythm to the body tightness.
+### ABC Diatype Plus Variable — Primary typeface for all headings, display text, and body. The variable version provides the full range from whisper-light to bold. Display sizes (48-69px) use heavy negative tracking (-0.04 to -0.06em) creating tight, confident headlines. Body and UI text settles at 14-18px with weight 400-500. The signature use of weights 400-500 for large display text (rather than 700-800) gives Replit's type a modern, editorial confidence — authority through precision, not volume. · `--font-abc-diatype-plus-variable`
+- **Substitute:** Inter, Geist, or DM Sans
+- **Weights:** 400, 500, 600, 700
+- **Sizes:** 8, 10, 11, 12, 14, 15, 16, 17, 18, 20, 24, 26, 28, 32, 42, 48, 60, 64, 69
+- **Line height:** 0.80, 0.83, 0.89, 1.00, 1.05, 1.10, 1.20, 1.40, 1.60
+- **Letter spacing:** -0.06em at 69px, -0.05em at 64px, -0.04em at 48px, -0.03em at 32px, -0.02em at 20px, -0.01em at 14px, normal at 12px and below
+- **Role:** Primary typeface for all headings, display text, and body. The variable version provides the full range from whisper-light to bold. Display sizes (48-69px) use heavy negative tracking (-0.04 to -0.06em) creating tight, confident headlines. Body and UI text settles at 14-18px with weight 400-500. The signature use of weights 400-500 for large display text (rather than 700-800) gives Replit's type a modern, editorial confidence — authority through precision, not volume.
+
+### IBM Plex Sans — IBM Plex Sans — detected in extracted data but not described by AI · `--font-ibm-plex-sans`
+- **Weights:** 400
+- **Sizes:** 14px
+- **Line height:** 1, 1.2, 1.57
+- **Role:** IBM Plex Sans — detected in extracted data but not described by AI
 
 ### Type Scale
 
 | Role | Size | Line Height | Letter Spacing | Token |
 |------|------|-------------|----------------|-------|
-| caption | 12px | 1.33 | 0.6px | `--text-caption` |
-| body-sm | 14px | 1.43 | -0.364px | `--text-body-sm` |
-| body | 16px | 1.5 | -0.352px | `--text-body` |
-| subheading | 20px | 1.5 | -0.36px | `--text-subheading` |
-| heading-sm | 24px | 1.3 | -0.312px | `--text-heading-sm` |
-| heading | 30px | 1.2 | -0.36px | `--text-heading` |
-| heading-lg | 42px | 1.05 | -0.336px | `--text-heading-lg` |
-| display | 64px | 1 | -0.448px | `--text-display` |
+| caption | 11px | 1.2 | -0.01px | `--text-caption` |
+| body | 16px | 1.5 | -0.01px | `--text-body` |
+| subheading | 20px | 1.2 | -0.02px | `--text-subheading` |
+| heading-sm | 24px | 1.2 | -0.03px | `--text-heading-sm` |
+| heading | 32px | 1.05 | -0.03px | `--text-heading` |
+| heading-lg | 48px | 1 | -0.04px | `--text-heading-lg` |
+| display | 64px | 0.9 | -0.05px | `--text-display` |
 
 ## Tokens — Spacing & Shapes
 
@@ -75,184 +80,160 @@ Kivo operates as a phosphorescent terminal in a darkened server room: near-black
 | 16 | 16px | `--spacing-16` |
 | 20 | 20px | `--spacing-20` |
 | 24 | 24px | `--spacing-24` |
-| 28 | 28px | `--spacing-28` |
 | 32 | 32px | `--spacing-32` |
-| 36 | 36px | `--spacing-36` |
 | 40 | 40px | `--spacing-40` |
 | 48 | 48px | `--spacing-48` |
-| 56 | 56px | `--spacing-56` |
+| 60 | 60px | `--spacing-60` |
 | 64 | 64px | `--spacing-64` |
-| 96 | 96px | `--spacing-96` |
-| 128 | 128px | `--spacing-128` |
-| 160 | 160px | `--spacing-160` |
+| 80 | 80px | `--spacing-80` |
+| 120 | 120px | `--spacing-120` |
 
 ### Border Radius
 
 | Element | Value |
 |---------|-------|
-| cards | 8px |
-| icons | 0px |
-| pills | 9999px |
-| inputs | 8px |
-| buttons | 12px |
-
-### Shadows
-
-| Name | Value | Token |
-|------|-------|-------|
-| md | `rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1)...` | `--shadow-md` |
+| nav | 6px |
+| cards | 40px |
+| badges | 6px |
+| inputs | 6px |
+| buttons | 100px |
 
 ### Layout
 
-- **Page max-width:** 1280px
+- **Page max-width:** 1200px
 - **Section gap:** 80px
 - **Card padding:** 32px
-- **Element gap:** 20px
+- **Element gap:** 12px
 
 ## Components
 
-### Primary Filled Button
-**Role:** Default CTA across the application
+### Primary CTA Button (Pill)
+**Role:** Main action trigger — sign up, get started, create
 
-Background #181818 (Ground Iron), text and border #ddffdc (Phosphor White), 1px solid border, 12px radius, 32px padding on all sides. Text is Inter Variable 16px weight 500, letter-spacing -0.352px. The dark fill with phosphor border creates an 'engraved into the dark' appearance — the button is present but doesn't shout, letting the page's single lime accent do the emphasis work.
+Filled pill button, 100px border-radius, #ff3c00 background, white text, ABC Diatype 14-16px weight 500, 10px 20px padding. Full-bleed rounded shape — no straight edges. hovers to #ec4e02.
 
-### Ghost Outline Button
-**Role:** Secondary action paired with the primary button
+### Secondary Outline Button (Pill)
+**Role:** Secondary action — log in, learn more
 
-Transparent background, 1px border in #ddffdc, text #ddffdc, 12px radius, 32px padding. Inter Variable 16px weight 500. Used in CTA pairs like 'Get Started' + 'Contact Us' where the filled button takes the lead. The phosphor border maintains the glow metaphor without filling space.
+Ghost pill button, 100px border-radius, transparent background, 1.5px #312e2 or #0e0e0f border, #0e0e0f text, 10px 20px padding. Same pill geometry as primary.
 
-### Accent Pill Button
-**Role:** Hero CTA and high-conversion single-action moments
+### Nav Item
+**Role:** Top navigation links
 
-Full pill radius (9999px), background #7fee64 (Lime Pulse), text in dark (#181818 or #000000), 12–16px vertical padding, 20–24px horizontal padding. Inter Variable 16px weight 500. This is the only component that uses the vivid green as a fill — treat it as rationed: one per viewport maximum.
+Text-only nav items, ABC Diatype 14px weight 500, #36373b color. Active state indicated by #ff3c00 underline/border or #2492ff accent. No background fill on inactive.
 
-### Outlined Ghost Link
-**Role:** Inline action affordance for navigation, 'Learn More' style links
+### Feature Bento Card (Peach Gradient)
+**Role:** Large feature showcase cards in bento grid layout
 
-Transparent background, 1px border in #485346 (Circuit Border) at reduced opacity, 9999px radius, 8px padding. Text in #859984 (Fern Link). Inter Variable 14px weight 500. The green-tinted hairline border makes links discoverable without competing with buttons.
+Oversized rounded card, 40-60px border-radius, #ffb199 or #ff764c background fill, 32px padding. Contains a small eyebrow label (14px weight 500 #312e2e), large heading (32-48px weight 400, tight tracking), and description paragraph (14-16px). Cards can be 2-3 column widths in a bento grid.
 
-### Navigation Bar
-**Role:** Top-level site navigation
+### Category Icon Button
+**Role:** Project type selector in hero prompt area
 
-Background #212525 (Carbon Veil) with 10px backdrop blur, 1px bottom border in #1f2a33. Full-width, fixed/sticky. Logo (green 3D mark + 'Kivo' wordmark in Phosphor White) on left, nav links (Inter 14px weight 500, #ddffdc) centered, Login + Sign Up on right. The Sign Up is the Accent Pill Button variant. Height approximately 64px with 24px horizontal padding.
+Vertical pill: icon (24px outlined) stacked above label text (13px weight 500). No background, #0e0e0f color. 12px gap between icon and label. hovers with #ff3c00 icon stroke.
 
-### Hero Section
-**Role:** Above-the-fold brand statement and primary conversion
+### Prompt Input Bar
+**Role:** Hero AI prompt input — the centerpiece action
 
-Full-bleed #000000 canvas with centered text stack. Headline Goga 64px weight 500, lh 1.0, with the first two words in #7fee64 (Lime Pulse) and the rest in #ddffdc — the lime phrase acts as a status LED. Subhead in Inter 20px weight 400, #aed2a4 (Moss 80), max-width ~640px centered. Two CTAs side by side: Accent Pill + Ghost Outline. Below the text sits a 3D glowing cube (the signature visual) with a radial gradient halo (rgba(195,198,64,0.85) fading to transparent). The cube uses the marketing gradient (#80ee64 → #18b759 → #09af58) and casts a green bloom onto the void.
+Large rounded input, 16-20px border-radius, white (#ffffff) background, 1px #dfddd8 border, 16-20px padding. Placeholder text in #898c94. Embedded coral circular submit button (40px diameter) at right edge with #ff3c00 fill. Full-width within container, 48-56px height.
 
-### Code Window Card
-**Role:** Display SDK code snippets, benchmark results, terminal mockups
+### Trust Logo Strip
+**Role:** Social proof / customer logos
 
-Rounded panel (~12–16px radius) with dark interior (#181818 or #212525) and 1px hairline border in #485346. Top bar shows three traffic-light dots (using the red-5/green/yellow tinted neutrals or just colored circles). Content uses monospace font (Fira Mono), syntax-highlighted with #7fee64 for keywords, #ddffdc for strings, #677d64 for comments. Optional title bar text right-aligned in #9cbf93. No shadow — depth comes from the border hairline.
+Horizontal row of partner/company logos, evenly spaced with 24-32px gaps. Logos rendered in #76716f or #898c94 grayscale. No borders or background — sits directly on canvas.
 
-### Workload Card
-**Role:** Product capability cards (Inference, Training, Sandboxes)
+### Tagline Eyebrow
+**Role:** Small descriptor above headings
 
-Dark surface (#1f2a33 or #181818), 8px radius, no border or optional 1px #485346. Top half is a 3D isometric icon on a colored ground: green wireframe cube (Inference), solid green stairs (Training), stacked green layers (Sandboxes). Title in Goga 24px weight 400, #ddffdc. Description in Inter 16px weight 400, #8cab87 (Sage 60). 32px padding. Cards sit in a 3-column grid with 20–24px gap.
+13-14px weight 500, #76716f or #52545a color, normal tracking. Used as supporting copy above display headlines.
 
-### Eyebrow Label
-**Role:** Category or section identifier above headings
+### Display Headline
+**Role:** Hero and section titles
 
-Inter Variable 12px weight 500, uppercase, letter-spacing 0.6px (+0.05em), color #9cbf93 (Moss 70). Acts as a section's tag/chip — small, widely tracked, muted green. Always sits 8–12px above the heading it qualifies.
+ABC Diatype Plus Variable 48-69px weight 400-500, #0e0e0f or #1a1919 color, heavy negative letter-spacing (-0.04 to -0.06em), line-height 0.85-1.00. The restrained weight paired with tight tracking creates editorial authority.
 
-### Customer Logo Strip
-**Role:** Social proof — logos of companies using the platform
+### Dark Preview Card
+**Role:** Code/product preview frames in dark mode
 
-Two-row grid of customer logos rendered in #697368 (Deep Fern) or #859984 — a desaturated green-gray that lets logos recede into the dark canvas. Logos are at uniform height (~20–24px) with consistent 40–60px horizontal spacing. No borders, no backgrounds. The muted treatment signals 'proof without ego'.
+Rounded card, 20-40px radius, #1a1919 or #0e0e0f dark background, containing a code editor or product UI mockup. Creates visual contrast against the warm cream canvas.
 
-### Section Divider
-**Role:** Visual separator between content bands
+### Nav Badge
+**Role:** Notification/announcement indicator on nav items
 
-1px horizontal line in #1f2a33 (Phosphor Blue-Black) spanning the content max-width. Used sparingly between light and dark section transitions. No decorative weight — purely functional.
+Small pill, #ff3c00 background, white text, 12px weight 500, 4px 8px padding, 6px border-radius. Indicates new or hot items.
 
-### Tag/Chip
-**Role:** Status indicators, category labels, feature flags
+### Agent Number Display
+**Role:** Branded "Agent 4" text treatment
 
-Full pill radius (9999px), background #7fee64 (Lime Pulse) for active/positive tags, or transparent with #485346 border for neutral tags. Text Inter 12px weight 500. Padding 4px 12px. The green fill is rationed — use for status (running, active, live) not decoration.
+Large inline text where the number/version is in #ff3c00 while the word is in #0e0e0f. 42-48px weight 400, tight tracking. Creates the signature "Meet Agent 4" hero treatment.
 
 ## Do's and Don'ts
 
 ### Do
-- Use #7fee64 (Lime Pulse) as a fill on exactly one element per viewport — the hero CTA pill, an active tag, or the logo. Never tile it across a surface.
-- Set Inter font-feature-settings to 'cv11' and Goga to 'ss01' globally — these variants are part of the brand identity, not optional.
-- Default body text to #8cab87 (Sage 60) on #000000 — the 19:1 contrast ratio means readability is never a concern; the muted green is the readable state.
-- Render headlines in Goga with negative tracking (-0.336px at 42px, -0.448px at 64px) — the tight setting is signature, not optional.
-- Use 12px radius for buttons and 8px for cards — these two values define the geometry. Do not introduce new radius tokens.
-- Communicate depth through surface value shifts (#000000 → #181818 → #212525) and 1px #485346 hairlines. Reach for shadows only on the nav bar.
-- Use 32px padding on primary cards and content blocks. The comfortable density is non-negotiable — cramped layouts break the terminal metaphor.
+- Use #ff3c00 exclusively for primary actions, active states, and brand emphasis — never for body text or large backgrounds
+- Set display headlines at 48-69px weight 400-500 with -0.04 to -0.06em letter-spacing to match the editorial confidence of the system
+- Use pill buttons (100px radius) for all interactive actions to maintain the rounded, friendly geometry
+- Ground every page on #faf6f1 warm canvas — white (#ffffff) is reserved for cards and inputs that need to lift off the cream
+- Use 40-60px border-radius for feature/hero cards and 20px for standard content cards
+- Let the warm peach/coral gradient cards (#ffb199 → #ff764c) be the visual exclamation points — surround them with monochrome calm
+- Keep line-heights tight on display text (0.85-1.05) and generous on body copy (1.38-1.60)
 
 ### Don't
-- Do not use the vivid lime (#7fee64) as a text color on body copy — it is for fills, the logo, and the hero phrase only.
-- Do not apply drop shadows to cards, buttons, or content blocks. The system uses one shadow (nav bar) and that is the ceiling.
-- Do not introduce blue, purple, or any non-green chromatic accents. The system is monochromatic green-on-black by design.
-- Do not use #ddffdc (Phosphor White) for body paragraphs — it is reserved for headings, icons, and button text. Body copy must use the muted sage scale (#8cab87, #677d64).
-- Do not set text in Inter for display headings. Goga is mandatory for H1–H4 and card titles; Inter handles only UI chrome and body.
-- Do not use fully rounded corners (9999px) on cards or panels. Pill radius is reserved for CTAs, tags, and link chips only.
-- Do not use raw white #ffffff or pure green #00ff00. The phosphor palette is deliberately desaturated and slightly warm — saturated primaries look alien against the void canvas.
+- Don't use blue (#2492ff) for CTAs — orange #ff3c00 owns primary action; blue is only for secondary nav differentiation
+- Don't use sharp corners on cards or buttons — the system is defined by generous rounding (minimum 6px, typically 20-100px)
+- Don't use heavy drop shadows — the system relies on borders and surface contrast, not elevation shadows
+- Don't set display text in weight 700+ — the signature is 400-500 with tight tracking, not bold weight
+- Don't use pure #ffffff for page backgrounds — #faf6f1 warm cream is the canvas; white is only for elevated cards
+- Don't place more than 2-3 peach/coral cards per viewport — they should punctuate, not dominate
+- Don't use #000000 as text color — use #0e0e0f or #1a1919 to keep the warm temperature of the neutrals
 
 ## Surfaces
 
 | Level | Name | Value | Purpose |
 |-------|------|-------|---------|
-| 0 | Void | `#000000` | Deepest page canvas, hero background, full-bleed dark sections |
-| 1 | Ground | `#181818` | Primary UI surface, filled button background, standard card surface on dark |
-| 2 | Carbon | `#212525` | Elevated surface for nav bar, code window interiors, selected states |
-| 3 | Mint Frost | `#def0dd` | Light section canvas (alternate surface), soft card tint |
-| 4 | Lime Pulse | `#7fee64` | Highest-emphasis accent surface — active CTA pill, tag fills |
+| 1 | Warm Canvas | `#faf6f1` | Primary page background — the permanent warm cream stage |
+| 2 | Card White | `#ffffff` | Standard card surface, input fields, elevated content blocks |
+| 3 | Sand Wash | `#dfddd8` | Alternate light surface for subtle section differentiation |
+| 4 | Peach Feature | `#ffb199` | Feature card backgrounds — visual exclamation points |
+| 5 | Coral Feature | `#ff764c` | High-energy feature card backgrounds for key bento sections |
+| 6 | Dark Preview | `#1a1919` | Dark code/product preview cards that contrast against the warm canvas |
 
 ## Elevation
 
-- **Navigation Bar:** `rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px`
+This system intentionally avoids drop shadows. Structure is communicated through border hairlines (1px in #dfddd8, #312e2, or #898c94) and surface color contrast. The warm cream canvas, white cards, and peach feature surfaces create depth through temperature and chroma shifts rather than shadow. This keeps the interface feeling flat, fast, and modern — like a well-lit workspace rather than a skeuomorphic panel system.
 
 ## Imagery
 
-Kivo's visual language is split between two modes: 3D glowing product renderings and dark code-window mockups. The hero centers on a single 3D cube rendered with the marketing gradient (lime-to-emerald), sitting in a radial gradient halo that blooms green light onto the void canvas — this is the brand's signature visual. Workload cards feature isometric 3D icons (wireframe cube, solid stairs, stacked layers) rendered in the same lime green, sitting on dark grounds. Code and benchmark displays are presented as terminal-window cards with traffic-light dots, monospaced syntax highlighting in the phosphor palette, and a muted green border — they feel like screenshots of a real CLI. Customer logos appear as desaturated green-gray marks on a single low-contrast row, signaling credibility without visual competition. The overall density is low — most pages are text-dominant with imagery appearing as singular focal objects rather than grids of photos. There is no photography; the entire visual system is rendered, geometric, and emissive.
-
-## Layout
-
-Kivo uses a full-bleed dark layout with max-width 1280px content containment. The hero is centered-stack: headline (with the first phrase in lime), subhead, dual CTAs, and a single 3D object as the visual anchor — no split layouts, no sidebar. Content sections follow a consistent rhythm: eyebrow label (uppercase, Moss 70) → Goga heading → muted body copy, then either a 2-column feature layout (text + code/visual card) or a 3-column card grid. Section gaps are generous at 80px. The page alternates between deep void (#000000) and slightly lighter ground (#181818) bands, with one light section (#def0dd) appearing mid-page as a visual breath. Navigation is a single fixed top bar with backdrop blur — no sidebar, no mega-menu. Footer is compact, dark, with link columns in muted green. The density is comfortable: each section gets room to breathe, and no more than 3 columns are ever used for card grids.
+Imagery is minimal and product-focused. The system relies on dark code editor preview cards (#1a1919) embedded as showcase elements within the warm cream layout. Logo strips for social proof are rendered in muted gray (#76716b-#898c94), never in brand color. No lifestyle photography, no decorative illustrations — the visual interest comes from typographic scale, the warm/neutral surface palette, and the peach gradient feature cards. Icons throughout are thin-stroke outlined style, monochrome (black or orange depending on context), 1.5px apparent stroke weight.
 
 ## Agent Prompt Guide
 
-primary action: #181818 (filled action)
-Create a Primary Action Button: #181818 background, #859984 text, 9999px radius, compact pill padding. Use this filled treatment for the main CTA.
-## Quick Color Reference
-- background: #000000
-- surface: #181818
-- elevated surface: #212525
-- text primary: #ddffdc
-- text body: #8cab87
-- border: #485346
-- accent: #7fee64 (Lime Pulse — rationed, one per viewport)
+**Quick Color Reference**
+- Text: #0e0e0f (primary), #52545a (body), #76716f (muted)
+- Background: #faf6f1 (canvas), #ffffff (cards), #ffb199/#ff764c (feature cards)
+- Border: #dfddd8 (light), #312e2e (medium), #0e0e0f (strong)
+- Accent: #ff3c00 (primary action)
+- primary action: #ff3c00 (filled action)
 
-## 3-5 Example Component Prompts
+**3-5 Example Component Prompts**
 
-**1. Hero Section**: Full-bleed #000000 canvas, centered stack. Headline at 64px Goga weight 500, lh 1.0, letter-spacing -0.448px — first two words in #7fee64, remainder in #ddffdc. Subhead at 20px Inter weight 400, #aed2a4, max-width 640px, centered. Two buttons side by side with 12px gap: lime accent pill (#7fee64 bg, #181818 text, 9999px radius, 16px 24px padding, Inter 16px weight 500) followed by ghost outline button (#ddffdc border, transparent bg, 12px radius, 32px padding). Below, a centered 3D lime cube with radial green glow.
+1. **Hero Display Headline**: 64px ABC Diatype Plus Variable weight 400, #0e0e0f, letter-spacing -0.05em, line-height 0.90. Centered on #faf6f1 canvas.
 
-**2. Code Window Card**: 16px radius panel, #181818 background, 1px solid #485346 border. Top bar: 12px height, 8px 16px padding, three 8px traffic-light dots (left-aligned). Content area: 24px padding, monospace text (Fira Mono) at 14px, line-height 1.5. Keywords in #7fee64, strings in #ddffdc, comments in #677d64. Optional right-aligned title in #9cbf93 at 12px Inter weight 500.
+2. **Primary CTA Pill Button**: #ff3c00 background, white text, 14px weight 500, 10px 20px padding, 100px border-radius. hovers to #ec4e02.
 
-**3. Workload Card**: 8px radius, #1f2a33 background, 32px padding. Top: 3D isometric icon (wireframe cube or solid stairs) in #7fee64, 120px square. Title: Goga 24px weight 400, #ddffdc, 16px top margin. Description: Inter 16px weight 400, #8cab87, 8px top margin. No border, no shadow.
+3. **Peach Feature Card**: 40px border-radius, #ffb199 background, 32px padding. Eyebrow label 13px weight 500 #312e2e, heading 32px weight 400 #0e0e0f, letter-spacing -0.03em. Description 16px #52545a.
 
-**4. Navigation Bar**: Fixed top, full-width, #212525 background, 10px backdrop blur, 1px bottom border #1f2a33. Height 64px, horizontal padding 24px. Left: logo (lime 3D mark + 'Kivo' in Goga 20px weight 500, #ddffdc). Center: nav links (Inter 14px weight 500, #ddffdc, 32px gap). Right: 'Login' text link (#859984) + 'Sign Up' lime pill button (#7fee64 bg, #181818 text, 9999px radius, 8px 16px padding).
+4. **Prompt Input Bar**: Full-width, 56px height, 20px border-radius, #ffffff background, 1px #dfddd8 border. Placeholder #898c94. Embedded #ff3c00 circular submit button (44px diameter) at right edge.
 
-**5. Section with Eyebrow + Heading + 3-Column Grid**: Full-width #000000 band, 80px vertical padding, max-width 1280px centered. Eyebrow: Inter 12px weight 500, uppercase, +0.6px tracking, #9cbf93. Heading: Goga 42px weight 500, lh 1.05, -0.336px tracking, #ddffdc, 12px below eyebrow. Below: 3-column grid with 20px gap, each cell is a Workload Card as specified above.
-
-## Motion & Transition Philosophy
-
-Kivo's motion is expressive but restrained in vocabulary. Primary transition duration is 300ms with ease-out for UI state changes (color, background, border, fill, stroke — all transition together for a unified feel). The timing function cubic-bezier(0.34, 1.56, 0.64, 1) is used sparingly for 'spring' moments on the 3D cube and key illustrations. Long-duration ambient animations (80s) drive the continuous rotation of the hero cube. The system avoids bouncy or playful easings on UI chrome — springs are for the brand visuals, not the buttons. All color transitions should include the full set: color, background-color, border-color, fill, stroke, and text-decoration-color transitioning simultaneously over 300ms ease-out to maintain a single coherent feel.
-
-## The Phosphor Metaphor
-
-Kivo's design speaks the visual language of a CRT terminal: a black void canvas, pale-green phosphor type (slightly warm, not pure green-0), and a single status LED (the vivid lime) that signals active state. This is not a coincidence — the platform is for developers, and the aesthetic pays homage to terminal culture without being kitschy. When in doubt about any design decision, ask: 'Would this look right on a high-end oscilloscope display?' The answer should be yes. This rules out: neon effects, glow filters on text, scanline textures, monospace-as-decoration, and any visual that reads as 'hacker movie' rather than 'professional infrastructure tool.'
+5. **Trust Logo Strip**: Horizontal flex row, 32px gaps, logos in #898c94 grayscale, vertically centered, no borders or background container.
 
 ## Similar Brands
 
-- **Replicate** — Same dark canvas with a single vivid green accent, developer-first code-window imagery, and a rationed-use approach to chromatic color
-- **Together AI** — Dark-mode AI infrastructure with a lime/emerald accent, similar generous spacing, and a custom geometric display face for headings
-- **Railway** — Dark-by-default dev tool with a single bright accent color, flat surfaces, and hairline borders instead of shadows for depth
-- **Vercel** — Dark mode marketing site with generous whitespace, centered hero stacks, and 2-column feature sections with code/visual cards
-- **Anyscale** — Developer-focused AI infrastructure with a green-on-dark phosphor aesthetic and 3D illustration accents
+- **Linear** — Same pill-button geometry, border-driven elevation (no shadows), and confident oversized display type with tight tracking
+- **Vercel** — Similar clean monochrome base with single vivid accent color, generous whitespace, and developer-focused restraint
+- **Notion** — Warm neutral background tones, playful rounded geometry, and a creator-friendly approachable feel
+- **Cursor** — AI-tool visual language with prominent prompt input as hero element, clean typography, and minimal decoration
+- **Framer** — Bento card grid layouts with warm accent colors, large display headlines, and creator/builder audience targeting
 
 ## Quick Start
 
@@ -261,56 +242,59 @@ Kivo's design speaks the visual language of a CRT terminal: a black void canvas,
 ```css
 :root {
   /* Colors */
-  --color-void-black: #000000;
-  --color-ground-iron: #181818;
-  --color-carbon-veil: #212525;
-  --color-circuit-border: #485346;
-  --color-phosphor-blue-black: #1f2a33;
-  --color-charcoal-rust: #231c1c;
-  --color-lime-pulse: #7fee64;
-  --color-phosphor-white: #ddffdc;
-  --color-mint-frost: #def0dd;
-  --color-sage-60: #8cab87;
-  --color-sage-40: #677d64;
-  --color-moss-70: #9cbf93;
-  --color-moss-80: #aed2a4;
-  --color-fern-link: #859984;
-  --color-deep-fern: #697368;
-  --color-pine-15: #3e4a3c;
+  --color-ember-orange: #ff3c00;
+  --color-sunset-coral: #ff764c;
+  --color-peach-blush: #ffb199;
+  --color-burnt-rust: #ec4e02;
+  --color-electric-blue: #2492ff;
+  --color-warm-canvas: #faf6f1;
+  --color-pure-white: #ffffff;
+  --color-ink-black: #0e0e0f;
+  --color-charcoal: #312e2e;
+  --color-slate: #36373b;
+  --color-deep-charcoal: #1a1919;
+  --color-gunmetal: #2f3034;
+  --color-stone: #898c94;
+  --color-pewter: #52545a;
+  --color-warm-gray: #76716f;
+  --color-mist: #61646b;
+  --color-sand: #dfddd8;
+  --color-driftwood: #cbc7c3;
+  --color-fog: #efefef;
 
   /* Typography — Font Families */
-  --font-goga: 'Goga', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter-variable: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-abc-diatype: 'ABC Diatype', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-abc-diatype-plus-variable: 'ABC Diatype Plus Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-ibm-plex-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.33;
-  --tracking-caption: 0.6px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.43;
-  --tracking-body-sm: -0.364px;
+  --text-caption: 11px;
+  --leading-caption: 1.2;
+  --tracking-caption: -0.01px;
   --text-body: 16px;
   --leading-body: 1.5;
-  --tracking-body: -0.352px;
+  --tracking-body: -0.01px;
   --text-subheading: 20px;
-  --leading-subheading: 1.5;
-  --tracking-subheading: -0.36px;
+  --leading-subheading: 1.2;
+  --tracking-subheading: -0.02px;
   --text-heading-sm: 24px;
-  --leading-heading-sm: 1.3;
-  --tracking-heading-sm: -0.312px;
-  --text-heading: 30px;
-  --leading-heading: 1.2;
-  --tracking-heading: -0.36px;
-  --text-heading-lg: 42px;
-  --leading-heading-lg: 1.05;
-  --tracking-heading-lg: -0.336px;
+  --leading-heading-sm: 1.2;
+  --tracking-heading-sm: -0.03px;
+  --text-heading: 32px;
+  --leading-heading: 1.05;
+  --tracking-heading: -0.03px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1;
+  --tracking-heading-lg: -0.04px;
   --text-display: 64px;
-  --leading-display: 1;
-  --tracking-display: -0.448px;
+  --leading-display: 0.9;
+  --tracking-display: -0.05px;
 
   /* Typography — Weights */
   --font-weight-regular: 400;
   --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
   /* Spacing */
   --spacing-unit: 4px;
@@ -320,45 +304,49 @@ Kivo's design speaks the visual language of a CRT terminal: a black void canvas,
   --spacing-16: 16px;
   --spacing-20: 20px;
   --spacing-24: 24px;
-  --spacing-28: 28px;
   --spacing-32: 32px;
-  --spacing-36: 36px;
   --spacing-40: 40px;
   --spacing-48: 48px;
-  --spacing-56: 56px;
+  --spacing-60: 60px;
   --spacing-64: 64px;
-  --spacing-96: 96px;
-  --spacing-128: 128px;
-  --spacing-160: 160px;
+  --spacing-80: 80px;
+  --spacing-120: 120px;
 
   /* Layout */
-  --page-max-width: 1280px;
+  --page-max-width: 1200px;
   --section-gap: 80px;
   --card-padding: 32px;
-  --element-gap: 20px;
+  --element-gap: 12px;
 
   /* Border Radius */
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-3xl: 25px;
+  --radius-md: 6px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-3xl: 24px;
+  --radius-3xl-2: 40px;
+  --radius-3xl-3: 46px;
+  --radius-full: 56px;
+  --radius-full-2: 60px;
+  --radius-full-3: 70px;
+  --radius-full-4: 90px;
+  --radius-full-5: 100px;
+  --radius-full-6: 999px;
+  --radius-full-7: 1028px;
 
   /* Named Radii */
-  --radius-cards: 8px;
-  --radius-icons: 0px;
-  --radius-pills: 9999px;
-  --radius-inputs: 8px;
-  --radius-buttons: 12px;
-
-  /* Shadows */
-  --shadow-md: rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px;
+  --radius-nav: 6px;
+  --radius-cards: 40px;
+  --radius-badges: 6px;
+  --radius-inputs: 6px;
+  --radius-buttons: 100px;
 
   /* Surfaces */
-  --surface-void: #000000;
-  --surface-ground: #181818;
-  --surface-carbon: #212525;
-  --surface-mint-frost: #def0dd;
-  --surface-lime-pulse: #7fee64;
+  --surface-warm-canvas: #faf6f1;
+  --surface-card-white: #ffffff;
+  --surface-sand-wash: #dfddd8;
+  --surface-peach-feature: #ffb199;
+  --surface-coral-feature: #ff764c;
+  --surface-dark-preview: #1a1919;
 }
 ```
 
@@ -367,52 +355,53 @@ Kivo's design speaks the visual language of a CRT terminal: a black void canvas,
 ```css
 @theme {
   /* Colors */
-  --color-void-black: #000000;
-  --color-ground-iron: #181818;
-  --color-carbon-veil: #212525;
-  --color-circuit-border: #485346;
-  --color-phosphor-blue-black: #1f2a33;
-  --color-charcoal-rust: #231c1c;
-  --color-lime-pulse: #7fee64;
-  --color-phosphor-white: #ddffdc;
-  --color-mint-frost: #def0dd;
-  --color-sage-60: #8cab87;
-  --color-sage-40: #677d64;
-  --color-moss-70: #9cbf93;
-  --color-moss-80: #aed2a4;
-  --color-fern-link: #859984;
-  --color-deep-fern: #697368;
-  --color-pine-15: #3e4a3c;
+  --color-ember-orange: #ff3c00;
+  --color-sunset-coral: #ff764c;
+  --color-peach-blush: #ffb199;
+  --color-burnt-rust: #ec4e02;
+  --color-electric-blue: #2492ff;
+  --color-warm-canvas: #faf6f1;
+  --color-pure-white: #ffffff;
+  --color-ink-black: #0e0e0f;
+  --color-charcoal: #312e2e;
+  --color-slate: #36373b;
+  --color-deep-charcoal: #1a1919;
+  --color-gunmetal: #2f3034;
+  --color-stone: #898c94;
+  --color-pewter: #52545a;
+  --color-warm-gray: #76716f;
+  --color-mist: #61646b;
+  --color-sand: #dfddd8;
+  --color-driftwood: #cbc7c3;
+  --color-fog: #efefef;
 
   /* Typography */
-  --font-goga: 'Goga', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter-variable: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-abc-diatype: 'ABC Diatype', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-abc-diatype-plus-variable: 'ABC Diatype Plus Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-ibm-plex-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.33;
-  --tracking-caption: 0.6px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.43;
-  --tracking-body-sm: -0.364px;
+  --text-caption: 11px;
+  --leading-caption: 1.2;
+  --tracking-caption: -0.01px;
   --text-body: 16px;
   --leading-body: 1.5;
-  --tracking-body: -0.352px;
+  --tracking-body: -0.01px;
   --text-subheading: 20px;
-  --leading-subheading: 1.5;
-  --tracking-subheading: -0.36px;
+  --leading-subheading: 1.2;
+  --tracking-subheading: -0.02px;
   --text-heading-sm: 24px;
-  --leading-heading-sm: 1.3;
-  --tracking-heading-sm: -0.312px;
-  --text-heading: 30px;
-  --leading-heading: 1.2;
-  --tracking-heading: -0.36px;
-  --text-heading-lg: 42px;
-  --leading-heading-lg: 1.05;
-  --tracking-heading-lg: -0.336px;
+  --leading-heading-sm: 1.2;
+  --tracking-heading-sm: -0.03px;
+  --text-heading: 32px;
+  --leading-heading: 1.05;
+  --tracking-heading: -0.03px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1;
+  --tracking-heading-lg: -0.04px;
   --text-display: 64px;
-  --leading-display: 1;
-  --tracking-display: -0.448px;
+  --leading-display: 0.9;
+  --tracking-display: -0.05px;
 
   /* Spacing */
   --spacing-4: 4px;
@@ -421,24 +410,27 @@ Kivo's design speaks the visual language of a CRT terminal: a black void canvas,
   --spacing-16: 16px;
   --spacing-20: 20px;
   --spacing-24: 24px;
-  --spacing-28: 28px;
   --spacing-32: 32px;
-  --spacing-36: 36px;
   --spacing-40: 40px;
   --spacing-48: 48px;
-  --spacing-56: 56px;
+  --spacing-60: 60px;
   --spacing-64: 64px;
-  --spacing-96: 96px;
-  --spacing-128: 128px;
-  --spacing-160: 160px;
+  --spacing-80: 80px;
+  --spacing-120: 120px;
 
   /* Border Radius */
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-3xl: 25px;
-
-  /* Shadows */
-  --shadow-md: rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px;
+  --radius-md: 6px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-3xl: 24px;
+  --radius-3xl-2: 40px;
+  --radius-3xl-3: 46px;
+  --radius-full: 56px;
+  --radius-full-2: 60px;
+  --radius-full-3: 70px;
+  --radius-full-4: 90px;
+  --radius-full-5: 100px;
+  --radius-full-6: 999px;
+  --radius-full-7: 1028px;
 }
 ```

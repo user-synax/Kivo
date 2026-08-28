@@ -105,14 +105,15 @@ export async function listConversations({ userId }) {
     .lean();
 
   const lookup = onlineSnapshot();
+  const uid = new mongoose.Types.ObjectId(userId);
   const result = [];
   for (const c of conversations) {
     const base = publicConversation(c, userId, lookup);
     const unread = await Message.countDocuments({
       conversationId: c._id,
-      senderId: { $ne: userId },
+      senderId: { $ne: uid },
       isDeleted: false,
-      readBy: { $not: { $elemMatch: { userId } } },
+      readBy: { $not: { $elemMatch: { userId: uid } } },
     });
     base.unreadCount = unread;
     result.push(base);

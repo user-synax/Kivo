@@ -192,10 +192,16 @@ export async function removeReaction({ messageId, userId, reactionId }) {
 export async function markRead({ conversationId, userId, upToMessageId }) {
   await assertMembership(conversationId, userId);
 
+  // Cast to ObjectId explicitly: the stored senderId / readBy.userId are
+  // ObjectIds, and a raw string in $ne / $elemMatch would fail to match,
+  // causing updateMany to touch zero documents and reads to never persist.
+  const uid = new mongoose.Types.ObjectId(userId);
+  const cid = new mongoose.Types.ObjectId(conversationId);
+
   const filter = {
-    conversationId,
-    senderId: { $ne: userId },
-    readBy: { $not: { $elemMatch: { userId } } },
+    conversationId: cid,
+    senderId: { $ne: uid },
+    readBy: { $not: { $elemMatch: { userId: uid } } },
   };
   if (upToMessageId) {
     if (!mongoose.Types.ObjectId.isValid(upToMessageId)) {
@@ -206,7 +212,7 @@ export async function markRead({ conversationId, userId, upToMessageId }) {
   }
 
   const result = await Message.updateMany(filter, {
-    $addToSet: { readBy: { userId, readAt: new Date() } },
+    $addToSet: { readBy: { userId: uid, readAt: new Date() } },
   });
 
   const payload = {

@@ -7,7 +7,7 @@ import { getSession } from "@/lib/auth";
 // Neutral loader shown briefly while the client confirms a session. Uses the
 // default (Phosphor) palette directly so it works even outside ThemeProvider
 // (e.g. the GuestGate on login), avoiding any flash of mis-themed colors.
-const LOADER = { base: "#000000", border: "#485346", accent: "#7fee64" };
+const LOADER = { base: "#faf6f1", border: "#dfddd8", accent: "#ff3c00" };
 
 function Loader() {
   return (

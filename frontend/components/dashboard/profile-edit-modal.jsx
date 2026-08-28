@@ -236,11 +236,11 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-4">
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-8">
           <button
             type="button"
             onClick={openFullProfile}
-            className="text-[13px] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-[var(--text-primary)]"
+            className="text-[13px] text-[var(--text-muted)] hover:cursor-pointer transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-[var(--text-primary)]"
           >
             View full profile
           </button>
@@ -248,7 +248,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             <button
               type="button"
               onClick={close}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)]"
+              className="rounded-lg border border-[var(--border)] px-12 hover:cursor-pointer py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)]"
             >
               Cancel
             </button>
@@ -256,7 +256,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:brightness-95 disabled:opacity-50"
+              className="rounded-lg bg-[var(--accent)] px-12 hover:cursor-pointer py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:brightness-95 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>

@@ -1,6 +1,7 @@
 import Hero from "@/components/Hero";
 import { Navbar } from "../components/navbar/navbar";
 import { GuestGate } from "@/components/auth-guard";
+// import Component from "@/components/saa-s-template";
 
 export default function Home() {
   return (

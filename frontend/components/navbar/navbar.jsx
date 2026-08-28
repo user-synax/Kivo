@@ -156,7 +156,7 @@ export function Navbar() {
                         className="kivo-focus flex items-center gap-2 rounded-pills px-2"
                     >
                         <BrandMark />
-                        <span className="font-goga text-[20px] font-medium tracking-tight text-phosphor-white">
+                        <span className="font-goga text-[20px] font-medium tracking-tight text-ink-black">
                             Kivo
                         </span>
                     </motion.a>
@@ -170,7 +170,7 @@ export function Navbar() {
                             <li key={item.label}>
                                 <a
                                     href={item.href}
-                                    className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-phosphor-white/90"
+                                    className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-ink-black/90"
                                 >
                                     {item.label}
                                 </a>
@@ -185,13 +185,13 @@ export function Navbar() {
                     >
                         <a
                             href="/login"
-                            className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-fern-link"
+                            className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-electric-blue"
                         >
                             Log in
                         </a>
                         <a
                             href="/signup"
-                            className="kivo-cta kivo-focus rounded-pills bg-lime-pulse px-5 py-2 text-[14px] font-medium text-ground-iron"
+                            className="kivo-cta kivo-focus rounded-pills bg-ember-orange px-5 py-2 text-[14px] font-medium text-white"
                         >
                             Sign up
                         </a>
@@ -206,7 +206,7 @@ export function Navbar() {
                         aria-expanded={open}
                         aria-controls="kivo-mobile-menu"
                         onClick={() => setOpen((v) => !v)}
-                        className="kivo-focus flex h-10 w-10 items-center justify-center rounded-pills text-phosphor-white md:hidden"
+                        className="kivo-focus flex h-10 w-10 items-center justify-center rounded-pills text-ink-black md:hidden"
                     >
                         <MenuIcon open={open} reduce={reduce} />
                     </motion.button>
@@ -223,7 +223,7 @@ export function Navbar() {
                             exit="exit"
                             role="menu"
                             aria-label="Mobile navigation"
-                            className="pointer-events-auto absolute inset-x-0 top-full mt-2 origin-top rounded-xl border border-circuit-border/70 bg-carbon-veil/95 p-2 shadow-md backdrop-blur-[10px]"
+                            className="pointer-events-auto absolute inset-x-0 top-full mt-2 origin-top rounded-xl border border-stone/60 bg-pure-white/95 p-2 shadow-md backdrop-blur-[10px]"
                         >
                             <ul className="flex flex-col">
                                 {navItems.map((item) => (
@@ -232,19 +232,19 @@ export function Navbar() {
                                             href={item.href}
                                             role="menuitem"
                                             onClick={() => setOpen(false)}
-                                            className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-phosphor-white/90"
+                                            className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-ink-black/90"
                                         >
                                             {item.label}
                                         </a>
                                     </li>
                                 ))}
                             </ul>
-                            <div className="mt-1 flex flex-col gap-1 border-t border-circuit-border/50 pt-2">
+                            <div className="mt-1 flex flex-col gap-1 border-t border-stone/40 pt-2">
                                 <a
                                     href="#login"
                                     role="menuitem"
                                     onClick={() => setOpen(false)}
-                                    className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-fern-link"
+                                    className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-electric-blue"
                                 >
                                     Log in
                                 </a>
@@ -252,7 +252,7 @@ export function Navbar() {
                                     href="#signup"
                                     role="menuitem"
                                     onClick={() => setOpen(false)}
-                                    className="kivo-cta kivo-focus mt-1 flex min-h-[44px] items-center justify-center rounded-pills bg-lime-pulse px-5 py-2 text-[15px] font-medium text-ground-iron"
+                                    className="kivo-cta kivo-focus mt-1 flex min-h-[44px] items-center justify-center rounded-pills bg-ember-orange px-5 py-2 text-[15px] font-medium text-white"
                                 >
                                     Sign up
                                 </a>
@@ -265,7 +265,7 @@ export function Navbar() {
     );
 }
 
-/* Provisional brand mark — a phosphor-green LED tile standing in for the
+/* Provisional brand mark — an ember-orange tile standing in for the
    final 3D logo asset. Drop the real mark at /public/logo.svg and swap
    this for <img src="/logo.svg" alt="Kivo" /> when ready. */
 function BrandMark() {
@@ -277,14 +277,14 @@ function BrandMark() {
             aria-hidden="true"
             className="shrink-0"
         >
-            <rect x="1" y="1" width="20" height="20" rx="6" fill="#7fee64" />
+            <rect x="1" y="1" width="20" height="20" rx="6" fill="#ff3c00" />
             <rect
                 x="6.5"
                 y="6.5"
                 width="9"
                 height="9"
                 rx="2.5"
-                fill="#181818"
+                fill="#ffffff"
             />
         </svg>
     );
