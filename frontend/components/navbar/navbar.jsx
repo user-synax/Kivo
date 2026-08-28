@@ -184,13 +184,13 @@ export function Navbar() {
                         className="hidden items-center gap-2 md:flex"
                     >
                         <a
-                            href="#login"
+                            href="/login"
                             className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-fern-link"
                         >
                             Log in
                         </a>
                         <a
-                            href="#signup"
+                            href="/signup"
                             className="kivo-cta kivo-focus rounded-pills bg-lime-pulse px-5 py-2 text-[14px] font-medium text-ground-iron"
                         >
                             Sign up

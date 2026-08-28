@@ -15,8 +15,6 @@ const env = {
 
   mongoUri: required("MONGODB_URI", process.env.MONGODB_URI),
 
-  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
-
   // Comma-separated list of allowed CORS origins. Left unset to allow any
   // origin (reflective) for local dev — set explicitly in production.
   corsAllowedOrigins: process.env.CORS_ALLOWED_ORIGINS || "",

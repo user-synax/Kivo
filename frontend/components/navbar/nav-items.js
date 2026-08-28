@@ -6,6 +6,6 @@ export const navItems = [
 ];
 
 export const authItems = [
-  { label: "Log in", href: "#login", variant: "ghost" },
-  { label: "Sign up", href: "#signup", variant: "cta" },
+  { label: "Log in", href: "/login", variant: "ghost" },
+  { label: "Sign up", href: "/signup", variant: "cta" },
 ];

@@ -1,60 +1,45 @@
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import env, { refreshTtlSeconds } from "../../config/env.js";
-import { getRedis } from "../../config/redis.js";
 import { unauthorized, conflict, notFound } from "../../utils/errors.js";
 import User from "../../models/User.js";
+import Session from "../../models/Session.js";
 
-const SESSION_KEY = (sessionId) => `session:${sessionId}`;
-const USER_SESSIONS_KEY = (userId) => `user_sessions:${userId}`;
-
-function newSessionId() {
-  return crypto.randomUUID();
-}
-
-// Persist the session record in Redis. This record is the SOURCE OF TRUTH for
-// whether a refresh token is still valid. The refresh token is only a credential
-// used to look the record up. Also maintains a per-user index set so we can
-// revoke every session at once (logout-all / force-logout).
-async function storeSession(sessionId, userId, deviceInfo) {
-  const redis = getRedis();
-  const sessionData = JSON.stringify({
+// Persist the session record in MongoDB. This record is the SOURCE OF TRUTH for
+// whether a refresh token is still valid. The refresh token only references it.
+async function storeSession(userId, deviceInfo) {
+  const ttlMs = refreshTtlSeconds() * 1000;
+  const session = await Session.create({
     userId,
-    createdAt: Date.now(),
     deviceInfo: deviceInfo || {},
+    expiresAt: new Date(Date.now() + ttlMs),
   });
-  const ttl = refreshTtlSeconds();
-
-  await redis.set(SESSION_KEY(sessionId), sessionData, { EX: ttl });
-  await redis.sAdd(USER_SESSIONS_KEY(userId), sessionId);
-  // Keep the index set alive at least as long as the longest session.
-  await redis.expire(USER_SESSIONS_KEY(userId), ttl);
-  return sessionId;
+  return session._id.toString();
 }
 
 async function destroySession(sessionId, userId) {
-  const redis = getRedis();
-  await redis.del(SESSION_KEY(sessionId));
-  if (userId) {
-    await redis.sRem(USER_SESSIONS_KEY(userId), sessionId);
-  }
+  await Session.deleteOne({ _id: sessionId, userId });
 }
 
 async function getSession(sessionId) {
-  const raw = await getRedis().get(SESSION_KEY(sessionId));
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
+  const session = await Session.findById(sessionId);
+  if (!session) return null;
+  // Defensive check in case the TTL sweep has not run yet.
+  if (session.expiresAt && session.expiresAt.getTime() < Date.now()) {
+    await Session.deleteOne({ _id: sessionId }).catch(() => {});
     return null;
   }
+  return {
+    userId: session.userId.toString(),
+    createdAt: session.createdAt?.getTime?.() ?? Date.now(),
+    deviceInfo: session.deviceInfo || {},
+  };
 }
 
 // Issue a short-lived access token + long-lived refresh token, and create the
-// backing Redis session. Returns the tokens (refresh token is opaque to the
+// backing session document. Returns the tokens (refresh token is opaque to the
 // caller — it goes into an httpOnly cookie, never the response body).
 async function issueSession(userId, deviceInfo) {
-  const sessionId = newSessionId();
+  const sessionId = await storeSession(userId, deviceInfo);
 
   const accessToken = jwt.sign({ userId, sessionId }, env.accessTokenSecret, {
     expiresIn: env.accessTokenTtl,
@@ -63,7 +48,6 @@ async function issueSession(userId, deviceInfo) {
     expiresIn: env.refreshTokenTtl,
   });
 
-  await storeSession(sessionId, userId, deviceInfo);
   return { accessToken, refreshToken, sessionId };
 }
 
@@ -71,13 +55,14 @@ function publicUser(user) {
   return {
     id: user.id,
     email: user.email,
+    displayName: user.displayName || null,
     username: user.username || null,
     role: user.role,
     createdAt: user.createdAt,
   };
 }
 
-export async function registerUser({ email, username, password }) {
+export async function registerUser({ email, username, password, displayName }) {
   const existing = await User.findOne({ email });
   if (existing) {
     throw conflict("Email already registered", "EMAIL_TAKEN");
@@ -91,7 +76,13 @@ export async function registerUser({ email, username, password }) {
 
   const passwordHash = await User.hashPassword(password);
   // Role is ALWAYS assigned server-side; never taken from the request body.
-  const user = await User.create({ email, username, passwordHash, role: "user" });
+  const user = await User.create({
+    email,
+    username,
+    displayName,
+    passwordHash,
+    role: "user",
+  });
 
   const deviceInfo = {};
   const { accessToken, refreshToken } = await issueSession(user.id, deviceInfo);
@@ -119,7 +110,7 @@ export async function loginUser({ identifier, password, deviceInfo }) {
 }
 
 // Rotate the refresh token: verify the supplied refresh token, ensure its
-// session still exists in Redis, then atomically delete the old session and
+// session still exists in the store, then atomically delete the old session and
 // create a new one. If the session is gone (expired/revoked/already rotated),
 // reject — forcing a fresh login.
 export async function refreshSession({ refreshToken }) {
@@ -163,16 +154,7 @@ export async function logoutSession({ sessionId, userId }) {
 // Revoke EVERY session for a user. Used by /logout-all (self) and by the admin
 // force-logout route. This is the "force logout everywhere" primitive.
 export async function logoutAllSessions({ userId }) {
-  const redis = getRedis();
-  const sessionIds = await redis.sMembers(USER_SESSIONS_KEY(userId));
-  if (sessionIds.length > 0) {
-    const pipeline = redis.multi();
-    for (const id of sessionIds) {
-      pipeline.del(SESSION_KEY(id));
-    }
-    pipeline.del(USER_SESSIONS_KEY(userId));
-    await pipeline.exec();
-  }
+  await Session.deleteMany({ userId });
 }
 
 // Convenience wrapper used by admin routes to force-logout a target user.
