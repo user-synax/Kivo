@@ -4,14 +4,27 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
-import { clearSession, getSession, getToken } from "@/lib/auth";
+import { apiGet } from "@/lib/api";
+import { clearSession, getSession, getToken, setSession } from "@/lib/auth";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    setUser(getSession());
+    let active = true;
+    apiGet("/api/v1/users/me")
+      .then((me) => {
+        if (!active) return;
+        setUser(me);
+        setSession(me, getToken());
+      })
+      .catch(() => {
+        if (active) setUser(getSession());
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleLogout() {

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
 import { UserPanel } from "./user-panel";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
-import { getSession } from "@/lib/auth";
+import { getSession, getToken, setSession } from "@/lib/auth";
 import {
   formatTime,
   otherParticipant,
@@ -83,6 +83,24 @@ export function DashboardShell() {
   // re-renders after the user saves a new avatar style in the edit modal.
   const [currentUser, setCurrentUser] = useState(() => getSession());
   const refreshUser = useCallback(() => setCurrentUser(getSession()), []);
+
+  // The localStorage session may be stale (e.g. created before avatarUrl was
+  // added to the auth response, or before the first avatar upload). Re-fetch the
+  // authoritative current-user profile so the sidebar/avatar always reflect the
+  // latest avatarUrl. Persist it back so other routes (profile page) see it too.
+  useEffect(() => {
+    let active = true;
+    apiGet("/api/v1/users/me")
+      .then((me) => {
+        if (!active) return;
+        setCurrentUser((prev) => ({ ...(prev || {}), ...me }));
+        setSession(me, getToken());
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // The "other" participant id of the currently open DM, derived from the
   // conversation list so it's available to the profile-fetch effect (which runs

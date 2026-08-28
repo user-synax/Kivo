@@ -65,7 +65,6 @@ const SIZE = {
 function AvatarSurface({
     name,
     selected,
-    online,
     avatarStyle,
     size = "md",
     url,
@@ -111,14 +110,6 @@ function AvatarSurface({
             >
                 {initials(name)}
             </span>
-            {online && (
-                <span
-                    className={clsx(
-                        "absolute rounded-full bg-[var(--online)] ring-[var(--bg-elevated)]",
-                        config.dot,
-                    )}
-                />
-            )}
         </div>
     );
 }
@@ -151,7 +142,6 @@ export function Avatar({
                 <AvatarSurface
                     name={name}
                     selected={selected}
-                    online={online}
                     size={size}
                     avatarStyle={null}
                     url={url}
@@ -161,22 +151,33 @@ export function Avatar({
             <AvatarSurface
                 name={name}
                 selected={selected}
-                online={online}
                 size={size}
                 avatarStyle={avatarStyle}
                 url={url}
             />
         );
 
-    // No premium decoration/badge requested — return the bare avatar (keeps the
-    // existing DOM shape / spacing identical for current callers).
-    if (!badge && !decoration) return surface;
+    // Online indicator lives OUTSIDE the avatar (the surface clips with
+    // overflow-hidden), so it shows at the corner instead of being cut off inside.
+    const dot = online ? (
+        <span
+            className={clsx(
+                "absolute z-10 rounded-full bg-[var(--online)] ring-[var(--bg-elevated)]",
+                config.dot,
+            )}
+        />
+    ) : null;
+
+    // No premium decoration/badge and no presence dot — return the bare avatar
+    // (keeps the existing DOM shape / spacing identical for current callers).
+    if (!badge && !decoration && !dot) return surface;
 
     return (
         <div className={clsx("relative inline-flex shrink-0", decoration)}>
             {surface}
+            {dot}
             {badge ? (
-                <span className={clsx("absolute", config.badgeOffset)}>
+                <span className={clsx("absolute z-10", config.badgeOffset)}>
                     {badge}
                 </span>
             ) : null}
