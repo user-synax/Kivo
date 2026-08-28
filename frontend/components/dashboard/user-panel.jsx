@@ -113,7 +113,7 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt }) {
           <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
             About
           </p>
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3.5">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-8 py-3.5">
             {loading ? (
               <div className="h-3 w-2/3 animate-pulse rounded-full bg-[var(--color-driftwood)]" />
             ) : profile?.bio ? (
@@ -133,7 +133,7 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt }) {
           <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
             Details
           </p>
-          <div className="rounded-2xl divide-y divide-[var(--border)] border border-[var(--border)] bg-[var(--bg-surface)] px-4">
+          <div className="rounded-2xl divide-y divide-[var(--border)] border border-[var(--border)] bg-[var(--bg-surface)] px-8">
             <DetailRow label="Email" value={profile?.email} />
             <DetailRow label="Member since" value={formatJoined(profile?.createdAt)} />
             <DetailRow
