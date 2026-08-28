@@ -1,9 +1,12 @@
 "use client";
 
 // Single Socket.IO connection for the logged-in user. The connection is created
-// once on mount (under the AuthGate, so a token is guaranteed to exist) and torn
-// down on unmount. If the server rejects the handshake because the access token
-// expired, we silently refresh and reconnect once.
+// once on mount and torn down on unmount.
+//
+// IMPORTANT: the access token lives only in memory (see lib/auth.js) and is
+// `null` after a page refresh until the app re-acquires it from the httpOnly
+// refresh cookie. We therefore cannot assume getToken() is populated at mount —
+// if it's missing we first do a silent refresh to obtain a token, then connect.
 //
 // socket.io-client is imported dynamically inside the effect so it never runs
 // during SSR (it touches browser globals at construction time).
@@ -22,47 +25,67 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     let active = true;
+    let cancelled = false;
     let s = null;
 
-    const token = getToken();
-    if (!token) {
-      setSocket(null);
-      return undefined;
-    }
+    const socketUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-    let cancelled = false;
-    import("socket.io-client").then(({ io }) => {
-      if (cancelled) return;
-      s = io({
-        path: "/socket.io",
-        auth: { token: getToken() },
-        transports: ["websocket", "polling"],
-        withCredentials: true,
-        reconnectionDelay: 800,
-        reconnectionDelayMax: 4000,
-      });
-      socketRef.current = s;
+    const buildSocket = (token) => {
+      if (!token || cancelled || !active) return;
+      import("socket.io-client").then(({ io }) => {
+        if (cancelled || !active) return;
+        // Connect directly to the backend's Socket.IO endpoint. The frontend
+        // (Next.js) and backend (Express) run on different origins/ports, so a
+        // path-only client would hit the wrong origin and — because Next.js
+        // rewrites do not proxy WebSocket upgrades — the connection would fail.
+        s = io(socketUrl, {
+          path: "/socket.io",
+          auth: { token },
+          transports: ["websocket", "polling"],
+          withCredentials: true,
+          reconnectionDelay: 800,
+          reconnectionDelayMax: 4000,
+        });
+        socketRef.current = s;
 
-      s.on("connect_error", async (err) => {
-        // Likely an expired access token — try one silent refresh then retry.
-        if (err?.message && /token/i.test(err.message)) {
-          try {
-            const fresh = await refreshAccessToken();
-            s.auth = { token: fresh };
-            s.connect();
-          } catch {
-            // refresh failed: leave disconnected; api layer will also force logout
+        s.on("connect_error", async (err) => {
+          // Likely an expired/refreshed token — try a silent refresh then retry.
+          if (err?.message && /token/i.test(err.message)) {
+            try {
+              const fresh = await refreshAccessToken();
+              if (!active) return;
+              s.auth = { token: fresh };
+              s.connect();
+            } catch {
+              // refresh failed: leave disconnected; api layer forces logout
+            }
           }
-        }
-      });
+        });
 
-      s.on("connect", () => {
-        if (active) setSocket(s);
+        s.on("connect", () => {
+          if (active) setSocket(s);
+        });
+        s.on("disconnect", () => {
+          if (active) setSocket(null);
+        });
       });
-      s.on("disconnect", () => {
-        if (active) setSocket(null);
-      });
-    });
+    };
+
+    // Acquire a token: prefer the in-memory one, otherwise restore it from the
+    // refresh cookie (handles the post-refresh cold start).
+    (async () => {
+      let token = getToken();
+      if (!token) {
+        try {
+          token = await refreshAccessToken();
+        } catch {
+          token = null;
+        }
+      }
+      if (!active || cancelled) return;
+      buildSocket(token);
+    })();
 
     return () => {
       active = false;

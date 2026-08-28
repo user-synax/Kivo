@@ -1,18 +1,21 @@
 "use client";
 
+import { Smile } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { EmojiPicker } from "@/components/dashboard/emoji-picker";
+import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { useSocket } from "@/components/socket-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
-  formatTime,
   otherParticipant,
   participantAvatarName,
   participantName,
 } from "@/lib/chat";
 
-const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const TYPING_IDLE_MS = 1500;
+// Messages from the same sender within this window are visually grouped.
+const GROUP_WINDOW_MS = 60000;
 
 function initials(name) {
   return name
@@ -21,6 +24,16 @@ function initials(name) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
+
+// Online / Offline status label — uses the transitions-dev text-states-swap:
+// the keyed span remounts on change so it blur-rises in (reduced-motion safe).
+function StatusText({ online }) {
+  return (
+    <span key={online ? "on" : "off"} className="t-text-swap">
+      {online ? "Online" : "Offline"}
+    </span>
+  );
 }
 
 function EmptyState() {
@@ -83,6 +96,9 @@ export function ChatPanel({ conversation, onBack }) {
   const [reactionFor, setReactionFor] = useState(null); // messageId with open picker
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [showEmoji, setShowEmoji] = useState(false);
+  const textareaRef = useRef(null);
+  const emojiBtnRef = useRef(null);
 
   const scrollRef = useRef(null);
   const typingTimer = useRef(null);
@@ -277,6 +293,22 @@ export function ChatPanel({ conversation, onBack }) {
     }, TYPING_IDLE_MS);
   };
 
+  // Insert an emoji at the caret position in the composer (falls back to
+  // appending at the end when the textarea isn't focused).
+  const insertEmoji = (emoji) => {
+    const el = textareaRef.current;
+    const start = el ? el.selectionStart : text.length;
+    const end = el ? el.selectionEnd : text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      const pos = start + emoji.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
   const send = async () => {
     const content = text.trim();
     if (!content || !convId) return;
@@ -415,18 +447,22 @@ export function ChatPanel({ conversation, onBack }) {
             </svg>
           </button>
         )}
-        <div className="relative flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-primary)]">
+        <div className="relative lg:ml-14 flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-primary)]">
           {initials(participantAvatarName(other))}
-          {otherOnline && (
-            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-[var(--online)] ring-2 ring-[var(--bg-base)]" />
-          )}
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-[var(--bg-base)] ${
+              otherOnline
+                ? "bg-[var(--online)]"
+                : "border border-[var(--text-muted)] bg-[var(--bg-surface)]"
+            }`}
+          />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--text-primary)]">
             {otherName}
           </p>
           <p className="truncate text-[12px] text-[var(--text-muted)]">
-            {otherOnline ? "Online" : "Offline"}
+            <StatusText online={otherOnline} />
           </p>
         </div>
       </div>
@@ -437,161 +473,68 @@ export function ChatPanel({ conversation, onBack }) {
         onScroll={(e) => {
           if (e.currentTarget.scrollTop <= 8) loadOlder();
         }}
-        className="flex-1 overflow-y-auto px-4 py-4"
+        className="t-scroll mt-12 flex-1 overflow-y-auto px-4 py-4"
       >
         {loadingHistory && (
           <p className="py-2 text-center text-[12px] text-[var(--text-muted)]">
             Loading…
           </p>
         )}
-        <div className="mx-auto flex max-w-3xl flex-col gap-2">
-          {messages.map((m) => {
+        <div
+          key={convId}
+          className="t-panel-in mx-auto flex max-w-3xl flex-col"
+        >
+          {messages.map((m, i) => {
             const mine = m.senderId === userId;
             const receipt = receiptState(m, userId, otherId);
+            const prev = i > 0 ? messages[i - 1] : null;
+            const next = i < messages.length - 1 ? messages[i + 1] : null;
+            const grouped =
+              !!prev &&
+              prev.senderId === m.senderId &&
+              !m.isDeleted &&
+              !prev.isDeleted &&
+              new Date(m.createdAt).getTime() -
+                new Date(prev.createdAt).getTime() <=
+                GROUP_WINDOW_MS;
+            const groupLast =
+              !next ||
+              next.senderId !== m.senderId ||
+              m.isDeleted ||
+              next.isDeleted ||
+              new Date(next.createdAt).getTime() -
+                new Date(m.createdAt).getTime() >
+                GROUP_WINDOW_MS;
             return (
               <div
                 key={m.id}
-                className={`group flex flex-col ${mine ? "items-end" : "items-start"}`}
+                className={`t-msg-in group flex flex-col ${mine ? "items-end" : "items-start"} ${
+                  i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
+                }`}
               >
-                <div
-                  className={`relative max-w-[75%] rounded-2xl px-4 py-2.5 text-sm text-[var(--text-primary)] ${
-                    mine
-                      ? "rounded-tr-md bg-[var(--bubble-sent)]"
-                      : "rounded-tl-md border border-[var(--border)] bg-[var(--bubble-received)]"
-                  }`}
-                >
-                  {editingId === m.id ? (
-                    <textarea
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          saveEdit(m.id);
-                        }
-                        if (e.key === "Escape") setEditingId(null);
-                      }}
-                      className="w-full bg-transparent text-sm text-[var(--text-primary)] focus:outline-none"
-                      rows={2}
-                    />
-                  ) : m.isDeleted ? (
-                    <span className="italic text-[var(--text-muted)]">
-                      This message was deleted
-                    </span>
-                  ) : (
-                    <span className="whitespace-pre-wrap break-words">
-                      {m.content}
-                    </span>
-                  )}
-
-                  {/* Hover actions */}
-                  {!m.isDeleted && editingId !== m.id && (
-                    <div
-                      className={`absolute -top-3 ${
-                        mine
-                          ? "left-0 -translate-x-full"
-                          : "right-0 translate-x-full"
-                      } hidden items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-1 py-0.5 group-hover:flex`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setReactionFor(reactionFor === m.id ? null : m.id)
-                        }
-                        aria-label="React"
-                        className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                      >
-                        ☺
-                      </button>
-                      {mine && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingId(m.id);
-                            setEditText(m.content);
-                          }}
-                          aria-label="Edit"
-                          className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
-                          ✎
-                        </button>
-                      )}
-                      {mine && (
-                        <button
-                          type="button"
-                          onClick={() => removeMessage(m.id)}
-                          aria-label="Delete"
-                          className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
-                          🗑
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Reaction picker */}
-                  {reactionFor === m.id && (
-                    <div
-                      className={`absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 ${
-                        mine ? "right-0" : "left-0"
-                      }`}
-                    >
-                      {EMOJIS.map((e) => (
-                        <button
-                          key={e}
-                          type="button"
-                          onClick={() => toggleReaction(m.id, e)}
-                          className="rounded px-1 text-base hover:bg-[var(--hover)]"
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Meta: time + receipt + reactions + failed retry */}
-                <div
-                  className={`mt-1 flex items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]`}
-                >
-                  <span>{formatTime(m.createdAt)}</span>
-                  {m.isEdited && <span>· edited</span>}
-                  {m.status === "failed" && (
-                    <button
-                      type="button"
-                      onClick={() => retry(m.tempId)}
-                      className="text-[var(--accent)] hover:underline"
-                    >
-                      failed · retry
-                    </button>
-                  )}
-                  {receipt === "sent" && <span>✓</span>}
-                  {receipt === "delivered" && <span>✓✓</span>}
-                  {receipt === "read" && (
-                    <span className="text-[var(--accent)]">✓✓</span>
-                  )}
-
-                  {/* Reaction chips */}
-                  {m.reactions && m.reactions.length > 0 && (
-                    <div className="ml-1 flex flex-wrap gap-1">
-                      {Object.entries(
-                        m.reactions.reduce((acc, r) => {
-                          acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-                          return acc;
-                        }, {}),
-                      ).map(([emoji, count]) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => toggleReaction(m.id, emoji)}
-                          className="rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[11px] hover:bg-[var(--hover)]"
-                        >
-                          {emoji} {count}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <MessageBubble
+                  message={m}
+                  mine={mine}
+                  showTail={groupLast}
+                  showMeta={groupLast}
+                  reactionOpen={reactionFor === m.id}
+                  isEditing={editingId === m.id}
+                  editText={editText}
+                  onEditTextChange={setEditText}
+                  onSaveEdit={() => saveEdit(m.id)}
+                  onCancelEdit={() => setEditingId(null)}
+                  onToggleReactionPicker={() =>
+                    setReactionFor(reactionFor === m.id ? null : m.id)
+                  }
+                  onReact={(emoji) => toggleReaction(m.id, emoji)}
+                  onEdit={() => {
+                    setEditingId(m.id);
+                    setEditText(m.content);
+                  }}
+                  onDelete={() => removeMessage(m.id)}
+                  onRetry={() => retry(m.tempId)}
+                  receipt={receipt}
+                />
               </div>
             );
           })}
@@ -611,8 +554,26 @@ export function ChatPanel({ conversation, onBack }) {
 
       {/* Composer */}
       <div className="shrink-0 border-t border-[var(--border)] p-3">
-        <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+        <div className="relative mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5">
+          <button
+            ref={emojiBtnRef}
+            type="button"
+            aria-label="Add emoji"
+            aria-expanded={showEmoji}
+            onClick={() => setShowEmoji((v) => !v)}
+            className="relative flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <Smile className="h-5 w-5" />
+            {showEmoji && (
+              <EmojiPicker
+                onSelect={(emoji) => insertEmoji(emoji)}
+                onClose={() => setShowEmoji(false)}
+                ignoreRef={emojiBtnRef}
+              />
+            )}
+          </button>
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -627,13 +588,13 @@ export function ChatPanel({ conversation, onBack }) {
             placeholder="Type a message…"
             aria-label="Message"
             rows={1}
-            className="max-h-32 w-full resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+            className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
           />
           <button
             type="button"
             onClick={send}
             disabled={!text.trim()}
-            className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[13px] font-medium text-[var(--on-accent)] transition-opacity duration-200 disabled:opacity-40"
+            className="shrink-0 rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:brightness-95 disabled:opacity-40"
           >
             Send
           </button>

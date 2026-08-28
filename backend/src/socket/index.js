@@ -86,7 +86,9 @@ export function initSocket(server) {
     // live updates for all their threads without per-room subscribe calls.
     let conversations = [];
     try {
-      conversations = await Conversation.find({ participants: userId }).select("_id").lean();
+      conversations = await Conversation.find({ participants: userId })
+        .select("_id participants")
+        .lean();
     } catch (err) {
       console.error("[socket] failed to load conversations for", userId, err);
     }
@@ -99,6 +101,22 @@ export function initSocket(server) {
     if (becameOnline) {
       // Notify other participants in this user's conversations.
       socket.broadcast.emit("presence:online", { userId });
+    }
+
+    // Push the current online state of this user's peers directly to the
+    // connecting socket. A late joiner would otherwise only learn peer presence
+    // from the GET /conversations snapshot (taken at load) and could render a
+    // peer as "offline" until that peer reconnects — this corrects it at once.
+    const peerIds = new Set();
+    for (const c of conversations) {
+      for (const p of c.participants || []) {
+        const pid = (p?._id || p)?.toString?.() || p?.toString?.();
+        if (pid && pid !== userId) peerIds.add(pid);
+      }
+    }
+    const onlinePeers = [...peerIds].filter((id) => isOnline(id));
+    if (onlinePeers.length) {
+      socket.emit("presence:snapshot", { online: onlinePeers });
     }
 
     // Typing indicator. Client emits { conversationId } with start/stop; we

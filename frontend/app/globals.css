@@ -177,6 +177,32 @@
   --tabs-bar-bg: var(--color-carbon-veil);
   --tabs-pill-bg: var(--color-phosphor-blue-black);
 
+  /* Notification badge — unread counts pop in */
+  --badge-slide-dur: 260ms;
+  --badge-pop-dur: 500ms;
+  --badge-pop-close-dur: 180ms;
+  --badge-fade-dur: 400ms;
+  --badge-fade-close-dur: 180ms;
+  --badge-blur: 2px;
+  --badge-offset-x: -8.2px;
+  --badge-offset-y: 12.4px;
+  --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Panel reveal — chat panel / message list entrance */
+  --panel-open-dur: 400ms;
+  --panel-close-dur: 350ms;
+  --panel-translate-y: 12px;
+  --panel-blur: 2px;
+  --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Text states swap — online / offline status */
+  --text-swap-dur: 150ms;
+  --text-swap-translate-y: 4px;
+  --text-swap-blur: 2px;
+  --text-swap-ease: ease-in-out;
+
   /* Hamburger morph */
   --morph-open-dur: 250ms;
   --morph-close-dur: 200ms;
@@ -552,6 +578,250 @@
     z-index: 0;
     pointer-events: none;
   }
+
+  /* ── transitions-dev: notification badge (unread counts) ───── */
+  @keyframes t-badge-slide-in {
+    from { transform: translate(var(--badge-offset-x), var(--badge-offset-y)); }
+    to   { transform: translate(0, 0); }
+  }
+  .t-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .t-badge[data-open="true"] {
+    animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease);
+  }
+  .t-badge-dot {
+    display: block;
+    transform-origin: center;
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+    transition:
+      transform var(--badge-pop-dur)  var(--badge-pop-ease),
+      opacity   var(--badge-fade-dur) var(--badge-pop-ease),
+      filter    var(--badge-pop-dur)  var(--badge-pop-ease);
+    will-change: transform, opacity, filter;
+  }
+  .t-badge[data-open="false"] .t-badge-dot {
+    transform: scale(0);
+    opacity: 0;
+    filter: blur(var(--badge-blur));
+    transition:
+      transform var(--badge-pop-close-dur) var(--badge-close-ease),
+      opacity   var(--badge-fade-close-dur) var(--badge-close-ease),
+      filter    var(--badge-pop-close-dur) var(--badge-close-ease);
+  }
+  @keyframes t-badge-pop {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+  }
+  .t-badge-pop {
+    animation: t-badge-pop var(--badge-pop-dur) var(--badge-pop-ease) both;
+  }
+
+  /* ── transitions-dev: panel reveal (message list entrance) ──── */
+  @keyframes t-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--panel-translate-y));
+      filter: blur(var(--panel-blur));
+    }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+  .t-panel-in {
+    animation: t-panel-in var(--panel-open-dur) var(--panel-ease) both;
+    will-change: transform, opacity, filter;
+  }
+
+  /* Per-message entrance — subtle cross-blur rise */
+  @keyframes t-msg-in {
+    from { opacity: 0; transform: translateY(8px); filter: blur(2px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+  .t-msg-in {
+    animation: t-msg-in var(--duration-slow) var(--ease-smooth-out) both;
+    will-change: transform, opacity, filter;
+  }
+
+  /* ── Chat message bubble (themeable surface) ───────────────
+     Colors are driven by --bubble-sent / --bubble-received (set per
+     global theme in theme.js). To ship a NEW bubble theme you do NOT
+     touch this component — just add a [data-bubble-theme="…"] override:
+
+       .t-bubble[data-bubble-theme="midnight"] {
+         --bubble-sent: #…;
+         --bubble-received: #…;
+         --bubble-radius: 22px;
+       }
+
+     The component reads these vars, so the new theme is picked up
+     automatically. Optional knobs: --bubble-radius, --bubble-pad.
+  */
+  .t-bubble {
+    position: relative;
+    max-width: 78%;
+    border-radius: var(--bubble-radius, 18px);
+    padding: var(--bubble-pad, 10px 14px);
+    font-size: var(--body-sm-font-size, 14px);
+    line-height: var(--leading-body-sm, 1.45);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    transition: background-color var(--duration-quick, 120ms)
+      var(--ease-smooth-out, ease);
+  }
+  .t-bubble.is-mine {
+    background: var(--bubble-sent);
+  }
+  .t-bubble.is-other {
+    background: var(--bubble-received);
+    border: 1px solid var(--border);
+  }
+  /* Tail corner (higher specificity so it beats the base border-radius shorthand). */
+  .t-bubble.is-mine.with-tail {
+    border-top-right-radius: 6px;
+  }
+  .t-bubble.is-other.with-tail {
+    border-top-left-radius: 6px;
+  }
+  .t-bubble.is-deleted {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  /* Example extra bubble theme (try data-bubble-theme="rounded"): softer,
+     more pill-like corners independent of the global color theme. */
+  .t-bubble[data-bubble-theme="rounded"] {
+    --bubble-radius: 22px;
+    --bubble-pad: 10px 16px;
+  }
+
+  /* ── transitions-dev: text states swap (online / offline) ──── */
+  @keyframes t-text-swap-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--text-swap-translate-y));
+      filter: blur(var(--text-swap-blur));
+    }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+  .t-text-swap {
+    display: inline-block;
+    animation: t-text-swap-in var(--text-swap-dur) var(--text-swap-ease) both;
+    will-change: transform, opacity, filter;
+  }
+
+  /* ── Custom themed scrollbar ──────────────────────────────
+     Replace the native scrollbar entirely. Colors are driven by theme
+     variables (--scrollbar-thumb / --scrollbar-thumb-hover) so the bar
+     re-skins with the active theme. Firefox uses scrollbar-width; WebKit
+     uses the ::-webkit-scrollbar family. */
+  .t-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  .t-scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .t-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .t-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    /* Transparent 2px border keeps a gap between thumb and track. */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .t-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  .t-scroll::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* ── Emoji picker (composer) ────────────────────────────── */
+  .t-emoji-picker {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    transform-origin: bottom left;
+    animation: t-panel-in var(--duration-fast) var(--ease-smooth-out) both;
+  }
+  .t-emoji-picker__tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .t-emoji-picker__tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .t-emoji-picker__tab {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border: 0;
+    border-radius: 9999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      color var(--duration-quick) var(--ease-smooth-out),
+      background-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  .t-emoji-picker__tab:hover {
+    color: var(--text-primary);
+  }
+  .t-emoji-picker__tab[data-active="true"] {
+    color: var(--on-accent);
+    background: var(--accent);
+  }
+  .t-emoji-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    padding: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .t-emoji-picker__emoji {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    padding: 2px;
+    font-size: 20px;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  .t-emoji-picker__emoji:hover {
+    background: var(--hover);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -559,9 +829,17 @@
   .t-modal,
   .t-modal-backdrop,
   .t-tabs-pill,
-  .t-tab {
+  .t-tab,
+  .t-badge,
+  .t-badge-dot,
+  .t-badge-pop,
+  .t-panel-in,
+  .t-msg-in,
+  .t-bubble,
+  .t-text-swap {
     /* biome-ignore lint/complexity/noImportantStyles: the transitions-dev skill requires an !important guard so the reduced-motion reset always wins. */
     transition: none !important;
+    animation: none !important;
   }
 }
 

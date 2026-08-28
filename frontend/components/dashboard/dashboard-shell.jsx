@@ -1,8 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
 import { apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
@@ -14,6 +14,7 @@ import { Sidebar } from "./sidebar";
 // Restrained easing — matches the rest of the app (no bounce).
 const EASE = [0.22, 1, 0.36, 1];
 const COLLAPSE_KEY = "kivo:sidebar-collapsed";
+const SELECTED_KEY = "kivo:selected-conversation";
 const MOBILE_QUERY = "(min-width: 768px)";
 
 function useIsDesktop() {
@@ -46,9 +47,24 @@ function toListItem(c, currentUser) {
 export function DashboardShell() {
   const isDesktop = useIsDesktop();
   const reduce = useReducedMotion();
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem(SELECTED_KEY) : null,
+  );
+  // Mirror selectedId into a ref so the socket handler (which only re-subscribes
+  // on [socket]) can read the currently open conversation without stale closures.
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+  // Mirror the conversation list + an in-flight fetch guard so the socket handler
+  // can detect a brand-new conversation and avoid duplicate list refreshes.
+  const fetchingRef = useRef(new Set());
   const [collapsed, setCollapsed] = useState(false);
   const [conversations, setConversations] = useState([]);
+  const conversationsRef = useRef(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
   const [showFriends, setShowFriends] = useState(false);
   const socket = useSocket();
   const currentUser = getSession();
@@ -70,12 +86,38 @@ export function DashboardShell() {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
+  // Remember the open conversation across reloads so the chat doesn't reset to the
+  // empty state on every refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
+    else localStorage.removeItem(SELECTED_KEY);
+  }, [selectedId]);
+
+  // Reusable list loader (also used to pull in a conversation that just appeared).
+  const loadConversations = useCallback(() => {
+    return apiGet("/api/v1/conversations")
+      .then((data) => (Array.isArray(data) ? data : []))
+      .catch(() => []);
+  }, []);
+
   // Load the conversation list once on mount.
   useEffect(() => {
     let active = true;
-    apiGet("/api/v1/conversations")
+    loadConversations()
       .then((data) => {
-        if (active) setConversations(Array.isArray(data) ? data : []);
+        if (!active) return;
+        const list = Array.isArray(data) ? data : [];
+        setConversations(list);
+        // The open conversation may have been restored from localStorage before
+        // this fetch resolved — clear its unread now so the badge doesn't stick.
+        const restored = selectedIdRef.current;
+        if (restored && list.some((c) => c.id === restored)) {
+          apiPost(`/api/v1/conversations/${restored}/read`, {}).catch(() => {});
+          setConversations((prev) =>
+            prev.map((c) => (c.id === restored ? { ...c, unreadCount: 0 } : c)),
+          );
+        }
       })
       .catch(() => {
         if (active) setConversations([]);
@@ -83,9 +125,10 @@ export function DashboardShell() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadConversations]);
 
-  // Mark the opened conversation as read (clears its unread badge).
+  // Mark the opened conversation as read (clears its unread badge). Also runs on
+  // mount (selectedId restored from localStorage) and on every selection change.
   useEffect(() => {
     if (!selectedId) return undefined;
     apiPost(`/api/v1/conversations/${selectedId}/read`, {}).catch(() => {});
@@ -104,18 +147,35 @@ export function DashboardShell() {
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === msg.conversationId);
         if (idx === -1) return prev;
+        const isMine = msg.senderId === currentUser?.id;
+        // If the conversation is currently open the viewer is looking at it, so
+        // don't bump the unread badge (chat-panel already marks it read on
+        // receipt). Only unread conversations get incremented.
+        const isOpen = msg.conversationId === selectedIdRef.current;
         const updated = {
           ...prev[idx],
           lastMessageAt: msg.createdAt,
           lastMessagePreview: msg.isDeleted ? "" : msg.content,
-          unreadCount:
-            msg.senderId === currentUser?.id
-              ? prev[idx].unreadCount
+          unreadCount: isMine
+            ? prev[idx].unreadCount
+            : isOpen
+              ? 0
               : (prev[idx].unreadCount || 0) + 1,
         };
         const rest = prev.filter((c) => c.id !== msg.conversationId);
         return [updated, ...rest];
       });
+      // Brand-new DM from a user not yet in the list: pull the full list once so
+      // it appears live (guarded so a burst of messages doesn't refetch repeatedly).
+      if (
+        !conversationsRef.current.some((c) => c.id === msg.conversationId) &&
+        !fetchingRef.current.has(msg.conversationId)
+      ) {
+        fetchingRef.current.add(msg.conversationId);
+        loadConversations()
+          .then((list) => setConversations(list))
+          .finally(() => fetchingRef.current.delete(msg.conversationId));
+      }
     };
 
     const onPresence = (userId, online) => {
@@ -135,16 +195,31 @@ export function DashboardShell() {
       );
     };
 
+    // Authoritative list of peers who are already online when this socket joins.
+    const onSnapshot = ({ online }) => {
+      if (!Array.isArray(online)) return;
+      const set = new Set(online.map(String));
+      setConversations((prev) =>
+        prev.map((c) => {
+          const others = c.otherParticipantIds || [];
+          if (!others.length) return c;
+          return { ...c, online: others.map((id) => set.has(String(id))) };
+        }),
+      );
+    };
+
     socket.on("message:new", onNew);
     socket.on("presence:online", (p) => onPresence(p?.userId, true));
     socket.on("presence:offline", (p) => onPresence(p?.userId, false));
+    socket.on("presence:snapshot", onSnapshot);
 
     return () => {
       socket.off("message:new", onNew);
       socket.off("presence:online");
       socket.off("presence:offline");
+      socket.off("presence:snapshot", onSnapshot);
     };
-  }, [socket, currentUser?.id]);
+  }, [socket, currentUser?.id, loadConversations]);
 
   // All hooks above run unconditionally. Only now — after every hook has been
   // declared — is it safe to bail out of rendering when the session is gone.

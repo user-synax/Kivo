@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
+import { PanelLeft } from "lucide-react";
 
 // Conversation list. On desktop it expands (names/previews) or collapses to an
 // icon-only avatar rail. On mobile it is always full-width and the toggle is
@@ -45,7 +46,7 @@ function ConversationItem({ conversation, selected, collapsed, onSelect }) {
       type="button"
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
-      className={`group relative flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] ${
+      className={`group relative hover:cursor-pointer flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] ${
         selected ? "bg-[var(--hover)]" : ""
       } ${collapsed ? "justify-center" : ""}`}
     >
@@ -56,7 +57,9 @@ function ConversationItem({ conversation, selected, collapsed, onSelect }) {
       <div className="relative shrink-0">
         <Avatar name={name} selected={selected} online={online} />
         {unread > 0 && collapsed && (
-          <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-[var(--unread-badge)] ring-2 ring-[var(--bg-elevated)]" />
+          <span className="t-badge" data-open="true">
+            <span className="t-badge-dot size-2.5 rounded-full bg-[var(--unread-badge)] ring-2 ring-[var(--bg-elevated)]" />
+          </span>
         )}
       </div>
 
@@ -75,7 +78,7 @@ function ConversationItem({ conversation, selected, collapsed, onSelect }) {
               {lastMessage}
             </span>
             {unread > 0 && (
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--unread-badge)] px-1 text-[11px] font-medium text-[var(--on-accent)]">
+              <span className="t-badge-pop flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--unread-badge)] px-1 text-[11px] font-medium text-[var(--on-accent)]">
                 {unread}
               </span>
             )}
@@ -312,15 +315,9 @@ export function Sidebar({
               type="button"
               onClick={onToggle}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              className="flex size-9 hover:cursor-pointer items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
+                <PanelLeft className="w-5 h-5"/>
                 {collapsed ? (
                   <path
                     d="M4 6h16M4 12h10M4 18h16"
@@ -336,7 +333,6 @@ export function Sidebar({
                     strokeLinecap="round"
                   />
                 )}
-              </svg>
             </button>
           )}
         </div>
