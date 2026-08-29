@@ -162,7 +162,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
         role="dialog"
         aria-modal="true"
         aria-label="Edit profile"
-        className={`t-modal relative z-10 m-3 w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-md)] ${
+        className={`t-modal relative z-10 m-0 w-full max-w-md overflow-hidden rounded-t-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-md)] sm:m-3 sm:rounded-2xl ${
           shown ? "is-open" : ""
         }`}
       >
@@ -290,7 +290,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">
               Avatar style
             </span>
-            <div className="grid grid-cols-5 gap-3">
+             <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 sm:gap-3">
               {AVATAR_STYLES.map((preset) => {
                 const active = preset.id === avatarStyle;
                 return (
@@ -335,7 +335,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-8">
+        <div className="flex flex-col gap-3 border-t border-[var(--border)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <button
             type="button"
             onClick={openFullProfile}
@@ -347,7 +347,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             <button
               type="button"
               onClick={close}
-              className="rounded-lg border border-[var(--border)] px-12 hover:cursor-pointer py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)]"
+              className="flex-1 rounded-lg border border-[var(--border)] px-4 hover:cursor-pointer py-2.5 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] sm:flex-none"
             >
               Cancel
             </button>
@@ -355,7 +355,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[var(--accent)] px-12 hover:cursor-pointer py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:brightness-95 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-[var(--accent)] px-4 hover:cursor-pointer py-2.5 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:brightness-95 disabled:opacity-50 sm:flex-none"
             >
               {saving ? "Saving…" : "Save"}
             </button>

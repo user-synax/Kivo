@@ -26,7 +26,7 @@ function MemberRow({
   busy,
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5">
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5">
       <Avatar
         name={participantName(member)}
         avatarStyle={member.avatarStyle}
@@ -48,7 +48,7 @@ function MemberRow({
         </div>
       </div>
       {canManage && !isSelf && (
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:justify-end max-sm:gap-2">
           {isAdmin ? (
             <button
               type="button"

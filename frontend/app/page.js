@@ -10,7 +10,7 @@ const EASE_SMOOTH_OUT = [0.22, 1, 0.36, 1];
 
 /* Drop your hero visual in /public and point this at the file.
    e.g. "/hero-image.png". Until it exists, a placeholder is shown. */
-const HERO_IMAGE = "/hero-image";
+const HERO_IMAGE = "/hero-image.png";
 
 export default function Home() {
   const reduce = useReducedMotion();
