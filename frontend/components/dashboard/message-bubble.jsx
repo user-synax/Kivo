@@ -1,10 +1,24 @@
 "use client";
 
 import { Check, CheckCheck, FaceGrinning, Pencil, Trash } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { formatTime } from "@/lib/chat";
 import { cn } from "@/lib/utils";
+
+// True on touch / no-hover devices (phones, tablets). Used to swap the
+// desktop hover-reveal of message actions for a press-and-hold gesture.
+function useIsTouch() {
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: none) and (pointer: coarse)");
+    setIsTouch(mq.matches);
+    const onChange = (e) => setIsTouch(e.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  return isTouch;
+}
 
 // A single chat message bubble built on shadcn's `Bubble` primitive.
 //
@@ -41,6 +55,28 @@ export function MessageBubble({
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
+  const isTouch = useIsTouch();
+
+  // Mobile: hold a bubble to reveal its actions. The timer is cancelled if the
+  // finger moves (scroll) or lifts before the threshold, so it never fights scrolling.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pressTimer = useRef(null);
+
+  const startPress = () => {
+    if (!isTouch || deleted || isEditing) return;
+    pressTimer.current = setTimeout(() => {
+      setMenuOpen(true);
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate(12);
+      }
+    }, 450);
+  };
+  const cancelPress = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
 
   useEffect(() => {
     if (isEditing) editRef.current?.focus();
@@ -51,10 +87,27 @@ export function MessageBubble({
 
   return (
     <>
+      {/* Tap-away layer while the mobile long-press menu is open. */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <Bubble
         variant={bubbleVariant}
         align={mine ? "end" : "start"}
-        className={cn("group/bubble relative", className)}
+        className={cn("group/bubble relative", isTouch && "select-none", className)}
+        onTouchStart={startPress}
+        onTouchEnd={cancelPress}
+        onTouchMove={cancelPress}
+        onContextMenu={(e) => {
+          if (!isTouch) return;
+          e.preventDefault();
+          setMenuOpen((v) => !v);
+        }}
       >
         <BubbleContent className={cn(contentClassName)}>
           {isEditing ? (
@@ -79,17 +132,25 @@ export function MessageBubble({
           )}
         </BubbleContent>
 
-        {/* Hover actions (react / edit / delete) */}
+        {/* Hover actions (react / edit / delete). On touch devices these are
+            also revealed by a long-press on the bubble. */}
         {!deleted && !isEditing && (
           <div
             className={cn(
-              "absolute -top-3 hidden items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-1 py-0.5 group-hover/bubble:flex",
-              mine ? "left-0 -translate-x-full" : "right-0 translate-x-full",
+              "absolute z-20 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-1 py-0.5 shadow-md",
+              menuOpen ? "flex" : "hidden group-hover/bubble:flex",
+              mine
+                ? "left-0 -top-3 -translate-x-full"
+                : "right-0 -top-3 translate-x-full",
+              "max-sm:left-1/2 max-sm:-top-2 max-sm:-translate-x-1/2 max-sm:translate-y-0",
             )}
           >
             <button
               type="button"
-              onClick={onToggleReactionPicker}
+              onClick={() => {
+                setMenuOpen(false);
+                onToggleReactionPicker?.();
+              }}
               aria-label="React"
               className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
             >
@@ -98,7 +159,10 @@ export function MessageBubble({
             {mine && (
               <button
                 type="button"
-                onClick={onEdit}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onEdit?.();
+                }}
                 aria-label="Edit"
                 className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
               >
@@ -108,7 +172,10 @@ export function MessageBubble({
             {mine && (
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete?.();
+                }}
                 aria-label="Delete"
                 className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
               >
