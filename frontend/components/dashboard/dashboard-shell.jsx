@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
-import { UserPanel } from "./user-panel";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import {
@@ -15,7 +14,52 @@ import {
 } from "@/lib/chat";
 import { ChatPanel } from "./chat-panel";
 import { FriendsModal } from "./friends-modal";
+import { GroupCreateModal } from "./group-create-modal";
+import { GroupSettingsPanel } from "./group-settings-panel";
 import { Sidebar } from "./sidebar";
+
+// Group settings surface: a slide-in drawer on smaller screens (with a dimmed
+// backdrop) and a persistent side column on wide desktops (xl+). The inner
+// GroupSettingsPanel owns the content; this wrapper only controls positioning
+// and the enter/exit transition so it works in both the mobile and desktop
+// layouts.
+function GroupSettingsOverlay({ open, conversation, onClose, onConversationUpdate, onLeft }) {
+  const reduce = useReducedMotion();
+  const slide = reduce ? { duration: 0 } : { duration: 0.28, ease: EASE };
+  return (
+    <AnimatePresence>
+      {open && conversation && (
+        <motion.div
+          key="gs-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
+          onClick={onClose}
+          className="fixed inset-0 z-30 bg-black/40 xl:hidden"
+        />
+      )}
+      {open && conversation && (
+        <motion.aside
+          key="gs-drawer"
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "100%" }}
+          transition={slide}
+          className="fixed right-0 top-0 z-40 h-[100dvh] w-[320px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-none"
+        >
+          <GroupSettingsPanel
+            conversation={conversation}
+            onClose={onClose}
+            onConversationUpdate={onConversationUpdate}
+            onLeft={onLeft}
+          />
+        </motion.aside>
+      )}
+    </AnimatePresence>
+  );
+}
+import { UserPanel } from "./user-panel";
 
 // Restrained easing — matches the rest of the app (no bounce).
 const EASE = [0.22, 1, 0.36, 1];
@@ -37,18 +81,19 @@ function useIsDesktop() {
 
 // Convert a backend conversation into the shape the Sidebar renders.
 function toListItem(c, currentUser) {
+  const isGroup = c.type === "group";
   const other = otherParticipant(c, currentUser?.id);
   const online = Array.isArray(c.online) ? c.online.some(Boolean) : false;
   return {
     id: c.id,
-    name: c.type === "group" ? c.name || "Group" : participantName(other),
+    name: isGroup ? c.name || "Group" : participantName(other),
     type: c.type,
-    lastMessage: c.lastMessagePreview || "",
+    lastMessage: c.lastMessagePreview || (isGroup ? "Group conversation" : ""),
     time: formatTime(c.lastMessageAt),
     unread: c.unreadCount || 0,
     online,
-    avatarStyle: other?.avatarStyle || null,
-    avatarUrl: other?.avatarUrl || null,
+    avatarStyle: isGroup ? null : other?.avatarStyle || null,
+    avatarUrl: isGroup ? c.avatarUrl || null : other?.avatarUrl || null,
   };
 }
 
@@ -78,6 +123,8 @@ export function DashboardShell() {
     conversationsRef.current = conversations;
   }, [conversations]);
   const [showFriends, setShowFriends] = useState(false);
+  const [showGroupCreate, setShowGroupCreate] = useState(false);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
   const socket = useSocket();
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
@@ -145,6 +192,29 @@ export function DashboardShell() {
       .catch(() => []);
   }, []);
 
+  // Insert or merge a conversation into the list (drives sidebar + selected).
+  // Recomputes isAdmin from the admins array so realtime events — which carry the
+  // acting member's perspective — don't clobber the current user's admin flag.
+  const upsertConversation = useCallback((conv) => {
+    if (!conv?.id) return;
+    const me = getSession();
+    const merged = {
+      ...conv,
+      isAdmin: (conv.admins || []).map(String).includes(me?.id),
+    };
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === conv.id);
+      if (idx === -1) return [merged, ...prev];
+      const copy = [...prev];
+      copy[idx] = {
+        ...copy[idx],
+        ...merged,
+        unreadCount: merged.unreadCount ?? copy[idx].unreadCount,
+      };
+      return copy;
+    });
+  }, []);
+
   // Load the conversation list once on mount.
   useEffect(() => {
     let active = true;
@@ -157,7 +227,9 @@ export function DashboardShell() {
         // this fetch resolved — clear its unread now so the badge doesn't stick.
         const restored = selectedIdRef.current;
         if (restored && list.some((c) => c.id === restored)) {
-          apiPatch(`/api/v1/conversations/${restored}/read`, {}).catch(() => {});
+          apiPatch(`/api/v1/conversations/${restored}/read`, {}).catch(
+            () => {},
+          );
           setConversations((prev) =>
             prev.map((c) => (c.id === restored ? { ...c, unreadCount: 0 } : c)),
           );
@@ -283,13 +355,46 @@ export function DashboardShell() {
     socket.on("presence:offline", (p) => onPresence(p?.userId, false));
     socket.on("presence:snapshot", onSnapshot);
 
+    // Group membership / settings changes pushed from the server. These keep the
+    // conversation list, the open chat, and the settings panel in sync for every
+    // member (including the acting user, whose API response also updates state).
+    const onMemberAdded = ({ conversation }) => {
+      if (conversation) upsertConversation(conversation);
+    };
+    const onMemberRemoved = ({ conversation }) => {
+      if (conversation) upsertConversation(conversation);
+    };
+    const onConversationUpdated = ({ conversation }) => {
+      if (conversation) upsertConversation(conversation);
+    };
+    const onAdminChanged = ({ conversation }) => {
+      if (conversation) upsertConversation(conversation);
+    };
+    const onConversationRemoved = ({ conversationId }) => {
+      if (!conversationId) return;
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      setSelectedId((id) => (id === conversationId ? null : id));
+      setShowGroupSettings(false);
+    };
+
+    socket.on("conversation:member-added", onMemberAdded);
+    socket.on("conversation:member-removed", onMemberRemoved);
+    socket.on("conversation:updated", onConversationUpdated);
+    socket.on("conversation:admin-changed", onAdminChanged);
+    socket.on("conversation:removed", onConversationRemoved);
+
     return () => {
       socket.off("message:new", onNew);
       socket.off("presence:online");
       socket.off("presence:offline");
       socket.off("presence:snapshot", onSnapshot);
+      socket.off("conversation:member-added", onMemberAdded);
+      socket.off("conversation:member-removed", onMemberRemoved);
+      socket.off("conversation:updated", onConversationUpdated);
+      socket.off("conversation:admin-changed", onAdminChanged);
+      socket.off("conversation:removed", onConversationRemoved);
     };
-  }, [socket, currentUser?.id, loadConversations]);
+  }, [socket, currentUser?.id, loadConversations, upsertConversation]);
 
   // All hooks above run unconditionally. Only now — after every hook has been
   // declared — is it safe to bail out of rendering when the session is gone.
@@ -297,6 +402,10 @@ export function DashboardShell() {
 
   const handleCompose = () => {
     setShowFriends(true);
+  };
+
+  const handleNewGroup = () => {
+    setShowGroupCreate(true);
   };
 
   // Called from the friends modal when the user picks "Message" on a friend.
@@ -308,10 +417,29 @@ export function DashboardShell() {
         return [conv, ...prev];
       });
       setSelectedId(conv.id);
+      setShowGroupSettings(false);
       setShowFriends(false);
     } catch (err) {
       window.alert(err?.message || "Could not start conversation");
     }
+  };
+
+  // Called when a group is created from the friends modal's group flow.
+  const handleGroupCreated = (conv) => {
+    setConversations((prev) => {
+      if (prev.some((c) => c.id === conv.id)) return prev;
+      return [conv, ...prev];
+    });
+    setSelectedId(conv.id);
+    setShowGroupSettings(false);
+    setShowFriends(false);
+    setShowGroupCreate(false);
+  };
+
+  // Selecting any conversation closes an open group-settings drawer.
+  const handleSelect = (id) => {
+    setShowGroupSettings(false);
+    setSelectedId(id);
   };
 
   const selected = conversations.find((c) => c.id === selectedId) || null;
@@ -344,6 +472,7 @@ export function DashboardShell() {
               <ChatPanel
                 conversation={selected}
                 onBack={() => setSelectedId(null)}
+                onOpenGroupSettings={() => setShowGroupSettings(true)}
               />
             </motion.div>
           ) : (
@@ -358,24 +487,42 @@ export function DashboardShell() {
               <Sidebar
                 conversations={listItems}
                 selectedId={selectedId}
-                onSelect={setSelectedId}
+                onSelect={handleSelect}
                 collapsed={false}
                 showToggle={false}
                 onCompose={handleCompose}
+                onNewGroup={handleNewGroup}
                 currentUser={currentUser}
                 onProfileUpdate={refreshUser}
               />
             </motion.div>
           )}
         </AnimatePresence>
-        <FriendsModal
-          open={showFriends}
-          onClose={() => setShowFriends(false)}
-          onStartChat={handleStartChat}
-        />
-      </div>
-    );
-  }
+      <FriendsModal
+        open={showFriends}
+        onClose={() => setShowFriends(false)}
+        onStartChat={handleStartChat}
+      />
+
+      <GroupCreateModal
+        open={showGroupCreate}
+        onClose={() => setShowGroupCreate(false)}
+        onCreated={handleGroupCreated}
+      />
+
+      <GroupSettingsOverlay
+        open={selected?.type === "group" && showGroupSettings}
+        conversation={selected}
+        onClose={() => setShowGroupSettings(false)}
+        onConversationUpdate={upsertConversation}
+        onLeft={() => {
+          setShowGroupSettings(false);
+          setSelectedId(null);
+        }}
+      />
+    </div>
+  );
+}
 
   // Desktop: sidebar + chat side by side.
   return (
@@ -388,18 +535,22 @@ export function DashboardShell() {
         <Sidebar
           conversations={listItems}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={handleSelect}
           collapsed={collapsed}
           showToggle
           onToggle={() => setCollapsed((v) => !v)}
           onCompose={handleCompose}
+          onNewGroup={handleNewGroup}
           currentUser={currentUser}
           onProfileUpdate={refreshUser}
         />
       </motion.div>
 
       <div className="flex h-full min-w-0 flex-1 flex-col">
-        <ChatPanel conversation={selected} />
+        <ChatPanel
+          conversation={selected}
+          onOpenGroupSettings={() => setShowGroupSettings(true)}
+        />
       </div>
 
       <AnimatePresence mode="wait">
@@ -414,10 +565,27 @@ export function DashboardShell() {
         ) : null}
       </AnimatePresence>
 
+      <GroupSettingsOverlay
+        open={selected?.type === "group" && showGroupSettings}
+        conversation={selected}
+        onClose={() => setShowGroupSettings(false)}
+        onConversationUpdate={upsertConversation}
+        onLeft={() => {
+          setShowGroupSettings(false);
+          setSelectedId(null);
+        }}
+      />
+
       <FriendsModal
         open={showFriends}
         onClose={() => setShowFriends(false)}
         onStartChat={handleStartChat}
+      />
+
+      <GroupCreateModal
+        open={showGroupCreate}
+        onClose={() => setShowGroupCreate(false)}
+        onCreated={handleGroupCreated}
       />
     </div>
   );

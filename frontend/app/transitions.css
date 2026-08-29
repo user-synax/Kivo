@@ -1,0 +1,398 @@
+/* ============================================================================
+   transitions.css — KIVO micro-animation library (transitions-dev)
+   ----------------------------------------------------------------------------
+   Shared motion tokens (--duration-*, --ease-*, --distance-*) live in
+   globals.css :root. These classes implement the skill's patterns:
+   t-stagger, t-shimmer, t-digit-group, t-tilt (+card/glare), t-tt (tooltip),
+   t-acc (accordion), t-panel-slide, t-check, t-avatar-group, t-success-check,
+   t-learn, t-icon-swap, t-skel. Reduced-motion is honored globally.
+   ========================================================================== */
+
+/* ── Stagger (texts / items reveal) ─────────────────────────────────────── */
+@keyframes t-stagger-in {
+    from {
+        opacity: 0;
+        transform: translateY(var(--stagger-distance, 12px));
+        filter: blur(var(--stagger-blur, 3px));
+    }
+    to {
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+}
+.t-stagger {
+    opacity: 0;
+    animation: t-stagger-in var(--stagger-dur, 500ms) var(--stagger-ease,
+            cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: var(--stagger-delay, 0ms);
+    will-change: transform, opacity, filter;
+}
+.t-stagger[data-stagger-index] {
+    /* index is injected inline as a custom prop for per-item offset */
+    animation-delay: calc(
+        var(--stagger-index, 0) * var(--stagger-stagger, 40ms)
+    );
+}
+
+/* ── Shimmer (skeleton / eyebrow sweep) ─────────────────────────────────── */
+.t-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+.t-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.12),
+        transparent
+    );
+    animation: t-shimmer-sweep 2.6s ease-in-out infinite;
+}
+@keyframes t-shimmer-sweep {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* ── Digit group (number pop-in) ────────────────────────────────────────── */
+@keyframes t-digit-pop {
+    from {
+        opacity: 0;
+        transform: translateY(40%) scale(0.8);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+}
+.t-digit-group {
+    display: inline-flex;
+    overflow: hidden;
+}
+.t-digit-group > * {
+    display: inline-block;
+    animation: t-digit-pop var(--duration-slow, 400ms)
+        var(--ease-bounce, cubic-bezier(0.34, 1.36, 0.64, 1)) both;
+    animation-delay: var(--digit-delay, 0ms);
+}
+
+/* ── Tilt (card hover tilt + glare) ─────────────────────────────────────── */
+.t-tilt {
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform var(--duration-fast, 250ms)
+        var(--ease-smooth-out, ease-out);
+    will-change: transform;
+}
+.t-tilt-card {
+    position: relative;
+    border-radius: inherit;
+    transform-style: preserve-3d;
+    transition: transform var(--duration-fast, 250ms)
+        var(--ease-smooth-out, ease-out);
+    will-change: transform;
+}
+.t-tilt-glare {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+        circle at var(--glare-x, 50%) var(--glare-y, 0%),
+        rgba(255, 255, 255, 0.18),
+        transparent 45%
+    );
+    transition: opacity var(--duration-fast, 250ms) var(--ease-smooth-out, ease-out);
+    z-index: 2;
+}
+.t-tilt:hover .t-tilt-glare,
+.t-tilt-card:hover .t-tilt-glare {
+    opacity: 1;
+}
+
+/* ── Tooltip (t-tt) ─────────────────────────────────────────────────────── */
+.t-tt-wrap {
+    position: relative;
+    display: inline-flex;
+}
+.t-tt-trigger {
+    cursor: help;
+}
+.t-tt {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translate(-50%, 4px) scale(var(--tt-scale, 0.96));
+    transform-origin: bottom center;
+    min-width: 12rem;
+    width: max-content;
+    max-width: 18rem;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--ink, #fff);
+    background: var(--surface-2, #1c1c1c);
+    border: 1px solid var(--hairline, #262626);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity var(--duration-quick, 150ms) var(--ease-smooth-out, ease-out),
+        transform var(--duration-quick, 150ms) var(--ease-smooth-out, ease-out);
+    z-index: 50;
+}
+.t-tt-wrap:hover .t-tt,
+.t-tt-trigger:focus-visible + .t-tt {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+    pointer-events: auto;
+}
+
+/* ── Accordion (t-acc) ─────────────────────────────────────────────────── */
+.t-acc {
+    --acc-max: 0fr;
+    border: 1px solid var(--hairline, #262626);
+    border-radius: 16px;
+    background: var(--surface-1, #141414);
+    overflow: hidden;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.t-acc-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink, #fff);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+.t-acc-chevron {
+    color: var(--ink-muted, #999);
+    flex-shrink: 0;
+    transition: transform var(--duration-fast, 250ms)
+        var(--ease-smooth-out, ease-out);
+}
+.t-acc[data-open="true"] .t-acc-chevron {
+    transform: rotate(180deg);
+}
+.t-acc-panel {
+    display: grid;
+    grid-template-rows: var(--acc-max);
+    transition: grid-template-rows var(--duration-medium, 350ms)
+        var(--ease-smooth-out, ease-out);
+}
+.t-acc[data-open="true"] {
+    --acc-max: 1fr;
+}
+.t-acc-panel-inner {
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ── Panel slide (reveal) ───────────────────────────────────────────────── */
+@keyframes t-panel-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(-24px);
+        filter: blur(2px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+}
+.t-panel-slide {
+    animation: t-panel-slide-in var(--duration-slow, 400ms)
+        var(--ease-smooth-out, ease-out) both;
+    will-change: transform, opacity, filter;
+}
+
+/* ── Check (animated checkbox tick) ─────────────────────────────────────── */
+.t-check {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.55rem;
+    border: 2px solid rgba(75, 169, 225, 0.5);
+    background: var(--surface-1, #141414);
+    cursor: pointer;
+    transition: background var(--duration-slow, 400ms)
+            var(--ease-smooth-out, ease-out),
+        border-color var(--duration-slow, 400ms) var(--ease-smooth-out, ease-out);
+}
+.t-check svg {
+    width: 100%;
+    height: 100%;
+}
+.t-check svg path {
+    fill: none;
+    stroke: var(--accent-blue, #4ba9e1);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: var(--check-len, 15);
+    stroke-dashoffset: var(--check-len, 15);
+    transition: stroke-dashoffset var(--duration-slow, 400ms)
+        var(--ease-smooth-out, ease-out);
+}
+.t-check[aria-checked="true"] {
+    background: var(--accent-blue, #4ba9e1);
+    border-color: var(--accent-blue, #4ba9e1);
+}
+.t-check[aria-checked="true"] svg path {
+    stroke: #fff;
+    stroke-dashoffset: 0;
+}
+
+/* ── Avatar group (t-avatar-group) ─────────────────────────────────────── */
+.t-avatar-group {
+    display: inline-flex;
+    align-items: center;
+}
+.t-avatar {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    border: 2px solid var(--canvas, #090909);
+    background: var(--surface-2, #1c1c1c);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    overflow: hidden;
+    margin-left: -0.6rem;
+}
+.t-avatar:first-child {
+    margin-left: 0;
+}
+
+/* ── Success check (badge) ──────────────────────────────────────────────── */
+.t-success-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.t-success-check svg path {
+    stroke: var(--accent-blue, #4ba9e1);
+    stroke-width: 5;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ── Learn CTA (t-learn) ───────────────────────────────────────────────── */
+.t-learn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: var(--accent-blue, #4ba9e1);
+    transition: gap var(--duration-quick, 150ms) var(--ease-smooth-out, ease-out);
+}
+.t-learn:hover {
+    gap: 0.7rem;
+}
+
+/* ── Icon swap (t-icon-swap) ────────────────────────────────────────────── */
+.t-icon-swap {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 1em;
+    height: 1em;
+}
+.t-icon-swap > * {
+    grid-area: 1 / 1;
+    transition:
+        opacity var(--duration-quick, 150ms) var(--ease-smooth-out, ease-out),
+        transform var(--duration-quick, 150ms) var(--ease-smooth-out, ease-out);
+}
+.t-icon-swap > :last-child {
+    opacity: 0;
+    transform: translateX(-40%);
+}
+.t-icon-swap[data-swapped="true"] > :first-child {
+    opacity: 0;
+    transform: translateX(40%);
+}
+.t-icon-swap[data-swapped="true"] > :last-child {
+    opacity: 1;
+    transform: none;
+}
+
+/* ── Skeleton (t-skel) ─────────────────────────────────────────────────── */
+.t-skel {
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: inherit;
+}
+.t-skel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    animation: t-shimmer-sweep 1.8s ease-in-out infinite;
+}
+.t-skel-content {
+    opacity: 0;
+    transition: opacity var(--duration-slow, 400ms)
+        var(--ease-smooth-out, ease-out);
+}
+.t-skel[data-loaded="true"]::after {
+    animation: none;
+    opacity: 0;
+}
+.t-skel[data-loaded="true"] .t-skel-content {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .t-stagger,
+    .t-shimmer::after,
+    .t-digit-group > *,
+    .t-panel-slide,
+    .t-skel::after,
+    .t-icon-swap > *,
+    .t-check svg path,
+    .t-acc-panel,
+    .t-acc-chevron {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+    }
+    .t-skel::after {
+        display: none;
+    }
+}

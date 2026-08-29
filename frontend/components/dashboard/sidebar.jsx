@@ -66,6 +66,40 @@ function ConversationItem({ conversation, selected, onSelect, index }) {
   );
 }
 
+function ConversationSection({ label, items, selectedId, onSelect, baseIndex = 0, collapsed, onNewGroup }) {
+  if (!items.length) return null;
+  return (
+    <div className="mb-1">
+      {!collapsed && (
+        <div className="flex items-center justify-between px-3 pb-1 pt-3">
+          <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            {label}
+          </span>
+          {onNewGroup && (
+            <button
+              type="button"
+              onClick={onNewGroup}
+              aria-label="New group"
+              className="kivo-focus flex size-6 items-center justify-center rounded-full text-[var(--text-muted)] hover:cursor-pointer transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+      )}
+      {items.map((c, i) => (
+        <ConversationItem
+          key={c.id}
+          conversation={c}
+          selected={c.id === selectedId}
+          onSelect={() => onSelect(c.id)}
+          index={baseIndex + i}
+        />
+      ))}
+    </div>
+  );
+}
+
 function ProfileNav({ currentUser, onEditProfile, collapsed }) {
   if (!currentUser) return null;
   const label = currentUser.displayName || currentUser.email || "Account";
@@ -236,6 +270,7 @@ export function Sidebar({
   showToggle,
   onToggle,
   onCompose,
+  onNewGroup,
   currentUser,
   onProfileUpdate,
 }) {
@@ -250,8 +285,17 @@ export function Sidebar({
     );
   }, [conversations, query]);
 
+  const dms = useMemo(
+    () => filtered.filter((c) => c.type !== "group"),
+    [filtered],
+  );
+  const groups = useMemo(
+    () => filtered.filter((c) => c.type === "group"),
+    [filtered],
+  );
+
   return (
-    <div className="flex h-full min-w-0 flex-col bg-(--bg-elevated) pt-[max(env(safe-area-inset-top),1.25rem)]">
+    <div className="flex h-full min-w-0 flex-col bg-(--bg-elevated) pt-[max(env(safe-area-inset-top),1rem)]">
       {/* Header */}
       <div
         className={`flex shrink-0 items-center gap-2 ${
@@ -261,7 +305,7 @@ export function Sidebar({
         }`}
       >
         {!collapsed && (
-          <span className="truncate font-display text-[17px] font-semibold tracking-tight text-(--text-primary)">
+          <span className="truncate font-display text-3xl font-semibold tracking-tight text-(--text-primary)">
             Chats
           </span>
         )}
@@ -288,7 +332,7 @@ export function Sidebar({
               type="button"
               onClick={onToggle}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="kivo-focus flex size-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              className="kivo-focus hover:cursor-pointer flex size-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
             >
               <PanelLeft className="h-5 w-5" strokeWidth={1.6} />
             </button>
@@ -334,15 +378,23 @@ export function Sidebar({
         ) : filtered.length === 0 ? (
           <EmptyState message={`No friends match “${query.trim()}”`} />
         ) : (
-          filtered.map((c, i) => (
-            <ConversationItem
-              key={c.id}
-              conversation={c}
-              selected={c.id === selectedId}
-              onSelect={() => onSelect(c.id)}
-              index={i}
+          <>
+            <ConversationSection
+              label="Direct Messages"
+              items={dms}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              collapsed={collapsed}
             />
-          ))
+            <ConversationSection
+              label="Groups"
+              items={groups}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              collapsed={collapsed}
+              onNewGroup={onNewGroup}
+            />
+          </>
         )}
       </div>
 

@@ -51,7 +51,7 @@ export function AuthCard({ children }) {
         </a>
 
         {/* Card */}
-        <div className="rounded-cards border border-stone/70 bg-pure-white p-8 shadow-[0_40px_90px_-30px_rgba(25,23,28,0.28)] sm:p-10">
+        <div className="rounded-cards border border-hairline/70 bg-fog p-8 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.6)] sm:p-10">
           {children}
         </div>
       </motion.div>

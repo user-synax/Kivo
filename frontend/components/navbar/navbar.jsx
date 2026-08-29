@@ -133,7 +133,7 @@ export function Navbar() {
             initial={reduce ? false : { y: -24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, ease: EASE_SMOOTH_OUT }}
-            className="pointer-events-none fixed mt-12 inset-x-0 top-3 z-50 flex justify-center px-3 sm:top-4 sm:px-4"
+            className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3 sm:top-4 sm:px-4"
         >
             <div
                 ref={containerRef}
@@ -185,13 +185,13 @@ export function Navbar() {
                     >
                         <a
                             href="/login"
-                            className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-ink-black/90"
+                            className="kivo-nav-link kivo-focus rounded-pills px-2 py-2 text-[14px] font-medium text-ink-black/90"
                         >
                             Log in
                         </a>
                         <a
                             href="/signup"
-                            className="kivo-cta kivo-focus rounded-pills bg-ink px-5 py-2 text-[14px] font-medium text-white shadow-[0_6px_18px_-6px_rgba(25,23,28,0.5)] transition-[transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:scale-[0.97]"
+                            className="kivo-cta kivo-focus rounded-pills px-5 py-2 text-[14px] font-medium shadow-[0_6px_18px_-6px_rgba(0,0,0,0.6)] transition-[transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:scale-[0.97]"
                         >
                             Sign up
                         </a>
@@ -223,7 +223,7 @@ export function Navbar() {
                             exit="exit"
                             role="menu"
                             aria-label="Mobile navigation"
-                            className="pointer-events-auto absolute inset-x-0 top-full mt-2 origin-top rounded-xl border border-stone/60 bg-pure-white/95 p-2 shadow-md backdrop-blur-[10px]"
+                            className="pointer-events-auto absolute inset-x-0 top-full mt-2 origin-top rounded-xl border border-hairline/60 bg-fog/95 p-2 shadow-md backdrop-blur-[10px]"
                         >
                             <ul className="flex flex-col">
                                 {navItems.map((item) => (
@@ -241,7 +241,7 @@ export function Navbar() {
                             </ul>
                             <div className="mt-1 flex flex-col gap-1 border-t border-stone/40 pt-2">
                                 <a
-                                    href="#login"
+                                    href="/login"
                                     role="menuitem"
                                     onClick={() => setOpen(false)}
                                     className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-ink-black/90"
@@ -249,10 +249,10 @@ export function Navbar() {
                                     Log in
                                 </a>
                                 <a
-                                    href="#signup"
+                                    href="/signup"
                                     role="menuitem"
                                     onClick={() => setOpen(false)}
-                                    className="kivo-cta kivo-focus mt-1 flex min-h-[44px] items-center justify-center rounded-pills bg-ink px-5 py-2 text-[15px] font-medium text-white shadow-[0_6px_18px_-6px_rgba(25,23,28,0.5)] active:scale-[0.97]"
+                                    className="kivo-cta kivo-focus mt-1 flex min-h-[44px] items-center justify-center rounded-pills px-5 py-2 text-[15px] font-medium shadow-[0_6px_18px_-6px_rgba(0,0,0,0.6)] active:scale-[0.97]"
                                 >
                                     Sign up
                                 </a>
@@ -278,8 +278,8 @@ function BrandMark() {
         >
             <defs>
                 <linearGradient id="kivoMark" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#7a40ed" />
-                    <stop offset="100%" stopColor="#17082c" />
+                    <stop offset="0%" stopColor="#4ba9e1" />
+                    <stop offset="100%" stopColor="#1c1c1c" />
                 </linearGradient>
             </defs>
             <rect x="1" y="1" width="22" height="22" rx="7" fill="url(#kivoMark)" />

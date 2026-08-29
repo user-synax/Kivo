@@ -1,0 +1,162 @@
+/* ============================================================================
+   transitions-extra.css — KIVO decorative / ambient motion
+   ----------------------------------------------------------------------------
+   Atmospheric-only animation: drifting gradient spotlights, floating blobs,
+   badge glows, avatar-frame shimmer. Nothing here is load-bearing for layout;
+   all of it is disabled under prefers-reduced-motion.
+   ========================================================================== */
+
+/* ── Floating blobs (hero ambience) ─────────────────────────────────────── */
+.blob-1 {
+    animation: t-blob-float 6s ease-in-out infinite;
+}
+.blob-2 {
+    animation: t-blob-float 8s ease-in-out infinite 2s;
+}
+.blob-3 {
+    animation: t-blob-float 7s ease-in-out infinite 4s;
+}
+@keyframes t-blob-float {
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        transform: translateY(-18px) scale(1.04);
+    }
+}
+
+/* ── Gradient spotlight drift (signature tiles breathe) ─────────────────── */
+.spotlight::before {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    background: radial-gradient(
+        closest-side,
+        rgba(255, 255, 255, 0.18),
+        transparent
+    );
+    opacity: 0;
+    transition: opacity var(--duration-slow, 400ms)
+        var(--ease-smooth-out, ease-out);
+    animation: t-spotlight-drift 14s ease-in-out infinite;
+    pointer-events: none;
+}
+.spotlight:hover::before {
+    opacity: 1;
+}
+@keyframes t-spotlight-drift {
+    0% {
+        transform: translate(-10%, -10%) rotate(0deg);
+    }
+    50% {
+        transform: translate(10%, 8%) rotate(180deg);
+    }
+    100% {
+        transform: translate(-10%, -10%) rotate(360deg);
+    }
+}
+
+/* ── Shop cosmetic: avatar frame glow ───────────────────────────────────── */
+.shop-frame-glow {
+    animation: t-shop-frame-pulse 2.8s ease-in-out infinite;
+}
+@keyframes t-shop-frame-pulse {
+    0%,
+    100% {
+        filter: drop-shadow(0 0 4px currentColor);
+    }
+    50% {
+        filter: drop-shadow(0 0 12px currentColor);
+    }
+}
+
+.shop-item-icon-container {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ── Founder ring (avatar frame) ────────────────────────────────────────── */
+.founder-ring-inner {
+    background: #0f0f0f;
+    border-radius: 50%;
+    padding: 2px;
+}
+
+/* ── Avatar frame shimmer (cosmetic) ───────────────────────────────────── */
+.avatar-frame-rainbow,
+.avatar-frame-gold {
+    position: relative;
+}
+.avatar-frame-rainbow::after,
+.avatar-frame-gold::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(
+        from 0deg,
+        var(--gradient-violet, #6a4cf5),
+        var(--gradient-magenta, #d44df0),
+        var(--gradient-orange, #ff7a3d),
+        var(--gradient-violet, #6a4cf5)
+    );
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: t-spin-gradient 6s linear infinite;
+    pointer-events: none;
+}
+.avatar-frame-gold::after {
+    background: conic-gradient(
+        from 0deg,
+        #ffd479,
+        #ffb14d,
+        #ffe6a8,
+        #ffd479
+    );
+}
+@keyframes t-spin-gradient {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Rarity glow (cosmetic shop tiers) ──────────────────────────────────── */
+.rarity-mythic {
+    animation: t-rarity-pulse 3s ease-in-out infinite;
+}
+.rarity-legendary {
+    animation: t-rarity-pulse 3.4s ease-in-out infinite 0.4s;
+}
+@keyframes t-rarity-pulse {
+    0%,
+    100% {
+        filter: drop-shadow(0 0 6px rgba(212, 77, 240, 0.5));
+    }
+    50% {
+        filter: drop-shadow(0 0 16px rgba(212, 77, 240, 0.85));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .blob-1,
+    .blob-2,
+    .blob-3,
+    .spotlight::before,
+    .shop-frame-glow,
+    .avatar-frame-rainbow::after,
+    .avatar-frame-gold::after,
+    .rarity-mythic,
+    .rarity-legendary {
+        animation: none !important;
+    }
+    .spotlight::before,
+    .avatar-frame-rainbow::after,
+    .avatar-frame-gold::after {
+        display: none;
+    }
+}

@@ -42,7 +42,7 @@ export function AuthInput({
           required={required}
           placeholder={placeholder}
           className={[
-            "w-full rounded-inputs border bg-pure-white px-3.5 py-3 font-sans text-[15px] text-ink-black",
+            "w-full rounded-inputs border border-hairline bg-surface-2 px-3.5 py-3 font-sans text-[15px] text-ink",
             "placeholder:text-pewter",
             "outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
             "focus:border-eclipse-violet/50 focus:ring-2 focus:ring-eclipse-violet/20",

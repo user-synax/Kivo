@@ -9,11 +9,19 @@ const router = Router();
 router.use(authenticate);
 
 router.post("/", conversationsController.createConversation);
+router.post("/group", conversationsController.createGroup);
 router.get("/", conversationsController.listConversations);
 
 // Conversation-scoped message endpoints live under the conversation id.
 router.get("/:id/messages", messagesController.listMessages);
 router.post("/:id/messages", messagesController.createMessage);
 router.patch("/:id/read", messagesController.markRead);
+
+// Group management (admin-restricted actions enforced in the service layer).
+router.patch("/:id", conversationsController.updateGroup);
+router.post("/:id/members", conversationsController.addMembers);
+router.delete("/:id/members/:userId", conversationsController.removeMember);
+router.post("/:id/admins/:userId", conversationsController.promoteMember);
+router.delete("/:id/admins/:userId", conversationsController.demoteMember);
 
 export default router;

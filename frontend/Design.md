@@ -1,432 +1,565 @@
-# Jitter — Style Reference
-> kinetic playground in a Swiss design studio — soft white surfaces, pill-shaped cards, and a violet spark firing on near-black ink.
+version: alpha
+name: Framer-design-analysis
+description: "A confident dark-canvas builder marketing site that treats the page like a working artboard — pure black surfaces, white display type set in GT Walsheim Medium with aggressive negative tracking, and a single confident blue (#4ba9e1) reserved for hyperlinks and selection states. The page rhythm is broken by oversized vibrant gradient atmosphere panels — magenta, violet, orange spotlights — that act as living showcase tiles, not decoration. Every CTA is a white pill on dark; every card is a translucent or charcoal surface; every section title pulls letter-spacing tight enough to feel like a poster."
 
-**Theme:** light
+colors:
+  primary: "#ffffff"
+  on-primary: "#000000"
+  accent-blue: "##4ba9e1"
+  ink: "#ffffff"
+  ink-muted: "#999999"
+  canvas: "#090909"
+  surface-1: "#141414"
+  surface-2: "#1c1c1c"
+  hairline: "#262626"
+  hairline-soft: "#1a1a1a"
+  inverse-canvas: "#ffffff"
+  inverse-ink: "#000000"
+  gradient-magenta: "#d44df0"
+  gradient-violet: "#6a4cf5"
+  gradient-orange: "#ff7a3d"
+  gradient-coral: "#ff5577"
+  semantic-success: "#22c55e"
 
-Jitter reads as a kinetic playground rendered in Swiss-design precision. The canvas is a soft off-white (#f2f1f3) with bright white cards floating on it via diffuse, multi-layer shadows that bleed across more than 150px of vertical space. A near-black ink (#19171c) carries the majority of the UI — headlines, nav, buttons, body — with a deeply saturated violet (#7a40ed) acting as a brand spark for hero CTAs, tags, and feature highlights. Secondary punctuation comes from a vivid cyan-blue (#00b2ff) and an electric yellow-green (#f5ff63). Typography splits the work: TWK Lausanne (a custom geometric grotesque) takes the stage at 48–200px with aggressive negative tracking, while Inter handles everything 26px and below with quiet competence. The geometry is rounded to the point of pill-shaped — cards and buttons share 40–50px radii, so every surface feels like a soft cushion rather than a hard tile.
+typography:
+  display-xxl:
+    fontFamily: GT Walsheim Framer Medium
+    fontSize: 110px
+    fontWeight: 500
+    lineHeight: 0.85
+    letterSpacing: -5.5px
+  display-xl:
+    fontFamily: GT Walsheim Medium
+    fontSize: 85px
+    fontWeight: 500
+    lineHeight: 0.95
+    letterSpacing: -4.25px
+    fontFeature: ss02
+  display-lg:
+    fontFamily: GT Walsheim Medium
+    fontSize: 62px
+    fontWeight: 500
+    lineHeight: 1.00
+    letterSpacing: -3.1px
+    fontFeature: ss02
+  display-md:
+    fontFamily: GT Walsheim Medium
+    fontSize: 32px
+    fontWeight: 500
+    lineHeight: 1.13
+    letterSpacing: -1.0px
+  headline:
+    fontFamily: Inter
+    fontSize: 22px
+    fontWeight: 700
+    lineHeight: 1.20
+    letterSpacing: -0.8px
+    fontFeature: cv05
+  subhead:
+    fontFamily: Inter Variable
+    fontSize: 24px
+    fontWeight: 400
+    lineHeight: 1.30
+    letterSpacing: -0.01px
+    fontFeature: cv11
+  body-lg:
+    fontFamily: Inter Variable
+    fontSize: 18px
+    fontWeight: 400
+    lineHeight: 1.30
+    letterSpacing: -0.18px
+    fontFeature: cv11
+  body:
+    fontFamily: Inter Variable
+    fontSize: 15px
+    fontWeight: 400
+    lineHeight: 1.30
+    letterSpacing: -0.15px
+    fontFeature: cv11
+  body-sm:
+    fontFamily: Inter Variable
+    fontSize: 14px
+    fontWeight: 500
+    lineHeight: 1.40
+    letterSpacing: -0.14px
+    fontFeature: cv11
+  caption:
+    fontFamily: Inter Variable
+    fontSize: 13px
+    fontWeight: 500
+    lineHeight: 1.20
+    letterSpacing: -0.13px
+    fontFeature: cv11
+  micro:
+    fontFamily: Inter Variable
+    fontSize: 12px
+    fontWeight: 400
+    lineHeight: 1.20
+    letterSpacing: -0.12px
+    fontFeature: cv11
+  button:
+    fontFamily: Inter Variable
+    fontSize: 14px
+    fontWeight: 500
+    lineHeight: 1.0
+    letterSpacing: -0.14px
+    fontFeature: cv11
 
-## Tokens — Colors
+rounded:
+  xs: 4px
+  sm: 6px
+  md: 10px
+  lg: 15px
+  xl: 20px
+  xxl: 30px
+  pill: 100px
+  full: 9999px
 
-| Name | Value | Token | Role |
-|------|-------|-------|------|
-| Studio Off-White | `#f2f1f3` | `--color-studio-off-white` | Page canvas and recessed section backgrounds — the base layer on which every card and panel sits |
-| Pure White | `#ffffff` | `--color-pure-white` | Card surfaces, elevated panels, text on dark fills, button labels on filled buttons |
-| Hairline Gray | `#e5e4e7` | `--color-hairline-gray` | Subtle borders, divider lines, and muted card backgrounds |
-| Soft Mist | `#97979b` | `--color-soft-mist` | Muted secondary text and placeholder labels |
-| Slate | `#6e6e73` | `--color-slate` | Body copy in card contexts, secondary descriptive text |
-| Ink | `#19171c` | `--color-ink` | Supporting neutral for secondary UI, dividers, and muted labels. Do not promote it to the primary CTA color |
-| Pure Black | `#000000` | `--color-pure-black` | Icon fills, footer text, maximum-contrast dark surfaces |
-| Eclipse Violet | `#7a40ed` | `--color-eclipse-violet` | Violet supporting accent for decorative details and low-frequency emphasis. Do not promote it to the primary CTA color |
-| Deep Plum | `#17082c` | `--color-deep-plum` | Dark violet, near-black with purple cast — headings on light surfaces where an extra brand warmth is needed |
-| Lilac Wash | `#a981ff` | `--color-lilac-wash` | Violet supporting accent for decorative details and low-frequency emphasis. Do not promote it to the primary CTA color |
-| Lavender Mist | `#cab3f8` | `--color-lavender-mist` | Pale violet — secondary link backgrounds and highlight washes |
-| Electric Blue | `#00b2ff` | `--color-electric-blue` | Secondary accent — animated highlight rings, icon accents, card border highlights |
-| Sky Tint | `#e6f4ff` | `--color-sky-tint` | Cool blue-tinted card backgrounds and soft highlight washes |
-| Ice Blue | `#a9dbff` | `--color-ice-blue` | Mid-saturation blue — decorative fills inside illustration and animated graphics |
-| Volt | `#f5ff63` | `--color-volt` | Green supporting accent for decorative details and low-frequency emphasis. Use as a supporting accent, not as a status color |
+spacing:
+  hair: 1px
+  xxs: 4px
+  xs: 8px
+  sm: 12px
+  md: 15px
+  lg: 20px
+  xl: 30px
+  xxl: 40px
+  section: 96px
 
-## Tokens — Typography
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button}"
+    rounded: "{rounded.pill}"
+    padding: 10px 15px
+  button-primary-pressed:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button}"
+    rounded: "{rounded.pill}"
+  button-secondary:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.button}"
+    rounded: "{rounded.pill}"
+    padding: 10px 15px
+  button-translucent:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.ink}"
+    typography: "{typography.button}"
+    rounded: "{rounded.xxl}"
+    padding: 8px 14px
+  button-icon-circular:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.button}"
+    rounded: "{rounded.full}"
+    size: 40px
+  pricing-tab-default:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink-muted}"
+    typography: "{typography.button}"
+    rounded: "{rounded.pill}"
+    padding: 8px 14px
+  pricing-tab-selected:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.ink}"
+    typography: "{typography.button}"
+    rounded: "{rounded.pill}"
+    padding: 8px 14px
+  text-input:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: 10px 14px
+  text-input-focused:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: 10px 14px
+  pricing-card:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.xl}"
+    padding: 24px
+  pricing-card-featured:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.xl}"
+    padding: 24px
+  template-card:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.lg}"
+    padding: 12px
+  gradient-spotlight-card:
+    backgroundColor: "{colors.gradient-violet}"
+    textColor: "{colors.ink}"
+    typography: "{typography.subhead}"
+    rounded: "{rounded.xl}"
+    padding: 32px
+  gradient-spotlight-card-magenta:
+    backgroundColor: "{colors.gradient-magenta}"
+    textColor: "{colors.ink}"
+    typography: "{typography.subhead}"
+    rounded: "{rounded.xl}"
+    padding: 32px
+  gradient-spotlight-card-orange:
+    backgroundColor: "{colors.gradient-orange}"
+    textColor: "{colors.ink}"
+    typography: "{typography.subhead}"
+    rounded: "{rounded.xl}"
+    padding: 32px
+  product-mockup-tile:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.xl}"
+    padding: 16px
+  feature-row:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.xs}"
+  comparison-row:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink-muted}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.xs}"
+  top-nav:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.xs}"
+    height: 56px
+  faq-row:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: 24px
+  footer:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink-muted}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.xs}"
+    padding: 64px 32px
 
-### TWK Lausanne — Display and heading typeface — handles everything from 16px subheads up to a 200px hero. The 750/800 weights carry the brand voice at large sizes; the condensed letter-spacing pulls characters tight so headlines feel engineered rather than set. Line-heights compress below 1.0 at display sizes (0.85–0.95), making the hero feel dense and architectural rather than airy. · `--font-twk-lausanne`
-- **Substitute:** Inter Tight, Switzer, or General Sans
-- **Weights:** 500, 600, 700, 750, 800
-- **Sizes:** 16, 18, 20, 21, 24, 36, 40, 48, 72, 80, 200
-- **Line height:** 0.85, 0.90, 0.95, 1.00, 1.20, 1.38, 1.50, 2.50
-- **Letter spacing:** -0.044em at 200px display, -0.032em at 80px, -0.037em at 72px, -0.030em at 48px, -0.020em at 24px, -0.010em at 16px
-- **Role:** Display and heading typeface — handles everything from 16px subheads up to a 200px hero. The 750/800 weights carry the brand voice at large sizes; the condensed letter-spacing pulls characters tight so headlines feel engineered rather than set. Line-heights compress below 1.0 at display sizes (0.85–0.95), making the hero feel dense and architectural rather than airy.
+## Overview
 
-### Inter — UI and body typeface — nav labels, button text, card descriptions, badge copy, form inputs, and the 26px sub-heading tier. Inter carries the weight of small-to-medium text across the entire interface while TWK Lausanne does the display work above 36px. Negative tracking is modest (-0.017 to -0.023em) and only applied at 15px and above. · `--font-inter`
-- **Substitute:** Inter (already on Google Fonts)
-- **Weights:** 400, 500, 600, 700, 800
-- **Sizes:** 12, 13, 14, 15, 16, 17, 18, 26
-- **Line height:** 1.10, 1.14, 1.15, 1.20, 1.25, 1.40, 1.41, 1.50, 1.60
-- **Letter spacing:** -0.023em at 18px, -0.020em at 16–17px, -0.017em at 15px, 0 at 12–14px
-- **Role:** UI and body typeface — nav labels, button text, card descriptions, badge copy, form inputs, and the 26px sub-heading tier. Inter carries the weight of small-to-medium text across the entire interface while TWK Lausanne does the display work above 36px. Negative tracking is modest (-0.017 to -0.023em) and only applied at 15px and above.
+Framer's marketing canvas is a near-pure black artboard. The dominant surface is `{colors.canvas}` — almost pure black with a faint warmth — and on top of it sits oversized white display type set in **GT Walsheim Medium** with letter-spacing pulled to extreme negative values (-5.5px on the 110px display, -4.25px on the 85px hero). The page reads like a poster: one assertive statement per band, generous breathing room above and below.
 
-### Type Scale
+The single accent is `{colors.accent-blue}` — used scarcely, mostly for hyperlinks, selection halos, and a subtle blue-tinted shadow ring on focused inputs. The brand chrome itself is monochrome: white pill buttons, charcoal cards, gray secondary text. What makes Framer distinctive is the rhythm break — every few sections the page drops in a **vibrant gradient atmosphere card**: a magenta-violet spotlight, a sunset-orange wash, a coral-pink panel. These aren't section backgrounds; they're individual cards arranged in a card grid, each one a small living poster that shows what Framer can produce.
 
-| Role | Size | Line Height | Letter Spacing | Token |
-|------|------|-------------|----------------|-------|
-| caption | 12px | 1.5 | — | `--text-caption` |
-| body-sm | 14px | 1.5 | — | `--text-body-sm` |
-| body | 16px | 1.5 | — | `--text-body` |
-| subheading | 21px | 1.38 | — | `--text-subheading` |
-| heading-sm | 26px | 1.25 | — | `--text-heading-sm` |
-| heading | 40px | 1.2 | — | `--text-heading` |
-| heading-lg | 48px | 1.15 | — | `--text-heading-lg` |
-| display | 80px | 0.95 | -2.56px | `--text-display` |
+Body type is **Inter Variable**, with Framer leaning hard into Inter's character variants (`cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07`, `dlig`) — the result is a body voice that feels custom-tuned, with single-storey "a", straight-leg "l", and tabular figures. There's no light mode on the marketing site; the brand IS dark.
 
-## Tokens — Spacing & Shapes
+**Key Characteristics:**
 
-**Base unit:** 4px
+- Black-canvas marketing system: `{colors.canvas}` is the surface for hero, body, pricing, FAQ, and footer alike — no light interludes.
+- Massive negative letter-spacing on display sizes (-5.5px / -4.25px / -3.1px) creates a poster-grade headline cadence.
+- White pill (`{components.button-primary}`) is the only primary CTA shape across the site; secondary actions live as charcoal pills (`{components.button-secondary}`) or text links.
+- Oversized **gradient spotlight cards** (violet, magenta, orange, coral) act as showcase tiles inside the dark grid; they are individual cards, not section backgrounds.
+- Inter Variable with bespoke OpenType character variants (`cv01/05/09/11`, `ss03/ss07`, `dlig`) used everywhere body type appears — the typographic voice is unmistakable.
+- Border radius scale runs from 4px utility chips up to 100px pills and full circles, with 15–20px the default for cards and 30px for atmospheric gradient cards.
+- A single chromatic accent `{colors.accent-blue}` reserved for hyperlinks, focus, and selection — never decorative.
 
-**Density:** comfortable
+## Colors
 
-### Spacing Scale
+> Source pages: framer.com (home), /ai/, /startups/, /marketplace/templates/nudge/, /gallery/a16z-speedrun-×-tonik, /pricing.
 
-| Name | Value | Token |
-|------|-------|-------|
-| 4 | 4px | `--spacing-4` |
-| 8 | 8px | `--spacing-8` |
-| 12 | 12px | `--spacing-12` |
-| 20 | 20px | `--spacing-20` |
-| 24 | 24px | `--spacing-24` |
-| 32 | 32px | `--spacing-32` |
-| 40 | 40px | `--spacing-40` |
-| 44 | 44px | `--spacing-44` |
-| 60 | 60px | `--spacing-60` |
-| 68 | 68px | `--spacing-68` |
-| 80 | 80px | `--spacing-80` |
-| 84 | 84px | `--spacing-84` |
-| 100 | 100px | `--spacing-100` |
-| 144 | 144px | `--spacing-144` |
-| 180 | 180px | `--spacing-180` |
-| 200 | 200px | `--spacing-200` |
+### Brand & Accent
 
-### Border Radius
+- **Pure White** ({colors.primary}): The brand primary surface. Every primary CTA pill, every display headline, every body line on canvas.
+- **Sky Blue** ({colors.accent-blue}): The single chromatic accent. Hyperlinks, focused-input rings, and a few selection states. Never used for backgrounds or as a brand fill.
 
-| Element | Value |
-|---------|-------|
-| cards | 40px |
-| badges | 40px |
-| inputs | 26px |
-| buttons | 50px |
-| nav-elements | 20px |
+### Surface
 
-### Shadows
+- **Canvas** ({colors.canvas}): Default page background — near-black with a faint warmth. Footer, pricing, hero, and FAQ all sit on it.
+- **Surface 1** ({colors.surface-1}): One step above canvas — pricing cards, secondary buttons, mockup tiles.
+- **Surface 2** ({colors.surface-2}): Two steps above — featured pricing card, hero pill backdrop, selected pricing tab.
+- **Hairline** ({colors.hairline}): 1px borders on input groups, comparison-table dividers.
+- **Hairline Soft** ({colors.hairline-soft}): Subtler dividers — between FAQ rows and footer column rules.
+- **Inverse Canvas** ({colors.inverse-canvas}): Pure white — used as the surface of light-on-dark pill CTAs and a small set of light-mode template thumbnails embedded in the showcase grid.
 
-| Name | Value | Token |
-|------|-------|-------|
-| xl | `rgba(25, 23, 28, 0.01) 0px 152px 61px 0px, rgba(25, 23, 2...` | `--shadow-xl` |
-| xl-2 | `rgba(0, 0, 0, 0.01) 0px 63px 25px 0px, rgba(0, 0, 0, 0.05...` | `--shadow-xl-2` |
-| subtle | `rgb(255, 255, 255) 1px 0px 0px 0px, rgb(255, 255, 255) -1...` | `--shadow-subtle` |
-| xl-3 | `rgba(0, 0, 0, 0.01) 0px 119px 48px 0px, rgba(0, 0, 0, 0.0...` | `--shadow-xl-3` |
+### Text
 
-### Layout
+- **Ink** ({colors.ink}): All headline and emphasized body type — pure white.
+- **Ink Muted** ({colors.ink-muted}): Secondary type — gray (#999999) used for meta info, footer columns, comparison-row labels, deselected pricing tabs. Hierarchy on the dark canvas is carried by ink → ink-muted contrast, not by weight changes.
 
-- **Page max-width:** 1200px
-- **Section gap:** 80-120px
-- **Card padding:** 24-40px
-- **Element gap:** 8-12px
+### Semantic
+
+- **Success Green** ({colors.semantic-success}): Pricing comparison-table checkmarks. Glyph fill, not surface.
+
+### Brand Gradient (signature)
+
+- **Gradient Magenta** ({colors.gradient-magenta}): Spotlight card variant.
+- **Gradient Violet** ({colors.gradient-violet}): Spotlight card variant — most common.
+- **Gradient Orange** ({colors.gradient-orange}): Spotlight card variant — sunset wash.
+- **Gradient Coral** ({colors.gradient-coral}): Spotlight card variant — coral/pink.
+
+These four sit as oversized atmospheric tiles inside otherwise monochrome card grids — a dark canvas with one or two glowing spotlight cards is a recurring page signature.
+
+## Typography
+
+### Font Family
+
+- **GT Walsheim Framer Medium** / **GT Walsheim Medium** — Framer's display typeface. Geometric, slightly humanist, very confident at large sizes with extreme negative tracking. Fallbacks: `GT Walsheim Medium Placeholder` system font.
+- **Inter Variable** — System body typeface. Used with extensive OpenType character variants: `cv01` (alternate "1"), `cv05` (alternate "g"), `cv09` (alternate "i" / "l"), `cv11` (alternate "0"), `ss03` / `ss07` stylistic sets, `dlig` discretionary ligatures, and `tnum` for numerics in tabular contexts. The result is a body voice that feels bespoke without commissioning a custom face.
+- **Inter** — Used selectively for `{typography.headline}` (the 22px / 20px tier). The non-variable cut catches small tracking targets that the variable file rounds.
+
+### Hierarchy
+
+| Token                      | Size  | Weight | Line Height | Letter Spacing | Use                                         |
+| -------------------------- | ----- | ------ | ----------- | -------------- | ------------------------------------------- |
+| `{typography.display-xxl}` | 110px | 500    | 0.85        | -5.5px         | Largest hero headline (home, AI page)       |
+| `{typography.display-xl}`  | 85px  | 500    | 0.95        | -4.25px        | Section opener headlines                    |
+| `{typography.display-lg}`  | 62px  | 500    | 1.00        | -3.1px         | Sub-section openers                         |
+| `{typography.display-md}`  | 32px  | 500    | 1.13        | -1.0px         | Card titles, smaller display                |
+| `{typography.headline}`    | 22px  | 700    | 1.20        | -0.8px         | Pricing tier headlines, FAQ category titles |
+| `{typography.subhead}`     | 24px  | 400    | 1.30        | -0.01px        | Lead body next to display headlines         |
+| `{typography.body-lg}`     | 18px  | 400    | 1.30        | -0.18px        | Hero subhead, lead paragraphs               |
+| `{typography.body}`        | 15px  | 400    | 1.30        | -0.15px        | Default body, card descriptions             |
+| `{typography.body-sm}`     | 14px  | 500    | 1.40        | -0.14px        | Pricing comparison rows, dense data         |
+| `{typography.caption}`     | 13px  | 500    | 1.20        | -0.13px        | Eyebrows, footer columns, meta              |
+| `{typography.micro}`       | 12px  | 400    | 1.20        | -0.12px        | Disclaimer, footnote                        |
+| `{typography.button}`      | 14px  | 500    | 1.0         | -0.14px        | Pill buttons                                |
+
+### Principles
+
+- **Letter-spacing scales with size, hard.** Display-xxl pulls -5.5px (5% of size); body sticks to about -1% (-0.15px on 15px). The result: posters at the top, comfortable reading at body.
+- **OpenType character variants are the brand voice.** Switching off `cv11`, `ss03`, etc. visibly changes the body voice — the brand depends on them.
+- **Weight stays in a narrow band.** Display sits at 500, body at 400, body-sm/caption at 500. Hierarchy is carried by size + tracking, not by 700/900 ramps.
+- **Tight line-heights everywhere.** Even body runs at 1.30 — Framer's editorial tone is denser than typical SaaS marketing.
+
+### Note on Font Substitutes
+
+If implementing without GT Walsheim Medium, suitable open-source substitutes include **Mona Sans**, **Geist**, or **Inter** at weight 600–700 with manually tightened tracking. Mona Sans's hairline weights at 100–300 are particularly close to Framer's cleaner section openers. Inter Variable is open-source — keep it as-is and preserve the documented OpenType variants.
+
+## Layout
+
+### Spacing System
+
+- **Base unit**: 5px (Framer uses non-standard 5/10/15/20/30 increments rather than the more common 4/8/16/24).
+- **Tokens (front matter)**: `{spacing.hair}` 1px · `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 15px · `{spacing.lg}` 20px · `{spacing.xl}` 30px · `{spacing.xxl}` 40px · `{spacing.section}` 96px.
+- Card interior padding: `{spacing.lg}` 20px on pricing cards; `{spacing.xl}` 30px on gradient spotlight cards.
+- Pill button padding: 10px vertical · 15px horizontal — `{components.button-primary}`.
+- Section padding (vertical): roughly `{spacing.section}` 96px on home; tighter (~64px) on pricing comparison.
+
+### Grid & Container
+
+- Max content width sits around the 1199px breakpoint, with side gutters that scale toward `{spacing.xl}` on desktop.
+- Card grids on the home gallery use 2-up at desktop, collapsing to 1-up below 810px.
+- Pricing tier grid is 4-up across the documented breakpoints; comparison table beneath it uses fixed-width left column with horizontally scrolling tier columns at narrow widths.
+
+### Whitespace Philosophy
+
+The dark canvas IS the whitespace. Where lighter brands lean on white air to separate sections, Framer leans on long stretches of black with a single oversized statement floating in the middle. Sections separate by mode change: a band of charcoal cards, then a band of black with a gradient spotlight, then back to charcoal — like cuts in a dark film.
+
+## Elevation & Depth
+
+| Level          | Treatment                                                                       | Use                                                       |
+| -------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0 (flat)       | No shadow, no border                                                            | Default for canvas-mounted display type, FAQ rows, footer |
+| 1 (charcoal)   | `{colors.surface-1}` lift on canvas                                             | Pricing cards, mockup tiles, secondary buttons            |
+| 2 (light-edge) | `rgba(255,255,255,0.10)` 0.5px top edge + `rgba(0,0,0,0.25)` 0px 10px 30px drop | Floating product cards, modal cards                       |
+| 3 (selected)   | `rgba(0,153,255,0.15)` 0px 0px 0px 1px ring                                     | Focused inputs, selected option                           |
+
+Four shadow signatures recur across the homepage: a 1px subtle drop, a translucent blue ring, a thick near-black 2px outline (used as the active-element marker on sub-nav), and the layered light-edge + drop-shadow used for floating cards.
+
+### Decorative Depth
+
+- **Gradient spotlight cards** are the dominant depth device — color saturation against black canvas substitutes for shadow-driven elevation.
+- **Layered product mockups** (browser frames containing live Framer-built sites) sit inside `{colors.surface-1}` cards with the level-2 light-edge treatment.
+- **Subtle blue ring (focus / selected)** is the only chromatic depth signal — used to mark the active state of input groups and pricing tier toggles without changing the underlying surface.
+
+## Shapes
+
+### Border Radius Scale
+
+Framer's extracted radius set is unusually granular (1px, 4px, 5px, 6px, 8px, 10px, 12px, 15px, 20px, 30px, 40px, 100px). The named scale below picks the levels the marketing surface actually consumes.
+
+| Token            | Value  | Use                                        |
+| ---------------- | ------ | ------------------------------------------ |
+| `{rounded.xs}`   | 4px    | Small chip / utility radius                |
+| `{rounded.sm}`   | 6px    | Inline tag, badge                          |
+| `{rounded.md}`   | 10px   | Form input, list item                      |
+| `{rounded.lg}`   | 15px   | Template card thumbnails                   |
+| `{rounded.xl}`   | 20px   | Pricing cards, mockup tiles                |
+| `{rounded.xxl}`  | 30px   | Gradient spotlight cards, oversized panels |
+| `{rounded.pill}` | 100px  | All primary text CTAs                      |
+| `{rounded.full}` | 9999px | Circular icon buttons, avatar circles      |
+
+### Photography & Illustration Geometry
+
+- Embedded site mockups (browser-chromed previews of Framer-built sites) sit in `{rounded.xl}` 20px tiles with `{spacing.md}` 15px interior padding.
+- Gradient spotlight cards use `{rounded.xxl}` 30px corners — softer than the 20px content cards by design, to make them feel like atmospheric panels rather than tighter UI.
+- Icon glyphs and sub-nav glyphs render in `{rounded.full}` circles at 32–40px sizes.
 
 ## Components
 
-### Navigation Header
-**Role:** Top-level site navigation
+### Buttons
 
-White background, 20px radius on grouped link containers, logo on the left in #19171c, nav links at 14–16px Inter weight 500 in #19171c, a ghost 'Log in' text link, and a dark filled CTA button on the right edge. Sticky on scroll. Height approximately 64px.
+**`button-primary`** — White pill on dark canvas. The primary CTA across home, pricing, AI, and gallery pages.
 
-### Dark Filled Pill Button
-**Role:** Primary navigation and high-emphasis action
+- Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 10px 15px, rounded `{rounded.pill}`.
+- Pressed state lives in `button-primary-pressed` (the live site uses a transform-scale shrink rather than a darkened fill).
 
-50px border-radius (full pill), fill #19171c, text #ffffff at 14–16px Inter weight 500–600, horizontal padding 20–24px, vertical padding 10–12px. Used for the 'Try for free' nav CTA and 'Browse 300+ free templates' overlay button. The 50px radius forces a capsule shape regardless of label length.
+**`button-secondary`** — Charcoal pill. Used for secondary navigation actions ("Sign in", "Talk to sales") and as the visual counterpart to the primary pill.
 
-### Violet Filled Pill Button
-**Role:** Hero call-to-action and brand-forward action
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.button}`, padding 10px 15px, rounded `{rounded.pill}`.
 
-50px border-radius, fill #7a40ed, text #ffffff at 16px Inter weight 600, padding 16px 32px. Larger scale than the dark button — sits alone in the hero as the singular brand-colored action on the page.
+**`button-translucent`** — Translucent / lifted secondary used on top of busy backgrounds (gallery hero, gradient cards).
 
-### Pill Badge / Tag
-**Role:** Section label and category tag
+- Background `{colors.surface-2}`, text `{colors.ink}`, type `{typography.button}`, rounded `{rounded.xxl}`, padding 8px 14px.
 
-40px border-radius, small padding 4–8px vertical, 12–16px horizontal. Background varies: lilac wash #cab3f8 for category tags, Volt #f5ff63 for attention/warning tags, lilac #a981ff for highlighted labels. Text at 12–14px Inter weight 500 in #17082c or #19171c. Always appears above a section heading as a kicker.
+**`button-icon-circular`** — 40px circle for inline icon actions (carousel arrows, social links).
 
-### Circular Menu Button
-**Role:** Mobile/overlay menu toggle
+- Background `{colors.surface-1}`, text `{colors.ink}`, rounded `{rounded.full}`, size 40px.
 
-Perfectly circular (375px radius equivalent), fill #19171c, white hamburger icon centered. Sits flush to the top-right of the header alongside the dark CTA.
+### Pricing Tabs
 
-### Animation Preview Card
-**Role:** Animated content showcase tile
+**`pricing-tab-default`** + **`pricing-tab-selected`** — The pill-toggle that switches between Basic / Pro / Business / Enterprise on `/pricing`.
 
-White #ffffff fill, 40px border-radius, padding 0 (edge-to-edge media). Rises off the canvas via the signature layered shadow: rgba(25,23,28,0.01) 0 152px 61px, rgba(25,23,28,0.05) 0 85px 51px, rgba(25,23,28,0.09) 0 38px 38px, rgba(25,23,28,0.10) 0 9px 21px. The shadow extends 150px+ vertically — cards feel like they hover far above the page.
+- Default: `{colors.canvas}` background, `{colors.ink-muted}` text, rounded `{rounded.pill}`.
+- Selected: `{colors.surface-2}` background, `{colors.ink}` text — selected = lift, not color. Surface depth communicates "active" without needing a chromatic fill.
 
-### Logo Cloud Strip
-**Role:** Social proof band of partner/customer logos
+### Inputs & Forms
 
-Sits on the page canvas (#f2f1f3), one-line intro text centered above in 14px Inter weight 500 #6e6e73. Logos in #19171c at roughly 20–24px height, evenly spaced with 40–60px gap. No dividers between logos — the row is one continuous line of trust signals.
+**`text-input`** + **`text-input-focused`** — Form fields on `/pricing` (seat-count, currency switcher) and the in-product preview surfaces.
 
-### Hero Section
-**Role:** Above-the-fold introduction
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.md}`, padding 10px 14px.
+- Focused state retains the same surface; the focus ring is the level-3 blue-tinted shadow `rgba(0,153,255,0.15)` 0 0 0 1px.
 
-Centered layout on the off-white canvas. A small pill badge at the top, an 80px TWK Lausanne headline below in #19171c, a single violet CTA centered beneath, then the logo cloud. No hero image — the visual weight comes from the large display type alone.
+### Cards & Containers
 
-### Two-Column Feature Section
-**Role:** Text + media content blocks
+**`pricing-card`** — Each tier on `/pricing`.
 
-Asymmetric split: left column holds a 40–48px TWK Lausanne heading and Inter body copy, right column holds an Animation Preview Card. On alternate sections the order flips. Gap between columns approximately 40–64px, section padding 80–120px vertical.
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.xl}`, padding 24px.
 
-### Template Card Grid
-**Role:** Browseable template gallery
+**`pricing-card-featured`** — The Pro tier (visually emphasized).
 
-Horizontal-scrolling row of Animation Preview Cards, 4–5 visible at once on desktop. Each card is 40px radius with the same hover-shadow elevation. Overlay dark pill button ('Browse 300+ free templates') floats above the row as a forward action.
+- Background `{colors.surface-2}`, otherwise identical structure. The lift is one surface step up — no chromatic outline.
 
-### Inline Text Link
-**Role:** Standalone text link with brand color
+**`template-card`** — Thumbnail tile in the home "Built with Framer" gallery and `/marketplace`.
 
-14–16px Inter weight 500 in #7a40ed, no underline by default, underline appears on hover. Used for 'Learn more' inline CTAs and footer links.
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body-sm}`, rounded `{rounded.lg}`, padding 12px.
 
-### Dark Input Field
-**Role:** Text input on dark surface
+**`product-mockup-tile`** — Larger tile that frames a live product UI mock (Framer canvas, Workshop video, AI translate panel).
 
-26px border-radius, fill #2d2933, text #ffffff at 14–16px Inter weight 400, padding 12–16px. Placeholder text in a muted desaturated tone of the dark surface.
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body-sm}`, rounded `{rounded.xl}`, padding 16px.
 
-### Hamburger Overlay Panel
-**Role:** Mobile/expanded navigation menu
+### Gradient Spotlight Cards (signature)
 
-Full-viewport overlay in #ffffff with 40px outer padding, list of nav items at 24–32px TWK Lausanne weight 600 in #19171c, stacked vertically with 16–24px gap. Closes via a circular dark button in the top-right corner.
+The defining decorative surface of Framer's marketing — oversized atmospheric tiles dropped into otherwise monochrome card grids. Variants:
+
+**`gradient-spotlight-card`** — violet ground (most common).
+
+- Background `{colors.gradient-violet}`, text `{colors.ink}`, type `{typography.subhead}`, rounded `{rounded.xl}`, padding 32px. (The on-site card often pushes to `{rounded.xxl}` 30px when it spans a wider tile.)
+
+**`gradient-spotlight-card-magenta`** — magenta-pink ground.
+
+- Background `{colors.gradient-magenta}`, otherwise identical.
+
+**`gradient-spotlight-card-orange`** — sunset-orange wash.
+
+- Background `{colors.gradient-orange}`, otherwise identical.
+
+(Coral pink follows the same shape with `{colors.gradient-coral}`.)
+
+### Comparison & FAQ
+
+**`feature-row`** + **`comparison-row`** — Single rows inside the pricing comparison table.
+
+- `feature-row`: `{colors.canvas}` background, `{colors.ink}` text. Header rows.
+- `comparison-row`: `{colors.canvas}` background, `{colors.ink-muted}` text. Data rows with `{typography.body-sm}` and 1px `{colors.hairline-soft}` underlines.
+
+**`faq-row`** — Each accordion line in the pricing-page FAQ.
+
+- Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.md}`, padding 24px.
+
+### Navigation
+
+**`top-nav`** — Sticky bar on `{colors.canvas}` with the Framer wordmark left, primary nav links centered, and a `button-secondary` ("Sign in") + `button-primary` ("Get started for free") pair right.
+
+- Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body-sm}`, height 56px.
+- Mobile: collapses primary links into a hamburger; the two pill CTAs collapse into a single primary pill on the bar.
+
+### Footer
+
+**`footer`** — Dense link grid on `{colors.canvas}` with the Framer wordmark left and 5–6 columns of caption-sized links.
+
+- Background `{colors.canvas}`, text `{colors.ink-muted}`, type `{typography.caption}`, padding 64px 32px.
 
 ## Do's and Don'ts
 
 ### Do
-- Use #7a40ed for the singular hero CTA on a page — it should appear alone, not repeated across multiple action surfaces.
-- Set border-radius to 50px on all buttons and 40px on all cards, badges, and preview tiles — the capsule/pillow geometry is the signature.
-- Use TWK Lausanne (or Inter Tight as substitute) at 80px weight 750+ for hero display with letter-spacing -0.032em and line-height 0.95.
-- Use the four-layer diffused shadow stack on all elevated cards — the 150px+ vertical spread is what makes elements feel like they float.
-- Keep body and UI copy in Inter at 14–18px weight 400–500 in #19171c, reserving #6e6e73 for secondary descriptive text.
-- Apply the lilac pill badge (#cab3f8) above section headings as a category kicker — one badge per section, never stacked.
-- Limit accent color usage: one violet CTA per view, optional cyan-blue (#00b2ff) and Volt (#f5ff63) reserved for tag/status contexts only.
+
+- Reserve `{colors.primary}` (white) and `{colors.canvas}` (near-black) as the system's two anchor surfaces. Every band of the page chooses one or the other.
+- Push display-size letter-spacing aggressively negative — `{typography.display-xxl}` at -5.5px is the brand signature, not a stylistic accident.
+- Use `{colors.accent-blue}` only for hyperlinks, focus rings, and selected indicators. Never as a background or button fill.
+- Drop one or two `gradient-spotlight-card` variants into a card grid; they are the brand's atmosphere device. Don't overdo it — three or more in the same viewport reads as a moodboard, not a system.
+- Compose every CTA as a pill (`{rounded.pill}`); secondary actions live as charcoal pills, never as bordered ghost buttons.
+- Keep body type Inter Variable with character variants `cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07` enabled — the brand voice depends on them.
+- Use surface lift (canvas → surface-1 → surface-2) to mark hierarchy on dark, not opacity changes on white type.
 
 ### Don't
-- Do not use sharp corners or radii below 20px anywhere — the rounded geometry is non-negotiable.
-- Do not place the violet CTA (#7a40ed) in the navigation bar; nav-level CTAs should be the dark #19171c fill.
-- Do not use raw #000000 for body text or button fills — always use #19171c to keep the brand-violet undertone alive.
-- Do not apply shadows with hard edges or single-layer low-blur values; the multi-layer diffuse stack at low opacity is the system.
-- Do not use the Volt yellow (#f5ff63) on a dark background without confirming it has a dark text label — the contrast is so extreme it functions as a warning.
-- Do not set display type above 26px in Inter — Inter is for UI, TWK Lausanne owns everything 36px and up.
-- Do not introduce a fourth chromatic accent beyond violet, blue, and Volt — the system runs on chromatic scarcity.
 
-## Surfaces
+- Don't ship a light-mode marketing page. Framer's identity is dark.
+- Don't introduce mid-tone gray text outside `{colors.ink-muted}`. The hierarchy is binary: `ink` or `ink-muted`.
+- Don't use `{colors.accent-blue}` as a brand fill (e.g., a blue CTA pill). The blue is a signal color, not a surface.
+- Don't square off CTAs. Pill (`{rounded.pill}`) or full circle is the brand vocabulary.
+- Don't reduce the negative letter-spacing on display sizes "for accessibility". The compression is intrinsic to the brand voice; reduce the SIZE if needed, but keep the percentage.
+- Don't apply gradient backgrounds to whole sections. Gradients are CARDS, not section grounds.
+- Don't combine more than one chromatic accent. The palette is monochrome plus one blue plus the gradient family — not "blue, green, and red".
 
-| Level | Name | Value | Purpose |
-|-------|------|-------|---------|
-| 0 | Studio Off-White | `#f2f1f3` | Page canvas — the base layer everything else sits on |
-| 1 | Pure White | `#ffffff` | Card surfaces and animation preview tiles |
-| 2 | Hairline Gray | `#e5e4e7` | Muted recessed panels and subtle background shifts |
-| 3 | Ink | `#19171c` | Dark surface — filled buttons, header on dark mode, high-contrast blocks |
+## Responsive Behavior
 
-## Elevation
+### Breakpoints
 
-- **Animation Preview Card (hovered):** `0px 152px 61px 0px rgba(25,23,28,0.01), 0px 85px 51px 0px rgba(25,23,28,0.05), 0px 38px 38px 0px rgba(25,23,28,0.09), 0px 9px 21px 0px rgba(25,23,28,0.10)`
-- **Template Card (resting):** `0px 119px 48px 0px rgba(0,0,0,0.01), 0px 67px 40px 0px rgba(0,0,0,0.05), 0px 30px 30px 0px rgba(0,0,0,0.09), 0px 7px 16px 0px rgba(0,0,0,0.10)`
-- **Floating overlay element:** `0px 63px 25px 0px rgba(0,0,0,0.01), 0px 35px 21px 0px rgba(0,0,0,0.05), 0px 16px 16px 0px rgba(0,0,0,0.09), 0px 4px 9px 0px rgba(0,0,0,0.10)`
+| Name      | Width  | Key Changes                                               |
+| --------- | ------ | --------------------------------------------------------- |
+| Desktop   | 1199px | Default desktop layout                                    |
+| Tablet    | 810px  | Card grids collapse 4-up → 2-up; nav becomes hamburger    |
+| Mobile-Lg | 809px  | Pricing comparison table becomes per-tier accordion       |
+| Mobile-XS | 98px   | Smallest documented breakpoint — single-column everything |
 
-## Imagery
+### Touch Targets
 
-Visuals are dominated by product-generated animation previews — short looping motion clips rendered as rounded-corner video tiles. No lifestyle photography, no human subjects, no environment shots. The motion previews are the imagery: abstract geometric loops, type animations, icon morphs, and UI mockups in motion. All sit on pure white with 40px radius. Supporting graphics include flat duotone illustrations in violet-to-plum gradient (#7a40ed → #17082c) and lilac-to-lavender gradient (#a981ff → #cab3f8) used for section backgrounds. No raster photography appears anywhere.
+- Pill buttons (`button-primary`, `button-secondary`) maintain a minimum 44px tap height across all viewports — combine `{typography.button}` 14px line-height with the documented 10px vertical padding.
+- Circular icon buttons (`button-icon-circular`) are 40px on desktop and grow to 44px on touch viewports.
+- Pricing-tab pills hold ≥40px tap height; below 810px they may collapse into a horizontal-scroll row instead of stacking.
 
-## Layout
+### Collapsing Strategy
 
-Max-width 1200px centered, generous 80–120px vertical breathing room between sections. The page is a vertical stack of horizontal bands on the #f2f1f3 canvas. Each band is either: (1) a centered hero stack (badge → headline → CTA → logo cloud), (2) a two-column asymmetric block (text-left/media-right alternating), or (3) a horizontal-scrolling card row of animation previews. No sidebar, no persistent navigation rail — navigation is a single sticky top bar. The hero is typographic (no hero image); the visual interest escalates as the user scrolls into the animation preview cards. Sections flow seamlessly without dividers, separated only by whitespace.
+- **Nav**: horizontal nav with a centered link group + right-anchored pill pair collapses to a hamburger overlay below 810px. The `button-primary` stays visible on the bar.
+- **Card grids**: the gallery and template-card grids go 2-up on desktop → 1-up on mobile. Gradient spotlight cards retain `{rounded.xxl}` corners at every viewport — they don't bleed.
+- **Pricing comparison table**: collapses into per-tier accordions below 810px to avoid horizontal scroll.
+- **Display type**: `{typography.display-xxl}` 110px scales down toward `{typography.display-lg}` 62px on tablet and `{typography.display-md}` 32px on mobile, preserving the percentage-negative letter-spacing.
 
-## Agent Prompt Guide
+### Image Behavior
 
-## Quick Color Reference
-- text: #19171c
-- background: #f2f1f3
-- card surface: #ffffff
-- border: #e5e4e7
-- accent: #7a40ed
-- primary action: no distinct CTA color
+- Embedded product mockups (browser frames containing live Framer-built sites) maintain their aspect ratio and never crop.
+- Gradient spotlight cards keep their gradient orientations across breakpoints — the gradient direction is part of the brand spec.
 
-## Example Component Prompts
-No distinct primary action color was observed; use the extracted neutral button treatments instead of inventing a filled CTA color.
+## Iteration Guide
 
-2. **Animation preview card**: Pure white #ffffff fill, 40px border-radius, edge-to-edge video content. Hovered state applies the four-layer shadow: rgba(25,23,28,0.01) 0 152px 61px, rgba(25,23,28,0.05) 0 85px 51px, rgba(25,23,28,0.09) 0 38px 38px, rgba(25,23,28,0.10) 0 9px 21px. No visible border.
+1. Focus on ONE component at a time and reference it by its `components:` token name (e.g., `{components.button-primary}`, `{components.gradient-spotlight-card}`).
+2. When introducing a new section on the dark canvas, decide first which surface lift it lives on — `{colors.canvas}` for hero/FAQ, `{colors.surface-1}` for cards, `{colors.surface-2}` for featured cards. The depth choice is the most consequential decision.
+3. Default body to `{typography.body}` with all the documented OpenType variants; reach for `{typography.subhead}` only inside spotlight cards.
+4. Run `npx @google/design.md lint DESIGN.md` after edits — `broken-ref`, `contrast-ratio`, and `orphaned-tokens` warnings flag issues automatically.
+5. Add new variants as separate component entries (`-pressed`, `-featured`, `-selected`) — do not bury them in prose.
+6. Treat `{colors.accent-blue}` as a single-shot signal color: hyperlinks, focus, and selection — that's it. If you find yourself reaching for a second blue, the brand is drifting.
+7. Gradient spotlight cards are scarce by design. One or two per long page is the spec; three is a moodboard.
 
+## Known Gaps
 
-4. **Template card grid row**: Five Animation Preview Cards in a horizontal row with 20px gap, each 40px radius on the #f2f1f3 canvas. A dark filled pill button ('Browse 300+ free templates', #19171c fill, white text, 50px radius) floats centered over the row.
-
-5. **Pill badge above section heading**: Background #a981ff, text #17082c, 12px Inter weight 600, 40px border-radius, padding 4px 14px. Sits 8–12px above a 40–48px TWK Lausanne heading in #19171c.
-
-## Similar Brands
-
-- **Figma** — Same white-canvas design-tool aesthetic with pill buttons, soft rounded cards, and tight geometric typography at display sizes
-- **Framer** — Identical playfulness: off-white canvas, violet brand accent, oversized display headlines with aggressive negative tracking, and a focus on motion as the primary content
-- **Linear** — Same near-black ink (#19171c variant) for primary surfaces, pill-shaped controls, and a strict approach to accent color as functional punctuation rather than decoration
-- **Pitch** — Similar Swiss-design type treatment, generous vertical section gaps, and a violet-forward brand palette on a light canvas
-- **Spline** — Same product-showcase-first approach where motion previews replace photography, on rounded white cards floating over soft off-white
-
-## Quick Start
-
-### CSS Custom Properties
-
-```css
-:root {
-  /* Colors */
-  --color-studio-off-white: #f2f1f3;
-  --color-pure-white: #ffffff;
-  --color-hairline-gray: #e5e4e7;
-  --color-soft-mist: #97979b;
-  --color-slate: #6e6e73;
-  --color-ink: #19171c;
-  --color-pure-black: #000000;
-  --color-eclipse-violet: #7a40ed;
-  --color-deep-plum: #17082c;
-  --color-lilac-wash: #a981ff;
-  --color-lavender-mist: #cab3f8;
-  --color-electric-blue: #00b2ff;
-  --color-sky-tint: #e6f4ff;
-  --color-ice-blue: #a9dbff;
-  --color-volt: #f5ff63;
-
-  /* Typography — Font Families */
-  --font-twk-lausanne: 'TWK Lausanne', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-
-  /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.5;
-  --text-body: 16px;
-  --leading-body: 1.5;
-  --text-subheading: 21px;
-  --leading-subheading: 1.38;
-  --text-heading-sm: 26px;
-  --leading-heading-sm: 1.25;
-  --text-heading: 40px;
-  --leading-heading: 1.2;
-  --text-heading-lg: 48px;
-  --leading-heading-lg: 1.15;
-  --text-display: 80px;
-  --leading-display: 0.95;
-  --tracking-display: -2.56px;
-
-  /* Typography — Weights */
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --font-weight-w750: 750;
-  --font-weight-extrabold: 800;
-
-  /* Spacing */
-  --spacing-unit: 4px;
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-12: 12px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-40: 40px;
-  --spacing-44: 44px;
-  --spacing-60: 60px;
-  --spacing-68: 68px;
-  --spacing-80: 80px;
-  --spacing-84: 84px;
-  --spacing-100: 100px;
-  --spacing-144: 144px;
-  --spacing-180: 180px;
-  --spacing-200: 200px;
-
-  /* Layout */
-  --page-max-width: 1200px;
-  --section-gap: 80-120px;
-  --card-padding: 24-40px;
-  --element-gap: 8-12px;
-
-  /* Border Radius */
-  --radius-2xl: 20px;
-  --radius-3xl: 26px;
-  --radius-3xl-2: 40px;
-  --radius-full: 50px;
-  --radius-full-2: 375px;
-
-  /* Named Radii */
-  --radius-cards: 40px;
-  --radius-badges: 40px;
-  --radius-inputs: 26px;
-  --radius-buttons: 50px;
-  --radius-nav-elements: 20px;
-
-  /* Shadows */
-  --shadow-xl: rgba(25, 23, 28, 0.01) 0px 152px 61px 0px, rgba(25, 23, 28, 0.05) 0px 85px 51px 0px, rgba(25, 23, 28, 0.09) 0px 38px 38px 0px, rgba(25, 23, 28, 0.1) 0px 9px 21px 0px;
-  --shadow-xl-2: rgba(0, 0, 0, 0.01) 0px 63px 25px 0px, rgba(0, 0, 0, 0.05) 0px 35px 21px 0px, rgba(0, 0, 0, 0.09) 0px 16px 16px 0px, rgba(0, 0, 0, 0.1) 0px 4px 9px 0px;
-  --shadow-subtle: rgb(255, 255, 255) 1px 0px 0px 0px, rgb(255, 255, 255) -1px 0px 0px 0px;
-  --shadow-xl-3: rgba(0, 0, 0, 0.01) 0px 119px 48px 0px, rgba(0, 0, 0, 0.05) 0px 67px 40px 0px, rgba(0, 0, 0, 0.09) 0px 30px 30px 0px, rgba(0, 0, 0, 0.1) 0px 7px 16px 0px;
-
-  /* Surfaces */
-  --surface-studio-off-white: #f2f1f3;
-  --surface-pure-white: #ffffff;
-  --surface-hairline-gray: #e5e4e7;
-  --surface-ink: #19171c;
-}
-```
-
-### Tailwind v4
-
-```css
-@theme {
-  /* Colors */
-  --color-studio-off-white: #f2f1f3;
-  --color-pure-white: #ffffff;
-  --color-hairline-gray: #e5e4e7;
-  --color-soft-mist: #97979b;
-  --color-slate: #6e6e73;
-  --color-ink: #19171c;
-  --color-pure-black: #000000;
-  --color-eclipse-violet: #7a40ed;
-  --color-deep-plum: #17082c;
-  --color-lilac-wash: #a981ff;
-  --color-lavender-mist: #cab3f8;
-  --color-electric-blue: #00b2ff;
-  --color-sky-tint: #e6f4ff;
-  --color-ice-blue: #a9dbff;
-  --color-volt: #f5ff63;
-
-  /* Typography */
-  --font-twk-lausanne: 'TWK Lausanne', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-
-  /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.5;
-  --text-body: 16px;
-  --leading-body: 1.5;
-  --text-subheading: 21px;
-  --leading-subheading: 1.38;
-  --text-heading-sm: 26px;
-  --leading-heading-sm: 1.25;
-  --text-heading: 40px;
-  --leading-heading: 1.2;
-  --text-heading-lg: 48px;
-  --leading-heading-lg: 1.15;
-  --text-display: 80px;
-  --leading-display: 0.95;
-  --tracking-display: -2.56px;
-
-  /* Spacing */
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-12: 12px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-40: 40px;
-  --spacing-44: 44px;
-  --spacing-60: 60px;
-  --spacing-68: 68px;
-  --spacing-80: 80px;
-  --spacing-84: 84px;
-  --spacing-100: 100px;
-  --spacing-144: 144px;
-  --spacing-180: 180px;
-  --spacing-200: 200px;
-
-  /* Border Radius */
-  --radius-2xl: 20px;
-  --radius-3xl: 26px;
-  --radius-3xl-2: 40px;
-  --radius-full: 50px;
-  --radius-full-2: 375px;
-
-  /* Shadows */
-  --shadow-xl: rgba(25, 23, 28, 0.01) 0px 152px 61px 0px, rgba(25, 23, 28, 0.05) 0px 85px 51px 0px, rgba(25, 23, 28, 0.09) 0px 38px 38px 0px, rgba(25, 23, 28, 0.1) 0px 9px 21px 0px;
-  --shadow-xl-2: rgba(0, 0, 0, 0.01) 0px 63px 25px 0px, rgba(0, 0, 0, 0.05) 0px 35px 21px 0px, rgba(0, 0, 0, 0.09) 0px 16px 16px 0px, rgba(0, 0, 0, 0.1) 0px 4px 9px 0px;
-  --shadow-subtle: rgb(255, 255, 255) 1px 0px 0px 0px, rgb(255, 255, 255) -1px 0px 0px 0px;
-  --shadow-xl-3: rgba(0, 0, 0, 0.01) 0px 119px 48px 0px, rgba(0, 0, 0, 0.05) 0px 67px 40px 0px, rgba(0, 0, 0, 0.09) 0px 30px 30px 0px, rgba(0, 0, 0, 0.1) 0px 7px 16px 0px;
-}
-```
+- The exact gradient stops for the spotlight cards are derived from screenshot pixels rather than from CSS variables — the production gradients are likely defined as `linear-gradient` strings on individual elements rather than as design tokens. Treat the documented `{colors.gradient-*}` hex values as base anchors, not as exact gradient specs.
+- Form-field validation / error styling is not visible on the inspected pages because no error states render in the static screenshots.
+- Dark mode is the only mode — no light-mode adaptation is documented because the marketing site does not ship one.
+- The marketplace template detail page returned sparser CSS variable data than the other pages; surface tokens for that page were inferred from the matching home / gallery treatment rather than extracted directly.

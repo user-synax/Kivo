@@ -1,976 +1,1005 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./transitions.css";
+@import "./transitions-extra.css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================================
+   KIVO — Framer dark-canvas design system
+   ----------------------------------------------------------------------------
+   Design.md is the single source of truth: near-black canvas (#090909), white
+   ink (#ffffff), a single blue signal (#4ba9e1) reserved for links / focus /
+   selection, charcoal surfaces (surface-1 #141414 / surface-2 #1c1c1c),
+   hairline borders (#262626), oversized negative-tracked display type, and
+   pill geometry everywhere. No light mode ships.
+
+   The previous "Jitter" token names (ink-black, pure-white, stone, ember-orange,
+   eclipse-violet, electric-blue, fog, warm-canvas, sand, driftwood, pewter,
+   pills/nav/cards/inputs radii, font-goga) are redefined below to Framer values
+   so every existing component re-themes without edits.
+   ========================================================================== */
+
 :root {
-  /* Colors — Jitter (Swiss kinetic studio: off-white canvas, white cards,
-     near-black ink, violet brand spark, pill geometry) */
-  --color-studio-off-white: #f2f1f3; /* page canvas */
-  --color-pure-white: #ffffff; /* card / surface */
-  --color-hairline-gray: #e5e4e7; /* borders, dividers, recessed panels */
-  --color-ink: #19171c; /* ink text + dark fills */
-  --color-ink-black: #19171c; /* alias used across components */
-  --color-soft-mist: #97979b; /* muted secondary text */
-  --color-slate: #6e6e73; /* body copy on light surfaces */
-  --color-deep-charcoal: #19171c;
-  --color-pewter: #6e6e73; /* alias */
-  --color-warm-gray: #97979b;
-  --color-mist: #97979b;
-  --color-gunmetal: #6e6e73;
-  --color-charcoal: #2d2933;
-  --color-eclipse-violet: #7a40ed; /* brand accent (violet spark) */
-  --color-ember-orange: #7a40ed; /* legacy alias -> violet accent */
-  --color-burnt-rust: #5a2bbf; /* violet hover/active */
-  --color-sunset-coral: #a981ff; /* lilac */
-  --color-peach-blush: #cab3f8; /* lavender mist */
-  --color-electric-blue: #00b2ff; /* secondary accent */
-  --color-deep-plum: #17082c; /* near-black with purple cast */
-  --color-lilac-wash: #a981ff;
-  --color-lavender-mist: #cab3f8;
-  --color-volt: #f5ff63;
-  --color-ice-blue: #a9dbff;
-  --color-sky-tint: #e6f4ff;
-  --color-stone: #e5e4e7; /* hairline border */
-  --color-sand: #e5e4e7;
-  --color-driftwood: #dcdce0;
-  --color-warm-canvas: #f2f1f3; /* alias -> canvas */
-  --color-fog: #ffffff; /* alias -> white surface */
+    /* ── Framer core palette ─────────────────────────────────────────── */
+    --canvas: #090909; /* page background — near-black */
+    --surface-1: #141414; /* cards, secondary buttons, mockup tiles */
+    --surface-2: #1c1c1c; /* featured cards, selected tabs, hero pill backdrop */
+    --surface-3: #222222; /* hover lift on surfaces */
+    --hairline: #262626; /* 1px borders, dividers */
+    --hairline-soft: #1a1a1a; /* subtler dividers */
+    --ink: #ffffff; /* headlines, emphasized body */
+    --ink-muted: #999999; /* secondary type, meta, muted body */
+    --accent-blue: #4ba9e1; /* the ONLY chromatic accent */
+    --inverse-canvas: #ffffff; /* light pill CTAs, light thumbnails */
+    --inverse-ink: #000000;
+    --ink-inverse: #000000;
 
-  /* Typography — Font Families.
-     --font-inter / --font-outfit are supplied by next/font on <html>
-     (see app/layout.js); we only declare the alias + mono stacks here. */
-  --font-playfair: var(--font-inter);
-  --font-jetbrains:
-    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    /* Brand gradient family (signature showcase tiles — used sparingly) */
+    --gradient-magenta: #d44df0;
+    --gradient-violet: #6a4cf5;
+    --gradient-orange: #ff7a3d;
+    --gradient-coral: #ff5577;
+    --gradient-mix-a: #6a4cf5;
+    --gradient-mix-b: #d44df0;
 
-  /* Typography — Scale */
-  --text-caption: 11px;
-  --leading-caption: 1.2;
-  --tracking-caption: -0.01px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.5;
-  --tracking-body-sm: -0.01px;
-  --text-body: 16px;
-  --leading-body: 1.5;
-  --tracking-body: -0.01px;
-  --text-subheading: 20px;
-  --leading-subheading: 1.2;
-  --tracking-subheading: -0.02px;
-  --text-heading-sm: 24px;
-  --leading-heading-sm: 1.2;
-  --tracking-heading-sm: -0.03px;
-  --text-heading: 32px;
-  --leading-heading: 1.05;
-  --tracking-heading: -0.03px;
-  --text-heading-lg: 48px;
-  --leading-heading-lg: 1;
-  --tracking-heading-lg: -0.04px;
-  --text-display: 64px;
-  --leading-display: 0.9;
-  --tracking-display: -0.05px;
+    /* Semantic */
+    --semantic-success: #22c55e;
 
-  /* Typography — Weights */
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+    /* ── shadcn token layer (mapped to Framer) ───────────────────────── */
+    --background: #090909;
+    --foreground: #ffffff;
+    --card: #141414;
+    --card-foreground: #ffffff;
+    --popover: #141414;
+    --popover-foreground: #ffffff;
+    /* Framer's primary CTA is a white pill on dark canvas. */
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    --secondary: #1c1c1c;
+    --secondary-foreground: #ffffff;
+    --muted: #1c1c1c;
+    --muted-foreground: #999999;
+    /* Accent = surface-2 so hover lifts stay monochrome; the blue lives in --ring. */
+    --accent: #1c1c1c;
+    --accent-foreground: #ffffff;
+    --destructive: #ff5577;
+    --destructive-foreground: #ffffff;
+    --border: #262626;
+    --input: #262626;
+    --ring: #4ba9e1;
 
-  /* Spacing */
-  --spacing-unit: 4px;
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-12: 12px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-28: 28px;
-  --spacing-32: 32px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-60: 60px;
-  --spacing-64: 64px;
-  --spacing-80: 80px;
-  --spacing-96: 96px;
-  --spacing-120: 120px;
-  --spacing-128: 128px;
-  --spacing-160: 160px;
+    --radius: 0.5rem;
+    --sidebar: #141414;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #ffffff;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: #1c1c1c;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #262626;
+    --sidebar-ring: #4ba9e1;
 
-  /* Layout */
-  --page-max-width: 1200px;
-  --section-gap: 80px;
-  --card-padding: 32px;
-  --element-gap: 12px;
+    /* ── Typography (next/font exposes --font-inter / --font-outfit) ──── */
+    --font-display: var(--font-outfit), var(--font-inter), ui-sans-serif,
+        system-ui, sans-serif;
+    --font-goga: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui,
+        sans-serif;
+    --font-playfair: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-jetbrains:
+        ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+        monospace;
 
-  /* Border Radius */
-  --radius: 6px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-2xl-2: 20px;
-  --radius-3xl: 24px;
-  --radius-3xl-2: 40px;
-  --radius-3xl-3: 46px;
-  --radius-full: 9999px;
-  --radius-full-2: 60px;
-  --radius-full-3: 70px;
-  --radius-full-4: 90px;
-  --radius-full-5: 100px;
-  --radius-full-6: 999px;
-  --radius-full-7: 1028px;
+    /* ── Spacing (Design.md 5px base: 4/8/12/16/20/30/40/96) ────────── */
+    --spacing-4: 4px;
+    --spacing-8: 8px;
+    --spacing-12: 12px;
+    --spacing-16: 16px;
+    --spacing-20: 20px;
+    --spacing-24: 24px;
+    --spacing-30: 30px;
+    --spacing-40: 40px;
+    --spacing-96: 96px;
+    --page-max-width: 1200px;
+    --section-gap: 96px;
+    --card-padding: 24px;
 
-  /* Named Radii */
-  --radius-nav: 6px;
-  --radius-cards: 40px;
-  --radius-badges: 40px;
-  --radius-inputs: 26px;
-  --radius-buttons: 9999px;
-  --radius-nav: 20px;
+    /* ── Border radius (pills + 4/6/10/15/20/30) ─────────────────────── */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-3xl: 30px;
+    --radius-pills: 9999px;
+    --radius-nav: 14px;
+    --radius-cards: 20px;
+    --radius-inputs: 10px;
+    --radius-buttons: 9999px;
 
-  /* Surfaces */
-  --surface-warm-canvas: #f2ead3;
-  --surface-card-white: #ffffff;
-  --surface-sand-wash: #ede7d6;
-  --surface-peach-feature: #fbe7c2;
-  --surface-coral-feature: #fdb813;
-  --surface-dark-preview: #14110b;
+    /* ── Elevation (Framer light-edge + drop) ────────────────────────── */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 10px 30px -10px rgba(0, 0, 0, 0.6);
+    --shadow-lg:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 20px 50px -12px rgba(0, 0, 0, 0.7);
+    --shadow-xl:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 30px 70px -16px rgba(0, 0, 0, 0.8);
 
-  /* Elevation (default = flat, border-driven; themes override) */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
+    /* ── Motion tokens — shared scale (transitions-dev) ──────────────── */
+    --duration-stagger: 40ms;
+    --duration-micro: 80ms;
+    --duration-quick: 150ms;
+    --duration-fast: 250ms;
+    --duration-medium: 350ms;
+    --duration-slow: 400ms;
+    --duration-very-slow: 500ms;
+    --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: ease-in-out;
+    --ease-out: ease-out;
+    --ease-linear: linear;
+    --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
 
-  /* ── Motion tokens — shared scale (transitions-dev) ─────────
-       Reference these with var(--…) for CSS-driven motion. The
-       React/Motion.dev usage mirrors these same values. */
-  /* Durations */
-  --duration-stagger: 40ms; /* per-item stagger offset */
-  --duration-micro: 80ms; /* tooltip/path delay, shake segment */
-  --duration-quick: 150ms; /* dropdown/panel close, text swap */
-  --duration-fast: 250ms; /* dropdown/panel open, tabs sliding */
-  --duration-medium: 350ms; /* panel close, toast close */
-  --duration-slow: 400ms; /* panel open, skeleton reveal */
-  --duration-very-slow: 500ms; /* emphasis moments, text reveal */
-
-  /* Easings */
-  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in-out: ease-in-out;
-  --ease-out: ease-out;
-  --ease-linear: linear;
-  --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
-
-  /* Distances */
-  --distance-micro: 4px;
-  --distance-small: 6px;
-  --distance-base: 8px;
-  --distance-medium: 12px;
-  --distance-large: 30px;
-
-  /* Scales */
-  --scale-large: 0.96;
-  --scale-medium: 0.97; /* dropdown/panel open */
-  --scale-small: 0.98;
-  --scale-tiny: 0.99; /* dropdown close */
-
-  /* Blur */
-  --blur-small: 2px;
-  --blur-medium: 3px;
-
-  /* ── Transition-specific tunables (transitions-dev) ───────── */
-  /* Navbar entrance — texts reveal */
-  --stagger-dur: 500ms;
-  --stagger-distance: 12px;
-  --stagger-stagger: 40ms;
-  --stagger-blur: 3px;
-  --stagger-ease: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* Mobile menu — dropdown/panel hybrid */
-  --dropdown-open-dur: 250ms;
-  --dropdown-close-dur: 150ms;
-  --dropdown-pre-scale: 0.97;
-  --dropdown-closing-scale: 0.99;
-  --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --panel-blur: 2px;
-
-  /* Modal open / close — scales up from center */
-  --modal-open-dur: 250ms;
-  --modal-close-dur: 150ms;
-  --modal-scale: 0.96;
-  --modal-scale-close: 0.96;
-  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --modal-backdrop-dur: 250ms;
-
-  /* Tabs sliding — active pill slides between options (Replit light palette) */
-  --tabs-dur: 250ms;
-  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --tabs-text-muted: var(--color-stone);
-  --tabs-text-active: var(--color-ink-black);
-  --tabs-bar-bg: var(--color-sand);
-  --tabs-pill-bg: var(--color-pure-white);
-
-  /* Notification badge — unread counts pop in */
-  --badge-slide-dur: 260ms;
-  --badge-pop-dur: 500ms;
-  --badge-pop-close-dur: 180ms;
-  --badge-fade-dur: 400ms;
-  --badge-fade-close-dur: 180ms;
-  --badge-blur: 2px;
-  --badge-offset-x: -8.2px;
-  --badge-offset-y: 12.4px;
-  --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
-  --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Panel reveal — chat panel / message list entrance */
-  --panel-open-dur: 400ms;
-  --panel-close-dur: 350ms;
-  --panel-translate-y: 12px;
-  --panel-blur: 2px;
-  --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* Text states swap — online / offline status */
-  --text-swap-dur: 150ms;
-  --text-swap-translate-y: 4px;
-  --text-swap-blur: 2px;
-  --text-swap-ease: ease-in-out;
-
-  /* Hamburger morph */
-  --morph-open-dur: 250ms;
-  --morph-close-dur: 200ms;
-  --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* ── shadcn token layer — mapped to Jitter (off-white + ink + violet) ── */
-  --background: #f2f1f3;
-  --foreground: #19171c;
-  --card: #ffffff;
-  --card-foreground: #19171c;
-  --popover: #ffffff;
-  --popover-foreground: #19171c;
-  --primary: #7a40ed;
-  --primary-foreground: #ffffff;
-  --secondary: #f2f1f3;
-  --secondary-foreground: #19171c;
-  --muted: #f2f1f3;
-  --muted-foreground: #6e6e73;
-  --accent: #7a40ed;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --border: #e5e4e7;
-  --input: #e5e4e7;
-  --ring: #7a40ed;
-  --chart-1: #7a40ed;
-  --chart-2: #97979b;
-  --chart-3: #6e6e73;
-  --chart-4: #a981ff;
-  --chart-5: #00b2ff;
-  --radius: 0.5rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #19171c;
-  --sidebar-primary: #7a40ed;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ede7f6;
-  --sidebar-accent-foreground: #19171c;
-  --sidebar-border: #e5e4e7;
-  --sidebar-ring: #7a40ed;
+    /* ── Transition-specific tunables (transitions-dev) ──────────────── */
+    --stagger-dur: 500ms;
+    --stagger-distance: 12px;
+    --stagger-stagger: 40ms;
+    --stagger-blur: 3px;
+    --stagger-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --dropdown-open-dur: 250ms;
+    --dropdown-close-dur: 150ms;
+    --dropdown-pre-scale: 0.97;
+    --dropdown-closing-scale: 0.99;
+    --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --panel-blur: 2px;
+    --modal-open-dur: 250ms;
+    --modal-close-dur: 150ms;
+    --modal-scale: 0.96;
+    --modal-scale-close: 0.96;
+    --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --modal-backdrop-dur: 250ms;
+    --tabs-dur: 250ms;
+    --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --tabs-text-muted: #999999;
+    --tabs-text-active: #ffffff;
+    --tabs-bar-bg: #141414;
+    --tabs-pill-bg: #1c1c1c;
+    --badge-slide-dur: 260ms;
+    --badge-pop-dur: 500ms;
+    --badge-pop-close-dur: 180ms;
+    --badge-fade-dur: 400ms;
+    --badge-fade-close-dur: 180ms;
+    --badge-blur: 2px;
+    --badge-offset-x: -8.2px;
+    --badge-offset-y: 12.4px;
+    --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
+    --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --panel-open-dur: 400ms;
+    --panel-close-dur: 350ms;
+    --panel-translate-y: 12px;
+    --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --text-swap-dur: 150ms;
+    --text-swap-translate-y: 4px;
+    --text-swap-blur: 2px;
+    --text-swap-ease: ease-in-out;
+    --morph-open-dur: 250ms;
+    --morph-close-dur: 200ms;
+    --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@theme {
-  /* Colors — Jitter */
-  --color-ember-orange: #7a40ed;
-  --color-eclipse-violet: #7a40ed;
-  --color-sunset-coral: #a981ff;
-  --color-peach-blush: #cab3f8;
-  --color-burnt-rust: #5a2bbf;
-  --color-electric-blue: #00b2ff;
-  --color-warm-canvas: #f2f1f3;
-  --color-studio-off-white: #f2f1f3;
-  --color-pure-white: #ffffff;
-  --color-ink-black: #19171c;
-  --color-ink: #19171c;
-  --color-charcoal: #2d2933;
-  --color-slate: #6e6e73;
-  --color-deep-charcoal: #19171c;
-  --color-gunmetal: #6e6e73;
-  --color-stone: #e5e4e7;
-  --color-pewter: #6e6e73;
-  --color-soft-mist: #97979b;
-  --color-warm-gray: #97979b;
-  --color-mist: #97979b;
-  --color-sand: #e5e4e7;
-  --color-driftwood: #dcdce0;
-  --color-fog: #ffffff;
-  --color-deep-plum: #17082c;
-  --color-lilac-wash: #a981ff;
-  --color-lavender-mist: #cab3f8;
-  --color-volt: #f5ff63;
-  --color-ice-blue: #a9dbff;
-  --color-sky-tint: #e6f4ff;
-
-  /* Typography — next/font supplies --font-inter / --font-outfit on <html> */
-  --font-goga: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-playfair: var(--font-inter);
-  --font-jetbrains:
-    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-
-  /* Typography — Scale */
-  --text-caption: 11px;
-  --leading-caption: 1.2;
-  --tracking-caption: -0.01px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.5;
-  --tracking-body-sm: -0.01px;
-  --text-body: 16px;
-  --leading-body: 1.5;
-  --tracking-body: -0.01px;
-  --text-subheading: 20px;
-  --leading-subheading: 1.2;
-  --tracking-subheading: -0.02px;
-  --text-heading-sm: 24px;
-  --leading-heading-sm: 1.2;
-  --tracking-heading-sm: -0.03px;
-  --text-heading: 32px;
-  --leading-heading: 1.05;
-  --tracking-heading: -0.03px;
-  --text-heading-lg: 48px;
-  --leading-heading-lg: 1;
-  --tracking-heading-lg: -0.04px;
-  --text-display: 64px;
-  --leading-display: 0.9;
-  --tracking-display: -0.05px;
-
-  /* Spacing */
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-12: 12px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-28: 28px;
-  --spacing-32: 32px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-60: 60px;
-  --spacing-64: 64px;
-  --spacing-80: 80px;
-  --spacing-96: 96px;
-  --spacing-120: 120px;
-  --spacing-128: 128px;
-  --spacing-160: 160px;
-
-  /* Border Radius */
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 16px;
-  --radius-2xl-2: 20px;
-  --radius-3xl: 24px;
-  --radius-3xl-2: 40px;
-  --radius-3xl-3: 46px;
-  --radius-full: 9999px;
-  --radius-full-2: 60px;
-  --radius-full-3: 70px;
-  --radius-full-4: 90px;
-  --radius-full-5: 100px;
-  --radius-full-6: 999px;
-  --radius-full-7: 1028px;
-  --radius-pills: 9999px;
-
-  /* Named Radii — Jitter: pill buttons (50px), 40px cards/badges,
-     26px inputs, 20px nav elements. No radius below 20px anywhere. */
-  --radius-nav: 20px;
-  --radius-cards: 40px;
-  --radius-badges: 40px;
-  --radius-inputs: 26px;
-  --radius-buttons: 9999px;
-
-  /* Elevation — Jitter signature: multi-layer, low-opacity, ink-tinted
-     diffuse stacks that let cards float 150px+ above the canvas. */
-  --shadow-sm: 0 1px 2px rgba(25, 23, 28, 0.04), 0 2px 6px rgba(25, 23, 28, 0.04);
-  --shadow-md: 0 7px 16px rgba(25, 23, 28, 0.1), 0 30px 30px rgba(25, 23, 28, 0.09), 0 67px 40px rgba(25, 23, 28, 0.05);
-  --shadow-lg: 0 9px 21px rgba(25, 23, 28, 0.1), 0 38px 38px rgba(25, 23, 28, 0.09), 0 85px 51px rgba(25, 23, 28, 0.05), 0 152px 61px rgba(25, 23, 28, 0.01);
-  --shadow-xl: 0 152px 61px rgba(25, 23, 28, 0.01), 0 85px 51px rgba(25, 23, 28, 0.05), 0 38px 38px rgba(25, 23, 28, 0.09), 0 9px 21px rgba(25, 23, 28, 0.1);
-  --shadow-2xl: 0 63px 25px rgba(0, 0, 0, 0.01), 0 35px 21px rgba(0, 0, 0, 0.05), 0 16px 16px rgba(0, 0, 0, 0.09), 0 4px 9px rgba(0, 0, 0, 0.1);
+/* Dark mode == the only mode. Keep .dark defined so `dark:` variants resolve. */
+.dark {
+    --background: #090909;
+    --foreground: #ffffff;
+    --card: #141414;
+    --card-foreground: #ffffff;
+    --popover: #141414;
+    --popover-foreground: #ffffff;
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    --secondary: #1c1c1c;
+    --secondary-foreground: #ffffff;
+    --muted: #1c1c1c;
+    --muted-foreground: #999999;
+    --accent: #1c1c1c;
+    --accent-foreground: #ffffff;
+    --destructive: #ff5577;
+    --border: #262626;
+    --input: #262626;
+    --ring: #4ba9e1;
+    --sidebar: #141414;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #ffffff;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: #1c1c1c;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #262626;
+    --sidebar-ring: #4ba9e1;
+    --tabs-text-muted: #999999;
+    --tabs-text-active: #ffffff;
+    --tabs-bar-bg: #141414;
+    --tabs-pill-bg: #1c1c1c;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 10px 30px -10px rgba(0, 0, 0, 0.6);
+    --shadow-lg:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 20px 50px -12px rgba(0, 0, 0, 0.7);
+    --shadow-xl:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 30px 70px -16px rgba(0, 0, 0, 0.8);
 }
 
 @theme inline {
-  --font-heading: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-inter);
-  --font-body: var(--font-playfair);
-  --font-mono: var(--font-jetbrains);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+    --font-heading: var(--font-outfit), var(--font-inter), ui-sans-serif,
+        system-ui, sans-serif;
+    --font-display: var(--font-outfit), var(--font-inter), ui-sans-serif,
+        system-ui, sans-serif;
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-jetbrains);
+
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+
+    --radius-sm: var(--radius-sm);
+    --radius-md: var(--radius-md);
+    --radius-lg: var(--radius-lg);
+    --radius-xl: var(--radius-xl);
+    --radius-2xl: var(--radius-2xl);
+    --radius-3xl: var(--radius-3xl);
+    --radius-4xl: 40px;
 }
 
-/* ── .dark — Jitter "Ink" surface (near-black violet cast) ───── */
-.dark {
-  --background: #19171c;
-  --foreground: #f2f1f3;
-  --card: #231f29;
-  --card-foreground: #f2f1f3;
-  --popover: #231f29;
-  --popover-foreground: #f2f1f3;
-  --primary: #7a40ed;
-  --primary-foreground: #ffffff;
-  --secondary: #2a2730;
-  --secondary-foreground: #f2f1f3;
-  --muted: #2a2730;
-  --muted-foreground: #b9b2c8;
-  --accent: #7a40ed;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --border: #332f3a;
-  --input: #332f3a;
-  --ring: #7a40ed;
-  --chart-1: #7a40ed;
-  --chart-2: #b9b2c8;
-  --chart-3: #6e6e73;
-  --chart-4: #a981ff;
-  --chart-5: #00b2ff;
-  --sidebar: #231f29;
-  --sidebar-foreground: #f2f1f3;
-  --sidebar-primary: #7a40ed;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2e2a37;
-  --sidebar-accent-foreground: #f2f1f3;
-  --sidebar-border: #332f3a;
-  --sidebar-ring: #7a40ed;
+@theme {
+    /* ── Framer palette tokens (also aliased from old Jitter names) ──── */
+    --color-canvas: #090909;
+    --color-surface-1: #141414;
+    --color-surface-2: #1c1c1c;
+    --color-surface-3: #222222;
+    --color-hairline: #262626;
+    --color-hairline-soft: #1a1a1a;
+    --color-ink: #ffffff;
+    --color-ink-black: #ffffff; /* old Jitter "ink" → Framer white ink */
+    --color-ink-muted: #999999;
+    --color-pewter: #999999; /* old alias → muted */
+    --color-accent-blue: #4ba9e1;
+    --color-brand: #4ba9e1;
+    --color-electric-blue: #4ba9e1; /* old alias → blue signal */
+    --color-ember-orange: #4ba9e1; /* old alias → blue signal */
+    --color-eclipse-violet: #4ba9e1; /* old alias → blue signal */
+    --color-inverse-canvas: #ffffff;
+    --color-inverse-ink: #000000;
+    --color-semantic-success: #22c55e;
 
-  /* Surface / palette overrides so kivo-* chrome matches the dark preview */
-  --surface-warm-canvas: #19171c;
-  --surface-card-white: #231f29;
-  --color-warm-canvas: #19171c;
-  --color-pure-white: #231f29;
-  --color-ink-black: #f2f1f3;
-  --color-sand: #332f3a;
-  --color-fog: #231f29;
+    --color-pure-white: #ffffff;
+    --color-fog: #141414; /* old alias → surface-1 */
+    --color-warm-canvas: #090909; /* old alias → canvas */
+    --color-sand: #1a1a1a;
+    --color-driftwood: #1a1a1a;
+    --color-stone: #262626; /* old alias → hairline */
+    --color-void-black: #090909;
+    --color-phosphor-white: #ffffff;
+    --color-swap: #999999;
 
-  /* Tabs palette for dark mode */
-  --tabs-text-muted: var(--color-stone);
-  --tabs-text-active: #f2ead3;
-  --tabs-bar-bg: #2a2419;
-  --tabs-pill-bg: #3a3326;
+    --color-gradient-magenta: #d44df0;
+    --color-gradient-violet: #6a4cf5;
+    --color-gradient-orange: #ff7a3d;
+    --color-gradient-coral: #ff5577;
 
-  /* Elevation — dark-appropriate subtle shadow (global, theme-independent) */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px -8px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px -12px rgba(0, 0, 0, 0.55);
-  --shadow-xl: 0 24px 48px -16px rgba(0, 0, 0, 0.6);
-  --shadow-2xl: 0 32px 64px -20px rgba(0, 0, 0, 0.65);
+    /* ── Radii (old Jitter names preserved) ─────────────────────────── */
+    --radius-pills: 9999px;
+    --radius-nav: 14px;
+    --radius-cards: 20px;
+    --radius-inputs: 10px;
+    --radius-buttons: 9999px;
+    --radius-full: 9999px;
+
+    /* ── Fonts ──────────────────────────────────────────────────────── */
+    --font-goga: var(--font-outfit), var(--font-inter), ui-sans-serif,
+        system-ui, sans-serif;
+    --font-display: var(--font-outfit), var(--font-inter), ui-sans-serif,
+        system-ui, sans-serif;
+    --font-jetbrains:
+        ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+        monospace;
+
+    /* ── Elevation ──────────────────────────────────────────────────── */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 10px 30px -10px rgba(0, 0, 0, 0.6);
+    --shadow-lg:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 20px 50px -12px rgba(0, 0, 0, 0.7);
+    --shadow-xl:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 30px 70px -16px rgba(0, 0, 0, 0.8);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
+
+    html {
+        @apply bg-canvas text-ink font-sans antialiased;
+        color-scheme: dark;
+    }
+
+    body {
+        @apply bg-canvas text-ink;
+        font-feature-settings:
+            "cv01" 1, "cv05" 1, "cv09" 1, "cv11" 1, "ss03" 1, "ss07" 1,
+            "dlig" 1, "tnum" 1;
+    }
+
+    /* Framer's signature: the dark canvas IS the whitespace. A faint grid
+       anchors the hero without breaking the poster calm. */
+    body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image:
+            linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(
+            circle at 50% 30%,
+            black,
+            transparent 75%
+        );
+    }
+
+    ::selection {
+        background: var(--accent-blue);
+        color: #fff;
+    }
+
+    /* Custom scrollbar — thin, ink-muted on canvas. */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    }
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.14);
+        border-radius: 9999px;
+        transition: background 0.3s ease;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.28);
+    }
+}
+
+@layer utilities {
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    /* ── Framer display type — aggressive negative tracking ──────────── */
+    .framer-display {
+        font-family: var(--font-display);
+        letter-spacing: -0.05em;
+        line-height: 0.9;
+        font-weight: 500;
+    }
+    .framer-display-xl {
+        font-family: var(--font-display);
+        font-size: clamp(3rem, 9vw, 6.875rem); /* up to 110px */
+        line-height: 0.85;
+        letter-spacing: -5.5px;
+        font-weight: 500;
+    }
+    .framer-display-lg {
+        font-family: var(--font-display);
+        font-size: clamp(2.5rem, 6vw, 3.875rem); /* up to 62px */
+        line-height: 1;
+        letter-spacing: -3.1px;
+        font-weight: 500;
+    }
+    .framer-display-md {
+        font-family: var(--font-display);
+        font-size: clamp(1.75rem, 4vw, 2rem); /* up to 32px */
+        line-height: 1.13;
+        letter-spacing: -1px;
+        font-weight: 500;
+    }
+
+    .text-balance {
+        text-wrap: balance;
+    }
+
+    .max-w-container {
+        max-width: 1200px;
+    }
+
+    /* ── Gradient spotlight cards (signature showcase tiles) ─────────── */
+    .spotlight {
+        position: relative;
+        overflow: hidden;
+        border-radius: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #fff;
+    }
+    .spotlight-violet {
+        background:
+            radial-gradient(
+                120% 120% at 0% 0%,
+                var(--gradient-violet),
+                transparent 60%
+            ),
+            linear-gradient(135deg, #5a3df0, #7d4df0);
+    }
+    .spotlight-magenta {
+        background:
+            radial-gradient(
+                120% 120% at 100% 0%,
+                var(--gradient-magenta),
+                transparent 60%
+            ),
+            linear-gradient(135deg, #c23de0, #e06fc0);
+    }
+    .spotlight-orange {
+        background:
+            radial-gradient(
+                120% 120% at 0% 100%,
+                var(--gradient-orange),
+                transparent 60%
+            ),
+            linear-gradient(135deg, #ff6a2d, #ff9a4d);
+    }
+    .spotlight-coral {
+        background:
+            radial-gradient(
+                120% 120% at 100% 100%,
+                var(--gradient-coral),
+                transparent 60%
+            ),
+            linear-gradient(135deg, #ff4d6d, #ff7d97);
+    }
+
+    /* Soft brand glow used behind focal sections. */
+    .stats-glow,
+    .pricing-glow {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            radial-gradient(
+                60% 55% at 50% -5%,
+                rgba(75, 169, 225, 0.12),
+                transparent 70%
+            ),
+            radial-gradient(
+                40% 40% at 85% 110%,
+                rgba(28, 28, 28, 0.6),
+                transparent 70%
+            );
+    }
 }
 
 @layer components {
-  /* Floating pill navbar — warm canvas surface that tightens as the
-     page scrolls. data-scrolled is toggled imperatively (no React
-     re-render) so only the backdrop/surface shift, never layout. */
-  .kivo-nav-pill {
-    background-color: rgba(242, 241, 243, 0.72);
-    border-color: rgba(25, 23, 28, 0.08);
-    border-radius: var(--radius-pills);
-    box-shadow: 0 8px 30px -16px rgba(25, 23, 28, 0.25);
-    transition:
-      background-color var(--duration-fast) var(--ease-smooth-out),
-      border-color var(--duration-fast) var(--ease-smooth-out);
-  }
-  .kivo-nav-pill[data-scrolled="true"] {
-    background-color: rgba(242, 241, 243, 0.92);
-    border-color: rgba(25, 23, 28, 0.12);
-  }
-
-  /* Understated nav link hover — a warm wash that lifts to primary orange on hover. */
-  .kivo-nav-link {
-    transition:
-      color var(--duration-fast) var(--ease-smooth-out),
-      background-color var(--duration-fast) var(--ease-smooth-out);
-  }
-  .kivo-nav-link:hover {
-    color: var(--color-ember-orange);
-    background-color: rgba(156, 163, 175, 0.18);
-  }
-
-  /* Primary CTA — restrained press feedback, no distracting scale-up. */
-  .kivo-cta {
-    transition:
-      transform var(--duration-quick) var(--ease-smooth-out),
-      background-color var(--duration-fast) var(--ease-smooth-out),
-      filter var(--duration-fast) var(--ease-smooth-out);
-  }
-  .kivo-cta:hover {
-    filter: brightness(1.06);
-  }
-  .kivo-cta:active {
-    transform: scale(0.97);
-  }
-
-  /* Visible keyboard focus — uses the active theme accent. */
-  .kivo-focus:focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--bg-surface, #ffffff),
-      0 0 0 4px var(--accent, #7a40ed);
-  }
-
-  /* ── transitions-dev: menu dropdown (theme selector) ───────── */
-  .t-dropdown {
-    transform-origin: top left;
-    transform: scale(var(--dropdown-pre-scale));
-    opacity: 0;
-    pointer-events: none;
-    transition:
-      transform var(--dropdown-open-dur) var(--dropdown-ease),
-      opacity var(--dropdown-open-dur) var(--dropdown-ease);
-    will-change: transform, opacity;
-  }
-  .t-dropdown[data-origin="top-right"] {
-    transform-origin: top right;
-  }
-  .t-dropdown[data-origin="top-center"] {
-    transform-origin: top center;
-  }
-  .t-dropdown[data-origin="bottom-left"] {
-    transform-origin: bottom left;
-  }
-  .t-dropdown[data-origin="bottom-center"] {
-    transform-origin: bottom center;
-  }
-  .t-dropdown[data-origin="bottom-right"] {
-    transform-origin: bottom right;
-  }
-  .t-dropdown.is-open {
-    transform: scale(1);
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .t-dropdown.is-closing {
-    transform: scale(var(--dropdown-closing-scale));
-    opacity: 0;
-    pointer-events: none;
-    transition:
-      transform var(--dropdown-close-dur) var(--dropdown-ease),
-      opacity var(--dropdown-close-dur) var(--dropdown-ease);
-  }
-
-  /* ── transitions-dev: modal open / close ──────────────────── */
-  .t-modal {
-    transform-origin: center;
-    transform: scale(var(--modal-scale));
-    opacity: 0;
-    pointer-events: none;
-    transition:
-      transform var(--modal-open-dur) var(--modal-ease),
-      opacity var(--modal-open-dur) var(--modal-ease);
-    will-change: transform, opacity;
-  }
-  .t-modal.is-open {
-    transform: scale(1);
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .t-modal.is-closing {
-    transform: scale(var(--modal-scale-close));
-    opacity: 0;
-    pointer-events: none;
-    transition:
-      transform var(--modal-close-dur) var(--modal-ease),
-      opacity var(--modal-close-dur) var(--modal-ease);
-  }
-  .t-modal-backdrop {
-    opacity: 0;
-    transition: opacity var(--modal-backdrop-dur) var(--modal-ease);
-  }
-  .t-modal-backdrop.is-open {
-    opacity: 1;
-  }
-
-  /* ── transitions-dev: tabs sliding segmented control ──────── */
-  .t-tabs {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px;
-    border-radius: 48px;
-    background: var(--tabs-bar-bg);
-  }
-  .t-tab {
-    position: relative;
-    appearance: none;
-    border: 0;
-    background: transparent;
-    height: 34px;
-    padding: 4px 16px;
-    color: var(--tabs-text-muted);
-    cursor: pointer;
-    border-radius: 48px;
-    z-index: 1;
-    transition: color var(--tabs-dur) var(--tabs-ease);
-  }
-  .t-tab:not([aria-selected="true"]):hover,
-  .t-tab[aria-selected="true"] {
-    color: var(--tabs-text-active);
-  }
-  .t-tabs-pill {
-    position: absolute;
-    top: 3px;
-    left: 0;
-    height: 34px;
-    width: 0;
-    background: var(--tabs-pill-bg);
-    border-radius: 48px;
-    transform: translateX(0);
-    transition:
-      transform var(--tabs-dur) var(--tabs-ease),
-      width var(--tabs-dur) var(--tabs-ease);
-    will-change: transform, width;
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  /* ── transitions-dev: notification badge (unread counts) ───── */
-  @keyframes t-badge-slide-in {
-    from { transform: translate(var(--badge-offset-x), var(--badge-offset-y)); }
-    to   { transform: translate(0, 0); }
-  }
-  .t-badge {
-    position: absolute;
-    top: -6px;
-    right: -8px;
-    pointer-events: none;
-    will-change: transform;
-  }
-  .t-badge[data-open="true"] {
-    animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease);
-  }
-  .t-badge-dot {
-    display: block;
-    transform-origin: center;
-    transform: scale(1);
-    opacity: 1;
-    filter: blur(0);
-    transition:
-      transform var(--badge-pop-dur)  var(--badge-pop-ease),
-      opacity   var(--badge-fade-dur) var(--badge-pop-ease),
-      filter    var(--badge-pop-dur)  var(--badge-pop-ease);
-    will-change: transform, opacity, filter;
-  }
-  .t-badge[data-open="false"] .t-badge-dot {
-    transform: scale(0);
-    opacity: 0;
-    filter: blur(var(--badge-blur));
-    transition:
-      transform var(--badge-pop-close-dur) var(--badge-close-ease),
-      opacity   var(--badge-fade-close-dur) var(--badge-close-ease),
-      filter    var(--badge-pop-close-dur) var(--badge-close-ease);
-  }
-  @keyframes t-badge-pop {
-    from { transform: scale(0); }
-    to   { transform: scale(1); }
-  }
-  .t-badge-pop {
-    animation: t-badge-pop var(--badge-pop-dur) var(--badge-pop-ease) both;
-  }
-
-  /* ── transitions-dev: panel reveal (message list entrance) ──── */
-  @keyframes t-panel-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--panel-translate-y));
-      filter: blur(var(--panel-blur));
+    /* ── Floating pill navbar — charcoal surface on the dark canvas ──── */
+    .kivo-nav-pill {
+        background-color: rgba(20, 20, 20, 0.72);
+        border-color: rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-pills);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(10px);
+        transition:
+            background-color var(--duration-fast) var(--ease-smooth-out),
+            border-color var(--duration-fast) var(--ease-smooth-out);
     }
-    to { opacity: 1; transform: none; filter: none; }
-  }
-  .t-panel-in {
-    animation: t-panel-in var(--panel-open-dur) var(--panel-ease) both;
-    will-change: transform, opacity, filter;
-  }
-
-  /* ── Sidebar conversation rows — staggered cross-blur rise ──── */
-  @keyframes t-item-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-      filter: blur(2px);
+    .kivo-nav-pill[data-scrolled="true"] {
+        background-color: rgba(20, 20, 20, 0.92);
+        border-color: rgba(255, 255, 255, 0.14);
     }
-    to {
-      opacity: 1;
-      transform: none;
-      filter: none;
+
+    .kivo-nav-link {
+        color: var(--ink-muted);
+        transition:
+            color var(--duration-fast) var(--ease-smooth-out),
+            background-color var(--duration-fast) var(--ease-smooth-out);
     }
-  }
-  .t-item-in {
-    animation: t-item-in var(--duration-slow) var(--ease-smooth-out) both;
-    will-change: transform, opacity, filter;
-  }
+    .kivo-nav-link:hover {
+        color: var(--ink);
+        background-color: rgba(255, 255, 255, 0.06);
+    }
 
-  /* Per-message entrance — subtle cross-blur rise */
-  @keyframes t-msg-in {
-    from { opacity: 0; transform: translateY(8px); filter: blur(2px); }
-    to   { opacity: 1; transform: none; filter: none; }
-  }
-  .t-msg-in {
-    animation: t-msg-in var(--duration-slow) var(--ease-smooth-out) both;
-    will-change: transform, opacity, filter;
-  }
+    /* Primary CTA — white pill on dark, subtle press. */
+    .kivo-cta {
+        background-color: var(--ink);
+        color: var(--inverse-ink);
+        transition:
+            transform var(--duration-quick) var(--ease-smooth-out),
+            filter var(--duration-fast) var(--ease-smooth-out);
+    }
+    .kivo-cta:hover {
+        filter: brightness(0.94);
+    }
+    .kivo-cta:active {
+        transform: scale(0.97);
+    }
 
-  /* ── Chat message bubble (themeable surface) ───────────────
-     Colors are driven by --bubble-sent / --bubble-received (set per
-     global theme in theme.js). To ship a NEW bubble theme you do NOT
-     touch this component — just add a [data-bubble-theme="…"] override:
+    .kivo-focus:focus-visible {
+        outline: none;
+        box-shadow:
+            0 0 0 2px var(--canvas, #090909),
+            0 0 0 4px var(--accent-blue, #4ba9e1);
+    }
 
-        .t-bubble[data-bubble-theme="midnight"] {
-          --bubble-sent: #…;
-          --bubble-received: #…;
-          --bubble-radius: 22px;
+    /* ── Framer card primitives ─────────────────────────────────────── */
+    .framer-card {
+        background-color: var(--surface-1);
+        border: 1px solid var(--hairline);
+        border-radius: 20px;
+        box-shadow: var(--shadow-md);
+    }
+    .framer-card-featured {
+        background-color: var(--surface-2);
+        border-color: rgba(75, 169, 225, 0.4);
+        border-radius: 20px;
+        box-shadow: var(--shadow-lg);
+    }
+
+    /* ── transitions-dev: dropdown ──────────────────────────────────── */
+    .t-dropdown {
+        transform-origin: top left;
+        transform: scale(var(--dropdown-pre-scale));
+        opacity: 0;
+        pointer-events: none;
+        transition:
+            transform var(--dropdown-open-dur) var(--dropdown-ease),
+            opacity var(--dropdown-open-dur) var(--dropdown-ease);
+        will-change: transform, opacity;
+    }
+    .t-dropdown[data-origin="top-right"] {
+        transform-origin: top right;
+    }
+    .t-dropdown[data-origin="top-center"] {
+        transform-origin: top center;
+    }
+    .t-dropdown[data-origin="bottom-left"] {
+        transform-origin: bottom left;
+    }
+    .t-dropdown[data-origin="bottom-center"] {
+        transform-origin: bottom center;
+    }
+    .t-dropdown[data-origin="bottom-right"] {
+        transform-origin: bottom right;
+    }
+    .t-dropdown.is-open {
+        transform: scale(1);
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .t-dropdown.is-closing {
+        transform: scale(var(--dropdown-closing-scale));
+        opacity: 0;
+        pointer-events: none;
+        transition:
+            transform var(--dropdown-close-dur) var(--dropdown-ease),
+            opacity var(--dropdown-close-dur) var(--dropdown-ease);
+    }
+
+    /* ── transitions-dev: modal ─────────────────────────────────────── */
+    .t-modal {
+        transform-origin: center;
+        transform: scale(var(--modal-scale));
+        opacity: 0;
+        pointer-events: none;
+        transition:
+            transform var(--modal-open-dur) var(--modal-ease),
+            opacity var(--modal-open-dur) var(--modal-ease);
+        will-change: transform, opacity;
+    }
+    .t-modal.is-open {
+        transform: scale(1);
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .t-modal.is-closing {
+        transform: scale(var(--modal-scale-close));
+        opacity: 0;
+        pointer-events: none;
+        transition:
+            transform var(--modal-close-dur) var(--modal-ease),
+            opacity var(--modal-close-dur) var(--modal-ease);
+    }
+    .t-modal-backdrop {
+        opacity: 0;
+        transition: opacity var(--modal-backdrop-dur) var(--modal-ease);
+    }
+    .t-modal-backdrop.is-open {
+        opacity: 1;
+    }
+
+    /* ── transitions-dev: tabs (sliding segmented control) ──────────── */
+    .t-tabs {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 4px;
+        border-radius: 48px;
+        background: var(--tabs-bar-bg);
+        border: 1px solid var(--hairline);
+    }
+    .t-tab {
+        position: relative;
+        appearance: none;
+        border: 0;
+        background: transparent;
+        height: 38px;
+        padding: 4px 18px;
+        color: var(--tabs-text-muted);
+        cursor: pointer;
+        border-radius: 48px;
+        z-index: 1;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: color var(--tabs-dur) var(--tabs-ease);
+    }
+    .t-tab:not([aria-selected="true"]):hover,
+    .t-tab[aria-selected="true"] {
+        color: var(--tabs-text-active);
+    }
+    .t-tabs-pill {
+        position: absolute;
+        top: 4px;
+        left: 0;
+        height: 38px;
+        width: 0;
+        background: var(--tabs-pill-bg);
+        border-radius: 48px;
+        transform: translateX(0);
+        box-shadow: var(--shadow-md);
+        transition:
+            transform var(--tabs-dur) var(--tabs-ease),
+            width var(--tabs-dur) var(--tabs-ease);
+        will-change: transform, width;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    /* ── transitions-dev: notification badge ─────────────────────────── */
+    @keyframes t-badge-slide-in {
+        from {
+            transform: translate(var(--badge-offset-x), var(--badge-offset-y));
         }
-
-     The component reads these vars, so the new theme is picked up
-     automatically. Optional knobs: --bubble-radius, --bubble-pad.
-  */
-  .t-bubble {
-    position: relative;
-    max-width: 78%;
-    border-radius: var(--bubble-radius, 18px);
-    padding: var(--bubble-pad, 10px 14px);
-    font-size: var(--body-sm-font-size, 14px);
-    line-height: var(--leading-body-sm, 1.45);
-    color: var(--text-primary);
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    transition: background-color var(--duration-quick, 120ms)
-      var(--ease-smooth-out, ease);
-  }
-  .t-bubble.is-mine {
-    background: var(--bubble-sent);
-  }
-  .t-bubble.is-other {
-    background: var(--bubble-received);
-    border: 1px solid var(--border);
-  }
-  /* Tail corner (higher specificity so it beats the base border-radius shorthand). */
-  .t-bubble.is-mine.with-tail {
-    border-top-right-radius: 6px;
-  }
-  .t-bubble.is-other.with-tail {
-    border-top-left-radius: 6px;
-  }
-  .t-bubble.is-deleted {
-    background: transparent;
-    border: 1px dashed var(--border);
-    color: var(--text-muted);
-    font-style: italic;
-  }
-  /* Example extra bubble theme (try data-bubble-theme="rounded"): softer,
-     more pill-like corners independent of the global color theme. */
-  .t-bubble[data-bubble-theme="rounded"] {
-    --bubble-radius: 22px;
-    --bubble-pad: 10px 16px;
-  }
-
-  /* ── transitions-dev: text states swap (online / offline) ──── */
-  @keyframes t-text-swap-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--text-swap-translate-y));
-      filter: blur(var(--text-swap-blur));
+        to {
+            transform: translate(0, 0);
+        }
     }
-    to { opacity: 1; transform: none; filter: none; }
-  }
-  .t-text-swap {
-    display: inline-block;
-    animation: t-text-swap-in var(--text-swap-dur) var(--text-swap-ease) both;
-    will-change: transform, opacity, filter;
-  }
+    .t-badge {
+        position: absolute;
+        top: -6px;
+        right: -8px;
+        pointer-events: none;
+        will-change: transform;
+    }
+    .t-badge[data-open="true"] {
+        animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease);
+    }
+    .t-badge-dot {
+        display: block;
+        transform-origin: center;
+        transform: scale(1);
+        opacity: 1;
+        filter: blur(0);
+        transition:
+            transform var(--badge-pop-dur) var(--badge-pop-ease),
+            opacity var(--badge-fade-dur) var(--badge-pop-ease),
+            filter var(--badge-pop-dur) var(--badge-pop-ease);
+        will-change: transform, opacity, filter;
+    }
+    .t-badge[data-open="false"] .t-badge-dot {
+        transform: scale(0);
+        opacity: 0;
+        filter: blur(var(--badge-blur));
+        transition:
+            transform var(--badge-pop-close-dur) var(--badge-close-ease),
+            opacity var(--badge-fade-close-dur) var(--badge-close-ease),
+            filter var(--badge-pop-close-dur) var(--badge-close-ease);
+    }
+    @keyframes t-badge-pop {
+        from {
+            transform: scale(0);
+        }
+        to {
+            transform: scale(1);
+        }
+    }
+    .t-badge-pop {
+        animation: t-badge-pop var(--badge-pop-dur) var(--badge-pop-ease) both;
+    }
 
-  /* ── Custom themed scrollbar ──────────────────────────────
-     Replace the native scrollbar entirely. Colors are driven by theme
-     variables (--scrollbar-thumb / --scrollbar-thumb-hover) so the bar
-     re-skins with the active theme. Firefox uses scrollbar-width; WebKit
-     uses the ::-webkit-scrollbar family. */
-  .t-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;
-  }
-  .t-scroll::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  .t-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .t-scroll::-webkit-scrollbar-thumb {
-    background-color: var(--scrollbar-thumb);
-    border-radius: 9999px;
-    /* Transparent 2px border keeps a gap between thumb and track. */
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-  .t-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: var(--scrollbar-thumb-hover);
-  }
-  .t-scroll::-webkit-scrollbar-corner {
-    background: transparent;
-  }
+    /* ── transitions-dev: panel reveal / item / message entrance ────── */
+    @keyframes t-panel-in {
+        from {
+            opacity: 0;
+            transform: translateY(var(--panel-translate-y));
+            filter: blur(var(--panel-blur));
+        }
+        to {
+            opacity: 1;
+            transform: none;
+            filter: none;
+        }
+    }
+    .t-panel-in {
+        animation: t-panel-in var(--panel-open-dur) var(--panel-ease) both;
+        will-change: transform, opacity, filter;
+    }
+    @keyframes t-item-in {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+            filter: blur(2px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+            filter: none;
+        }
+    }
+    .t-item-in {
+        animation: t-item-in var(--duration-slow) var(--ease-smooth-out) both;
+        will-change: transform, opacity, filter;
+    }
+    @keyframes t-msg-in {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+            filter: blur(2px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+            filter: none;
+        }
+    }
+    .t-msg-in {
+        animation: t-msg-in var(--duration-slow) var(--ease-smooth-out) both;
+        will-change: transform, opacity, filter;
+    }
 
-  /* ── Emoji picker (composer) ────────────────────────────── */
-  .t-emoji-picker {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 0;
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    width: 320px;
-    max-width: calc(100vw - 24px);
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    overflow: hidden;
-    transform-origin: bottom left;
-    animation: t-panel-in var(--duration-fast) var(--ease-smooth-out) both;
-  }
-  .t-emoji-picker__tabs {
-    display: flex;
-    gap: 2px;
-    padding: 6px;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .t-emoji-picker__tabs::-webkit-scrollbar {
-    display: none;
-  }
-  .t-emoji-picker__tab {
-    flex: 0 0 auto;
-    padding: 4px 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-muted);
-    background: transparent;
-    border: 0;
-    border-radius: 9999px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition:
-      color var(--duration-quick) var(--ease-smooth-out),
-      background-color var(--duration-quick) var(--ease-smooth-out);
-  }
-  .t-emoji-picker__tab:hover {
-    color: var(--text-primary);
-  }
-  .t-emoji-picker__tab[data-active="true"] {
-    color: var(--on-accent);
-    background: var(--accent);
-  }
-  .t-emoji-picker__grid {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 2px;
-    padding: 8px;
-    max-height: 240px;
-    overflow-y: auto;
-  }
-  .t-emoji-picker__emoji {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    aspect-ratio: 1;
-    padding: 2px;
-    font-size: 20px;
-    line-height: 1;
-    background: transparent;
-    border: 0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color var(--duration-quick) var(--ease-smooth-out);
-  }
-  .t-emoji-picker__emoji:hover {
-    background: var(--hover);
-  }
+    /* ── Chat bubble (themeable; dashboard overrides via theme.js vars) ─ */
+    .t-bubble {
+        position: relative;
+        max-width: 78%;
+        border-radius: var(--bubble-radius, 18px);
+        padding: var(--bubble-pad, 10px 14px);
+        font-size: var(--body-sm-font-size, 14px);
+        line-height: var(--leading-body-sm, 1.45);
+        color: var(--text-primary);
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        transition: background-color var(--duration-quick, 120ms)
+            var(--ease-smooth-out, ease);
+    }
+    .t-bubble.is-mine {
+        background: var(--bubble-sent);
+        color: var(--bubble-sent-fg, #090909);
+    }
+    .t-bubble.is-other {
+        background: var(--bubble-received);
+        border: 1px solid var(--border);
+    }
+    .t-bubble.is-mine.with-tail {
+        border-top-right-radius: 6px;
+    }
+    .t-bubble.is-other.with-tail {
+        border-top-left-radius: 6px;
+    }
+    .t-bubble.is-deleted {
+        background: transparent;
+        border: 1px dashed var(--border);
+        color: var(--text-muted);
+        font-style: italic;
+    }
+    .t-bubble[data-bubble-theme="rounded"] {
+        --bubble-radius: 22px;
+        --bubble-pad: 10px 16px;
+    }
+
+    /* ── transitions-dev: text states swap ──────────────────────────── */
+    @keyframes t-text-swap-in {
+        from {
+            opacity: 0;
+            transform: translateY(var(--text-swap-translate-y));
+            filter: blur(var(--text-swap-blur));
+        }
+        to {
+            opacity: 1;
+            transform: none;
+            filter: none;
+        }
+    }
+    .t-text-swap {
+        display: inline-block;
+        animation: t-text-swap-in var(--text-swap-dur) var(--text-swap-ease) both;
+        will-change: transform, opacity, filter;
+    }
+
+    /* ── Custom themed scrollbar ────────────────────────────────────── */
+    .t-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.14))
+            transparent;
+    }
+    .t-scroll::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    .t-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .t-scroll::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.14));
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+    .t-scroll::-webkit-scrollbar-thumb:hover {
+        background-color: var(
+            --scrollbar-thumb-hover,
+            rgba(255, 255, 255, 0.28)
+        );
+    }
+    .t-scroll::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    /* ── Emoji picker (composer) ────────────────────────────────────── */
+    .t-emoji-picker {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        width: 320px;
+        max-width: calc(100vw - 24px);
+        background: var(--bg-elevated, #1c1c1c);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+        transform-origin: bottom left;
+        animation: t-panel-in var(--duration-fast) var(--ease-smooth-out) both;
+    }
+    .t-emoji-picker__tabs {
+        display: flex;
+        gap: 2px;
+        padding: 6px;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .t-emoji-picker__tabs::-webkit-scrollbar {
+        display: none;
+    }
+    .t-emoji-picker__tab {
+        flex: 0 0 auto;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        background: transparent;
+        border: 0;
+        border-radius: 9999px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+            color var(--duration-quick) var(--ease-smooth-out),
+            background-color var(--duration-quick) var(--ease-smooth-out);
+    }
+    .t-emoji-picker__tab:hover {
+        color: var(--text-primary);
+    }
+    .t-emoji-picker__tab[data-active="true"] {
+        color: var(--on-accent);
+        background: var(--accent);
+    }
+    .t-emoji-picker__grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        padding: 8px;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .t-emoji-picker__emoji {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 1;
+        padding: 2px;
+        font-size: 20px;
+        line-height: 1;
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color var(--duration-quick) var(--ease-smooth-out);
+    }
+    .t-emoji-picker__emoji:hover {
+        background: var(--hover);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .t-dropdown,
-  .t-modal,
-  .t-modal-backdrop,
-  .t-tabs-pill,
-  .t-tab,
-  .t-badge,
-  .t-badge-dot,
-  .t-badge-pop,
-  .t-panel-in,
-  .t-item-in,
-  .t-msg-in,
-  .t-bubble,
-  .t-text-swap {
-    /* biome-ignore lint/complexity/noImportantStyles: the transitions-dev skill requires an !important guard so the reduced-motion reset always wins. */
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .kivo-nav-pill,
-  .kivo-nav-link,
-  .kivo-cta {
-    /* biome-ignore lint/complexity/noImportantStyles: the transitions-dev skill requires an !important guard so the reduced-motion reset always wins. */
-    transition: none !important;
-  }
-  .kivo-cta:active {
-    transform: none;
-  }
+    .t-dropdown,
+    .t-modal,
+    .t-modal-backdrop,
+    .t-tabs-pill,
+    .t-tab,
+    .t-badge,
+    .t-badge-dot,
+    .t-badge-pop,
+    .t-panel-in,
+    .t-item-in,
+    .t-msg-in,
+    .t-bubble,
+    .t-text-swap {
+        transition: none !important;
+        animation: none !important;
+    }
+    .kivo-nav-pill,
+    .kivo-nav-link,
+    .kivo-cta {
+        transition: none !important;
+    }
+    .kivo-cta:active {
+        transform: none;
+    }
+    .framer-display,
+    .framer-display-xl,
+    .framer-display-lg,
+    .framer-display-md,
+    .spotlight {
+        animation: none !important;
+    }
 }

@@ -94,3 +94,9 @@ export function apiDelete(path, body) {
 export function apiUpload(path, body) {
   return request(path, { method: "PATCH", body });
 }
+
+// Multipart POST (e.g. group creation with an optional avatar file). Same
+// boundary-handling as apiUpload but issues a POST.
+export function apiPostForm(path, body) {
+  return request(path, { method: "POST", body });
+}

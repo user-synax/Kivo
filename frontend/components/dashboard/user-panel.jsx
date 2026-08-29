@@ -61,7 +61,7 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt }) {
       aria-label="Conversation details"
     >
       {/* Warm coral cover banner — the "coral sparks" accent of the system. */}
-      <div className="relative h-24 shrink-0 bg-gradient-to-br from-[var(--color-peach-blush)] to-[var(--color-sunset-coral)]" />
+      <div className="relative h-24 shrink-0 bg-gradient-to-br from-accent-blue/40 to-[#6a4cf5]/40" />
 
       <motion.div
         variants={container}
@@ -80,7 +80,7 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt }) {
               online={online}
               avatarStyle={profile?.avatarStyle}
               url={profile?.avatarUrl}
-              size="lg"
+              size="xl"
             />
           </div>
           <h2 className="mt-3 text-[18px] font-semibold leading-tight text-[var(--text-primary)]">

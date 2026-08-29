@@ -5,6 +5,26 @@ export const createConversationSchema = z.object({
   participantId: z.string().min(1, "participantId is required"),
 });
 
+// Create a group. `participantIds` are the OTHER members (the creator is added
+// automatically); at least 2 are required so the group has 3+ participants.
+export const createGroupSchema = z.object({
+  name: z.string().trim().min(1, "Group name is required").max(50, "Name too long"),
+  participantIds: z
+    .array(z.string().min(1))
+    .min(2, "Select at least 2 friends"),
+});
+
+// Rename a group. `avatar` is handled as a multipart file, not in this schema.
+// `name` is optional so an avatar-only update is valid.
+export const updateGroupSchema = z.object({
+  name: z.string().trim().min(1, "Group name cannot be empty").max(50, "Name too long").optional(),
+});
+
+// Add members to a group.
+export const addMembersSchema = z.object({
+  memberIds: z.array(z.string().min(1)).min(1, "Select at least one member"),
+});
+
 // Convenience parser that throws a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {
   const result = schema.safeParse(body);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Smile, Send } from "lucide-react";
+import { Send, Smile, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
@@ -54,7 +54,8 @@ function EmptyState() {
   );
 }
 
-// Read-receipt state for the current user's own messages.
+// Read-receipt state for the current user's own messages. Group chats don't show
+// per-recipient receipts, so this is effectively DM-only.
 function receiptState(message, userId, otherId) {
   if (message.senderId !== userId) return null;
   const read = otherId && message.readBy?.some((r) => r.userId === otherId);
@@ -65,18 +66,37 @@ function receiptState(message, userId, otherId) {
   return "sent";
 }
 
-export function ChatPanel({ conversation, onBack }) {
+export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
   const socket = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
 
   const convId = conversation?.id || null;
-  const other = conversation ? otherParticipant(conversation, userId) : null;
+  const isGroup = conversation?.type === "group";
+  const other =
+    conversation && !isGroup ? otherParticipant(conversation, userId) : null;
   const otherId = other?.id || null;
   const otherName = participantName(other);
   const online = Array.isArray(conversation?.online)
     ? conversation.online.some(Boolean)
     : Boolean(conversation?.online);
+
+  // Index group members by id so we can render sender names/avatars per message.
+  const membersById = {};
+  for (const p of conversation?.participants || []) {
+    const id = p?.id || p?._id || p;
+    if (id) membersById[id.toString()] = p;
+  }
+  const senderName = (senderId) => {
+    const s = membersById[senderId];
+    return s ? participantName(s) : "Unknown";
+  };
+  const senderAvatar = (senderId) => {
+    const s = membersById[senderId];
+    return s
+      ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl }
+      : { avatarStyle: null, avatarUrl: null };
+  };
 
   const [messages, setMessages] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
@@ -84,6 +104,7 @@ export function ChatPanel({ conversation, onBack }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
+  const [typerName, setTyperName] = useState(null);
   const [otherOnline, setOtherOnline] = useState(online);
   const [reactionFor, setReactionFor] = useState(null); // messageId with open picker
   const [editingId, setEditingId] = useState(null);
@@ -154,6 +175,7 @@ export function ChatPanel({ conversation, onBack }) {
   };
 
   // Realtime event wiring for this conversation.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: chat-panel rebuilds sender/name helpers per conversation; the effect re-subscribes on convId/userId.
   useEffect(() => {
     if (!socket || !convId) return undefined;
 
@@ -230,7 +252,10 @@ export function ChatPanel({ conversation, onBack }) {
       );
     };
     const onTypingStart = (p) => {
-      if (p.conversationId === convId && p.userId !== userId) setTyping(true);
+      if (p.conversationId === convId && p.userId !== userId) {
+        setTyping(true);
+        setTyperName(isGroup ? senderName(p.userId) : otherName);
+      }
     };
     const onTypingStop = (p) => {
       if (p.conversationId === convId && p.userId !== userId) setTyping(false);
@@ -265,7 +290,7 @@ export function ChatPanel({ conversation, onBack }) {
       socket.off("presence:online", onOnline);
       socket.off("presence:offline", onOffline);
     };
-  }, [socket, convId, userId, otherId]);
+  }, [socket, convId, userId, otherId, isGroup]);
 
   // Stop emitting "typing" when leaving the conversation.
   useEffect(() => {
@@ -411,6 +436,19 @@ export function ChatPanel({ conversation, onBack }) {
 
   if (!conversation) return <EmptyState />;
 
+  const headerName = isGroup ? conversation.name || "Group" : otherName;
+  const headerAvatar = isGroup
+    ? {
+        name: conversation.name || "Group",
+        avatarStyle: null,
+        avatarUrl: conversation.avatarUrl,
+      }
+    : {
+        name: participantAvatarName(other),
+        avatarStyle: other?.avatarStyle,
+        avatarUrl: other?.avatarUrl,
+      };
+
   return (
     <div className="flex h-full flex-col bg-[var(--bg-base)]">
       {/* Header */}
@@ -440,20 +478,34 @@ export function ChatPanel({ conversation, onBack }) {
           </button>
         )}
         <Avatar
-          name={participantAvatarName(other)}
-          online={otherOnline}
-          avatarStyle={other?.avatarStyle}
-          url={other?.avatarUrl}
-          size="sm"
+          name={headerAvatar.name}
+          online={isGroup ? false : otherOnline}
+          avatarStyle={headerAvatar.avatarStyle}
+          url={headerAvatar.avatarUrl}
+          size="xl"
         />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-            {otherName}
+            {headerName}
           </p>
           <p className="truncate text-[12px] text-[var(--text-muted)]">
-            <StatusText online={otherOnline} />
+            {isGroup ? (
+              <span>{conversation.participants?.length || 0} members</span>
+            ) : (
+              <StatusText online={otherOnline} />
+            )}
           </p>
         </div>
+        {isGroup && onOpenGroupSettings && (
+          <button
+            type="button"
+            onClick={onOpenGroupSettings}
+            aria-label="Group settings"
+            className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <Users className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -494,6 +546,8 @@ export function ChatPanel({ conversation, onBack }) {
               new Date(next.createdAt).getTime() -
                 new Date(m.createdAt).getTime() >
                 GROUP_WINDOW_MS;
+            const showSender = isGroup && !grouped && !mine;
+            const sAvatar = senderAvatar(m.senderId);
             return (
               <div
                 key={m.id}
@@ -501,6 +555,19 @@ export function ChatPanel({ conversation, onBack }) {
                   i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
                 }`}
               >
+                {showSender && (
+                  <div className="mb-1 flex items-center gap-1.5 pl-1">
+                    <Avatar
+                      name={senderName(m.senderId)}
+                      avatarStyle={sAvatar.avatarStyle}
+                      url={sAvatar.avatarUrl}
+                      size="sm"
+                    />
+                    <span className="text-[12px] font-medium text-[var(--text-primary)]">
+                      {mine ? "You" : senderName(m.senderId)}
+                    </span>
+                  </div>
+                )}
                 <MessageBubble
                   message={m}
                   mine={mine}
@@ -533,7 +600,7 @@ export function ChatPanel({ conversation, onBack }) {
                 <span className="size-1.5 animate-pulse rounded-full bg-[var(--text-muted)] [animation-delay:150ms]" />
                 <span className="size-1.5 animate-pulse rounded-full bg-[var(--text-muted)] [animation-delay:300ms]" />
               </span>
-              {otherName} is typing…
+              {typerName || headerName} is typing…
             </div>
           )}
           <div ref={bottomRef} />
