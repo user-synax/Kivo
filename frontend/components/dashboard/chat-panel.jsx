@@ -649,7 +649,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
             type="button"
             onClick={send}
             disabled={!text.trim()}
-            className=" rounded-nav bg-[var(--accent)] px-8 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
+            className=" rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
           >
             <Send className="h-5 w-5" />
           </button>

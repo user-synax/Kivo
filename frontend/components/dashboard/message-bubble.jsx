@@ -3,22 +3,16 @@
 import { Check, CheckCheck, FaceGrinning, Pencil, Trash } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/motion/context-menu";
 import { formatTime } from "@/lib/chat";
+import { EASE_OUT_CSS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
-
-// True on touch / no-hover devices (phones, tablets). Used to swap the
-// desktop hover-reveal of message actions for a press-and-hold gesture.
-function useIsTouch() {
-  const [isTouch, setIsTouch] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(hover: none) and (pointer: coarse)");
-    setIsTouch(mq.matches);
-    const onChange = (e) => setIsTouch(e.matches);
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
-  return isTouch;
-}
 
 // A single chat message bubble built on shadcn's `Bubble` primitive.
 //
@@ -55,28 +49,7 @@ export function MessageBubble({
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
-  const isTouch = useIsTouch();
-
-  // Mobile: hold a bubble to reveal its actions. The timer is cancelled if the
-  // finger moves (scroll) or lifts before the threshold, so it never fights scrolling.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const pressTimer = useRef(null);
-
-  const startPress = () => {
-    if (!isTouch || deleted || isEditing) return;
-    pressTimer.current = setTimeout(() => {
-      setMenuOpen(true);
-      if (typeof navigator !== "undefined" && navigator.vibrate) {
-        navigator.vibrate(12);
-      }
-    }, 450);
-  };
-  const cancelPress = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
+  const [pressing, setPressing] = useState(false);
 
   useEffect(() => {
     if (isEditing) editRef.current?.focus();
@@ -86,29 +59,22 @@ export function MessageBubble({
   const bubbleVariant = variant ?? (mine ? "default" : "secondary");
 
   return (
-    <>
-      {/* Tap-away layer while the mobile long-press menu is open. */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-10"
-          onClick={() => setMenuOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      <Bubble
-        variant={bubbleVariant}
-        align={mine ? "end" : "start"}
-        className={cn("group/bubble relative", isTouch && "select-none", className)}
-        onTouchStart={startPress}
-        onTouchEnd={cancelPress}
-        onTouchMove={cancelPress}
-        onContextMenu={(e) => {
-          if (!isTouch) return;
-          e.preventDefault();
-          setMenuOpen((v) => !v);
-        }}
-      >
+    <ContextMenu>
+      <ContextMenuTrigger disabled={deleted || isEditing}>
+        <Bubble
+          variant={bubbleVariant}
+          align={mine ? "end" : "start"}
+          className={cn(
+            "group/bubble relative transition-transform will-change-transform",
+            pressing && "scale-[0.98]",
+            className,
+          )}
+          style={{ transitionTimingFunction: EASE_OUT_CSS }}
+          onPointerDown={() => setPressing(true)}
+          onPointerUp={() => setPressing(false)}
+          onPointerLeave={() => setPressing(false)}
+          onPointerCancel={() => setPressing(false)}
+        >
         <BubbleContent className={cn(contentClassName)}>
           {isEditing ? (
             <textarea
@@ -132,59 +98,6 @@ export function MessageBubble({
           )}
         </BubbleContent>
 
-        {/* Hover actions (react / edit / delete). On touch devices these are
-            also revealed by a long-press on the bubble. */}
-        {!deleted && !isEditing && (
-          <div
-            className={cn(
-              "absolute z-20 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-1 py-0.5 shadow-md",
-              menuOpen ? "flex" : "hidden group-hover/bubble:flex",
-              mine
-                ? "left-0 -top-3 -translate-x-full"
-                : "right-0 -top-3 translate-x-full",
-              "max-sm:left-1/2 max-sm:-top-2 max-sm:-translate-x-1/2 max-sm:translate-y-0",
-            )}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                onToggleReactionPicker?.();
-              }}
-              aria-label="React"
-              className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-            >
-              <FaceGrinning className="h-3 w-3" />
-            </button>
-            {mine && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onEdit?.();
-                }}
-                aria-label="Edit"
-                className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-              >
-                <Pencil className="h-3 w-3" />
-              </button>
-            )}
-            {mine && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onDelete?.();
-                }}
-                aria-label="Delete"
-                className="flex size-6 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-              >
-                <Trash className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Reaction picker */}
         {reactionOpen && (
           <div
@@ -206,6 +119,29 @@ export function MessageBubble({
           </div>
         )}
       </Bubble>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent ariaLabel="Message actions">
+        <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
+          <FaceGrinning className="h-4 w-4" />
+          React
+        </ContextMenuItem>
+        {mine && (
+          <ContextMenuItem onSelect={() => onEdit?.()}>
+            <Pencil className="h-4 w-4" />
+            Edit
+          </ContextMenuItem>
+        )}
+        {mine && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem tone="destructive" onSelect={() => onDelete?.()}>
+              <Trash className="h-4 w-4" />
+              Delete
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
 
       {/* Reaction chips — in normal flow under the bubble, aligned to its side
           so they never overlap the corner. */}
@@ -262,7 +198,7 @@ export function MessageBubble({
           )}
         </div>
       )}
-    </>
+    </ContextMenu>
   );
 }
 
