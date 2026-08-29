@@ -11,78 +11,89 @@
 //   - radius:   the corner-radius scale (cards, buttons, inputs, pills...)
 //   - shadow:   the elevation language (flat & border-driven, or floating)
 //
-// All themes share the Replit "warm workshop with coral sparks" identity
-// (warm canvas + a single ember-orange accent) but vary in feel.
+// All themes share the Nexus "Global Transfers" identity (cream canvas +
+// a single primary orange accent + gold secondary) but vary in feel.
 
-const REPLIT_COLORS = {
-  base: "#faf6f1",
+const NEXUS_LIGHT = {
+  base: "#f2ead3",
   surface: "#ffffff",
   elevated: "#ffffff",
-  textPrimary: "#0e0e0f",
-  textMuted: "#52545a",
-  border: "#dfddd8",
-  accent: "#ff3c00",
-  hover: "rgba(14, 14, 15, 0.06)",
-  bubbleSent: "#ff764c",
+  textPrimary: "#111827",
+  textMuted: "#4b5563",
+  border: "#e5e7eb",
+  accent: "#f68b1f",
+  hover: "rgba(17, 24, 39, 0.06)",
+  bubbleSent: "#f68b1f",
   bubbleReceived: "#ffffff",
-  unreadBadge: "#ff3c00",
+  unreadBadge: "#f68b1f",
   onAccent: "#ffffff",
-  online: "#2492ff",
-  scrollbarThumb: "#dfddd8",
-  scrollbarThumbHover: "#898c94",
+  online: "#16a06a",
+  scrollbarThumb: "#d9d0bc",
+  scrollbarThumbHover: "#9ca3af",
 };
 
-const REPLIT_INK_COLORS = {
-  base: "#1a1919",
-  surface: "#0e0e0f",
-  elevated: "#0e0e0f",
-  textPrimary: "#faf6f1",
-  textMuted: "#898c94",
-  border: "#312e2e",
-  accent: "#ff3c00",
-  hover: "rgba(255, 255, 255, 0.07)",
-  bubbleSent: "#ff764c",
-  bubbleReceived: "#212121",
-  unreadBadge: "#ff3c00",
+const NEXUS_DARK = {
+  base: "#14110b",
+  surface: "#1f1b14",
+  elevated: "#1f1b14",
+  textPrimary: "#f2ead3",
+  textMuted: "#b9b2a3",
+  border: "#3a3326",
+  accent: "#f68b1f",
+  hover: "rgba(242, 234, 211, 0.07)",
+  bubbleSent: "#f68b1f",
+  bubbleReceived: "#2a2419",
+  unreadBadge: "#f68b1f",
   onAccent: "#ffffff",
-  online: "#2492ff",
-  scrollbarThumb: "#312e2e",
-  scrollbarThumbHover: "#898c94",
+  online: "#16a06a",
+  scrollbarThumb: "#3a3326",
+  scrollbarThumbHover: "#6b7280",
 };
 
-// Flat / border-driven elevation - Replit's signature "no shadows" look.
-const FLAT_SHADOW = { sm: "none", md: "none", lg: "none", xl: "none", "2xl": "none" };
+// Subtle elevation — Nexus uses light borders + "HTML-matched" shadow depth
+// rather than the old fully-flat look.
+const NEXUS_SHADOW = {
+  sm: "0 1px 2px rgba(17, 24, 39, 0.06)",
+  md: "0 4px 16px -8px rgba(17, 24, 39, 0.12)",
+  lg: "0 12px 32px -12px rgba(17, 24, 39, 0.16)",
+};
+
+const NEXUS_SHADOW_DARK = {
+  sm: "0 1px 2px rgba(0, 0, 0, 0.4)",
+  md: "0 4px 16px -8px rgba(0, 0, 0, 0.5)",
+  lg: "0 12px 32px -12px rgba(0, 0, 0, 0.55)",
+};
 
 export const themes = {
-  // Replit - the default. Warm canvas, large radii, flat & border-driven.
+  // Nexus - the default. Cream canvas, 16px cards, pill buttons, subtle elevation.
   replit: {
     id: "replit",
-    label: "Replit",
-    swatch: "#ff3c00",
-    colors: REPLIT_COLORS,
+    label: "Nexus",
+    swatch: "#f68b1f",
+    colors: NEXUS_LIGHT,
     radius: {
       base: "8px",
-      cards: "40px",
-      buttons: "100px",
+      cards: "16px",
+      buttons: "9999px",
       inputs: "8px",
       nav: "9999px",
       badges: "8px",
       pills: "9999px",
       full: "9999px",
     },
-    shadow: FLAT_SHADOW,
+    shadow: NEXUS_SHADOW,
   },
 
-  // Replit Soft - same warmth, gentle floating elevation + medium radii.
+  // Nexus Soft - same warmth, gentle floating elevation + slightly larger cards.
   replitSoft: {
     id: "replitSoft",
-    label: "Replit Soft",
-    swatch: "#ff764c",
-    colors: REPLIT_COLORS,
+    label: "Nexus Soft",
+    swatch: "#fdb813",
+    colors: NEXUS_LIGHT,
     radius: {
       base: "10px",
-      cards: "28px",
-      buttons: "100px",
+      cards: "20px",
+      buttons: "9999px",
       inputs: "10px",
       nav: "9999px",
       badges: "10px",
@@ -90,45 +101,45 @@ export const themes = {
       full: "9999px",
     },
     shadow: {
-      sm: "0 2px 6px -3px rgba(14, 14, 15, 0.12)",
-      md: "0 12px 28px -12px rgba(14, 14, 15, 0.18), 0 4px 10px -6px rgba(14, 14, 15, 0.12)",
-      lg: "0 18px 36px -16px rgba(14, 14, 15, 0.16)",
+      sm: "0 2px 6px -3px rgba(17, 24, 39, 0.12)",
+      md: "0 12px 28px -12px rgba(17, 24, 39, 0.18), 0 4px 10px -6px rgba(17, 24, 39, 0.12)",
+      lg: "0 18px 36px -16px rgba(17, 24, 39, 0.16)",
     },
   },
 
-  // Replit Crisp - structured & geometric: small radii, hairline shadows.
+  // Nexus Crisp - structured & geometric: small radii, hairline shadows.
   replitCrisp: {
     id: "replitCrisp",
-    label: "Replit Crisp",
-    swatch: "#312e2e",
-    colors: REPLIT_COLORS,
+    label: "Nexus Crisp",
+    swatch: "#1f2937",
+    colors: NEXUS_LIGHT,
     radius: {
       base: "8px",
-      cards: "14px",
-      buttons: "12px",
+      cards: "12px",
+      buttons: "8px",
       inputs: "8px",
       nav: "10px",
       badges: "6px",
-      pills: "12px",
+      pills: "10px",
       full: "9999px",
     },
     shadow: {
-      sm: "0 1px 1px rgba(14, 14, 15, 0.08)",
-      md: "0 1px 2px rgba(14, 14, 15, 0.10)",
-      lg: "0 2px 4px rgba(14, 14, 15, 0.10)",
+      sm: "0 1px 1px rgba(17, 24, 39, 0.08)",
+      md: "0 1px 2px rgba(17, 24, 39, 0.10)",
+      lg: "0 2px 4px rgba(17, 24, 39, 0.10)",
     },
   },
 
-  // Replit Float - bold, pillowy: very large radii + prominent elevation.
+  // Nexus Float - bold, pillowy: larger cards + prominent elevation.
   replitFloat: {
     id: "replitFloat",
-    label: "Replit Float",
-    swatch: "#ffb199",
-    colors: REPLIT_COLORS,
+    label: "Nexus Float",
+    swatch: "#fbe7c2",
+    colors: NEXUS_LIGHT,
     radius: {
       base: "14px",
-      cards: "48px",
-      buttons: "100px",
+      cards: "24px",
+      buttons: "9999px",
       inputs: "14px",
       nav: "9999px",
       badges: "14px",
@@ -136,31 +147,31 @@ export const themes = {
       full: "9999px",
     },
     shadow: {
-      sm: "0 4px 10px -4px rgba(14, 14, 15, 0.14)",
-      md: "0 24px 48px -16px rgba(14, 14, 15, 0.22), 0 8px 16px -10px rgba(14, 14, 15, 0.14)",
-      lg: "0 32px 64px -20px rgba(14, 14, 15, 0.24)",
-      xl: "0 40px 80px -24px rgba(14, 14, 15, 0.26)",
-      "2xl": "0 48px 96px -28px rgba(14, 14, 15, 0.28)",
+      sm: "0 4px 10px -4px rgba(17, 24, 39, 0.14)",
+      md: "0 24px 48px -16px rgba(17, 24, 39, 0.22), 0 8px 16px -10px rgba(17, 24, 39, 0.14)",
+      lg: "0 32px 64px -20px rgba(17, 24, 39, 0.24)",
+      xl: "0 40px 80px -24px rgba(17, 24, 39, 0.26)",
+      "2xl": "0 48px 96px -28px rgba(17, 24, 39, 0.28)",
     },
   },
 
-  // Replit Ink - the dark-preview variant of the default (flat & large radii).
+  // Nexus Ink - the dark variant of the default (subtle elevation + 16px cards).
   replitInk: {
     id: "replitInk",
-    label: "Replit Ink",
-    swatch: "#ff764c",
-    colors: REPLIT_INK_COLORS,
+    label: "Nexus Ink",
+    swatch: "#fdb813",
+    colors: NEXUS_DARK,
     radius: {
       base: "8px",
-      cards: "40px",
-      buttons: "100px",
+      cards: "16px",
+      buttons: "9999px",
       inputs: "8px",
       nav: "9999px",
       badges: "8px",
       pills: "9999px",
       full: "9999px",
     },
-    shadow: FLAT_SHADOW,
+    shadow: NEXUS_SHADOW_DARK,
   },
 };
 

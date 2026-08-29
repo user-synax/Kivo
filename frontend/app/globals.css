@@ -5,37 +5,34 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Colors — Replit "warm workshop with coral sparks" */
-  --color-ember-orange: #ff3c00;
-  --color-sunset-coral: #ff764c;
-  --color-peach-blush: #ffb199;
-  --color-burnt-rust: #ec4e02;
-  --color-electric-blue: #2492ff;
-  --color-warm-canvas: #faf6f1;
-  --color-pure-white: #ffffff;
-  --color-ink-black: #0e0e0f;
-  --color-charcoal: #312e2e;
-  --color-slate: #36373b;
-  --color-deep-charcoal: #1a1919;
-  --color-gunmetal: #2f3034;
-  --color-stone: #898c94;
-  --color-pewter: #52545a;
-  --color-warm-gray: #76716f;
-  --color-mist: #61646b;
-  --color-sand: #dfddd8;
-  --color-driftwood: #cbc7c3;
-  --color-fog: #efefef;
+  /* Colors — Nexus "Global Transfers" (warm orange + cream + gold) */
+  --color-ember-orange: #f68b1f; /* primary */
+  --color-sunset-coral: #fdb813; /* accent (gold) */
+  --color-peach-blush: #fbe7c2; /* light gold tint for gradients */
+  --color-burnt-rust: #d9780e; /* darker orange — hover/active */
+  --color-electric-blue: #2bb6a8; /* teal status / chart accent */
+  --color-warm-canvas: #f2ead3; /* background (cream) */
+  --color-pure-white: #ffffff; /* surface */
+  --color-ink-black: #111827; /* text primary */
+  --color-charcoal: #1f2937;
+  --color-slate: #374151;
+  --color-deep-charcoal: #111827;
+  --color-gunmetal: #374151;
+  --color-stone: #9ca3af; /* muted gray — borders / secondary text */
+  --color-pewter: #4b5563; /* text secondary */
+  --color-warm-gray: #6b7280;
+  --color-mist: #6b7280;
+  --color-sand: #e5e7eb; /* border */
+  --color-driftwood: #d9d0bc; /* darker cream border */
+  --color-fog: #ede7d6; /* subtle surface tint */
 
-  /* Typography — Font Families (ABC Diatype substitutes → Geist/Inter stack) */
-  --font-abc-diatype-plus-variable:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --font-abc-diatype:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --font-ibm-plex-sans:
-    "IBM Plex Sans", var(--font-geist-sans), ui-sans-serif, system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Typography — Font Families (single Inter design system) */
+  --font-inter:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-playfair: var(--font-inter);
+  --font-jetbrains:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   /* Typography — Scale */
   --text-caption: 11px;
@@ -123,12 +120,12 @@
   --radius-buttons: 100px;
 
   /* Surfaces */
-  --surface-warm-canvas: #faf6f1;
+  --surface-warm-canvas: #f2ead3;
   --surface-card-white: #ffffff;
-  --surface-sand-wash: #dfddd8;
-  --surface-peach-feature: #ffb199;
-  --surface-coral-feature: #ff764c;
-  --surface-dark-preview: #1a1919;
+  --surface-sand-wash: #ede7d6;
+  --surface-peach-feature: #fbe7c2;
+  --surface-coral-feature: #fdb813;
+  --surface-dark-preview: #14110b;
 
   /* Elevation (default = flat, border-driven; themes override) */
   --shadow-sm: none;
@@ -234,76 +231,71 @@
   --morph-close-dur: 200ms;
   --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* ── shadcn token layer — mapped to Replit light (warm canvas) ── */
-  --background: #faf6f1;
-  --foreground: #0e0e0f;
+  /* ── shadcn token layer — mapped to Nexus light (cream + orange) ── */
+  --background: #f2ead3;
+  --foreground: #111827;
   --card: #ffffff;
-  --card-foreground: #0e0e0f;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #0e0e0f;
-  --primary: #ff3c00;
+  --popover-foreground: #111827;
+  --primary: #f68b1f;
   --primary-foreground: #ffffff;
-  --secondary: #efefef;
-  --secondary-foreground: #0e0e0f;
-  --muted: #efefef;
-  --muted-foreground: #52545a;
-  --accent: #efefef;
-  --accent-foreground: #0e0e0f;
-  --destructive: #ec4e02;
-  --border: #dfddd8;
-  --input: #dfddd8;
-  --ring: #ff3c00;
-  --chart-1: #ff3c00;
-  --chart-2: #898c94;
-  --chart-3: #52545a;
-  --chart-4: #ff764c;
-  --chart-5: #2492ff;
-  --radius: 0.375rem;
+  --secondary: #f2ead3;
+  --secondary-foreground: #111827;
+  --muted: #ede7d6;
+  --muted-foreground: #4b5563;
+  --accent: #fdb813;
+  --accent-foreground: #111827;
+  --destructive: #dc2626;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #f68b1f;
+  --chart-1: #f68b1f;
+  --chart-2: #9ca3af;
+  --chart-3: #4b5563;
+  --chart-4: #fdb813;
+  --chart-5: #2bb6a8;
+  --radius: 0.5rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #0e0e0f;
-  --sidebar-primary: #ff3c00;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #f68b1f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #efefef;
-  --sidebar-accent-foreground: #0e0e0f;
-  --sidebar-border: #dfddd8;
-  --sidebar-ring: #ff3c00;
+  --sidebar-accent: #ede7d6;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #f68b1f;
 }
 
 @theme {
   /* Colors */
-  --color-ember-orange: #ff3c00;
-  --color-sunset-coral: #ff764c;
-  --color-peach-blush: #ffb199;
-  --color-burnt-rust: #ec4e02;
-  --color-electric-blue: #2492ff;
-  --color-warm-canvas: #faf6f1;
+  --color-ember-orange: #f68b1f;
+  --color-sunset-coral: #fdb813;
+  --color-peach-blush: #fbe7c2;
+  --color-burnt-rust: #d9780e;
+  --color-electric-blue: #2bb6a8;
+  --color-warm-canvas: #f2ead3;
   --color-pure-white: #ffffff;
-  --color-ink-black: #0e0e0f;
-  --color-charcoal: #312e2e;
-  --color-slate: #36373b;
-  --color-deep-charcoal: #1a1919;
-  --color-gunmetal: #2f3034;
-  --color-stone: #898c94;
-  --color-pewter: #52545a;
-  --color-warm-gray: #76716f;
-  --color-mist: #61646b;
-  --color-sand: #dfddd8;
-  --color-driftwood: #cbc7c3;
-  --color-fog: #efefef;
+  --color-ink-black: #111827;
+  --color-charcoal: #1f2937;
+  --color-slate: #374151;
+  --color-deep-charcoal: #111827;
+  --color-gunmetal: #374151;
+  --color-stone: #9ca3af;
+  --color-pewter: #4b5563;
+  --color-warm-gray: #6b7280;
+  --color-mist: #6b7280;
+  --color-sand: #e5e7eb;
+  --color-driftwood: #d9d0bc;
+  --color-fog: #ede7d6;
 
   /* Typography */
-  --font-goga:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+  --font-inter:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --font-abc-diatype-plus-variable:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --font-abc-diatype:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --font-ibm-plex-sans:
-    "IBM Plex Sans", var(--font-geist-sans), ui-sans-serif, system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-goga: var(--font-inter);
+  --font-playfair: var(--font-inter);
+  --font-jetbrains:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   /* Typography — Scale */
   --text-caption: 11px;
@@ -353,9 +345,9 @@
   --spacing-160: 160px;
 
   /* Border Radius */
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-2xl: 16px;
   --radius-2xl-2: 20px;
   --radius-3xl: 24px;
@@ -371,23 +363,27 @@
   --radius-pills: 9999px;
 
   /* Named Radii */
-  --radius-nav: 6px;
-  --radius-cards: 40px;
-  --radius-badges: 6px;
-  --radius-inputs: 6px;
-  --radius-buttons: 100px;
+  --radius-nav: 9999px;
+  --radius-cards: 16px;
+  --radius-badges: 8px;
+  --radius-inputs: 8px;
+  --radius-buttons: 9999px;
 
-  /* Elevation — themeable so themes can go flat (border-driven) or floating */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
-  --shadow-xl: none;
-  --shadow-2xl: none;
+  /* Elevation — single global, theme-independent shadow language
+     (subtle, "HTML-matched" depth per the Nexus spec). Themes only
+     vary color, never radius or shadow. */
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --shadow-md: 0 4px 16px -8px rgba(17, 24, 39, 0.12);
+  --shadow-lg: 0 12px 32px -12px rgba(17, 24, 39, 0.16);
+  --shadow-xl: 0 24px 48px -16px rgba(17, 24, 39, 0.2);
+  --shadow-2xl: 0 32px 64px -20px rgba(17, 24, 39, 0.22);
 }
 
 @theme inline {
-  --font-heading: var(--font-geist-sans);
-  --font-sans: var(--font-geist-sans);
+  --font-heading: var(--font-inter);
+  --font-sans: var(--font-inter);
+  --font-body: var(--font-playfair);
+  --font-mono: var(--font-jetbrains);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -428,54 +424,61 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ── .dark — Replit "Dark Preview" surface (#1a1919) ─────────── */
+/* ── .dark — Nexus "Dark" surface (warm near-black + cream) ───── */
 .dark {
-  --background: #1a1919;
-  --foreground: #faf6f1;
-  --card: #0e0e0f;
-  --card-foreground: #faf6f1;
-  --popover: #0e0e0f;
-  --popover-foreground: #faf6f1;
-  --primary: #ff3c00;
+  --background: #14110b;
+  --foreground: #f2ead3;
+  --card: #1f1b14;
+  --card-foreground: #f2ead3;
+  --popover: #1f1b14;
+  --popover-foreground: #f2ead3;
+  --primary: #f68b1f;
   --primary-foreground: #ffffff;
-  --secondary: #212121;
-  --secondary-foreground: #faf6f1;
-  --muted: #212121;
-  --muted-foreground: #898c94;
-  --accent: #212121;
-  --accent-foreground: #faf6f1;
-  --destructive: #ec4e02;
-  --border: #312e2e;
-  --input: #312e2e;
-  --ring: #ff3c00;
-  --chart-1: #ff3c00;
-  --chart-2: #898c94;
-  --chart-3: #52545a;
-  --chart-4: #ff764c;
-  --chart-5: #2492ff;
-  --sidebar: #0e0e0f;
-  --sidebar-foreground: #faf6f1;
-  --sidebar-primary: #ff3c00;
+  --secondary: #2a2419;
+  --secondary-foreground: #f2ead3;
+  --muted: #2a2419;
+  --muted-foreground: #b9b2a3;
+  --accent: #fdb813;
+  --accent-foreground: #14110b;
+  --destructive: #dc2626;
+  --border: #3a3326;
+  --input: #3a3326;
+  --ring: #f68b1f;
+  --chart-1: #f68b1f;
+  --chart-2: #b9b2a3;
+  --chart-3: #4b5563;
+  --chart-4: #fdb813;
+  --chart-5: #2bb6a8;
+  --sidebar: #1f1b14;
+  --sidebar-foreground: #f2ead3;
+  --sidebar-primary: #f68b1f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #212121;
-  --sidebar-accent-foreground: #faf6f1;
-  --sidebar-border: #312e2e;
-  --sidebar-ring: #ff3c00;
+  --sidebar-accent: #2a2419;
+  --sidebar-accent-foreground: #f2ead3;
+  --sidebar-border: #3a3326;
+  --sidebar-ring: #f68b1f;
 
   /* Surface / palette overrides so kivo-* chrome matches the dark preview */
-  --surface-warm-canvas: #1a1919;
-  --surface-card-white: #0e0e0f;
-  --color-warm-canvas: #1a1919;
-  --color-pure-white: #0e0e0f;
-  --color-ink-black: #faf6f1;
-  --color-sand: #312e2e;
-  --color-fog: #212121;
+  --surface-warm-canvas: #14110b;
+  --surface-card-white: #1f1b14;
+  --color-warm-canvas: #14110b;
+  --color-pure-white: #1f1b14;
+  --color-ink-black: #f2ead3;
+  --color-sand: #3a3326;
+  --color-fog: #2a2419;
 
   /* Tabs palette for dark mode */
   --tabs-text-muted: var(--color-stone);
-  --tabs-text-active: #faf6f1;
-  --tabs-bar-bg: #212121;
-  --tabs-pill-bg: #312e2e;
+  --tabs-text-active: #f2ead3;
+  --tabs-bar-bg: #2a2419;
+  --tabs-pill-bg: #3a3326;
+
+  /* Elevation — dark-appropriate subtle shadow (global, theme-independent) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px -8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 24px 48px -16px rgba(0, 0, 0, 0.6);
+  --shadow-2xl: 0 32px 64px -20px rgba(0, 0, 0, 0.65);
 }
 
 @layer base {
@@ -495,19 +498,19 @@
      page scrolls. data-scrolled is toggled imperatively (no React
      re-render) so only the backdrop/surface shift, never layout. */
   .kivo-nav-pill {
-    background-color: rgba(250, 246, 241, 0.72);
-    border-color: rgba(139, 140, 148, 0.35);
+    background-color: rgba(242, 234, 211, 0.72);
+    border-color: rgba(156, 163, 175, 0.35);
     border-radius: var(--radius-pills);
     transition:
       background-color var(--duration-fast) var(--ease-smooth-out),
       border-color var(--duration-fast) var(--ease-smooth-out);
   }
   .kivo-nav-pill[data-scrolled="true"] {
-    background-color: rgba(250, 246, 241, 0.92);
-    border-color: rgba(139, 140, 148, 0.6);
+    background-color: rgba(242, 234, 211, 0.92);
+    border-color: rgba(156, 163, 175, 0.6);
   }
 
-  /* Understated nav link hover — a warm wash that lifts to ember on hover. */
+  /* Understated nav link hover — a warm wash that lifts to primary orange on hover. */
   .kivo-nav-link {
     transition:
       color var(--duration-fast) var(--ease-smooth-out),
@@ -515,7 +518,7 @@
   }
   .kivo-nav-link:hover {
     color: var(--color-ember-orange);
-    background-color: rgba(139, 140, 148, 0.16);
+    background-color: rgba(156, 163, 175, 0.18);
   }
 
   /* Primary CTA — restrained press feedback, no distracting scale-up. */
@@ -532,12 +535,12 @@
     transform: scale(0.97);
   }
 
-  /* Visible keyboard focus — ember ring. */
+  /* Visible keyboard focus — primary orange ring. */
   .kivo-focus:focus-visible {
     outline: none;
     box-shadow:
-      0 0 0 2px rgba(250, 246, 241, 0.9),
-      0 0 0 4px rgba(255, 60, 0, 0.5);
+      0 0 0 2px rgba(242, 234, 211, 0.9),
+      0 0 0 4px rgba(246, 139, 31, 0.5);
   }
 
   /* ── transitions-dev: menu dropdown (theme selector) ───────── */

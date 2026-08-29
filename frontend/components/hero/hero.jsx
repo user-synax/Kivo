@@ -77,7 +77,6 @@ export function Hero() {
           <motion.p
             variants={textItemVariants}
             className="max-w-[560px] font-sans text-[16px] font-normal leading-[1.5] tracking-[-0.352px] text-pewter sm:text-[18px] lg:text-[20px] lg:leading-[1.5] lg:tracking-[-0.36px]"
-            style={{ fontFeatureSettings: '"cv11"' }}
           >
             DMs, groups, and communities - all in one place, built around how
             you communicate.
