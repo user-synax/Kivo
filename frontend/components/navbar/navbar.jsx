@@ -185,13 +185,13 @@ export function Navbar() {
                     >
                         <a
                             href="/login"
-                            className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-electric-blue"
+                            className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-ink-black/90"
                         >
                             Log in
                         </a>
                         <a
                             href="/signup"
-                            className="kivo-cta kivo-focus rounded-pills bg-ember-orange px-5 py-2 text-[14px] font-medium text-white"
+                            className="kivo-cta kivo-focus rounded-pills bg-ink px-5 py-2 text-[14px] font-medium text-white shadow-[0_6px_18px_-6px_rgba(25,23,28,0.5)] transition-[transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:scale-[0.97]"
                         >
                             Sign up
                         </a>
@@ -244,7 +244,7 @@ export function Navbar() {
                                     href="#login"
                                     role="menuitem"
                                     onClick={() => setOpen(false)}
-                                    className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-electric-blue"
+                                    className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-ink-black/90"
                                 >
                                     Log in
                                 </a>
@@ -252,7 +252,7 @@ export function Navbar() {
                                     href="#signup"
                                     role="menuitem"
                                     onClick={() => setOpen(false)}
-                                    className="kivo-cta kivo-focus mt-1 flex min-h-[44px] items-center justify-center rounded-pills bg-ember-orange px-5 py-2 text-[15px] font-medium text-white"
+                                    className="kivo-cta kivo-focus mt-1 flex min-h-[44px] items-center justify-center rounded-pills bg-ink px-5 py-2 text-[15px] font-medium text-white shadow-[0_6px_18px_-6px_rgba(25,23,28,0.5)] active:scale-[0.97]"
                                 >
                                     Sign up
                                 </a>
@@ -265,25 +265,26 @@ export function Navbar() {
     );
 }
 
-/* Provisional brand mark — an ember-orange tile standing in for the
-   final 3D logo asset. Drop the real mark at /public/logo.svg and swap
-   this for <img src="/logo.svg" alt="Kivo" /> when ready. */
+/* Brand mark — a violet→plum gradient tile carrying a white chat glyph.
+   Swap for <img src="/logo.svg" alt="Kivo" /> once the final asset lands. */
 function BrandMark() {
     return (
         <svg
-            width="22"
-            height="22"
-            viewBox="0 0 22 22"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
             aria-hidden="true"
             className="shrink-0"
         >
-            <rect x="1" y="1" width="20" height="20" rx="6" fill="#ff3c00" />
-            <rect
-                x="6.5"
-                y="6.5"
-                width="9"
-                height="9"
-                rx="2.5"
+            <defs>
+                <linearGradient id="kivoMark" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#7a40ed" />
+                    <stop offset="100%" stopColor="#17082c" />
+                </linearGradient>
+            </defs>
+            <rect x="1" y="1" width="22" height="22" rx="7" fill="url(#kivoMark)" />
+            <path
+                d="M7 9.2A1.6 1.6 0 0 1 8.6 7.6h6.8A1.6 1.6 0 0 1 17 9.2v4.1a1.6 1.6 0 0 1-1.6 1.6H10l-2.6 2.2v-2.2H8.6A1.6 1.6 0 0 1 7 13.3V9.2Z"
                 fill="#ffffff"
             />
         </svg>

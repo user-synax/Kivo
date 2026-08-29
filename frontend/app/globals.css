@@ -5,31 +5,42 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Colors — Nexus "Global Transfers" (warm orange + cream + gold) */
-  --color-ember-orange: #f68b1f; /* primary */
-  --color-sunset-coral: #fdb813; /* accent (gold) */
-  --color-peach-blush: #fbe7c2; /* light gold tint for gradients */
-  --color-burnt-rust: #d9780e; /* darker orange — hover/active */
-  --color-electric-blue: #2bb6a8; /* teal status / chart accent */
-  --color-warm-canvas: #f2ead3; /* background (cream) */
-  --color-pure-white: #ffffff; /* surface */
-  --color-ink-black: #111827; /* text primary */
-  --color-charcoal: #1f2937;
-  --color-slate: #374151;
-  --color-deep-charcoal: #111827;
-  --color-gunmetal: #374151;
-  --color-stone: #9ca3af; /* muted gray — borders / secondary text */
-  --color-pewter: #4b5563; /* text secondary */
-  --color-warm-gray: #6b7280;
-  --color-mist: #6b7280;
-  --color-sand: #e5e7eb; /* border */
-  --color-driftwood: #d9d0bc; /* darker cream border */
-  --color-fog: #ede7d6; /* subtle surface tint */
+  /* Colors — Jitter (Swiss kinetic studio: off-white canvas, white cards,
+     near-black ink, violet brand spark, pill geometry) */
+  --color-studio-off-white: #f2f1f3; /* page canvas */
+  --color-pure-white: #ffffff; /* card / surface */
+  --color-hairline-gray: #e5e4e7; /* borders, dividers, recessed panels */
+  --color-ink: #19171c; /* ink text + dark fills */
+  --color-ink-black: #19171c; /* alias used across components */
+  --color-soft-mist: #97979b; /* muted secondary text */
+  --color-slate: #6e6e73; /* body copy on light surfaces */
+  --color-deep-charcoal: #19171c;
+  --color-pewter: #6e6e73; /* alias */
+  --color-warm-gray: #97979b;
+  --color-mist: #97979b;
+  --color-gunmetal: #6e6e73;
+  --color-charcoal: #2d2933;
+  --color-eclipse-violet: #7a40ed; /* brand accent (violet spark) */
+  --color-ember-orange: #7a40ed; /* legacy alias -> violet accent */
+  --color-burnt-rust: #5a2bbf; /* violet hover/active */
+  --color-sunset-coral: #a981ff; /* lilac */
+  --color-peach-blush: #cab3f8; /* lavender mist */
+  --color-electric-blue: #00b2ff; /* secondary accent */
+  --color-deep-plum: #17082c; /* near-black with purple cast */
+  --color-lilac-wash: #a981ff;
+  --color-lavender-mist: #cab3f8;
+  --color-volt: #f5ff63;
+  --color-ice-blue: #a9dbff;
+  --color-sky-tint: #e6f4ff;
+  --color-stone: #e5e4e7; /* hairline border */
+  --color-sand: #e5e4e7;
+  --color-driftwood: #dcdce0;
+  --color-warm-canvas: #f2f1f3; /* alias -> canvas */
+  --color-fog: #ffffff; /* alias -> white surface */
 
-  /* Typography — Font Families (single Inter design system) */
-  --font-inter:
-    var(--font-inter), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Typography — Font Families.
+     --font-inter / --font-outfit are supplied by next/font on <html>
+     (see app/layout.js); we only declare the alias + mono stacks here. */
   --font-playfair: var(--font-inter);
   --font-jetbrains:
     ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -115,9 +126,10 @@
   /* Named Radii */
   --radius-nav: 6px;
   --radius-cards: 40px;
-  --radius-badges: 6px;
-  --radius-inputs: 6px;
-  --radius-buttons: 100px;
+  --radius-badges: 40px;
+  --radius-inputs: 26px;
+  --radius-buttons: 9999px;
+  --radius-nav: 20px;
 
   /* Surfaces */
   --surface-warm-canvas: #f2ead3;
@@ -231,68 +243,75 @@
   --morph-close-dur: 200ms;
   --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* ── shadcn token layer — mapped to Nexus light (cream + orange) ── */
-  --background: #f2ead3;
-  --foreground: #111827;
+  /* ── shadcn token layer — mapped to Jitter (off-white + ink + violet) ── */
+  --background: #f2f1f3;
+  --foreground: #19171c;
   --card: #ffffff;
-  --card-foreground: #111827;
+  --card-foreground: #19171c;
   --popover: #ffffff;
-  --popover-foreground: #111827;
-  --primary: #f68b1f;
+  --popover-foreground: #19171c;
+  --primary: #7a40ed;
   --primary-foreground: #ffffff;
-  --secondary: #f2ead3;
-  --secondary-foreground: #111827;
-  --muted: #ede7d6;
-  --muted-foreground: #4b5563;
-  --accent: #fdb813;
-  --accent-foreground: #111827;
+  --secondary: #f2f1f3;
+  --secondary-foreground: #19171c;
+  --muted: #f2f1f3;
+  --muted-foreground: #6e6e73;
+  --accent: #7a40ed;
+  --accent-foreground: #ffffff;
   --destructive: #dc2626;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #f68b1f;
-  --chart-1: #f68b1f;
-  --chart-2: #9ca3af;
-  --chart-3: #4b5563;
-  --chart-4: #fdb813;
-  --chart-5: #2bb6a8;
+  --border: #e5e4e7;
+  --input: #e5e4e7;
+  --ring: #7a40ed;
+  --chart-1: #7a40ed;
+  --chart-2: #97979b;
+  --chart-3: #6e6e73;
+  --chart-4: #a981ff;
+  --chart-5: #00b2ff;
   --radius: 0.5rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #111827;
-  --sidebar-primary: #f68b1f;
+  --sidebar-foreground: #19171c;
+  --sidebar-primary: #7a40ed;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ede7d6;
-  --sidebar-accent-foreground: #111827;
-  --sidebar-border: #e5e7eb;
-  --sidebar-ring: #f68b1f;
+  --sidebar-accent: #ede7f6;
+  --sidebar-accent-foreground: #19171c;
+  --sidebar-border: #e5e4e7;
+  --sidebar-ring: #7a40ed;
 }
 
 @theme {
-  /* Colors */
-  --color-ember-orange: #f68b1f;
-  --color-sunset-coral: #fdb813;
-  --color-peach-blush: #fbe7c2;
-  --color-burnt-rust: #d9780e;
-  --color-electric-blue: #2bb6a8;
-  --color-warm-canvas: #f2ead3;
+  /* Colors — Jitter */
+  --color-ember-orange: #7a40ed;
+  --color-eclipse-violet: #7a40ed;
+  --color-sunset-coral: #a981ff;
+  --color-peach-blush: #cab3f8;
+  --color-burnt-rust: #5a2bbf;
+  --color-electric-blue: #00b2ff;
+  --color-warm-canvas: #f2f1f3;
+  --color-studio-off-white: #f2f1f3;
   --color-pure-white: #ffffff;
-  --color-ink-black: #111827;
-  --color-charcoal: #1f2937;
-  --color-slate: #374151;
-  --color-deep-charcoal: #111827;
-  --color-gunmetal: #374151;
-  --color-stone: #9ca3af;
-  --color-pewter: #4b5563;
-  --color-warm-gray: #6b7280;
-  --color-mist: #6b7280;
-  --color-sand: #e5e7eb;
-  --color-driftwood: #d9d0bc;
-  --color-fog: #ede7d6;
+  --color-ink-black: #19171c;
+  --color-ink: #19171c;
+  --color-charcoal: #2d2933;
+  --color-slate: #6e6e73;
+  --color-deep-charcoal: #19171c;
+  --color-gunmetal: #6e6e73;
+  --color-stone: #e5e4e7;
+  --color-pewter: #6e6e73;
+  --color-soft-mist: #97979b;
+  --color-warm-gray: #97979b;
+  --color-mist: #97979b;
+  --color-sand: #e5e4e7;
+  --color-driftwood: #dcdce0;
+  --color-fog: #ffffff;
+  --color-deep-plum: #17082c;
+  --color-lilac-wash: #a981ff;
+  --color-lavender-mist: #cab3f8;
+  --color-volt: #f5ff63;
+  --color-ice-blue: #a9dbff;
+  --color-sky-tint: #e6f4ff;
 
-  /* Typography */
-  --font-inter:
-    var(--font-inter), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --font-goga: var(--font-inter);
+  /* Typography — next/font supplies --font-inter / --font-outfit on <html> */
+  --font-goga: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-playfair: var(--font-inter);
   --font-jetbrains:
     ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -362,25 +381,26 @@
   --radius-full-7: 1028px;
   --radius-pills: 9999px;
 
-  /* Named Radii */
-  --radius-nav: 9999px;
-  --radius-cards: 16px;
-  --radius-badges: 8px;
-  --radius-inputs: 8px;
+  /* Named Radii — Jitter: pill buttons (50px), 40px cards/badges,
+     26px inputs, 20px nav elements. No radius below 20px anywhere. */
+  --radius-nav: 20px;
+  --radius-cards: 40px;
+  --radius-badges: 40px;
+  --radius-inputs: 26px;
   --radius-buttons: 9999px;
 
-  /* Elevation — single global, theme-independent shadow language
-     (subtle, "HTML-matched" depth per the Nexus spec). Themes only
-     vary color, never radius or shadow. */
-  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
-  --shadow-md: 0 4px 16px -8px rgba(17, 24, 39, 0.12);
-  --shadow-lg: 0 12px 32px -12px rgba(17, 24, 39, 0.16);
-  --shadow-xl: 0 24px 48px -16px rgba(17, 24, 39, 0.2);
-  --shadow-2xl: 0 32px 64px -20px rgba(17, 24, 39, 0.22);
+  /* Elevation — Jitter signature: multi-layer, low-opacity, ink-tinted
+     diffuse stacks that let cards float 150px+ above the canvas. */
+  --shadow-sm: 0 1px 2px rgba(25, 23, 28, 0.04), 0 2px 6px rgba(25, 23, 28, 0.04);
+  --shadow-md: 0 7px 16px rgba(25, 23, 28, 0.1), 0 30px 30px rgba(25, 23, 28, 0.09), 0 67px 40px rgba(25, 23, 28, 0.05);
+  --shadow-lg: 0 9px 21px rgba(25, 23, 28, 0.1), 0 38px 38px rgba(25, 23, 28, 0.09), 0 85px 51px rgba(25, 23, 28, 0.05), 0 152px 61px rgba(25, 23, 28, 0.01);
+  --shadow-xl: 0 152px 61px rgba(25, 23, 28, 0.01), 0 85px 51px rgba(25, 23, 28, 0.05), 0 38px 38px rgba(25, 23, 28, 0.09), 0 9px 21px rgba(25, 23, 28, 0.1);
+  --shadow-2xl: 0 63px 25px rgba(0, 0, 0, 0.01), 0 35px 21px rgba(0, 0, 0, 0.05), 0 16px 16px rgba(0, 0, 0, 0.09), 0 4px 9px rgba(0, 0, 0, 0.1);
 }
 
 @theme inline {
-  --font-heading: var(--font-inter);
+  --font-heading: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-inter);
   --font-body: var(--font-playfair);
   --font-mono: var(--font-jetbrains);
@@ -424,48 +444,48 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ── .dark — Nexus "Dark" surface (warm near-black + cream) ───── */
+/* ── .dark — Jitter "Ink" surface (near-black violet cast) ───── */
 .dark {
-  --background: #14110b;
-  --foreground: #f2ead3;
-  --card: #1f1b14;
-  --card-foreground: #f2ead3;
-  --popover: #1f1b14;
-  --popover-foreground: #f2ead3;
-  --primary: #f68b1f;
+  --background: #19171c;
+  --foreground: #f2f1f3;
+  --card: #231f29;
+  --card-foreground: #f2f1f3;
+  --popover: #231f29;
+  --popover-foreground: #f2f1f3;
+  --primary: #7a40ed;
   --primary-foreground: #ffffff;
-  --secondary: #2a2419;
-  --secondary-foreground: #f2ead3;
-  --muted: #2a2419;
-  --muted-foreground: #b9b2a3;
-  --accent: #fdb813;
-  --accent-foreground: #14110b;
+  --secondary: #2a2730;
+  --secondary-foreground: #f2f1f3;
+  --muted: #2a2730;
+  --muted-foreground: #b9b2c8;
+  --accent: #7a40ed;
+  --accent-foreground: #ffffff;
   --destructive: #dc2626;
-  --border: #3a3326;
-  --input: #3a3326;
-  --ring: #f68b1f;
-  --chart-1: #f68b1f;
-  --chart-2: #b9b2a3;
-  --chart-3: #4b5563;
-  --chart-4: #fdb813;
-  --chart-5: #2bb6a8;
-  --sidebar: #1f1b14;
-  --sidebar-foreground: #f2ead3;
-  --sidebar-primary: #f68b1f;
+  --border: #332f3a;
+  --input: #332f3a;
+  --ring: #7a40ed;
+  --chart-1: #7a40ed;
+  --chart-2: #b9b2c8;
+  --chart-3: #6e6e73;
+  --chart-4: #a981ff;
+  --chart-5: #00b2ff;
+  --sidebar: #231f29;
+  --sidebar-foreground: #f2f1f3;
+  --sidebar-primary: #7a40ed;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2a2419;
-  --sidebar-accent-foreground: #f2ead3;
-  --sidebar-border: #3a3326;
-  --sidebar-ring: #f68b1f;
+  --sidebar-accent: #2e2a37;
+  --sidebar-accent-foreground: #f2f1f3;
+  --sidebar-border: #332f3a;
+  --sidebar-ring: #7a40ed;
 
   /* Surface / palette overrides so kivo-* chrome matches the dark preview */
-  --surface-warm-canvas: #14110b;
-  --surface-card-white: #1f1b14;
-  --color-warm-canvas: #14110b;
-  --color-pure-white: #1f1b14;
-  --color-ink-black: #f2ead3;
-  --color-sand: #3a3326;
-  --color-fog: #2a2419;
+  --surface-warm-canvas: #19171c;
+  --surface-card-white: #231f29;
+  --color-warm-canvas: #19171c;
+  --color-pure-white: #231f29;
+  --color-ink-black: #f2f1f3;
+  --color-sand: #332f3a;
+  --color-fog: #231f29;
 
   /* Tabs palette for dark mode */
   --tabs-text-muted: var(--color-stone);
@@ -498,16 +518,17 @@
      page scrolls. data-scrolled is toggled imperatively (no React
      re-render) so only the backdrop/surface shift, never layout. */
   .kivo-nav-pill {
-    background-color: rgba(242, 234, 211, 0.72);
-    border-color: rgba(156, 163, 175, 0.35);
+    background-color: rgba(242, 241, 243, 0.72);
+    border-color: rgba(25, 23, 28, 0.08);
     border-radius: var(--radius-pills);
+    box-shadow: 0 8px 30px -16px rgba(25, 23, 28, 0.25);
     transition:
       background-color var(--duration-fast) var(--ease-smooth-out),
       border-color var(--duration-fast) var(--ease-smooth-out);
   }
   .kivo-nav-pill[data-scrolled="true"] {
-    background-color: rgba(242, 234, 211, 0.92);
-    border-color: rgba(156, 163, 175, 0.6);
+    background-color: rgba(242, 241, 243, 0.92);
+    border-color: rgba(25, 23, 28, 0.12);
   }
 
   /* Understated nav link hover — a warm wash that lifts to primary orange on hover. */
@@ -535,12 +556,12 @@
     transform: scale(0.97);
   }
 
-  /* Visible keyboard focus — primary orange ring. */
+  /* Visible keyboard focus — uses the active theme accent. */
   .kivo-focus:focus-visible {
     outline: none;
     box-shadow:
-      0 0 0 2px rgba(242, 234, 211, 0.9),
-      0 0 0 4px rgba(246, 139, 31, 0.5);
+      0 0 0 2px var(--bg-surface, #ffffff),
+      0 0 0 4px var(--accent, #7a40ed);
   }
 
   /* ── transitions-dev: menu dropdown (theme selector) ───────── */
@@ -714,6 +735,24 @@
   }
   .t-panel-in {
     animation: t-panel-in var(--panel-open-dur) var(--panel-ease) both;
+    will-change: transform, opacity, filter;
+  }
+
+  /* ── Sidebar conversation rows — staggered cross-blur rise ──── */
+  @keyframes t-item-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+  }
+  .t-item-in {
+    animation: t-item-in var(--duration-slow) var(--ease-smooth-out) both;
     will-change: transform, opacity, filter;
   }
 
@@ -914,6 +953,7 @@
   .t-badge-dot,
   .t-badge-pop,
   .t-panel-in,
+  .t-item-in,
   .t-msg-in,
   .t-bubble,
   .t-text-swap {

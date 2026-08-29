@@ -66,12 +66,21 @@ export function Hero() {
           animate="show"
           className="flex max-w-[640px] flex-col gap-6 lg:max-w-none lg:gap-8"
         >
+          {/* Pill badge kicker — lavender category tag above the headline */}
+          <motion.span
+            variants={textItemVariants}
+            className="inline-flex w-fit items-center gap-1.5 rounded-pills bg-lavender-mist px-3.5 py-1 font-sans text-[12px] font-semibold text-deep-plum"
+          >
+            <span className="size-1.5 rounded-full bg-eclipse-violet" />
+            Introducing Kivo
+          </motion.span>
+
           <motion.h1
             variants={textItemVariants}
             className="font-goga text-[36px] font-normal leading-[0.95] tracking-[-0.017em] text-ink-black sm:text-[48px] sm:tracking-[-0.007em] lg:text-[54px] xl:text-[64px] xl:tracking-[-0.448px] xl:leading-[1]"
             style={{ fontFeatureSettings: '"ss01"' }}
           >
-            <span className="text-ember-orange">Chat</span> your way.
+            <span className="text-eclipse-violet">Chat</span> your way.
           </motion.h1>
 
           <motion.p
@@ -95,7 +104,7 @@ export function Hero() {
             >
               <Button
                 render={<a href="#get-started" />}
-                className="kivo-cta h-auto rounded-pills border border-ember-orange bg-ember-orange px-6 py-3 text-[16px] font-medium leading-none tracking-[-0.352px] text-white shadow-none hover:bg-ember-orange hover:text-white focus-visible:ring-ember-orange/30 has-[>svg]:px-6"
+                className="kivo-cta h-auto rounded-pills border border-eclipse-violet bg-eclipse-violet px-6 py-3 text-[16px] font-medium leading-none tracking-[-0.352px] text-white shadow-[0_12px_34px_-12px_rgba(122,64,237,0.6)] transition-[transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 focus-visible:ring-eclipse-violet/30 has-[>svg]:px-6"
                 style={{ fontFeatureSettings: '"cv11"' }}
               >
                 Get Started

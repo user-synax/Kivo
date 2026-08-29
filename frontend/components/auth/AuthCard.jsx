@@ -11,14 +11,14 @@ export function AuthCard({ children }) {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-warm-canvas px-4 py-12">
       {/* subtle radial glow — carries the brand accent without competing */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ember-orange/[0.06] blur-[90px]" />
+        <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-eclipse-violet/[0.08] blur-[90px]" />
       </div>
 
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: EASE_SMOOTH_OUT }}
-        className="relative w-full max-w-[420px]"
+        className="relative w-full max-w-[440px]"
       >
         {/* Logo */}
         <a
@@ -27,14 +27,23 @@ export function AuthCard({ children }) {
           aria-label="Kivo home"
         >
           <svg
-            width="24"
-            height="24"
-            viewBox="0 0 22 22"
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
             aria-hidden="true"
             className="shrink-0"
           >
-            <rect x="1" y="1" width="20" height="20" rx="6" fill="#ff3c00" />
-            <rect x="6.5" y="6.5" width="9" height="9" rx="2.5" fill="#ffffff" />
+            <defs>
+              <linearGradient id="kivoAuthMark" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#7a40ed" />
+                <stop offset="100%" stopColor="#17082c" />
+              </linearGradient>
+            </defs>
+            <rect x="1" y="1" width="22" height="22" rx="7" fill="url(#kivoAuthMark)" />
+            <path
+              d="M7 9.2A1.6 1.6 0 0 1 8.6 7.6h6.8A1.6 1.6 0 0 1 17 9.2v4.1a1.6 1.6 0 0 1-1.6 1.6H10l-2.6 2.2v-2.2H8.6A1.6 1.6 0 0 1 7 13.3V9.2Z"
+              fill="#ffffff"
+            />
           </svg>
           <span className="font-goga text-[22px] font-medium tracking-tight text-ink-black">
             Kivo
@@ -42,7 +51,7 @@ export function AuthCard({ children }) {
         </a>
 
         {/* Card */}
-        <div className="rounded-cards border border-stone/60 bg-fog p-8 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] sm:p-10">
+        <div className="rounded-cards border border-stone/70 bg-pure-white p-8 shadow-[0_40px_90px_-30px_rgba(25,23,28,0.28)] sm:p-10">
           {children}
         </div>
       </motion.div>

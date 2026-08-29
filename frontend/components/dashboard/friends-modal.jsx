@@ -1,430 +1,506 @@
 "use client";
 
+import {
+    Check,
+    Inbox,
+    Loader2,
+    MessageCircle,
+    Search,
+    SearchX,
+    UserPlus,
+    Users,
+    X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "@/components/dashboard/avatar";
 import { apiGet, apiPost } from "@/lib/api";
 
-function initials(name) {
-  return (name || "?")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function Avatar({ name }) {
-  return (
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-primary)]">
-      {initials(name)}
-    </div>
-  );
-}
+// Color hierarchy used throughout this modal (mirrors the rest of the app):
+//   accent fill   -> the one primary / affirming action per row (Accept, Add)
+//   bordered      -> a real but secondary action (Message, Close)
+//   plain/muted   -> a low-emphasis, reversible action (Decline)
+//   muted pill    -> an inert status, not a button (Requested)
+const btnPrimary =
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] transition-opacity duration-150 hover:opacity-90 disabled:pointer-events-none disabled:opacity-40";
+const btnSecondary =
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--hover)] disabled:pointer-events-none disabled:opacity-40";
+const btnGhost =
+    "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40";
+const tagPill =
+    "shrink-0 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--text-muted)]";
 
 const TABS = [
-  { id: "requests", label: "Requests" },
-  { id: "friends", label: "Friends" },
-  { id: "add", label: "Add friend" },
+    { id: "requests", label: "Requests" },
+    { id: "friends", label: "Friends" },
+    { id: "add", label: "Add friend" },
 ];
 
+function PersonRow({ person, subtitle, children }) {
+    return (
+        <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5">
+            <Avatar
+                name={person.name}
+                avatarStyle={person.avatarStyle}
+                url={person.avatarUrl}
+            />
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                    {person.name}
+                </p>
+                <p className="truncate text-xs text-[var(--text-muted)]">
+                    {subtitle}
+                </p>
+            </div>
+            {children}
+        </div>
+    );
+}
+
+function EmptyState({ icon: Icon, title, hint }) {
+    return (
+        <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+            <span className="grid size-11 place-items-center rounded-full bg-[var(--hover)] text-[var(--text-muted)]">
+                <Icon className="h-5 w-5" strokeWidth={1.6} />
+            </span>
+            <p className="text-[13px] text-[var(--text-muted)]">{title}</p>
+            {hint && (
+                <p className="text-[12px] text-[var(--text-muted)]/70">
+                    {hint}
+                </p>
+            )}
+        </div>
+    );
+}
+
 export function FriendsModal({ open, onClose, onStartChat }) {
-  const [tab, setTab] = useState("requests");
-  const [friends, setFriends] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [loadingSearch, setLoadingSearch] = useState(false);
-  const [busyId, setBusyId] = useState(null);
-  const timer = useRef(null);
+    const [tab, setTab] = useState("requests");
+    const [friends, setFriends] = useState([]);
+    const [requests, setRequests] = useState([]);
+    const [query, setQuery] = useState("");
+    const [results, setResults] = useState([]);
+    const [loadingSearch, setLoadingSearch] = useState(false);
+    const [busyId, setBusyId] = useState(null);
+    const timer = useRef(null);
 
-  // Mount + visibility state so the modal can animate both in and out.
-  const [render, setRender] = useState(open);
-  const [show, setShow] = useState(false);
-  const closeMs = 150;
+    // Mount + visibility state so the modal can animate both in and out.
+    const [render, setRender] = useState(open);
+    const [show, setShow] = useState(false);
+    const closeMs = 150;
 
-  const barRef = useRef(null);
-  const pillRef = useRef(null);
-  const firstTab = useRef(true);
+    const barRef = useRef(null);
+    const pillRef = useRef(null);
+    const firstTab = useRef(true);
 
-  // Drive mount/unmount around the open flag so we get an exit animation.
-  useEffect(() => {
-    if (open) {
-      setRender(true);
-      const id = requestAnimationFrame(() =>
-        requestAnimationFrame(() => setShow(true)),
-      );
-      return () => cancelAnimationFrame(id);
-    }
-    if (render) {
-      setShow(false);
-      const id = setTimeout(() => setRender(false), closeMs);
-      return () => clearTimeout(id);
-    }
-  }, [open, render]);
+    // Drive mount/unmount around the open flag so we get an exit animation.
+    useEffect(() => {
+        if (open) {
+            setRender(true);
+            const id = requestAnimationFrame(() =>
+                requestAnimationFrame(() => setShow(true)),
+            );
+            return () => cancelAnimationFrame(id);
+        }
+        if (render) {
+            setShow(false);
+            const id = setTimeout(() => setRender(false), closeMs);
+            return () => clearTimeout(id);
+        }
+    }, [open, render]);
 
-  // Slide the active-pill to the current tab (snap on first paint, tween after).
-  const movePill = (animate) => {
-    const bar = barRef.current;
-    const pill = pillRef.current;
-    if (!bar || !pill) return;
-    const tabs = [...bar.querySelectorAll(".t-tab")];
-    const activeEl =
-      tabs.find((t) => t.getAttribute("aria-selected") === "true") || tabs[0];
-    if (!activeEl) return;
-    if (!animate) {
-      const prev = pill.style.transition;
-      pill.style.transition = "none";
-      pill.style.transform = `translateX(${activeEl.offsetLeft}px)`;
-      pill.style.width = `${activeEl.offsetWidth}px`;
-      void pill.offsetWidth;
-      pill.style.transition = prev;
-    } else {
-      pill.style.transform = `translateX(${activeEl.offsetLeft}px)`;
-      pill.style.width = `${activeEl.offsetWidth}px`;
-    }
-  };
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: movePill only reads refs and is stable across renders.
-  useEffect(() => {
-    if (!render) return;
-    const id = requestAnimationFrame(() => {
-      movePill(!firstTab.current);
-      firstTab.current = false;
-    });
-    const onResize = () => movePill(false);
-    window.addEventListener("resize", onResize);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("resize", onResize);
+    // Slide the active-pill to the current tab (snap on first paint, tween after).
+    const movePill = (animate) => {
+        const bar = barRef.current;
+        const pill = pillRef.current;
+        if (!bar || !pill) return;
+        const tabs = [...bar.querySelectorAll(".t-tab")];
+        const activeEl =
+            tabs.find((t) => t.getAttribute("aria-selected") === "true") ||
+            tabs[0];
+        if (!activeEl) return;
+        if (!animate) {
+            const prev = pill.style.transition;
+            pill.style.transition = "none";
+            pill.style.transform = `translateX(${activeEl.offsetLeft}px)`;
+            pill.style.width = `${activeEl.offsetWidth}px`;
+            void pill.offsetWidth;
+            pill.style.transition = prev;
+        } else {
+            pill.style.transform = `translateX(${activeEl.offsetLeft}px)`;
+            pill.style.width = `${activeEl.offsetWidth}px`;
+        }
     };
-  }, [render, tab]);
 
-  const loadFriends = () =>
-    apiGet("/api/v1/friends")
-      .then((d) => setFriends(d || []))
-      .catch(() => setFriends([]));
-  const loadRequests = () =>
-    apiGet("/api/v1/friends/requests")
-      .then((d) => setRequests(d || []))
-      .catch(() => setRequests([]));
+    // biome-ignore lint/correctness/useExhaustiveDependencies: movePill only reads refs and is stable across renders.
+    useEffect(() => {
+        if (!render) return;
+        const id = requestAnimationFrame(() => {
+            movePill(!firstTab.current);
+            firstTab.current = false;
+        });
+        const onResize = () => movePill(false);
+        window.addEventListener("resize", onResize);
+        return () => {
+            cancelAnimationFrame(id);
+            window.removeEventListener("resize", onResize);
+        };
+    }, [render, tab]);
 
-  useEffect(() => {
-    if (!open) return;
-    apiGet("/api/v1/friends")
-      .then((d) => setFriends(d || []))
-      .catch(() => setFriends([]));
-    apiGet("/api/v1/friends/requests")
-      .then((d) => setRequests(d || []))
-      .catch(() => setRequests([]));
-  }, [open]);
+    const loadFriends = () =>
+        apiGet("/api/v1/friends")
+            .then((d) => setFriends(d || []))
+            .catch(() => setFriends([]));
+    const loadRequests = () =>
+        apiGet("/api/v1/friends/requests")
+            .then((d) => setRequests(d || []))
+            .catch(() => setRequests([]));
 
-  // Debounced search for the "Add friend" tab.
-  useEffect(() => {
-    if (!open) return;
-    if (timer.current) clearTimeout(timer.current);
-    const q = query.trim();
-    if (q.length === 0) {
-      setResults([]);
-      return;
-    }
-    setLoadingSearch(true);
-    timer.current = setTimeout(() => {
-      apiGet(`/api/v1/users/search?q=${encodeURIComponent(q)}`)
-        .then((d) => setResults(d || []))
-        .catch(() => setResults([]))
-        .finally(() => setLoadingSearch(false));
-    }, 300);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
+    useEffect(() => {
+        if (!open) return;
+        loadFriends();
+        loadRequests();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    // Debounced search for the "Add friend" tab.
+    useEffect(() => {
+        if (!open) return;
+        if (timer.current) clearTimeout(timer.current);
+        const q = query.trim();
+        if (q.length === 0) {
+            setResults([]);
+            return;
+        }
+        setLoadingSearch(true);
+        timer.current = setTimeout(() => {
+            apiGet(`/api/v1/users/search?q=${encodeURIComponent(q)}`)
+                .then((d) => setResults(d || []))
+                .catch(() => setResults([]))
+                .finally(() => setLoadingSearch(false));
+        }, 300);
+        return () => {
+            if (timer.current) clearTimeout(timer.current);
+        };
+    }, [query, open]);
+
+    const fullName = (u) => u.displayName || u.username || u.email;
+    const handle = (u) => (u.username ? `@${u.username}` : u.email);
+
+    const sendRequest = async (identifier, id) => {
+        setBusyId(id);
+        try {
+            await apiPost("/api/v1/friends/request", { identifier });
+            if (query.trim()) {
+                const d = await apiGet(
+                    `/api/v1/users/search?q=${encodeURIComponent(query.trim())}`,
+                );
+                setResults(d || []);
+            }
+            loadRequests();
+        } catch (err) {
+            window.alert(err?.message || "Could not send request");
+        } finally {
+            setBusyId(null);
+        }
     };
-  }, [query, open]);
 
-  const fullName = (u) => u.displayName || u.username || u.email;
+    const accept = async (id) => {
+        setBusyId(id);
+        try {
+            await apiPost(`/api/v1/friends/requests/${id}/accept`, {});
+            await loadRequests();
+            await loadFriends();
+        } finally {
+            setBusyId(null);
+        }
+    };
 
-  const sendRequest = async (identifier) => {
-    setBusyId(identifier);
-    try {
-      await apiPost("/api/v1/friends/request", { identifier });
-      if (query.trim()) {
-        const d = await apiGet(
-          `/api/v1/users/search?q=${encodeURIComponent(query.trim())}`,
-        );
-        setResults(d || []);
-      }
-      loadRequests();
-    } catch (err) {
-      window.alert(err?.message || "Could not send request");
-    } finally {
-      setBusyId(null);
-    }
-  };
+    const decline = async (id) => {
+        setBusyId(id);
+        try {
+            await apiPost(`/api/v1/friends/requests/${id}/decline`, {});
+            await loadRequests();
+        } finally {
+            setBusyId(null);
+        }
+    };
 
-  const accept = async (id) => {
-    setBusyId(id);
-    try {
-      await apiPost(`/api/v1/friends/requests/${id}/accept`, {});
-      await loadRequests();
-      await loadFriends();
-    } finally {
-      setBusyId(null);
-    }
-  };
+    const startChat = (friendId) => onStartChat(friendId);
 
-  const decline = async (id) => {
-    setBusyId(id);
-    try {
-      await apiPost(`/api/v1/friends/requests/${id}/decline`, {});
-      await loadRequests();
-    } finally {
-      setBusyId(null);
-    }
-  };
+    if (!render) return null;
 
-  const startChat = (friendId) => {
-    onStartChat(friendId);
-  };
-
-  if (!render) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className={`t-modal-backdrop absolute inset-0 bg-black/50 ${
-          show ? "is-open" : ""
-        }`}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Friends"
-        className={`t-modal relative z-10 flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl ${
-          show ? "is-open" : "is-closing"
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-          <h2 className="text-sm font-medium text-[var(--text-primary)]">
-            Friends
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex size-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex justify-center border-b border-[var(--border)] px-3 py-2.5">
-          <div ref={barRef} className="t-tabs" role="tablist">
-            <span ref={pillRef} className="t-tabs-pill" aria-hidden="true" />
-            {TABS.map((t) => (
-              <button
-                key={t.id}
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+            <button
                 type="button"
-                role="tab"
-                aria-selected={tab === t.id}
-                onClick={() => setTab(t.id)}
-                className="t-tab"
-              >
-                {t.label}
-                {t.id === "requests" && requests.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-[var(--unread-badge)] px-1.5 text-[11px] font-medium text-[var(--on-accent)]">
-                    {requests.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+                aria-label="Close"
+                onClick={onClose}
+                className={`t-modal-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm ${show ? "is-open" : ""}`}
+            />
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-3 py-3">
-          {tab === "requests" && (
-            <div className="flex flex-col gap-2">
-              {requests.length === 0 && (
-                <p className="px-1 py-6 text-center text-[13px] text-[var(--text-muted)]">
-                  No pending requests
-                </p>
-              )}
-              {requests.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
-                >
-                  <Avatar name={fullName(r.from)} avatarStyle={r.from.avatarStyle} url={r.from.avatarUrl} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                      {fullName(r.from)}
-                    </p>
-                    <p className="truncate text-[12px] text-[var(--text-muted)]">
-                      {r.from.username ? `@${r.from.username}` : r.from.email}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busyId === r.id}
-                    onClick={() => accept(r.id)}
-                    className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-[var(--on-accent)] transition-opacity disabled:opacity-40"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === r.id}
-                    onClick={() => decline(r.id)}
-                    className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-                  >
-                    Decline
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === "friends" && (
-            <div className="flex flex-col gap-2">
-              {friends.length === 0 && (
-                <p className="px-1 py-6 text-center text-[13px] text-[var(--text-muted)]">
-                  No friends yet — add someone from the “Add friend” tab
-                </p>
-              )}
-              {friends.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
-                >
-                  <Avatar name={fullName(f)} avatarStyle={f.avatarStyle} url={f.avatarUrl} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                      {fullName(f)}
-                    </p>
-                    <p className="truncate text-[12px] text-[var(--text-muted)]">
-                      {f.username ? `@${f.username}` : f.email}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => startChat(f.id)}
-                    className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--hover)]"
-                  >
-                    Message
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === "add" && (
-            <div className="flex flex-col gap-3">
-              <div>
-                <div className="relative">
-                  <svg
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <circle
-                      cx="11"
-                      cy="11"
-                      r="7"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                    />
-                    <path
-                      d="M20 20l-3.2-3.2"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by username or email…"
-                    aria-label="Search users"
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] py-2.5 pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none"
-                  />
-                </div>
-                <p className="mt-1.5 px-1 text-[12px] text-[var(--text-muted)]">
-                  Find people by their username or email address.
-                </p>
-              </div>
-
-              <div className="min-h-24">
-                {loadingSearch && (
-                  <p className="px-1 py-4 text-center text-[12px] text-[var(--text-muted)]">
-                    Searching…
-                  </p>
-                )}
-                {!loadingSearch && query.trim() && results.length === 0 && (
-                  <div className="flex flex-col items-center gap-2 px-1 py-8 text-center">
-                    <p className="text-[13px] text-[var(--text-muted)]">
-                      No users found
-                    </p>
-                    <p className="text-[12px] text-[var(--text-muted)]/70">
-                      Try a different name, @username, or email.
-                    </p>
-                  </div>
-                )}
-                {!query.trim() && !loadingSearch && (
-                  <p className="px-1 py-8 text-center text-[13px] text-[var(--text-muted)]">
-                    Start typing to find people to add.
-                  </p>
-                )}
-                <div className="flex flex-col gap-2">
-                  {results.map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Friends"
+                className={`t-modal relative z-10 flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] ${
+                    show ? "is-open" : "is-closing"
+                }`}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-16 py-3.5">
+                    <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                        Friends
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="kivo-focus hover:cursor-pointer flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                     >
-                      <Avatar name={fullName(u)} avatarStyle={u.avatarStyle} url={u.avatarUrl} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                          {fullName(u)}
-                        </p>
-                        <p className="truncate text-[12px] text-[var(--text-muted)]">
-                          {u.username ? `@${u.username}` : u.email}
-                        </p>
-                      </div>
-                      {u.relationship === "friends" ? (
-                        <button
-                          type="button"
-                          onClick={() => startChat(u.id)}
-                          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--hover)]"
-                        >
-                          Message
-                        </button>
-                      ) : u.relationship === "outgoing" ? (
-                        <span className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--text-muted)]">
-                          Requested
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={busyId === u.id}
-                          onClick={() => sendRequest(u.username || u.email)}
-                          className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-[var(--on-accent)] transition-opacity disabled:opacity-40"
-                        >
-                          Add friend
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
-              </div>
+
+                {/* Tabs — a segmented control; the pill's position/width is driven by
+            movePill() above, so `.t-tabs` / `.t-tab` / `.t-tabs-pill` must stay. */}
+                <div className="border-b border-[var(--border)] px-3 py-2.5">
+                    <div
+                        ref={barRef}
+                        role="tablist"
+                        className="t-tabs relative inline-flex w-full items-center gap-1 rounded-full bg-[var(--bg-surface)] p-1"
+                    >
+                        <span
+                            ref={pillRef}
+                            aria-hidden="true"
+                            className="t-tabs-pill absolute inset-y-1 left-1 rounded-full bg-[var(--accent)] shadow-[0_4px_12px_-4px_var(--accent)] transition-[transform,width] duration-200 ease-out"
+                        />
+                        {TABS.map((t) => (
+                            <button
+                                key={t.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === t.id}
+                                onClick={() => setTab(t.id)}
+                                className={`t-tab relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
+                                    tab === t.id
+                                        ? "text-[var(--on-accent)]"
+                                        : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                                }`}
+                            >
+                                {t.label}
+                                {t.id === "requests" && requests.length > 0 && (
+                                    <span
+                                        className={`flex min-w-4 items-center justify-center rounded-full px-1 text-[11px] font-semibold ${
+                                            tab === "requests"
+                                                ? "bg-white/25 text-[var(--on-accent)]"
+                                                : "bg-[var(--unread-badge)] text-[var(--on-accent)]"
+                                        }`}
+                                    >
+                                        {requests.length}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto px-3 py-3">
+                    {tab === "requests" && (
+                        <div className="flex flex-col gap-2">
+                            {requests.length === 0 && (
+                                <EmptyState
+                                    icon={Inbox}
+                                    title="No pending requests"
+                                />
+                            )}
+                            {requests.map((r) => (
+                                <PersonRow
+                                    key={r.id}
+                                    person={{
+                                        ...r.from,
+                                        name: fullName(r.from),
+                                    }}
+                                    subtitle={handle(r.from)}
+                                >
+                                    <div className="flex shrink-0 items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            disabled={busyId === r.id}
+                                            onClick={() => accept(r.id)}
+                                            className={btnPrimary}
+                                        >
+                                            {busyId === r.id ? (
+                                                <Loader2
+                                                    className="h-3.5 w-3.5 animate-spin"
+                                                    strokeWidth={2}
+                                                />
+                                            ) : (
+                                                <Check
+                                                    className="h-3.5 w-3.5"
+                                                    strokeWidth={2.2}
+                                                />
+                                            )}
+                                            Accept
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={busyId === r.id}
+                                            onClick={() => decline(r.id)}
+                                            className={btnGhost}
+                                        >
+                                            Decline
+                                        </button>
+                                    </div>
+                                </PersonRow>
+                            ))}
+                        </div>
+                    )}
+
+                    {tab === "friends" && (
+                        <div className="flex flex-col gap-2">
+                            {friends.length === 0 && (
+                                <EmptyState
+                                    icon={Users}
+                                    title="No friends yet"
+                                    hint="Add someone from the “Add friend” tab."
+                                />
+                            )}
+                            {friends.map((f) => (
+                                <PersonRow
+                                    key={f.id}
+                                    person={{ ...f, name: fullName(f) }}
+                                    subtitle={handle(f)}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => startChat(f.id)}
+                                        className={btnSecondary}
+                                    >
+                                        <MessageCircle
+                                            className="h-3.5 w-3.5"
+                                            strokeWidth={1.8}
+                                        />
+                                        Message
+                                    </button>
+                                </PersonRow>
+                            ))}
+                        </div>
+                    )}
+
+                    {tab === "add" && (
+                        <div className="flex flex-col gap-3">
+                            <div>
+                                <label className="flex items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5 shadow-[inset_0_1px_1px_var(--glass-highlight)] transition-colors duration-150 focus-within:border-[var(--accent)]">
+                                    <Search
+                                        className="h-4 w-4 shrink-0 text-[var(--text-muted)]"
+                                        strokeWidth={1.8}
+                                        aria-hidden="true"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={query}
+                                        onChange={(e) =>
+                                            setQuery(e.target.value)
+                                        }
+                                        placeholder="Search by username or email…"
+                                        aria-label="Search users"
+                                        className="w-full min-w-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+                                    />
+                                </label>
+                                <p className="mt-1.5 px-1 text-[12px] text-[var(--text-muted)]">
+                                    Find people by their username or email
+                                    address.
+                                </p>
+                            </div>
+
+                            <div className="min-h-24" aria-live="polite">
+                                {loadingSearch && (
+                                    <div className="flex items-center justify-center gap-2 px-1 py-8 text-[12px] text-[var(--text-muted)]">
+                                        <Loader2
+                                            className="h-3.5 w-3.5 animate-spin"
+                                            strokeWidth={2}
+                                        />
+                                        Searching…
+                                    </div>
+                                )}
+                                {!loadingSearch &&
+                                    query.trim() &&
+                                    results.length === 0 && (
+                                        <EmptyState
+                                            icon={SearchX}
+                                            title="No users found"
+                                            hint="Try a different name, @username, or email."
+                                        />
+                                    )}
+                                {!query.trim() && !loadingSearch && (
+                                    <EmptyState
+                                        icon={Search}
+                                        title="Start typing to find people to add."
+                                    />
+                                )}
+                                <div className="flex flex-col gap-2">
+                                    {results.map((u) => (
+                                        <PersonRow
+                                            key={u.id}
+                                            person={{ ...u, name: fullName(u) }}
+                                            subtitle={handle(u)}
+                                        >
+                                            {u.relationship === "friends" ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        startChat(u.id)
+                                                    }
+                                                    className={btnSecondary}
+                                                >
+                                                    <MessageCircle
+                                                        className="h-3.5 w-3.5"
+                                                        strokeWidth={1.8}
+                                                    />
+                                                    Message
+                                                </button>
+                                            ) : u.relationship ===
+                                              "outgoing" ? (
+                                                <span className={tagPill}>
+                                                    Requested
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    disabled={busyId === u.id}
+                                                    onClick={() =>
+                                                        sendRequest(
+                                                            u.username ||
+                                                                u.email,
+                                                            u.id,
+                                                        )
+                                                    }
+                                                    className={btnPrimary}
+                                                >
+                                                    {busyId === u.id ? (
+                                                        <Loader2
+                                                            className="h-3.5 w-3.5 animate-spin"
+                                                            strokeWidth={2}
+                                                        />
+                                                    ) : (
+                                                        <UserPlus
+                                                            className="h-3.5 w-3.5"
+                                                            strokeWidth={2}
+                                                        />
+                                                    )}
+                                                    Add
+                                                </button>
+                                            )}
+                                        </PersonRow>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-          )}
         </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default FriendsModal;

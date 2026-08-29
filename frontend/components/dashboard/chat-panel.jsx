@@ -1,6 +1,6 @@
 "use client";
 
-import { Smile } from "lucide-react";
+import { Smile, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
@@ -420,7 +420,7 @@ export function ChatPanel({ conversation, onBack }) {
             type="button"
             onClick={onBack}
             aria-label="Back to conversations"
-            className="flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
           >
             <svg
               width="18"
@@ -542,7 +542,7 @@ export function ChatPanel({ conversation, onBack }) {
 
       {/* Composer */}
       <div className="shrink-0 border-t border-[var(--border)] p-3">
-        <div className="relative mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5">
+        <div className="relative mx-auto flex max-w-3xl items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
           <button
             ref={emojiBtnRef}
             type="button"
@@ -582,9 +582,9 @@ export function ChatPanel({ conversation, onBack }) {
             type="button"
             onClick={send}
             disabled={!text.trim()}
-            className="shrink-0 rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:brightness-95 disabled:opacity-40"
+            className=" rounded-nav bg-[var(--accent)] px-8 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
           >
-            Send
+            <Send className="h-5 w-5" />
           </button>
         </div>
       </div>

@@ -42,10 +42,10 @@ export function AuthInput({
           required={required}
           placeholder={placeholder}
           className={[
-            "w-full rounded-inputs border bg-fog px-3.5 py-3 font-sans text-[15px] text-ink-black",
+            "w-full rounded-inputs border bg-pure-white px-3.5 py-3 font-sans text-[15px] text-ink-black",
             "placeholder:text-pewter",
             "outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
-            "focus:border-ember-orange/50 focus:ring-2 focus:ring-ember-orange/20",
+            "focus:border-eclipse-violet/50 focus:ring-2 focus:ring-eclipse-violet/20",
             error
               ? "border-red-400/60 focus:border-red-400/70 focus:ring-red-400/20"
               : "border-stone/60",

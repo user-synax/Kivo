@@ -235,7 +235,7 @@ export default function SignUpPage() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="kivo-cta mt-1 h-auto w-full rounded-pills bg-ember-orange px-6 py-3 text-[15px] font-medium text-white shadow-none transition-[transform,filter,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-ember-orange hover:text-white disabled:opacity-60"
+              className="kivo-cta mt-1 h-auto w-full rounded-pills bg-ink px-6 py-3 text-[15px] font-medium text-white shadow-[0_10px_28px_-10px_rgba(25,23,28,0.55)] transition-[transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:scale-[0.98] disabled:opacity-60 focus-visible:ring-eclipse-violet/30"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">

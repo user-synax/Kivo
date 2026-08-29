@@ -6,185 +6,165 @@
 // only ever reference design tokens through var(--...) / Tailwind utilities, never
 // hardcoded hex.
 //
-// A theme is no longer just a color swap - it carries the whole *layout* language:
-//   - colors:  surface / text / accent palette
-//   - radius:   the corner-radius scale (cards, buttons, inputs, pills...)
-//   - shadow:   the elevation language (flat & border-driven, or floating)
-//
-// All themes share the Nexus "Global Transfers" identity (cream canvas +
-// a single primary orange accent + gold secondary) but vary in feel.
+// Themes are COLOR-ONLY. Geometry (corner radius), elevation (shadows) and every
+// other part of the layout language live in globals.css as global design tokens,
+// so the whole product keeps one consistent shape across every palette and the
+// UI looks intentional in light and dark alike.
 
-const NEXUS_LIGHT = {
-  base: "#f2ead3",
+// Light palettes -------------------------------------------------------------
+const JITTER_LIGHT = {
+  base: "#f2f1f3",
   surface: "#ffffff",
   elevated: "#ffffff",
-  textPrimary: "#111827",
-  textMuted: "#4b5563",
-  border: "#e5e7eb",
-  accent: "#f68b1f",
-  hover: "rgba(17, 24, 39, 0.06)",
-  bubbleSent: "#f68b1f",
+  textPrimary: "#19171c",
+  textMuted: "#6e6e73",
+  border: "#e5e4e7",
+  accent: "#7a40ed",
+  hover: "rgba(25, 23, 28, 0.05)",
+  bubbleSent: "#7a40ed",
   bubbleReceived: "#ffffff",
-  unreadBadge: "#f68b1f",
+  unreadBadge: "#7a40ed",
   onAccent: "#ffffff",
   online: "#16a06a",
-  scrollbarThumb: "#d9d0bc",
-  scrollbarThumbHover: "#9ca3af",
+  accentSoft: "rgba(122, 64, 237, 0.10)",
+  glassHighlight: "rgba(255, 255, 255, 0.9)",
+  scrollbarThumb: "#dcdce0",
+  scrollbarThumbHover: "#97979b",
 };
 
-const NEXUS_DARK = {
-  base: "#14110b",
-  surface: "#1f1b14",
-  elevated: "#1f1b14",
-  textPrimary: "#f2ead3",
-  textMuted: "#b9b2a3",
-  border: "#3a3326",
-  accent: "#f68b1f",
-  hover: "rgba(242, 234, 211, 0.07)",
-  bubbleSent: "#f68b1f",
-  bubbleReceived: "#2a2419",
-  unreadBadge: "#f68b1f",
+const CLOUD_LIGHT = {
+  base: "#eef1f6",
+  surface: "#ffffff",
+  elevated: "#ffffff",
+  textPrimary: "#16181d",
+  textMuted: "#6b7280",
+  border: "#dbe0ea",
+  accent: "#6d4aee",
+  hover: "rgba(22, 24, 29, 0.05)",
+  bubbleSent: "#6d4aee",
+  bubbleReceived: "#ffffff",
+  unreadBadge: "#6d4aee",
   onAccent: "#ffffff",
-  online: "#16a06a",
-  scrollbarThumb: "#3a3326",
-  scrollbarThumbHover: "#6b7280",
+  online: "#0f9d6b",
+  accentSoft: "rgba(109, 74, 238, 0.10)",
+  glassHighlight: "rgba(255, 255, 255, 0.92)",
+  scrollbarThumb: "#d2d8e4",
+  scrollbarThumbHover: "#9aa3b2",
 };
 
-// Subtle elevation — Nexus uses light borders + "HTML-matched" shadow depth
-// rather than the old fully-flat look.
-const NEXUS_SHADOW = {
-  sm: "0 1px 2px rgba(17, 24, 39, 0.06)",
-  md: "0 4px 16px -8px rgba(17, 24, 39, 0.12)",
-  lg: "0 12px 32px -12px rgba(17, 24, 39, 0.16)",
+const SAND_LIGHT = {
+  base: "#f6f2ec",
+  surface: "#fffdfa",
+  elevated: "#fffdfa",
+  textPrimary: "#211c16",
+  textMuted: "#7a7065",
+  border: "#e7e0d5",
+  accent: "#8b5cf6",
+  hover: "rgba(33, 28, 22, 0.05)",
+  bubbleSent: "#8b5cf6",
+  bubbleReceived: "#fffdfa",
+  unreadBadge: "#8b5cf6",
+  onAccent: "#ffffff",
+  online: "#11916b",
+  accentSoft: "rgba(139, 92, 246, 0.10)",
+  glassHighlight: "rgba(255, 255, 255, 0.95)",
+  scrollbarThumb: "#e0d8cc",
+  scrollbarThumbHover: "#a89c8b",
 };
 
-const NEXUS_SHADOW_DARK = {
-  sm: "0 1px 2px rgba(0, 0, 0, 0.4)",
-  md: "0 4px 16px -8px rgba(0, 0, 0, 0.5)",
-  lg: "0 12px 32px -12px rgba(0, 0, 0, 0.55)",
+// Dark palettes --------------------------------------------------------------
+const INK_DARK = {
+  base: "#19171c",
+  surface: "#231f29",
+  elevated: "#2a2531",
+  textPrimary: "#f4f2f6",
+  textMuted: "#97979b",
+  border: "#3a3442",
+  accent: "#7a40ed",
+  hover: "rgba(255, 255, 255, 0.06)",
+  bubbleSent: "#7a40ed",
+  bubbleReceived: "#2a2730",
+  unreadBadge: "#7a40ed",
+  onAccent: "#ffffff",
+  online: "#2fd29a",
+  accentSoft: "rgba(122, 64, 237, 0.20)",
+  glassHighlight: "rgba(255, 255, 255, 0.08)",
+  scrollbarThumb: "#3a3442",
+  scrollbarThumbHover: "#6e6e73",
+};
+
+const MIDNIGHT_DARK = {
+  base: "#0e1116",
+  surface: "#161b22",
+  elevated: "#1c222b",
+  textPrimary: "#e7ecf3",
+  textMuted: "#8b95a3",
+  border: "#2a313c",
+  accent: "#7c5cff",
+  hover: "rgba(255, 255, 255, 0.05)",
+  bubbleSent: "#7c5cff",
+  bubbleReceived: "#1c222b",
+  unreadBadge: "#7c5cff",
+  onAccent: "#ffffff",
+  online: "#34d399",
+  accentSoft: "rgba(124, 92, 255, 0.20)",
+  glassHighlight: "rgba(255, 255, 255, 0.07)",
+  scrollbarThumb: "#2a313c",
+  scrollbarThumbHover: "#5a6473",
 };
 
 export const themes = {
-  // Nexus - the default. Cream canvas, 16px cards, pill buttons, subtle elevation.
-  replit: {
-    id: "replit",
-    label: "Nexus",
-    swatch: "#f68b1f",
-    colors: NEXUS_LIGHT,
-    radius: {
-      base: "8px",
-      cards: "16px",
-      buttons: "9999px",
-      inputs: "8px",
-      nav: "9999px",
-      badges: "8px",
-      pills: "9999px",
-      full: "9999px",
-    },
-    shadow: NEXUS_SHADOW,
+  // Jitter - the default light palette: off-white canvas, ink text, violet accent.
+  jitter: {
+    id: "jitter",
+    label: "Jitter",
+    swatch: "#7a40ed",
+    colors: JITTER_LIGHT,
   },
 
-  // Nexus Soft - same warmth, gentle floating elevation + slightly larger cards.
-  replitSoft: {
-    id: "replitSoft",
-    label: "Nexus Soft",
-    swatch: "#fdb813",
-    colors: NEXUS_LIGHT,
-    radius: {
-      base: "10px",
-      cards: "20px",
-      buttons: "9999px",
-      inputs: "10px",
-      nav: "9999px",
-      badges: "10px",
-      pills: "9999px",
-      full: "9999px",
-    },
-    shadow: {
-      sm: "0 2px 6px -3px rgba(17, 24, 39, 0.12)",
-      md: "0 12px 28px -12px rgba(17, 24, 39, 0.18), 0 4px 10px -6px rgba(17, 24, 39, 0.12)",
-      lg: "0 18px 36px -16px rgba(17, 24, 39, 0.16)",
-    },
+  // Cloud - cool, airy blue-grey canvas with an indigo accent.
+  cloud: {
+    id: "cloud",
+    label: "Cloud",
+    swatch: "#6d4aee",
+    colors: CLOUD_LIGHT,
   },
 
-  // Nexus Crisp - structured & geometric: small radii, hairline shadows.
-  replitCrisp: {
-    id: "replitCrisp",
-    label: "Nexus Crisp",
-    swatch: "#1f2937",
-    colors: NEXUS_LIGHT,
-    radius: {
-      base: "8px",
-      cards: "12px",
-      buttons: "8px",
-      inputs: "8px",
-      nav: "10px",
-      badges: "6px",
-      pills: "10px",
-      full: "9999px",
-    },
-    shadow: {
-      sm: "0 1px 1px rgba(17, 24, 39, 0.08)",
-      md: "0 1px 2px rgba(17, 24, 39, 0.10)",
-      lg: "0 2px 4px rgba(17, 24, 39, 0.10)",
-    },
+  // Sand - warm ivory canvas with a soft violet accent.
+  sand: {
+    id: "sand",
+    label: "Sand",
+    swatch: "#8b5cf6",
+    colors: SAND_LIGHT,
   },
 
-  // Nexus Float - bold, pillowy: larger cards + prominent elevation.
-  replitFloat: {
-    id: "replitFloat",
-    label: "Nexus Float",
-    swatch: "#fbe7c2",
-    colors: NEXUS_LIGHT,
-    radius: {
-      base: "14px",
-      cards: "24px",
-      buttons: "9999px",
-      inputs: "14px",
-      nav: "9999px",
-      badges: "14px",
-      pills: "9999px",
-      full: "9999px",
-    },
-    shadow: {
-      sm: "0 4px 10px -4px rgba(17, 24, 39, 0.14)",
-      md: "0 24px 48px -16px rgba(17, 24, 39, 0.22), 0 8px 16px -10px rgba(17, 24, 39, 0.14)",
-      lg: "0 32px 64px -20px rgba(17, 24, 39, 0.24)",
-      xl: "0 40px 80px -24px rgba(17, 24, 39, 0.26)",
-      "2xl": "0 48px 96px -28px rgba(17, 24, 39, 0.28)",
-    },
+  // Ink - the default dark palette: near-black canvas, luminous text, violet accent.
+  ink: {
+    id: "ink",
+    label: "Ink",
+    swatch: "#a981ff",
+    colors: INK_DARK,
   },
 
-  // Nexus Ink - the dark variant of the default (subtle elevation + 16px cards).
-  replitInk: {
-    id: "replitInk",
-    label: "Nexus Ink",
-    swatch: "#fdb813",
-    colors: NEXUS_DARK,
-    radius: {
-      base: "8px",
-      cards: "16px",
-      buttons: "9999px",
-      inputs: "8px",
-      nav: "9999px",
-      badges: "8px",
-      pills: "9999px",
-      full: "9999px",
-    },
-    shadow: NEXUS_SHADOW_DARK,
+  // Midnight - deep navy canvas with an electric-violet accent.
+  midnight: {
+    id: "midnight",
+    label: "Midnight",
+    swatch: "#7c5cff",
+    colors: MIDNIGHT_DARK,
   },
 };
 
-export const themeOrder = ["replit", "replitSoft", "replitCrisp", "replitFloat", "replitInk"];
-export const defaultThemeId = "replit";
+export const themeOrder = ["jitter", "cloud", "sand", "ink", "midnight"];
+export const defaultThemeId = "jitter";
 export const THEME_STORAGE_KEY = "kivo:theme";
 
 // Flat map of CSS custom property name -> value for a given theme id.
-// Colors, the radius scale, and the elevation language are all injected at the
-// root so the entire product (marketing chrome + dashboard) re-skins at once.
+// Only color tokens are injected here; radius + shadow are global design tokens
+// in globals.css, so the geometry of the UI never changes between themes.
 export function cssVarsFor(themeId) {
   const theme = themes[themeId] || themes[defaultThemeId];
-  const { colors: c, radius: r, shadow: s } = theme;
+  const c = theme.colors;
   return {
     // Color surface tokens
     "--bg-base": c.base,
@@ -200,24 +180,9 @@ export function cssVarsFor(themeId) {
     "--unread-badge": c.unreadBadge,
     "--on-accent": c.onAccent,
     "--online": c.online,
+    "--accent-soft": c.accentSoft,
+    "--glass-highlight": c.glassHighlight,
     "--scrollbar-thumb": c.scrollbarThumb,
     "--scrollbar-thumb-hover": c.scrollbarThumbHover,
-
-    // Layout: corner-radius scale
-    "--radius": r.base,
-    "--radius-cards": r.cards,
-    "--radius-buttons": r.buttons,
-    "--radius-inputs": r.inputs,
-    "--radius-nav": r.nav,
-    "--radius-badges": r.badges,
-    "--radius-pills": r.pills,
-    "--radius-full": r.full,
-
-    // Layout: elevation language
-    "--shadow-sm": s.sm || "none",
-    "--shadow-md": s.md || "none",
-    "--shadow-lg": s.lg || "none",
-    "--shadow-xl": s.xl || "none",
-    "--shadow-2xl": s["2xl"] || "none",
   };
 }
