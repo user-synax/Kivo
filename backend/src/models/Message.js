@@ -42,6 +42,11 @@ const messageSchema = new mongoose.Schema(
     // still enforces non-empty content via the zod schema in messages.validation.
     content: { type: String, trim: true, maxlength: 4000 },
 
+    // "text" for normal chat messages; "system" for centered info notices
+    // (e.g. a member was removed from a group). System messages render as a
+    // non-interactive chip and never bump unread counts.
+    type: { type: String, enum: ["text", "system"], default: "text" },
+
     // Optional reference to the message this one replies to (threaded replies).
     replyToMessageId: {
       type: mongoose.Schema.Types.ObjectId,

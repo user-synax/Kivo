@@ -32,6 +32,7 @@ export const updateMeSchema = z.object({
   bio: z.string().trim().max(280).optional(),
   status: z.string().trim().max(60).optional(),
   avatarStyle: z.enum(AVATAR_STYLE_IDS).nullable().optional(),
+  banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),
 });
 
 // Convenience parsers that throw a VALIDATION_ERROR ApiError on failure.

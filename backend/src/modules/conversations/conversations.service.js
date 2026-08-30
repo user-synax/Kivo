@@ -4,6 +4,7 @@ import Conversation from "../../models/Conversation.js";
 import Message from "../../models/Message.js";
 import User from "../../models/User.js";
 import { uploadAvatar } from "../../lib/appwrite.js";
+import { publicMessage } from "../messages/messages.service.js";
 import { getIO } from "../../socket/index.js";
 import {
   emitToConversation,
@@ -76,6 +77,21 @@ function onlineSnapshot() {
   return (id) => io.isUserOnline(id);
 }
 
+// Create a system/info message (centered chip on the client) and broadcast it to
+// the conversation room. Used for member join/leave/admin events.
+async function emitSystemMessage({ conversationId, senderId, content }) {
+  const message = await Message.create({
+    conversationId,
+    senderId,
+    content,
+    type: "system",
+  });
+  await Conversation.findByIdAndUpdate(conversationId, {
+    lastMessageAt: message.createdAt,
+  });
+  emitToConversation(conversationId, "message:new", publicMessage(message));
+}
+
 // Create a DM, or return the existing one if a thread already exists between the
 // two users. Prevents duplicate DM threads via a $all lookup on participants.
 export async function createOrGetDm({ userId, participantId }) {
@@ -130,6 +146,7 @@ export async function listConversations({ userId }) {
     const unread = await Message.countDocuments({
       conversationId: c._id,
       senderId: { $ne: uid },
+      type: { $ne: "system" },
       isDeleted: false,
       readBy: { $not: { $elemMatch: { userId: uid } } },
     });
@@ -303,6 +320,20 @@ export async function addMembers({ conversationId, userId, memberIds }) {
     conversation: payload,
     addedBy: userId,
   });
+
+  // Centered info chip(s): "Admin added {name}" for each new member.
+  const addedUsers = await User.find({ _id: { $in: toAdd } })
+    .select("displayName username")
+    .lean();
+  for (const u of addedUsers) {
+    const name = u.displayName || u.username || "A member";
+    await emitSystemMessage({
+      conversationId,
+      senderId: userId,
+      content: `Admin added ${name}`,
+    });
+  }
+
   return payload;
 }
 
@@ -349,11 +380,34 @@ export async function removeMember({ conversationId, userId, targetUserId }) {
     .populate("admins", "id")
     .lean();
 
+  // Build the centered info chip text shown in the chat for everyone.
+  const targetUser = await User.findById(targetUserId)
+    .select("displayName username")
+    .lean();
+  const targetName =
+    targetUser?.displayName || targetUser?.username || "A member";
+  const notice = isSelf
+    ? `${targetName} left the group`
+    : `Admin removed ${targetName}`;
+
   if (isSelf) {
     leaveUserFromRoom(userId, conversationId);
     // Tell the leaving member's client to drop the thread from their list.
     emitToUser(userId, "conversation:removed", { conversationId });
+  } else {
+    // Removed by an admin: kick them from the live room and tell their client to
+    // drop the thread in real time (no page refresh needed).
+    leaveUserFromRoom(targetUserId, conversationId);
+    emitToUser(targetUserId, "conversation:removed", { conversationId });
   }
+
+  // Broadcast the info chip to everyone still in the room.
+  await emitSystemMessage({
+    conversationId,
+    senderId: userId,
+    content: notice,
+  });
+
   const payload = publicConversation(updated, userId, onlineSnapshot());
   emitToConversation(conversationId, "conversation:member-removed", {
     conversationId,

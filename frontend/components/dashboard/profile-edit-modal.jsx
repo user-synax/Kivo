@@ -7,6 +7,7 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { apiPatch, apiUpload, apiDelete } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import { AVATAR_STYLES } from "@/lib/avatar-styles";
+import { BANNER_OPTIONS } from "@/lib/banners";
 
 function Field({ label, hint, children }) {
   return (
@@ -37,6 +38,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
   const [bio, setBio] = useState("");
   const [status, setStatus] = useState("");
   const [avatarStyle, setAvatarStyle] = useState("default");
+  const [banner, setBanner] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -98,6 +100,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
       setBio(me?.bio || "");
       setStatus(me?.status || "");
       setAvatarStyle(me?.avatarStyle || "default");
+      setBanner(me?.banner || "");
       setError(null);
       setRender(true);
       const id = requestAnimationFrame(() => setShown(true));
@@ -132,6 +135,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
         bio: bio.trim(),
         status: status.trim(),
         avatarStyle,
+        banner,
       });
       // Persist the refreshed user object (drives the sidebar avatar + session).
       setSession(updated, getToken());
@@ -321,6 +325,64 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                     <span className="text-[10px] text-[var(--text-muted)]">
                       {preset.label}
                     </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Banner — animated GIF cover. Pick from the curated Giphy set. */}
+          <div>
+            <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">
+              Banner
+            </span>
+            <div className="relative h-20 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
+              {banner ? (
+                <img
+                  src={banner}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setBanner("")}
+                aria-pressed={!banner}
+                className={`flex h-12 items-center justify-center rounded-lg border text-[11px] font-medium text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  !banner
+                    ? "border-[var(--accent)] bg-[var(--hover)] text-[var(--text-primary)]"
+                    : "border-[var(--border)] hover:bg-[var(--hover)]"
+                }`}
+              >
+                None
+              </button>
+              {BANNER_OPTIONS.map((opt) => {
+                const active = banner === opt.url;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setBanner(opt.url)}
+                    aria-pressed={active}
+                    aria-label={opt.label}
+                    title={opt.label}
+                    className={`relative h-12 overflow-hidden rounded-lg border transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                      active
+                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]"
+                        : "border-[var(--border)] hover:bg-[var(--hover)]"
+                    }`}
+                  >
+                    <img
+                      src={opt.url}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover"
+                    />
                   </button>
                 );
               })}

@@ -54,6 +54,18 @@ function EmptyState() {
   );
 }
 
+// Centered, non-interactive info chip for system notices (e.g. a member was
+// removed from a group). Renders in the middle of the chat column.
+function SystemNotice({ content }) {
+  return (
+    <div className="my-2 flex justify-center px-2">
+      <span className="max-w-[90%] rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-1.5 text-center text-[12px] text-[var(--text-muted)]">
+        {content}
+      </span>
+    </div>
+  );
+}
+
 // Read-receipt state for the current user's own messages. Group chats don't show
 // per-recipient receipts, so this is effectively DM-only.
 function receiptState(message, userId, otherId) {
@@ -527,6 +539,9 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
         >
           {messages.map((m, i) => {
             const mine = m.senderId === userId;
+            if (m.type === "system") {
+              return <SystemNotice key={m.id} content={m.content} />;
+            }
             const receipt = receiptState(m, userId, otherId);
             const prev = i > 0 ? messages[i - 1] : null;
             const next = i < messages.length - 1 ? messages[i + 1] : null;

@@ -12,6 +12,7 @@ export function publicMessage(message) {
     id: obj._id.toString(),
     conversationId: obj.conversationId.toString(),
     senderId: obj.senderId.toString(),
+    type: obj.type || "text",
     content: obj.isDeleted ? "" : obj.content,
     replyToMessageId: obj.replyToMessageId ? obj.replyToMessageId.toString() : null,
     reactions: (obj.reactions || []).map((r) => ({

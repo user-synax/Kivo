@@ -60,8 +60,18 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt }) {
       className="t-scroll hidden h-full w-[320px] shrink-0 flex-col overflow-y-auto border-l border-[var(--border)] bg-[var(--bg-elevated)] xl:flex"
       aria-label="Conversation details"
     >
-      {/* Warm coral cover banner — the "coral sparks" accent of the system. */}
-      <div className="relative h-24 shrink-0 bg-gradient-to-br from-accent-blue/40 to-[#6a4cf5]/40" />
+      {/* Cover banner — animated GIF when the user has picked one, otherwise the
+          default coral gradient. */}
+      <div className="relative h-24 shrink-0 overflow-hidden bg-gradient-to-br from-accent-blue/40 to-[#6a4cf5]/40">
+        {profile?.banner ? (
+          <img
+            src={profile.banner}
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full object-cover"
+          />
+        ) : null}
+      </div>
 
       <motion.div
         variants={container}

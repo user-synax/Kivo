@@ -47,6 +47,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Profile cover banner (animated GIF URL chosen from the curated set). Null
+    // when the user hasn't picked one; rendered behind the avatar on profiles.
+    banner: {
+      type: String,
+      default: null,
+    },
     // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
     // so the previous file can be deleted on re-upload.
     avatarFileId: {

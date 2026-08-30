@@ -1,6 +1,14 @@
 "use client";
 
-import { PanelLeft, Pencil, Plus, Search, X } from "lucide-react";
+import {
+  PanelLeft,
+  Pencil,
+  Plus,
+  Search,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
@@ -262,6 +270,80 @@ function ThemeSwitcher({ collapsed }) {
   );
 }
 
+function NewMenu({ onFriends, onGroup, collapsed }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (collapsed) return null;
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="New chat"
+        className="kivo-focus hover:cursor-pointer group flex h-9 items-center gap-1.5 rounded-full bg-accent pl-3.5 pr-1.5 text-[13px] font-medium text-(--on-accent) transition-[transform,filter] duration-200 ease-[${EASE}] hover:brightness-110"
+      >
+        <span>New</span>
+        <span className="flex size-6 items-center justify-center rounded-full bg-white/20 transition-transform duration-200 ease-[${EASE}]">
+          <Plus className="h-5 w-5" strokeWidth={2} />
+        </span>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="New"
+          className="absolute right-0 top-full z-30 mt-2 min-w-56 origin-top-right overflow-hidden rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl outline-none"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onFriends?.();
+            }}
+            className="relative isolate flex w-full select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] outline-none transition-colors duration-150 hover:bg-foreground/[0.065] focus-visible:bg-foreground/[0.065] focus-visible:ring-2 focus-visible:ring-foreground/15"
+          >
+            <UserPlus className="h-4 w-4" />
+            Friends
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onGroup?.();
+            }}
+            className="relative isolate flex w-full select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] outline-none transition-colors duration-150 hover:bg-foreground/[0.065] focus-visible:bg-foreground/[0.065] focus-visible:ring-2 focus-visible:ring-foreground/15"
+          >
+            <Users className="h-4 w-4" />
+            Group
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar({
   conversations,
   selectedId,
@@ -311,20 +393,12 @@ export function Sidebar({
         )}
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {onCompose && !collapsed && (
-            <button
-              type="button"
-              onClick={onCompose}
-              aria-label="New chat"
-              className="kivo-focus hover:cursor-pointer group flex h-9 items-center gap-1.5 rounded-full bg-accent pl-3.5 pr-1.5 text-[13px] font-medium text-(--on-accent) transition-[transform,filter] duration-200 ease-[${EASE}] hover:brightness-110"
-            >
-              <span>New</span>
-              <span
-                className={`flex size-6 items-center justify-center rounded-full bg-white/20 transition-transform duration-200 ease-[${EASE}] ${showToggle ? "flex" : "hidden"}`}
-              >
-                <Plus className="h-5 w-5" strokeWidth={2} />
-              </span>
-            </button>
+          {onCompose && (
+            <NewMenu
+              onFriends={onCompose}
+              onGroup={onNewGroup}
+              collapsed={collapsed}
+            />
           )}
 
           {showToggle && (

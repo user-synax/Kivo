@@ -81,6 +81,17 @@ export default function ProfilePage() {
           Profile
         </h1>
 
+        {user?.banner ? (
+          <div className="mt-6 h-28 w-full overflow-hidden rounded-xl border border-[var(--border)]">
+            <img
+              src={user.banner}
+              alt=""
+              aria-hidden="true"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ) : null}
+
         <div className="mt-6 flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
           <Avatar
             name={user?.displayName || user?.email || "?"}

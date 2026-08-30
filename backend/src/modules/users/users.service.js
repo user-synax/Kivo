@@ -17,6 +17,7 @@ function publicUser(user) {
     status: u.status || null,
     avatarStyle: u.avatarStyle || null,
     avatarUrl: u.avatarUrl || null,
+    banner: u.banner || null,
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
   };
 }
@@ -61,7 +62,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status avatarStyle avatarUrl role createdAt",
+    "displayName username email bio status avatarStyle avatarUrl banner role createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -73,7 +74,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status avatarStyle avatarUrl role createdAt",
+    "displayName username email bio status avatarStyle avatarUrl banner role createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -137,11 +138,14 @@ export async function updateMe({ userId, data }) {
   if (data.avatarStyle !== undefined) {
     update.avatarStyle = data.avatarStyle || null;
   }
+  if (data.banner !== undefined) {
+    update.banner = data.banner || null;
+  }
 
   const user = await User.findByIdAndUpdate(userId, update, {
     new: true,
     runValidators: true,
-  }).select("displayName username email bio status avatarStyle role createdAt");
+  }).select("displayName username email bio status avatarStyle banner role createdAt");
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
 }
