@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.0
-**Last Updated:** August 29, 2026
-**Status:** MVP Development (Core DMs Complete)
+**Version:** 2.1
+**Last Updated:** August 30, 2026
+**Status:** MVP Development (Core Messaging + Spaces Complete)
 
 ---
 
@@ -50,10 +50,10 @@ Kivo
 
 | Concept | Description | Scope |
 |---|---|---|
-| **DM** | Private one-to-one communication | MVP |
-| **Group** | Private small-group conversations (friends, college, projects, gaming) | MVP — backend complete, UI pending |
-| **Space** | Community-level container similar to a Discord server | Post-MVP |
-| **Channel** | Text conversation inside a Space | Post-MVP |
+| **DM** | Private one-to-one communication | ✅ Complete |
+| **Group** | Private small-group conversations (friends, college, projects, gaming) | ✅ Complete |
+| **Space** | Community-level container similar to a Discord server | ✅ Complete |
+| **Channel** | Text / announcement conversation inside a Space | ✅ Complete |
 | **Thread** | Message-level discussion inside a channel | Phase 2 |
 
 ---
@@ -65,20 +65,22 @@ Kivo
 | Area | Status | Notes |
 |---|---|---|
 | Authentication & Sessions | **Complete** | JWT access + httpOnly refresh cookie, session-backed |
-| User Profiles | **Complete** | Display name, username, bio, custom status, avatar upload |
+| User Profiles | **Complete** | Display name, username, bio, custom status, avatar upload, banner |
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
 | DM Conversations | **Complete** | Create, list, message history, unread counts |
 | Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts |
+| Message Replies | **Complete** | Reply-to with inline quote preview |
 | Typing Indicators | **Complete** | Realtime via Socket.IO |
 | Presence | **Complete** | Online/offline, snapshot on connect |
 | Realtime Events | **Complete** | Socket.IO with authenticated connections |
 | Theme System | **Complete** | 5 themes with live switching, persisted in localStorage |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
-| Group Chats | **Backend ready** | Schema supports `type: "group"`, no UI or routes |
-| Spaces & Channels | **Not started** | Post-MVP |
+| Group Chats | **Complete** | Create, manage members, admins, realtime updates |
+| Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
+| Space Discovery | **Complete** | Browse & search public spaces by category |
 | Threads | **Not started** | Phase 2 |
 | Notifications (push) | **Not started** | Planned |
-| Search | **Not started** | Planned |
+| Search | **Not started** | Planned (user search complete only) |
 | File Attachments | **Not started** | Planned |
 
 ---
@@ -248,6 +250,34 @@ Message {
 
 ---
 
+### 3.7 Group Messaging
+
+Group chats are private multi-person conversations (2+ members) for friends, college, projects, and gaming squads.
+
+| Action | Endpoint | Authorization |
+|---|---|---|
+| Create group | `POST /api/v1/conversations/group` | Authenticated (creator = first admin) |
+| Update name/avatar | `PATCH /api/v1/conversations/:id` | Group admin |
+| Add members | `POST /api/v1/conversations/:id/members` | Group admin |
+| Remove member / leave | `DELETE /api/v1/conversations/:id/members/:userId` | Admin, or self-leave |
+| Promote to admin | `POST /api/v1/conversations/:id/admins/:userId` | Group admin |
+| Demote admin | `DELETE /api/v1/conversations/:id/admins/:userId` | Group admin |
+
+**Rules & constraints**
+- A group needs at least **2 other members** (3 total, creator included).
+- Creator is seeded as the sole first admin; `admins[]` is participants-only.
+- The **last admin cannot be removed or demoted** — the group would be orphaned.
+- Membership changes join/leave the live Socket.IO room immediately.
+- System info messages are emitted for member joins/leaves ("Admin added X", "Y left the group") and render as centered chips — they never bump unread counts.
+
+### 3.8 Message Replies
+
+- Any message can be replied to via `replyToMessageId` (either in `POST /conversations/:id/messages` or on edit).
+- The client renders an inline quote preview of the original message above the reply.
+- Soft-deleted source messages keep their row so replies/ordering remain stable.
+
+---
+
 ### 4. Realtime System (Socket.IO)
 
 #### 4.1 Connection
@@ -412,7 +442,73 @@ Message {
 
 ---
 
-### 7. Search
+### 7. Spaces & Communities
+
+Discord-style community containers built on top of the existing conversation model.
+
+#### 7.1 Concepts
+
+| Concept | Description |
+|---|---|
+| **Space** | Community container: name, slug, description, category, avatar, banner, owner |
+| **Member** | A user with a role: `owner` → `admin` → `moderator` → `member` |
+| **Channel** | Embedded subdocument in the Space (types: `text`, `announcement`), each backed by a `Conversation` with `type: "space_channel"` |
+
+Role ranks: `owner 4 > admin 3 > moderator 2 > member 1`. Access control is rank-based server-side (`assertSpace`).
+
+#### 7.2 Space Endpoints
+
+| Method | Path | Authz |
+|---|---|---|
+| POST | `/api/v1/spaces` | Any authenticated user (auto-creates `#general`) |
+| GET | `/api/v1/spaces` | Member — own spaces |
+| GET | `/api/v1/spaces/discover?q=&category=` | Any authenticated user (public list) |
+| GET | `/api/v1/spaces/:id` | Member |
+| PATCH | `/api/v1/spaces/:id` | Admin+ |
+| DELETE | `/api/v1/spaces/:id` | Owner only (cascades conversations) |
+| POST | `/api/v1/spaces/:id/join` | Any authenticated user (public spaces) |
+
+#### 7.3 Membership & Roles
+
+| Method | Path | Authz |
+|---|---|---|
+| POST | `/api/v1/spaces/:id/members` | Admin+ |
+| DELETE | `/api/v1/spaces/:id/members/:userId` | Admin+, or self-leave |
+| PATCH | `/api/v1/spaces/:id/members/:userId/role` | Admin+ (owner→admin only by owner) |
+
+**Rules**
+- Cannot remove the **last owner**; owner self-leave auto-promotes the highest-ranking remaining member.
+- Only the owner can promote to `admin`; `owner` role can't be assigned directly.
+- Members are auto-added to / removed from every channel conversation and its live Socket.IO room.
+- Public join adds the user as `member` and subscribes them to all channel rooms in real time.
+- System messages are emitted into each channel on member join/leave/removal.
+
+#### 7.4 Channels
+
+| Method | Path | Authz |
+|---|---|---|
+| POST | `/api/v1/spaces/:id/channels` | Admin+ |
+| GET | `/api/v1/spaces/:id/channels` | Member |
+| PATCH | `/api/v1/spaces/:id/channels/:channelId` | Admin+ |
+| DELETE | `/api/v1/spaces/:id/channels/:channelId` | Admin+ (last channel protected) |
+
+- `#general` is auto-created on space creation and cannot be the last remaining channel deleted.
+- Slug uniqueness enforced per-space; name synced to the backing `Conversation`.
+- `announcement` channels are admin-facing; `text` channels allow all members.
+
+#### 7.5 Discovery
+
+- `GET /api/v1/spaces/discover` lists public spaces (regex name/description search + `category` filter, limit ≤ 50).
+- The frontend `SpaceDiscoverModal` provides search, category pills, and one-click join.
+- Invite links are **deprecated** — `createInvite` returns `INVITE_REMOVED`. Joining uses public discovery or admin-added members.
+
+#### 7.6 Realtime Events
+
+`space:updated`, `space:member-added`, `space:member-removed`, `space:member-updated`, `space:channel-created`, `space:channel-updated`, `space:channel-deleted`, `space:joined`, `space:removed`, `space:deleted` — emitted into `space:<id>` rooms (or `emitToUser` for target-only notifications).
+
+---
+
+### 8. Search
 
 | Search Type | Status | Notes |
 |---|---|---|

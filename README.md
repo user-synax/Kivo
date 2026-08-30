@@ -24,8 +24,12 @@
 ## ✨ Highlights
 
 - ⚡ **Real-time everything** — messages, typing, presence, and read receipts via Socket.IO (no polling).
+- 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
+- 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
+- 🔎 **Space discovery** — browse and join public communities by category or search.
+- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), edit, and soft-delete.
 - 🎨 **5 live-switchable themes** with a warm "Nexus" color palette, persisted without a page reload.
-- 👤 **Rich profiles** — display name, custom status, bio, and avatar uploads hosted on Appwrite Storage.
+- 👤 **Rich profiles** — display name, custom status, bio, banner, avatar frames, and uploads hosted on Appwrite Storage.
 - 🤝 **Complete friends system** — send, accept, decline, remove, search, and jump straight into a DM.
 - 📱 **Mobile-first polish** — responsive three-panel layout that works beautifully from phone to XL desktop.
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, never trust the client.
@@ -40,7 +44,7 @@ Kivo blends two beloved messaging styles into **one unified identity**:
 | Experience | Like | Description |
 |---|---|---|
 | **DMs & Groups** | 📱 WhatsApp | Private 1:1 and small-group conversations |
-| **Spaces & Channels** | 🛰️ Discord | Community-level containers with text channels (post-MVP) |
+| **Spaces & Channels** | 🛰️ Discord | Community containers with text/announcement channels, moderation roles & discovery |
 
 Kivo is **not** a Slack replacement — work-management, canvases, and enterprise tooling are intentionally out of scope. The focus is a **fast, simple, deeply personal** chat experience.
 
@@ -50,11 +54,12 @@ Kivo is **not** a Slack replacement — work-management, canvases, and enterpris
 
 ```
 Kivo
-├── DMs (1:1 private conversations)            ✅ MVP
-├── Groups (private small-group chat)          🔧 Backend ready, UI pending
-└── Spaces (community containers)              🚧 Post-MVP
-    └── Channels (text conversations)          🚧 Post-MVP
-        └── Messages
+├── DMs (1:1 private conversations)            ✅ Done
+├── Groups (private small-group chat)          ✅ Done
+└── Spaces (community containers)              ✅ Done
+    └── Channels (text & announcement)         ✅ Done
+        └── Messages                           ✅ Done
+            └── Replies (quote reply)          ✅ Done
             └── Threads (future)               🚧 Phase 2
 ```
 
@@ -65,9 +70,11 @@ Kivo
 Although Kivo is a **student project**, the messaging core is **fully functional** — you can use it today for:
 
 - ✉️ **Private 1:1 chats** with friends, family, or classmates
-- 👥 **Small group conversations** (e.g. college projects, gaming squads) — backend ready, UI on the way
+- 👥 **Group conversations** (e.g. college projects, gaming squads) with admins & member management
+- 🏠 **Your own Spaces & Channels** — run a community, moderate members, and organize chat by channel
+- 🔎 **Discover public spaces** by category or search and join with one click
 - 🎨 **Personalizing your chat** with 5 live-switchable themes
-- 🟢 Real-time presence, typing indicators, and read receipts
+- 🟢 Real-time presence, typing indicators, read receipts, and message replies
 
 It's a great platform for **normal, everyday conversations** — no enterprise features needed.
 
@@ -77,20 +84,20 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 
 ### ✅ Complete
 - Authentication & sessions (JWT + httpOnly refresh cookie)
-- User profiles (name, username, bio, custom status, avatar upload)
+- User profiles (name, username, bio, custom status, **banner**, avatar upload)
 - Friends system (request / accept / decline / list / search / remove)
 - DM conversations (create, list, history, unread counts)
-- Text messaging (send, edit, soft-delete, reactions, receipts)
+- Text messaging (send, **reply**, edit, soft-delete, reactions, emoji picker, receipts)
+- **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
+- **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
 - Typing indicators & presence (realtime via Socket.IO)
 - Theme system (5 themes, live switching)
 - Animated landing page
 
-### 🔧 Backend Ready
-- Group chats (schema supports `type: "group"`, UI pending)
-
 ### 🚧 Planned / Not Started
-- Spaces & Channels · Threads · Notifications (Appwrite push)
+- Threads · Notifications (Appwrite push)
 - Search (conversation / message) · File attachments · Image sharing
+- Voice channels / video calls
 
 ---
 
@@ -133,20 +140,20 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 ```
 kivo/
 ├── frontend/            # Next.js 16 app (App Router, React 19)
-│   ├── app/             # Routes: landing, login, signup, app, profile
-│   ├── components/      # UI, dashboard, chat, auth, navbar
-│   └── lib/             # theme, api, auth, chat, avatar helpers
+│   ├── app/             # Routes: landing, login, signup, app, profile, invite
+│   ├── components/      # UI, dashboard, chat, auth, navbar, spaces
+│   └── lib/             # theme, api, auth, chat, spaces, avatar helpers
 │
 ├── backend/             # Express 5 + Socket.IO + Mongoose
 │   └── src/
 │       ├── config/      # DB + env config
 │       ├── middleware/  # auth, errorHandler, rateLimiter
-│       ├── models/      # User, Session, Conversation, Message, FriendRequest
-│       ├── modules/     # auth, users, conversations, messages, friends, admin
-│       ├── socket/      # Socket.IO init, presence, events
-│       ├── services/    # Business logic
+│       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space
+│       ├── modules/     # auth, users, conversations, messages, friends, spaces, admin
+│       ├── socket/      # Socket.IO init, presence, room helpers, events
 │       └── utils/       # helpers & errors
 │
+├── docs.md              # Full features & how-to-use guide
 ├── PRD.md               # Full product requirements & spec
 ├── TECH-STACK.md        # Architecture & engineering decisions
 └── Design.md            # Visual design system
@@ -236,9 +243,14 @@ Registration / Login
 | `message:deleted` | Server → Room | Message soft-deleted |
 | `message:reaction` | Server → Room | Reaction added/removed |
 | `message:read` | Server → Room | Marked as read |
+| `message:delivery-updated` | Server → Room | Delivery state changed |
 | `typing:start` / `typing:stop` | Client → Room | Typing indicator |
 | `presence:online` / `offline` | Server → All | Presence broadcast |
 | `presence:snapshot` | Server → Client | Online peers on connect |
+| `conversation:member-added` / `member-removed` | Server → Room | Group membership changes |
+| `conversation:updated` / `admin-changed` / `removed` | Server → Room | Group updates |
+| `space:updated` / `space:member-*` / `space:channel-*` | Server → Space | Space, members & channels |
+| `space:deleted` / `space:joined` / `space:removed` | Server → All | Space lifecycle |
 
 > All socket events are **authenticated** via JWT handshake, and **authorized** — the server verifies conversation membership before accepting sensitive events.
 
@@ -275,10 +287,25 @@ Themes apply via CSS custom properties, persist in `localStorage`, and switch **
 ### 💬 Messaging
 - Cursor-based pagination with infinite scroll (newest-first)
 - Optimistic UI with sent → delivered → read states + retry on failure
+- **Quote replies** with inline preview of the original message
 - Reactions, edit, and soft-delete
-- 60-second message grouping & hover actions
+- 60-second message grouping & hover actions (bubble menu)
 - Emoji picker — 9 categories, 270+ emojis
 - Delivery & read receipts
+
+### 👥 Groups
+- Create private groups (2+ members) with a name & optional avatar
+- Add/remove members and promote/demote admins (real-time)
+- Admin-only management with system notices ("Admin added X", "Y left the group")
+- Prevent orphaned groups — the last admin can't be removed/demoted
+
+### 🏠 Spaces & Channels
+- Create a space with name, avatar, banner, description & category (a `#general` channel is auto-created)
+- Role hierarchy: **owner → admin → moderator → member** with rank-based permissions
+- Text & announcement channels, each backed by its own message thread
+- Admin+ create, rename, and delete channels (last channel protected)
+- Full moderation — add/remove members, assign roles, self-leave with auto owner promotion
+- **Discovery** — browse/search public spaces by category, join with one click
 
 ### 👥 Friends
 - Request by username or email
@@ -289,6 +316,7 @@ Themes apply via CSS custom properties, persist in `localStorage`, and switch **
 ### 👤 Profiles
 - Display name, unique username, bio (280), custom status (60)
 - 8 preset avatar styles + real avatar upload (Appwrite, 4MB max)
+- Profile **banner** image
 - User detail panel (desktop XL+) with member-since info
 
 ---
@@ -323,8 +351,8 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, realtime, friends, profiles, customization, landing page |
-| **Phase 2** | Spaces & Channels, Threads, pinned/saved messages, search |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, customization |
+| **Phase 2** | Threads, pinned/saved messages, stronger search, notifications (Appwrite push) |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |
 
@@ -332,6 +360,7 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 ## 📁 Related Documents
 
+- 🆔 [`docs.md`](./docs.md) — full features & how-to-use guide
 - 📄 [`PRD.md`](./PRD.md) — full product requirements, API reference, schema
 - 🏗️ [`TECH-STACK.md`](./TECH-STACK.md) — architecture & engineering decisions
 - 🎨 [`Design.md`](./Design.md) — visual design system & tokens
