@@ -55,7 +55,7 @@ function publicConversation(conversation, userId, onlineLookup) {
   return {
     id: conversation._id.toString(),
     type: conversation.type,
-    name: conversation.type === "group" ? (conversation.name || null) : null,
+    name: conversation.type === "group" || conversation.type === "space_channel" ? (conversation.name || null) : null,
     participants,
     otherParticipantIds,
     admins,
@@ -64,6 +64,8 @@ function publicConversation(conversation, userId, onlineLookup) {
     avatarUrl: conversation.avatarUrl || null,
     lastMessageAt: conversation.lastMessageAt || null,
     createdAt: conversation.createdAt,
+    spaceId: conversation.spaceId ? conversation.spaceId.toString() : null,
+    channelId: conversation.channelId ? conversation.channelId.toString() : null,
     online: onlineLookup
       ? otherParticipantIds.map((id) => Boolean(onlineLookup(id)))
       : undefined,

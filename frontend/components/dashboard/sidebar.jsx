@@ -1,6 +1,11 @@
 "use client";
 
 import {
+  ChevronDown,
+  Compass,
+  Hash,
+  Layers,
+  Megaphone,
   PanelLeft,
   Pencil,
   Plus,
@@ -9,6 +14,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
@@ -104,6 +110,103 @@ function ConversationSection({ label, items, selectedId, onSelect, baseIndex = 0
           index={baseIndex + i}
         />
       ))}
+    </div>
+  );
+}
+
+function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCreateSpace }) {
+  const [expanded, setExpanded] = useState({});
+  const toggle = (id) => setExpanded((prev) => ({ ...prev, [id]: prev[id] === false ? true : false }));
+  // default expanded = true if not explicitly false
+  const isExpanded = (id) => expanded[id] !== false;
+
+  if (collapsed) return null;
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between px-3 pb-1 pt-3">
+        <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Spaces</span>
+        {onCreateSpace && (
+          <button
+            type="button"
+            onClick={onCreateSpace}
+            aria-label="New space"
+            className="kivo-focus flex size-6 items-center justify-center rounded-full text-[var(--text-muted)] hover:cursor-pointer transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} />
+          </button>
+        )}
+      </div>
+
+      {!spaces?.length ? (
+        <div className="px-3 py-4 text-center">
+          <p className="text-[12px] text-[var(--text-muted)]">No spaces yet</p>
+          <button type="button" onClick={onCreateSpace} className="mt-2 text-[12px] font-medium text-[var(--accent)] hover:underline hover:cursor-pointer">Create a space</button>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {spaces.map((space) => {
+            const spaceChannels = channels.filter((c) => c.spaceId === space.id);
+            const expandedOpen = isExpanded(space.id);
+            return (
+              <div key={space.id} className="rounded-xl px-1">
+                <button
+                  type="button"
+                  onClick={() => toggle(space.id)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)]"
+                >
+                  <Avatar name={space.name} url={space.avatarUrl} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">{space.name}</p>
+                    <p className="truncate text-[11px] leading-tight text-[var(--text-muted)]">{space.category} • {spaceChannels.length} channel{spaceChannels.length !== 1 ? "s" : ""}</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ease-[${EASE}] ${expandedOpen ? "rotate-0" : "-rotate-90"}`} />
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {expandedOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="ml-3 mt-1 space-y-0.5 border-l border-[var(--border)] pl-3">
+                        {spaceChannels.length === 0 ? (
+                          <p className="px-2 py-1 text-[11px] text-[var(--text-muted)]">No channels</p>
+                        ) : (
+                          spaceChannels.map((c) => {
+                            const selected = c.id === selectedId;
+                            const isAnnouncement = c.name?.toLowerCase().includes("announce");
+                            const Icon = isAnnouncement ? Megaphone : Hash;
+                            const displayName = c.name.includes("/") ? c.name.split("/").pop().trim() : c.name;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => onSelect(c.id)}
+                                aria-current={selected ? "true" : undefined}
+                                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors duration-150 ${selected ? "bg-[var(--accent-soft)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"}`}
+                              >
+                                <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+                                <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-tight">{displayName.replace(/^#/, "")}</span>
+                                {c.unread > 0 && (
+                                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-semibold text-[var(--on-accent)]">{c.unread > 9 ? "9+" : c.unread}</span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -270,7 +373,7 @@ function ThemeSwitcher({ collapsed }) {
   );
 }
 
-function NewMenu({ onFriends, onGroup, collapsed }) {
+function NewMenu({ onFriends, onGroup, onSpace, onDiscover, collapsed }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -338,6 +441,30 @@ function NewMenu({ onFriends, onGroup, collapsed }) {
             <Users className="h-4 w-4" />
             Group
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onSpace?.();
+            }}
+            className="relative isolate flex w-full select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] outline-none transition-colors duration-150 hover:bg-foreground/[0.065] focus-visible:bg-foreground/[0.065] focus-visible:ring-2 focus-visible:ring-foreground/15"
+          >
+            <Layers className="h-4 w-4" />
+            Space
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDiscover?.();
+            }}
+            className="relative isolate flex w-full select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] outline-none transition-colors duration-150 hover:bg-foreground/[0.065] focus-visible:bg-foreground/[0.065] focus-visible:ring-2 focus-visible:ring-foreground/15"
+          >
+            <Compass className="h-4 w-4" />
+            Discover Spaces
+          </button>
         </div>
       )}
     </div>
@@ -353,6 +480,9 @@ export function Sidebar({
   onToggle,
   onCompose,
   onNewGroup,
+  onCreateSpace,
+  onDiscoverSpaces,
+  spaces,
   currentUser,
   onProfileUpdate,
 }) {
@@ -368,11 +498,15 @@ export function Sidebar({
   }, [conversations, query]);
 
   const dms = useMemo(
-    () => filtered.filter((c) => c.type !== "group"),
+    () => filtered.filter((c) => c.type === "dm"),
     [filtered],
   );
   const groups = useMemo(
     () => filtered.filter((c) => c.type === "group"),
+    [filtered],
+  );
+  const channels = useMemo(
+    () => filtered.filter((c) => c.type === "space_channel"),
     [filtered],
   );
 
@@ -397,6 +531,8 @@ export function Sidebar({
             <NewMenu
               onFriends={onCompose}
               onGroup={onNewGroup}
+              onSpace={onCreateSpace}
+              onDiscover={onDiscoverSpaces}
               collapsed={collapsed}
             />
           )}
@@ -467,6 +603,14 @@ export function Sidebar({
               onSelect={onSelect}
               collapsed={collapsed}
               onNewGroup={onNewGroup}
+            />
+            <SpacesSection
+              spaces={spaces}
+              channels={channels}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              collapsed={collapsed}
+              onCreateSpace={onCreateSpace}
             />
           </>
         )}

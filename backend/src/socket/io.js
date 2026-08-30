@@ -51,3 +51,31 @@ export function emitToUser(userId, event, payload) {
     if (sock.userId === userId) sock.emit(event, payload);
   }
 }
+
+export function spaceRoomName(spaceId) {
+  return `space:${spaceId}`;
+}
+
+export function emitToSpace(spaceId, event, payload) {
+  const io = getIO();
+  if (!io) return;
+  io.to(spaceRoomName(spaceId)).emit(event, payload);
+}
+
+export function joinUserToSpace(userId, spaceId) {
+  const io = getIO();
+  if (!io) return;
+  const room = spaceRoomName(spaceId);
+  for (const [, sock] of io.sockets.sockets) {
+    if (sock.userId === userId) sock.join(room);
+  }
+}
+
+export function leaveUserFromSpace(userId, spaceId) {
+  const io = getIO();
+  if (!io) return;
+  const room = spaceRoomName(spaceId);
+  for (const [, sock] of io.sockets.sockets) {
+    if (sock.userId === userId) sock.leave(room);
+  }
+}

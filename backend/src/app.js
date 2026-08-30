@@ -11,6 +11,7 @@ import conversationRoutes from "./modules/conversations/conversations.routes.js"
 import messageRoutes from "./modules/messages/messages.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 import friendRoutes from "./modules/friends/friends.routes.js";
+import spaceRoutes from "./modules/spaces/spaces.routes.js";
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use("/api/v1/conversations", conversationRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/friends", friendRoutes);
+app.use("/api/v1/spaces", spaceRoutes);
 
 // 404 + centralized error handler (must be registered last).
 app.use(notFoundHandler);

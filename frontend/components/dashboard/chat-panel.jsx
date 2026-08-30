@@ -1,6 +1,6 @@
 "use client";
 
-import { Reply, Send, Smile, Users, X } from "lucide-react";
+import { Lock, Reply, Send, Smile, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
@@ -152,15 +152,19 @@ function receiptState(message, userId, otherId) {
   return "sent";
 }
 
-export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
+export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) {
   const socket = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
 
   const convId = conversation?.id || null;
   const isGroup = conversation?.type === "group";
+  const isChannel = conversation?.type === "space_channel";
+  const channelMeta = isChannel && space ? space.channels?.find((c) => c.id === conversation.channelId) : null;
+  const isAnnouncement = channelMeta?.type === "announcement";
+  const canPost = !isAnnouncement || (space && ["owner", "admin"].includes(space.myRole));
   const other =
-    conversation && !isGroup ? otherParticipant(conversation, userId) : null;
+    conversation && !isGroup && !isChannel ? otherParticipant(conversation, userId) : null;
   const otherId = other?.id || null;
   const otherName = participantName(other);
   const online = Array.isArray(conversation?.online)
@@ -344,7 +348,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
     const onTypingStart = (p) => {
       if (p.conversationId === convId && p.userId !== userId) {
         setTyping(true);
-        setTyperName(isGroup ? senderName(p.userId) : otherName);
+        setTyperName(isGroup || isChannel ? senderName(p.userId) : otherName);
       }
     };
     const onTypingStop = (p) => {
@@ -551,18 +555,24 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
 
   if (!conversation) return <EmptyState />;
 
-  const headerName = isGroup ? conversation.name || "Group" : otherName;
-  const headerAvatar = isGroup
+  const headerName = isChannel ? `#${conversation.name || "general"}` : isGroup ? conversation.name || "Group" : otherName;
+  const headerAvatar = isChannel
     ? {
-        name: conversation.name || "Group",
+        name: `#${conversation.name || "general"}`,
         avatarStyle: null,
-        avatarUrl: conversation.avatarUrl,
+        avatarUrl: conversation.avatarUrl || null,
       }
-    : {
-        name: participantAvatarName(other),
-        avatarStyle: other?.avatarStyle,
-        avatarUrl: other?.avatarUrl,
-      };
+    : isGroup
+      ? {
+          name: conversation.name || "Group",
+          avatarStyle: null,
+          avatarUrl: conversation.avatarUrl,
+        }
+      : {
+          name: participantAvatarName(other),
+          avatarStyle: other?.avatarStyle,
+          avatarUrl: other?.avatarUrl,
+        };
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)]">
@@ -594,7 +604,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
         )}
         <Avatar
           name={headerAvatar.name}
-          online={isGroup ? false : otherOnline}
+          online={isGroup || isChannel ? false : otherOnline}
           avatarStyle={headerAvatar.avatarStyle}
           url={headerAvatar.avatarUrl}
           size="xl"
@@ -604,14 +614,14 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
             {headerName}
           </p>
           <p className="truncate text-[12px] text-[var(--text-muted)]">
-            {isGroup ? (
-              <span>{conversation.participants?.length || 0} members</span>
+            {isGroup || isChannel ? (
+              <span>{conversation.participants?.length || 0} members{isChannel ? " • Space channel" : ""}</span>
             ) : (
               <StatusText online={otherOnline} />
             )}
           </p>
         </div>
-        {isGroup && onOpenGroupSettings && (
+        {(isGroup || isChannel) && onOpenGroupSettings && (
           <button
             type="button"
             onClick={onOpenGroupSettings}
@@ -675,7 +685,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
               new Date(next.createdAt).getTime() -
                 new Date(m.createdAt).getTime() >
                 GROUP_WINDOW_MS;
-            const showSender = isGroup && !grouped && !mine;
+            const showSender = (isGroup || isChannel) && !grouped && !mine;
             const sAvatar = senderAvatar(m.senderId);
             return (
               <div
@@ -743,33 +753,39 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
 
        {/* Composer */}
        <div className="shrink-0 overflow-x-hidden border-t border-[var(--border)] p-3">
-         <div className="mx-auto max-w-3xl">
-           {replyingTo && (
-             <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
-               <div className="flex items-start gap-2 min-w-0">
-                 <span className="shrink-0 text-[var(--accent)]">
-                   <Reply className="h-4 w-4" />
-                 </span>
-                 <div className="min-w-0 flex-1 overflow-hidden">
-                   <span className="block text-[12px] font-medium text-[var(--text-primary)]">
-                     {senderName(replyingTo.senderId)}
-                   </span>
-                    <span className="block w-full break-words text-[12px] text-[var(--text-muted)] [overflow-wrap:anywhere]">
-                      {replyingTo.content}
+          <div className="mx-auto max-w-3xl">
+            {replyingTo && canPost && (
+              <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+                <div className="flex items-start gap-2 min-w-0">
+                  <span className="shrink-0 text-[var(--accent)]">
+                    <Reply className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <span className="block text-[12px] font-medium text-[var(--text-primary)]">
+                      {senderName(replyingTo.senderId)}
                     </span>
-                 </div>
-                 <button
-                   type="button"
-                   onClick={cancelReply}
-                   className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                   aria-label="Cancel reply"
-                 >
-                   <X className="h-4 w-4" />
-                 </button>
-               </div>
-             </div>
-           )}
-           <div className="relative flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
+                     <span className="block w-full break-words text-[12px] text-[var(--text-muted)] [overflow-wrap:anywhere]">
+                       {replyingTo.content}
+                     </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cancelReply}
+                    className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    aria-label="Cancel reply"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+            {!canPost ? (
+              <div className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Only admins can post in this announcement channel</span>
+              </div>
+            ) : (
+              <div className="relative flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
           <button
             ref={emojiBtnRef}
             type="button"
@@ -805,18 +821,19 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
             rows={1}
             className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
           />
-          <button
-            type="button"
-            onClick={send}
-            disabled={!text.trim()}
-            className=" rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
-          >
-            <Send className="h-5 w-5" />
-          </button>
+           <button
+             type="button"
+             onClick={send}
+             disabled={!text.trim()}
+             className=" rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
+           >
+             <Send className="h-5 w-5" />
+           </button>
+             </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
   );
 }
 

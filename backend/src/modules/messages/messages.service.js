@@ -3,6 +3,7 @@ import { unauthorized, forbidden, notFound, badRequest } from "../../utils/error
 import Conversation from "../../models/Conversation.js";
 import Message from "../../models/Message.js";
 import User from "../../models/User.js";
+import Space from "../../models/Space.js";
 import { emitToConversation, roomName } from "../../socket/io.js";
 
 // Public message shape returned to clients and used as the socket payload base.
@@ -74,7 +75,21 @@ export async function listMessages({ conversationId, userId, cursor, limit }) {
 }
 
 export async function createMessage({ conversationId, userId, content, replyToMessageId }) {
-  await assertMembership(conversationId, userId);
+  const conversation = await assertMembership(conversationId, userId);
+
+  // Announcement channels: only owner/admin can send
+  if (conversation.type === "space_channel" && conversation.spaceId && conversation.channelId) {
+    const space = await Space.findById(conversation.spaceId).select("members channels");
+    if (space) {
+      const ch = space.channels.id(conversation.channelId);
+      if (ch && ch.type === "announcement") {
+        const member = space.members.find((m) => m.userId.toString() === userId);
+        if (!member || !["owner", "admin"].includes(member.role)) {
+          throw forbidden("Only admins can post in announcement channels", "ANNOUNCEMENT_ONLY_ADMIN");
+        }
+      }
+    }
+  }
 
   if (replyToMessageId) {
     if (!mongoose.Types.ObjectId.isValid(replyToMessageId)) {

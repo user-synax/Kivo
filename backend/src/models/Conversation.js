@@ -9,16 +9,28 @@ const conversationSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["dm", "group"],
+      enum: ["dm", "group", "space_channel"],
       default: "dm",
       required: true,
+    },
+    spaceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Space",
+      default: null,
+      index: true,
+    },
+    channelId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
     },
     participants: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       required: true,
-      // Always exactly 2 for DM; >= 3 for groups (enforced in the service).
       validate: {
-        validator: (arr) => Array.isArray(arr) && arr.length >= 2,
+        validator(arr) {
+          if (this.type === "space_channel") return Array.isArray(arr) && arr.length >= 1;
+          return Array.isArray(arr) && arr.length >= 2;
+        },
         message: "A conversation needs at least two participants",
       },
     },

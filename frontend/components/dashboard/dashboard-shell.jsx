@@ -17,6 +17,9 @@ import { FriendsModal } from "./friends-modal";
 import { GroupCreateModal } from "./group-create-modal";
 import { GroupSettingsPanel } from "./group-settings-panel";
 import { Sidebar } from "./sidebar";
+import { SpaceCreateModal } from "@/components/spaces/space-create-modal";
+import { SpaceSettingsPanel } from "@/components/spaces/space-settings-panel";
+import { SpaceDiscoverModal } from "@/components/spaces/space-discover-modal";
 
 // Group settings surface: a slide-in drawer on smaller screens (with a dimmed
 // backdrop) and a persistent side column on wide desktops (xl+). The inner
@@ -59,6 +62,37 @@ function GroupSettingsOverlay({ open, conversation, onClose, onConversationUpdat
     </AnimatePresence>
   );
 }
+function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLeft }) {
+  const reduce = useReducedMotion();
+  const slide = reduce ? { duration: 0 } : { duration: 0.28, ease: EASE };
+  return (
+    <AnimatePresence>
+      {open && space && (
+        <motion.div
+          key="ss-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
+          onClick={onClose}
+          className="fixed inset-0 z-30 bg-black/40 xl:hidden"
+        />
+      )}
+      {open && space && (
+        <motion.aside
+          key="ss-drawer"
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "100%" }}
+          transition={slide}
+          className="fixed right-0 top-0 z-40 h-[100dvh] w-[360px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-none"
+        >
+          <SpaceSettingsPanel space={space} onClose={onClose} onUpdated={onUpdated} onDeleted={onDeleted} onLeft={onLeft} />
+        </motion.aside>
+      )}
+    </AnimatePresence>
+  );
+}
 import { UserPanel } from "./user-panel";
 
 // Restrained easing — matches the rest of the app (no bounce).
@@ -80,20 +114,30 @@ function useIsDesktop() {
 }
 
 // Convert a backend conversation into the shape the Sidebar renders.
-function toListItem(c, currentUser) {
+function toListItem(c, currentUser, spaces) {
   const isGroup = c.type === "group";
+  const isChannel = c.type === "space_channel";
   const other = otherParticipant(c, currentUser?.id);
   const online = Array.isArray(c.online) ? c.online.some(Boolean) : false;
+  let name = isGroup ? c.name || "Group" : participantName(other);
+  let avatarUrl = isGroup ? c.avatarUrl || null : other?.avatarUrl || null;
+  if (isChannel) {
+    const space = spaces?.find((s) => s.id === c.spaceId);
+    name = space ? `${space.name} / #${c.name}` : `#${c.name}`;
+    avatarUrl = space?.avatarUrl || null;
+  }
   return {
     id: c.id,
-    name: isGroup ? c.name || "Group" : participantName(other),
+    name,
     type: c.type,
-    lastMessage: c.lastMessagePreview || (isGroup ? "Group conversation" : ""),
+    spaceId: c.spaceId || null,
+    channelId: c.channelId || null,
+    lastMessage: c.lastMessagePreview || (isGroup ? "Group conversation" : isChannel ? "Channel" : ""),
     time: formatTime(c.lastMessageAt),
     unread: c.unreadCount || 0,
     online,
-    avatarStyle: isGroup ? null : other?.avatarStyle || null,
-    avatarUrl: isGroup ? c.avatarUrl || null : other?.avatarUrl || null,
+    avatarStyle: isGroup || isChannel ? null : other?.avatarStyle || null,
+    avatarUrl,
   };
 }
 
@@ -125,6 +169,11 @@ export function DashboardShell() {
   const [showFriends, setShowFriends] = useState(false);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
+  const [spaces, setSpaces] = useState([]);
+  const [showSpaceCreate, setShowSpaceCreate] = useState(false);
+  const [showSpaceSettings, setShowSpaceSettings] = useState(false);
+  const [selectedSpaceId, setSelectedSpaceId] = useState(null);
+  const [showDiscover, setShowDiscover] = useState(false);
   const socket = useSocket();
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
@@ -192,6 +241,22 @@ export function DashboardShell() {
       .catch(() => []);
   }, []);
 
+  const loadSpaces = useCallback(() => {
+    return apiGet("/api/v1/spaces")
+      .then((data) => (Array.isArray(data) ? data : []))
+      .catch(() => []);
+  }, []);
+  const upsertSpace = useCallback((space) => {
+    if (!space?.id) return;
+    setSpaces((prev) => {
+      const idx = prev.findIndex((s) => s.id === space.id);
+      if (idx === -1) return [space, ...prev];
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], ...space };
+      return copy;
+    });
+  }, []);
+
   // Insert or merge a conversation into the list (drives sidebar + selected).
   // Recomputes isAdmin from the admins array so realtime events — which carry the
   // acting member's perspective — don't clobber the current user's admin flag.
@@ -214,6 +279,22 @@ export function DashboardShell() {
       return copy;
     });
   }, []);
+
+  // Load spaces once on mount.
+  useEffect(() => {
+    let active = true;
+    loadSpaces()
+      .then((data) => {
+        if (!active) return;
+        setSpaces(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (active) setSpaces([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadSpaces]);
 
   // Load the conversation list once on mount.
   useEffect(() => {
@@ -383,6 +464,32 @@ export function DashboardShell() {
     socket.on("conversation:admin-changed", onAdminChanged);
     socket.on("conversation:removed", onConversationRemoved);
 
+    const onSpaceUpdated = ({ space }) => { if (space) upsertSpace(space); };
+    const onSpaceChannel = ({ space }) => { if (space) upsertSpace(space); loadConversations().then((list) => setConversations(list)); };
+    const onSpaceRemoved = ({ spaceId }) => {
+      if (!spaceId) return;
+      setSpaces((prev) => prev.filter((s) => s.id !== spaceId));
+      const selId = selectedIdRef.current;
+      const selConv = conversationsRef.current.find((c) => c.id === selId);
+      if (selConv?.spaceId === spaceId) setSelectedId(null);
+      setShowSpaceSettings(false);
+    };
+    const onSpaceJoined = ({ space }) => {
+      if (space) upsertSpace(space);
+      loadConversations().then((list) => setConversations(list));
+    };
+
+    socket.on("space:updated", onSpaceUpdated);
+    socket.on("space:member-added", onSpaceChannel);
+    socket.on("space:member-removed", onSpaceChannel);
+    socket.on("space:member-updated", onSpaceUpdated);
+    socket.on("space:channel-created", onSpaceChannel);
+    socket.on("space:channel-updated", onSpaceChannel);
+    socket.on("space:channel-deleted", onSpaceChannel);
+    socket.on("space:joined", onSpaceJoined);
+    socket.on("space:removed", onSpaceRemoved);
+    socket.on("space:deleted", onSpaceRemoved);
+
     return () => {
       socket.off("message:new", onNew);
       socket.off("presence:online");
@@ -393,8 +500,18 @@ export function DashboardShell() {
       socket.off("conversation:updated", onConversationUpdated);
       socket.off("conversation:admin-changed", onAdminChanged);
       socket.off("conversation:removed", onConversationRemoved);
+      socket.off("space:updated", onSpaceUpdated);
+      socket.off("space:member-added", onSpaceChannel);
+      socket.off("space:member-removed", onSpaceChannel);
+      socket.off("space:member-updated", onSpaceUpdated);
+      socket.off("space:channel-created", onSpaceChannel);
+      socket.off("space:channel-updated", onSpaceChannel);
+      socket.off("space:channel-deleted", onSpaceChannel);
+      socket.off("space:joined", onSpaceJoined);
+      socket.off("space:removed", onSpaceRemoved);
+      socket.off("space:deleted", onSpaceRemoved);
     };
-  }, [socket, currentUser?.id, loadConversations, upsertConversation]);
+  }, [socket, currentUser?.id, loadConversations, upsertConversation, loadSpaces, upsertSpace]);
 
   // All hooks above run unconditionally. Only now — after every hook has been
   // declared — is it safe to bail out of rendering when the session is gone.
@@ -436,14 +553,37 @@ export function DashboardShell() {
     setShowGroupCreate(false);
   };
 
+  const handleSpaceCreated = (space) => {
+    upsertSpace(space);
+    loadSpaces().then((list) => setSpaces(list));
+    loadConversations().then((list) => setConversations(list));
+    setShowSpaceCreate(false);
+    // auto-select first channel if available
+    if (space.channels?.[0]) {
+      // channel conversation will appear after reload; select after short delay
+      setTimeout(() => {
+        const chan = space.channels[0];
+        // find conversation for this channel (will be in conversations after reload)
+      }, 400);
+    }
+  };
+
+  const handleDiscoverJoined = (space) => {
+    upsertSpace(space);
+    loadSpaces().then((list) => setSpaces(list));
+    loadConversations().then((list) => setConversations(list));
+  };
+
   // Selecting any conversation closes an open group-settings drawer.
   const handleSelect = (id) => {
     setShowGroupSettings(false);
+    setShowSpaceSettings(false);
     setSelectedId(id);
   };
 
   const selected = conversations.find((c) => c.id === selectedId) || null;
-  const listItems = conversations.map((c) => toListItem(c, currentUser));
+  const selectedSpace = selected?.type === "space_channel" ? spaces.find((s) => s.id === selected.spaceId) || null : null;
+  const listItems = conversations.map((c) => toListItem(c, currentUser, spaces));
 
   // The "other" participant of the open DM, used by the detail panel.
   const selectedOtherOnline = selected
@@ -471,8 +611,12 @@ export function DashboardShell() {
             >
               <ChatPanel
                 conversation={selected}
+                space={selectedSpace}
                 onBack={() => setSelectedId(null)}
-                onOpenGroupSettings={() => setShowGroupSettings(true)}
+                onOpenGroupSettings={() => {
+                  if (selected?.type === "space_channel") setShowSpaceSettings(true);
+                  else setShowGroupSettings(true);
+                }}
               />
             </motion.div>
           ) : (
@@ -492,6 +636,9 @@ export function DashboardShell() {
                 showToggle={false}
                 onCompose={handleCompose}
                 onNewGroup={handleNewGroup}
+                onCreateSpace={() => setShowSpaceCreate(true)}
+                onDiscoverSpaces={() => setShowDiscover(true)}
+                spaces={spaces}
                 currentUser={currentUser}
                 onProfileUpdate={refreshUser}
               />
@@ -510,6 +657,19 @@ export function DashboardShell() {
         onCreated={handleGroupCreated}
       />
 
+      <SpaceCreateModal
+        open={showSpaceCreate}
+        onClose={() => setShowSpaceCreate(false)}
+        onCreated={handleSpaceCreated}
+      />
+
+      <SpaceDiscoverModal
+        open={showDiscover}
+        onClose={() => setShowDiscover(false)}
+        onJoined={handleDiscoverJoined}
+      />
+
+
       <GroupSettingsOverlay
         open={selected?.type === "group" && showGroupSettings}
         conversation={selected}
@@ -518,6 +678,24 @@ export function DashboardShell() {
         onLeft={() => {
           setShowGroupSettings(false);
           setSelectedId(null);
+        }}
+      />
+      <SpaceSettingsOverlay
+        open={selected?.type === "space_channel" && showSpaceSettings}
+        space={selectedSpace}
+        onClose={() => setShowSpaceSettings(false)}
+        onUpdated={upsertSpace}
+        onDeleted={(id) => {
+          setSpaces((prev) => prev.filter((s) => s.id !== id));
+          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSelectedId(null);
+          setShowSpaceSettings(false);
+        }}
+        onLeft={(id) => {
+          setSpaces((prev) => prev.filter((s) => s.id !== id));
+          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSelectedId(null);
+          setShowSpaceSettings(false);
         }}
       />
     </div>
@@ -541,6 +719,9 @@ export function DashboardShell() {
           onToggle={() => setCollapsed((v) => !v)}
           onCompose={handleCompose}
           onNewGroup={handleNewGroup}
+          onCreateSpace={() => setShowSpaceCreate(true)}
+          onDiscoverSpaces={() => setShowDiscover(true)}
+          spaces={spaces}
           currentUser={currentUser}
           onProfileUpdate={refreshUser}
         />
@@ -549,7 +730,11 @@ export function DashboardShell() {
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <ChatPanel
           conversation={selected}
-          onOpenGroupSettings={() => setShowGroupSettings(true)}
+          space={selectedSpace}
+          onOpenGroupSettings={() => {
+            if (selected?.type === "space_channel") setShowSpaceSettings(true);
+            else setShowGroupSettings(true);
+          }}
         />
       </div>
 
@@ -575,6 +760,24 @@ export function DashboardShell() {
           setSelectedId(null);
         }}
       />
+      <SpaceSettingsOverlay
+        open={selected?.type === "space_channel" && showSpaceSettings}
+        space={selectedSpace}
+        onClose={() => setShowSpaceSettings(false)}
+        onUpdated={upsertSpace}
+        onDeleted={(id) => {
+          setSpaces((prev) => prev.filter((s) => s.id !== id));
+          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSelectedId(null);
+          setShowSpaceSettings(false);
+        }}
+        onLeft={(id) => {
+          setSpaces((prev) => prev.filter((s) => s.id !== id));
+          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSelectedId(null);
+          setShowSpaceSettings(false);
+        }}
+      />
 
       <FriendsModal
         open={showFriends}
@@ -587,6 +790,19 @@ export function DashboardShell() {
         onClose={() => setShowGroupCreate(false)}
         onCreated={handleGroupCreated}
       />
+
+      <SpaceCreateModal
+        open={showSpaceCreate}
+        onClose={() => setShowSpaceCreate(false)}
+        onCreated={handleSpaceCreated}
+      />
+
+      <SpaceDiscoverModal
+        open={showDiscover}
+        onClose={() => setShowDiscover(false)}
+        onJoined={handleDiscoverJoined}
+      />
+
     </div>
   );
 }

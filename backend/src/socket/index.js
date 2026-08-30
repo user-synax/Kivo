@@ -95,6 +95,14 @@ export function initSocket(server) {
     for (const c of conversations) {
       socket.join(roomName(c._id.toString()));
     }
+    // Join space rooms for realtime space/channel updates.
+    try {
+      const { default: Space } = await import("../models/Space.js");
+      const spaces = await Space.find({ "members.userId": userId }).select("_id").lean();
+      for (const s of spaces) socket.join(`space:${s._id.toString()}`);
+    } catch (err) {
+      console.error("[socket] failed to load spaces for", userId, err);
+    }
 
     // Presence: announce first-connection online status to mutual participants.
     const becameOnline = markOnline(userId, socket.id);
