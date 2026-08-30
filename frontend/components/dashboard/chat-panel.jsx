@@ -1,6 +1,6 @@
 "use client";
 
-import { Send, Smile, Users } from "lucide-react";
+import { Reply, Send, Smile, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
@@ -17,6 +17,80 @@ import {
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
 const GROUP_WINDOW_MS = 60000;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
+
+function SwipeToReply({ children, onReply, enabled }) {
+  const [offset, setOffset] = useState(0);
+  const startRef = useRef(null);
+
+  if (!enabled) return children;
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    startRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchMove = (e) => {
+    if (!startRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - startRef.current.x;
+    const dy = t.clientY - startRef.current.y;
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    if (dx > 0 && dx < 80) setOffset(dx);
+  };
+  const onTouchEnd = () => {
+    if (!startRef.current) return;
+    if (offset > 45) {
+      onReply();
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+    setOffset(0);
+    startRef.current = null;
+  };
+
+  return (
+    <div
+      className="relative w-full"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      <div
+        className="absolute inset-y-0 left-1 flex items-center"
+        style={{
+          opacity: Math.min(offset / 45, 1),
+          transform: `scale(${Math.min(offset / 45, 1)})`,
+        }}
+      >
+        <div className="flex size-7 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow">
+          <Reply className="h-3.5 w-3.5" />
+        </div>
+      </div>
+      <div
+        className="relative"
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition:
+            offset === 0
+              ? "transform 200ms cubic-bezier(0.22,1,0.36,1)"
+              : "none",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // Online / Offline status label — uses the transitions-dev text-states-swap:
 // the keyed span remounts on change so it blur-rises in (reduced-motion safe).
@@ -121,9 +195,12 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
   const [reactionFor, setReactionFor] = useState(null); // messageId with open picker
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null); // message being replied to
   const [showEmoji, setShowEmoji] = useState(false);
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
+
+  const isMobile = useIsMobile();
 
   const scrollRef = useRef(null);
   const typingTimer = useRef(null);
@@ -140,6 +217,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
       setMessages([]);
       setNextCursor(null);
       setHasMore(false);
+      setReplyingTo(null);
       return undefined;
     }
     let active = true;
@@ -313,6 +391,16 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
     };
   }, [socket, convId]);
 
+  // Cancel reply mode on Escape.
+  useEffect(() => {
+    if (!replyingTo) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") cancelReply();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [replyingTo]);
+
   const emitTyping = () => {
     if (!socket || !convId) return;
     socket.emit("typing:start", { conversationId: convId });
@@ -338,10 +426,21 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
     });
   };
 
+  const handleReply = (m) => {
+    if (!m || m.isDeleted) return;
+    setReplyingTo(m);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+
   const send = async () => {
     const content = text.trim();
     if (!content || !convId) return;
     const tempId = `t_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const replyToId = replyingTo?.id ?? null;
+    setReplyingTo(null);
     const optimistic = {
       id: tempId,
       tempId,
@@ -361,9 +460,13 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (socket) socket.emit("typing:stop", { conversationId: convId });
     try {
-      const msg = await apiPost(`/api/v1/conversations/${convId}/messages`, {
-        content,
-      });
+      const msg = await apiPost(
+        `/api/v1/conversations/${convId}/messages`,
+        {
+          content,
+          ...(replyToId && { replyToMessageId: replyToId }),
+        },
+      );
       setMessages((prev) =>
         prev.map((m) => (m.tempId === tempId ? { ...msg, status: "sent" } : m)),
       );
@@ -462,7 +565,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
       };
 
   return (
-    <div className="flex h-full flex-col bg-[var(--bg-base)]">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)]">
       {/* Header */}
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] px-4">
         {onBack && (
@@ -521,13 +624,13 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
       </div>
 
       {/* Messages */}
-      <div
-        ref={scrollRef}
-        onScroll={(e) => {
-          if (e.currentTarget.scrollTop <= 8) loadOlder();
-        }}
-        className="t-scroll mt-12 flex-1 overflow-y-auto px-4 py-4"
-      >
+        <div
+          ref={scrollRef}
+          onScroll={(e) => {
+            if (e.currentTarget.scrollTop <= 8) loadOlder();
+          }}
+          className="t-scroll mt-12 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
+        >
         {loadingHistory && (
           <p className="py-2 text-center text-[12px] text-[var(--text-muted)]">
             Loading…
@@ -543,6 +646,17 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
               return <SystemNotice key={m.id} content={m.content} />;
             }
             const receipt = receiptState(m, userId, otherId);
+            const replySource = m.replyToMessageId
+              ? messages.find((x) => x.id === m.replyToMessageId)
+              : null;
+            const replyTo = replySource
+              ? {
+                  senderName: senderName(replySource.senderId),
+                  content: replySource.isDeleted
+                    ? "Message deleted"
+                    : replySource.content || "",
+                }
+              : null;
             const prev = i > 0 ? messages[i - 1] : null;
             const next = i < messages.length - 1 ? messages[i + 1] : null;
             const grouped =
@@ -566,7 +680,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
             return (
               <div
                 key={m.id}
-                className={`t-msg-in group flex flex-col ${mine ? "items-end" : "items-start"} ${
+                className={`t-msg-in group flex min-w-0 flex-col ${mine ? "items-end" : "items-start"} ${
                   i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
                 }`}
               >
@@ -583,28 +697,33 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
                     </span>
                   </div>
                 )}
-                <MessageBubble
-                  message={m}
-                  mine={mine}
-                  showMeta={groupLast}
-                  reactionOpen={reactionFor === m.id}
-                  isEditing={editingId === m.id}
-                  editText={editText}
-                  onEditTextChange={setEditText}
-                  onSaveEdit={() => saveEdit(m.id)}
-                  onCancelEdit={() => setEditingId(null)}
-                  onToggleReactionPicker={() =>
-                    setReactionFor(reactionFor === m.id ? null : m.id)
-                  }
-                  onReact={(emoji) => toggleReaction(m.id, emoji)}
-                  onEdit={() => {
-                    setEditingId(m.id);
-                    setEditText(m.content);
-                  }}
-                  onDelete={() => removeMessage(m.id)}
-                  onRetry={() => retry(m.tempId)}
-                  receipt={receipt}
-                />
+                <SwipeToReply enabled={isMobile} onReply={() => handleReply(m)}>
+                  <MessageBubble
+                    message={m}
+                    mine={mine}
+                    showMeta={groupLast}
+                    reactionOpen={reactionFor === m.id}
+                    isEditing={editingId === m.id}
+                    editText={editText}
+                    onEditTextChange={setEditText}
+                    onSaveEdit={() => saveEdit(m.id)}
+                    onCancelEdit={() => setEditingId(null)}
+                    onToggleReactionPicker={() =>
+                      setReactionFor(reactionFor === m.id ? null : m.id)
+                    }
+                    onReact={(emoji) => toggleReaction(m.id, emoji)}
+                    onEdit={() => {
+                      setEditingId(m.id);
+                      setEditText(m.content);
+                    }}
+                    onDelete={() => removeMessage(m.id)}
+                    onRetry={() => retry(m.tempId)}
+                    onReply={handleReply}
+                    isReplying={replyingTo?.id === m.id}
+                    replyTo={replyTo}
+                    receipt={receipt}
+                  />
+                </SwipeToReply>
               </div>
             );
           })}
@@ -622,9 +741,35 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
         </div>
       </div>
 
-      {/* Composer */}
-      <div className="shrink-0 border-t border-[var(--border)] p-3">
-        <div className="relative mx-auto flex max-w-3xl items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
+       {/* Composer */}
+       <div className="shrink-0 overflow-x-hidden border-t border-[var(--border)] p-3">
+         <div className="mx-auto max-w-3xl">
+           {replyingTo && (
+             <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+               <div className="flex items-start gap-2 min-w-0">
+                 <span className="shrink-0 text-[var(--accent)]">
+                   <Reply className="h-4 w-4" />
+                 </span>
+                 <div className="min-w-0 flex-1 overflow-hidden">
+                   <span className="block text-[12px] font-medium text-[var(--text-primary)]">
+                     {senderName(replyingTo.senderId)}
+                   </span>
+                    <span className="block w-full break-words text-[12px] text-[var(--text-muted)] [overflow-wrap:anywhere]">
+                      {replyingTo.content}
+                    </span>
+                 </div>
+                 <button
+                   type="button"
+                   onClick={cancelReply}
+                   className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                   aria-label="Cancel reply"
+                 >
+                   <X className="h-4 w-4" />
+                 </button>
+               </div>
+             </div>
+           )}
+           <div className="relative flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
           <button
             ref={emojiBtnRef}
             type="button"
@@ -668,6 +813,7 @@ export function ChatPanel({ conversation, onBack, onOpenGroupSettings }) {
           >
             <Send className="h-5 w-5" />
           </button>
+          </div>
         </div>
       </div>
     </div>

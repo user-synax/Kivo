@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, FaceGrinning, Pencil, Trash } from "lucide-react";
+import { Check, CheckCheck, FaceGrinning, Pencil, Reply, Trash } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
@@ -42,10 +42,13 @@ export function MessageBubble({
   onEdit,
   onDelete,
   onRetry,
+  onReply,
+  isReplying = false,
   receipt,
   variant,
   className,
   contentClassName,
+  replyTo,
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
@@ -67,6 +70,7 @@ export function MessageBubble({
           className={cn(
             "group/bubble relative transition-transform will-change-transform",
             pressing && "scale-[0.98]",
+            isReplying && "border-l-2 border-[var(--accent)]",
             className,
           )}
           style={{ transitionTimingFunction: EASE_OUT_CSS }}
@@ -75,7 +79,17 @@ export function MessageBubble({
           onPointerLeave={() => setPressing(false)}
           onPointerCancel={() => setPressing(false)}
         >
-        <BubbleContent className={cn(contentClassName)}>
+        <BubbleContent className={cn("min-w-0", contentClassName)}>
+          {replyTo ? (
+            <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10">
+              <span className="block truncate text-[11px] font-semibold text-[var(--accent)]">
+                {replyTo.senderName}
+              </span>
+              <span className="block break-words text-[12px] leading-snug text-[var(--text-muted)] [overflow-wrap:anywhere]">
+                {replyTo.content}
+              </span>
+            </div>
+          ) : null}
           {isEditing ? (
             <textarea
               value={editText}
@@ -94,7 +108,7 @@ export function MessageBubble({
           ) : deleted ? (
             <span className="opacity-70">This message was deleted</span>
           ) : (
-            <span className="whitespace-pre-wrap">{message.content}</span>
+            <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</span>
           )}
         </BubbleContent>
 
@@ -125,6 +139,10 @@ export function MessageBubble({
         <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
           <FaceGrinning className="h-4 w-4" />
           React
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onReply?.(message)}>
+          <Reply className="h-4 w-4" />
+          Reply
         </ContextMenuItem>
         {mine && (
           <ContextMenuItem onSelect={() => onEdit?.()}>
