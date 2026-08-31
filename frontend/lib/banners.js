@@ -14,5 +14,10 @@ export const BANNER_OPTIONS = [
     id: "valorant-astra",
     label: "Valorant Astra Agent banner",
     url: "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExeXd5OWpnOXZhOTVxeG12NjEzcHh0OWNuaWE4NnY4azVsMWkzcmYwMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/xvRPIAtMwKQ2SlxKtx/giphy.gif",
+  },
+  {
+    id: "pacman-chase",
+    label: "Pac-Man Chase banner",
+    url: "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExZzltank4dThwdnVjOHgydXN0bmV2eHp6cHFncXBnNzh1dTQ3bmt4NCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hkqefnFjn2MWVl6xvq/giphy.gif",
   }
 ];

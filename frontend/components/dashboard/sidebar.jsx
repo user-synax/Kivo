@@ -40,7 +40,7 @@ function ConversationItem({ conversation, selected, onSelect, index }) {
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
       style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}
-      className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-200 ease-[${EASE}] motion-reduce:animate-none animate-[t-item-in_0.4s_${EASE}_both] ${
+      className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-200 ease-[${EASE}] motion-reduce:animate-none animate-[t-item-in_0.4s_${EASE}_both] hover:cursor-pointer ${
         selected ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
       }`}
     >
@@ -115,10 +115,25 @@ function ConversationSection({ label, items, selectedId, onSelect, baseIndex = 0
 }
 
 function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCreateSpace }) {
+  const SPACES_EXPANDED_KEY = "kivo:spaces-expanded";
   const [expanded, setExpanded] = useState({});
-  const toggle = (id) => setExpanded((prev) => ({ ...prev, [id]: prev[id] === false ? true : false }));
-  // default expanded = true if not explicitly false
-  const isExpanded = (id) => expanded[id] !== false;
+  const hasLoadedRef = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SPACES_EXPANDED_KEY);
+      if (saved) setExpanded(JSON.parse(saved));
+    } catch {}
+    hasLoadedRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    try {
+      localStorage.setItem(SPACES_EXPANDED_KEY, JSON.stringify(expanded));
+    } catch {}
+  }, [expanded]);
+  const toggle = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  // default collapsed = true; only explicitly true is expanded (persists across refresh)
+  const isExpanded = (id) => expanded[id] === true;
 
   if (collapsed) return null;
 
@@ -153,7 +168,7 @@ function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCr
                 <button
                   type="button"
                   onClick={() => toggle(space.id)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)]"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[${EASE}] hover:cursor-pointer hover:bg-[var(--hover)]"
                 >
                   <Avatar name={space.name} url={space.avatarUrl} size="sm" />
                   <div className="min-w-0 flex-1">
@@ -187,7 +202,7 @@ function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCr
                                 type="button"
                                 onClick={() => onSelect(c.id)}
                                 aria-current={selected ? "true" : undefined}
-                                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors duration-150 ${selected ? "bg-[var(--accent-soft)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"}`}
+                                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors duration-150 hover:cursor-pointer ${selected ? "bg-[var(--accent-soft)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"}`}
                               >
                                 <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
                                 <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-tight">{displayName.replace(/^#/, "")}</span>
