@@ -3,6 +3,7 @@ import app from "./app.js";
 import env from "./config/env.js";
 import { connectDb } from "./config/db.js";
 import { initSocket } from "./socket/index.js";
+import "./config/webpush.js";
 
 async function start() {
   await connectDb();

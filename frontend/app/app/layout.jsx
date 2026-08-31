@@ -1,5 +1,6 @@
 import { AuthGate } from "@/components/auth-guard";
 import { SocketProvider } from "@/components/socket-provider";
+import { PwaRegister } from "@/components/pwa-register";
 import ThemeProvider from "@/components/theme-provider";
 
 export const metadata = {
@@ -13,7 +14,10 @@ export default function AppLayout({ children }) {
   return (
     <ThemeProvider>
       <AuthGate>
-        <SocketProvider>{children}</SocketProvider>
+        <SocketProvider>
+          <PwaRegister />
+          {children}
+        </SocketProvider>
       </AuthGate>
     </ThemeProvider>
   );

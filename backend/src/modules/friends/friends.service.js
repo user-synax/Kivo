@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { unauthorized, notFound, conflict, badRequest } from "../../utils/errors.js";
 import User from "../../models/User.js";
 import FriendRequest from "../../models/FriendRequest.js";
+import * as notificationsService from "../notifications/notifications.service.js";
 
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
@@ -66,6 +67,24 @@ export async function sendRequest({ userId, identifier }) {
   }
 
   const created = await FriendRequest.create({ from: userId, to: target._id, status: "pending" });
+
+  // In-app notification: friend_request (fire-and-forget, Phase 1 no push)
+  try {
+    const sender = await User.findById(userId).select("displayName username avatarUrl").lean();
+    const title = sender?.displayName || sender?.username || "New friend request";
+    const body = `${sender?.displayName || sender?.username || "Someone"} sent you a friend request`;
+    await notificationsService.createFriendNotification({
+      recipientId: target._id,
+      senderId: userId,
+      type: "friend_request",
+      title,
+      body,
+      avatarUrl: sender?.avatarUrl || null,
+    });
+  } catch (err) {
+    console.error("[notifications] friend_request failed:", err?.message || err);
+  }
+
   return { request: publicRequest(created, target), alreadySent: false };
 }
 
@@ -96,6 +115,24 @@ export async function acceptRequest({ userId, requestId }) {
   }
   req.status = "accepted";
   await req.save();
+
+  // In-app notification: friend_accept to the original requester
+  try {
+    const acceptor = await User.findById(userId).select("displayName username avatarUrl").lean();
+    const title = acceptor?.displayName || acceptor?.username || "Friend request accepted";
+    const body = `${acceptor?.displayName || acceptor?.username || "Someone"} accepted your friend request`;
+    await notificationsService.createFriendNotification({
+      recipientId: req.from,
+      senderId: userId,
+      type: "friend_accept",
+      title,
+      body,
+      avatarUrl: acceptor?.avatarUrl || null,
+    });
+  } catch (err) {
+    console.error("[notifications] friend_accept failed:", err?.message || err);
+  }
+
   const from = await User.findById(req.from).select("displayName username email").lean();
   return {
     id: req._id.toString(),

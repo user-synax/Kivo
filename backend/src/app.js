@@ -12,6 +12,8 @@ import messageRoutes from "./modules/messages/messages.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 import friendRoutes from "./modules/friends/friends.routes.js";
 import spaceRoutes from "./modules/spaces/spaces.routes.js";
+import notificationRoutes from "./modules/notifications/notifications.routes.js";
+import pushRoutes from "./modules/push/push.routes.js";
 
 const app = express();
 
@@ -36,6 +38,8 @@ app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/friends", friendRoutes);
 app.use("/api/v1/spaces", spaceRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/push", pushRoutes);
 
 // 404 + centralized error handler (must be registered last).
 app.use(notFoundHandler);

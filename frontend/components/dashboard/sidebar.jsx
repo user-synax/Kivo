@@ -500,6 +500,7 @@ export function Sidebar({
   spaces,
   currentUser,
   onProfileUpdate,
+  notificationBell = null,
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -542,6 +543,7 @@ export function Sidebar({
         )}
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {notificationBell}
           {onCompose && (
             <NewMenu
               onFriends={onCompose}

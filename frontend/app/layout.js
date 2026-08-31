@@ -17,6 +17,7 @@ export const metadata = {
   title: "Kivo - Chat your way",
   description:
     "Kivo is a chat application that allows you to communicate with your friends and family in real-time.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }) {

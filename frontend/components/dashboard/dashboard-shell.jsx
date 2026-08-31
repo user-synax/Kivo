@@ -20,6 +20,10 @@ import { Sidebar } from "./sidebar";
 import { SpaceCreateModal } from "@/components/spaces/space-create-modal";
 import { SpaceSettingsPanel } from "@/components/spaces/space-settings-panel";
 import { SpaceDiscoverModal } from "@/components/spaces/space-discover-modal";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { NotificationCenter } from "@/components/notifications/notification-center";
+import { requestPermission, subscribe, syncSubscription } from "@/lib/push";
+import { playDmSound } from "@/lib/sound";
 
 // Group settings surface: a slide-in drawer on smaller screens (with a dimmed
 // backdrop) and a persistent side column on wide desktops (xl+). The inner
@@ -174,6 +178,18 @@ export function DashboardShell() {
   const [showSpaceSettings, setShowSpaceSettings] = useState(false);
   const [selectedSpaceId, setSelectedSpaceId] = useState(null);
   const [showDiscover, setShowDiscover] = useState(false);
+  // Notifications — bell badge + center list, live via notification:new
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifNextCursor, setNotifNextCursor] = useState(null);
+  const [notifHasMore, setNotifHasMore] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifUnread, setNotifUnread] = useState(0);
+  const notificationsRef = useRef(notifications);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+  const lastFocusedRef = useRef(null);
   const socket = useSocket();
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
@@ -216,6 +232,99 @@ export function DashboardShell() {
   useEffect(() => {
     if (!currentUser) router.replace("/login");
   }, [currentUser, router]);
+
+  // Sync existing push subscription if permission already granted (no prompt).
+  useEffect(() => {
+    if (!currentUser) return;
+    syncSubscription().catch(() => {});
+  }, [currentUser]);
+
+  // Service-worker push click → navigate to conversation while app is open in another tab.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    function onSWMessage(event) {
+      const data = event.data;
+      if (data?.type === "kivo:notification-click" && data.conversationId) {
+        setSelectedId(data.conversationId);
+        setShowGroupSettings(false);
+        setShowSpaceSettings(false);
+      }
+    }
+    // Both navigator.serviceWorker and window can receive the postMessage; listen on both.
+    navigator.serviceWorker.addEventListener("message", onSWMessage);
+    window.addEventListener("message", (e) => {
+      if (e.data?.type === "kivo:notification-click") onSWMessage(e);
+    });
+    return () => navigator.serviceWorker.removeEventListener("message", onSWMessage);
+  }, []);
+
+  // Initial notifications fetch: unread count + first page.
+  useEffect(() => {
+    if (!currentUser) return;
+    let active = true;
+    apiGet("/api/v1/notifications/unread-count")
+      .then((d) => {
+        if (!active) return;
+        setNotifUnread(typeof d?.count === "number" ? d.count : 0);
+      })
+      .catch(() => {});
+    setNotifLoading(true);
+    apiGet("/api/v1/notifications?limit=20")
+      .then((d) => {
+        if (!active) return;
+        setNotifications(Array.isArray(d?.notifications) ? d.notifications : []);
+        setNotifNextCursor(d?.nextCursor || null);
+        setNotifHasMore(Boolean(d?.nextCursor));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setNotifLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
+
+  // Track focused DM for backend suppression (and local echo suppression).
+  // Emits which conversation the user is actively viewing so the server can
+  // skip creating a dm_message notification when they're already in that DM.
+  // Uses lastFocusedRef to avoid duplicate emits when conversations list churns.
+  useEffect(() => {
+    if (!socket) return;
+    const conv =
+      conversationsRef.current.find((c) => c.id === selectedId) ||
+      conversations.find((c) => c.id === selectedId);
+    const focusedId = selectedId && conv?.type === "dm" ? selectedId : null;
+    if (focusedId !== lastFocusedRef.current) {
+      lastFocusedRef.current = focusedId;
+      if (focusedId) socket.emit("conversation:focus", { conversationId: focusedId });
+      else socket.emit("conversation:blur");
+    }
+    return () => {
+      // don't blur here — other effect invocation will handle transition
+    };
+  }, [socket, selectedId, conversations]);
+
+  // Live bell/center updates — prepend without refetch.
+  // DM-focused filter: if the user is currently viewing that DM, don't show it
+  // (backend also suppresses, this is a fallback for race/edge cases).
+  useEffect(() => {
+    if (!socket) return;
+    const onNotificationNew = (notif) => {
+      if (!notif?.id) return;
+      if (notif.type === "dm_message" && notif.conversationId === selectedIdRef.current) {
+        const cur = conversationsRef.current.find((c) => c.id === selectedIdRef.current);
+        if (cur?.type === "dm") return;
+      }
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notif.id)) return prev;
+        return [notif, ...prev];
+      });
+      setNotifUnread((c) => c + 1);
+    };
+    socket.on("notification:new", onNotificationNew);
+    return () => socket.off("notification:new", onNotificationNew);
+  }, [socket]);
 
   // Persist collapse state (desktop only) across reloads.
   useEffect(() => {
@@ -367,6 +476,20 @@ export function DashboardShell() {
 
     const onNew = (msg) => {
       if (!msg?.conversationId) return;
+      // DM-only sound cue: play only for DMs, not groups/spaces, when tab not visible or conversation not focused
+      try {
+        if (msg.senderId !== currentUser?.id) {
+          const conv = conversationsRef.current.find((c) => c.id === msg.conversationId);
+          const isDm = conv ? conv.type === "dm" : true; // brand-new DM assumed dm; groups/spaces are pre-existing
+          if (isDm) {
+            const isVisible = typeof document !== "undefined" ? document.visibilityState === "visible" : true;
+            const isFocused = msg.conversationId === selectedIdRef.current;
+            if (!isVisible || !isFocused) {
+              playDmSound();
+            }
+          }
+        }
+      } catch {}
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === msg.conversationId);
         if (idx === -1) return prev;
@@ -525,6 +648,93 @@ export function DashboardShell() {
     setShowGroupCreate(true);
   };
 
+  // Notifications — bell/center handlers
+  const handleBellClick = async () => {
+    const willOpen = !notifOpen;
+    setNotifOpen(willOpen);
+    if (willOpen) {
+      // Refresh unread + list when opening (keeps badge/center in sync without polling)
+      apiGet("/api/v1/notifications/unread-count")
+        .then((d) => setNotifUnread(typeof d?.count === "number" ? d.count : 0))
+        .catch(() => {});
+      if (notifications.length === 0) {
+        setNotifLoading(true);
+        apiGet("/api/v1/notifications?limit=20")
+          .then((d) => {
+            setNotifications(Array.isArray(d?.notifications) ? d.notifications : []);
+            setNotifNextCursor(d?.nextCursor || null);
+            setNotifHasMore(Boolean(d?.nextCursor));
+          })
+          .catch(() => {})
+          .finally(() => setNotifLoading(false));
+      }
+      // Explicit user action → may prompt for push permission and subscribe
+      if (typeof window !== "undefined" && "Notification" in window) {
+        try {
+          if (Notification.permission === "default") {
+            const perm = await requestPermission();
+            if (perm === "granted") await subscribe();
+          } else if (Notification.permission === "granted") {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (!sub) await subscribe();
+          }
+        } catch {}
+      }
+    }
+  };
+
+  const handleLoadMoreNotifications = () => {
+    if (!notifNextCursor || notifLoading) return;
+    setNotifLoading(true);
+    apiGet(`/api/v1/notifications?cursor=${notifNextCursor}&limit=20`)
+      .then((d) => {
+        const more = Array.isArray(d?.notifications) ? d.notifications : [];
+        setNotifications((prev) => [...prev, ...more]);
+        setNotifNextCursor(d?.nextCursor || null);
+        setNotifHasMore(Boolean(d?.nextCursor));
+      })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await apiPatch("/api/v1/notifications/read", { all: true });
+    } catch {}
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifUnread(0);
+  };
+
+  const handleNotifSelect = async (notif) => {
+    if (!notif) return;
+    // Mark single read optimistically
+    if (!notif.read) {
+      setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
+      setNotifUnread((c) => Math.max(0, c - 1));
+      apiPatch("/api/v1/notifications/read", { ids: [notif.id] }).catch(() => {});
+    }
+    setNotifOpen(false);
+    const t = notif.type;
+    if (t === "friend_request" || t === "friend_accept") {
+      setShowFriends(true);
+      return;
+    }
+    if (notif.conversationId) {
+      // Ensure the conversation is in the local list; if not, reload once
+      const exists = conversationsRef.current.some((c) => c.id === notif.conversationId);
+      if (!exists) {
+        try {
+          const list = await loadConversations();
+          setConversations(list);
+        } catch {}
+      }
+      setSelectedId(notif.conversationId);
+      setShowGroupSettings(false);
+      setShowSpaceSettings(false);
+    }
+  };
+
   // Called from the friends modal when the user picks "Message" on a friend.
   const handleStartChat = async (participantId) => {
     try {
@@ -595,6 +805,25 @@ export function DashboardShell() {
     selected && selected.type === "dm" && selectedOtherId,
   );
 
+  // Notification bell node — passed into Sidebar's topbar; center is anchored to bell via relative wrapper
+  const notificationBellNode = (
+    <div id="kivo-notification-bell-wrap" className="relative">
+      <NotificationBell unreadCount={notifUnread} onClick={handleBellClick} isOpen={notifOpen} />
+      <NotificationCenter
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notifications={notifications}
+        nextCursor={notifNextCursor}
+        hasMore={notifHasMore}
+        loading={notifLoading}
+        onLoadMore={handleLoadMoreNotifications}
+        onMarkAllRead={handleMarkAllRead}
+        onSelect={handleNotifSelect}
+        unreadCount={notifUnread}
+      />
+    </div>
+  );
+
   // Mobile: stack navigation.
   if (!isDesktop) {
     return (
@@ -641,6 +870,7 @@ export function DashboardShell() {
                 spaces={spaces}
                 currentUser={currentUser}
                 onProfileUpdate={refreshUser}
+                notificationBell={notificationBellNode}
               />
             </motion.div>
           )}
@@ -700,7 +930,7 @@ export function DashboardShell() {
       />
     </div>
   );
-}
+  }
 
   // Desktop: sidebar + chat side by side.
   return (
@@ -724,6 +954,7 @@ export function DashboardShell() {
           spaces={spaces}
           currentUser={currentUser}
           onProfileUpdate={refreshUser}
+          notificationBell={notificationBellNode}
         />
       </motion.div>
 

@@ -5,6 +5,7 @@ import Message from "../../models/Message.js";
 import User from "../../models/User.js";
 import Space from "../../models/Space.js";
 import { emitToConversation, roomName } from "../../socket/io.js";
+import * as notificationsService from "../notifications/notifications.service.js";
 
 // Public message shape returned to clients and used as the socket payload base.
 export function publicMessage(message) {
@@ -113,6 +114,14 @@ export async function createMessage({ conversationId, userId, content, replyToMe
 
   const payload = publicMessage(message);
   emitToConversation(conversationId, "message:new", payload);
+
+  // In-app notifications: fan out per recipient (Phase 1 only, no push).
+  try {
+    await notificationsService.createForMessage({ message, conversation });
+  } catch (err) {
+    console.error("[notifications] createForMessage failed:", err?.message || err);
+  }
+
   return payload;
 }
 

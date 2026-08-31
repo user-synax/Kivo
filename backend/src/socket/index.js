@@ -20,6 +20,26 @@ export function getIO() {
 // a Redis pub/sub adapter) — do NOT add Redis here per the current spec.
 const onlineUsers = new Map();
 
+// Focused DM tracking — which conversation the user is currently viewing.
+// Used to suppress DM notifications when the recipient is actively looking at
+// that DM (spec: "when user is on the dm do not send them notification").
+// Map<userId, conversationId | null>
+const focusedConversationByUser = new Map();
+
+function setFocusedConversation(userId, conversationId) {
+  if (!conversationId) focusedConversationByUser.delete(userId);
+  else focusedConversationByUser.set(userId, String(conversationId));
+}
+
+function getFocusedConversation(userId) {
+  return focusedConversationByUser.get(String(userId)) || null;
+}
+
+function isUserFocusedOnConversation(userId, conversationId) {
+  if (!userId || !conversationId) return false;
+  return getFocusedConversation(userId) === String(conversationId);
+}
+
 function markOnline(userId, socketId) {
   if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
   onlineUsers.get(userId).add(socketId);
@@ -140,6 +160,17 @@ export function initSocket(server) {
       socket.to(roomName(conversationId)).emit("typing:stop", { conversationId, userId });
     });
 
+    // Focused DM tracking for notification suppression.
+    // Client emits when it opens/closes a conversation; we keep the latest per user.
+    socket.on("conversation:focus", (data) => {
+      const conversationId = data?.conversationId;
+      if (!conversationId) return;
+      setFocusedConversation(userId, String(conversationId));
+    });
+    socket.on("conversation:blur", () => {
+      setFocusedConversation(userId, null);
+    });
+
     // Delivery receipt. Client acknowledges a received `message:new` with the
     // messageId; we mark it delivered and tell the sender.
     socket.on("message:delivered", async (data) => {
@@ -166,6 +197,8 @@ export function initSocket(server) {
       const becameOffline = markOffline(userId, socket.id);
       if (becameOffline) {
         socket.broadcast.emit("presence:offline", { userId });
+        // Clear focused state when last socket disconnects — user is no longer viewing anything
+        focusedConversationByUser.delete(userId);
       }
       // Socket.IO leaves its rooms automatically on disconnect.
     });
@@ -174,6 +207,9 @@ export function initSocket(server) {
   // Expose current online state for the REST layer (e.g. conversation list). A
   // helper so controllers don't import the Map directly.
   io.isUserOnline = (userId) => isOnline(userId);
+  io.getFocusedConversation = (userId) => getFocusedConversation(userId);
+  io.isUserFocusedOnConversation = (userId, conversationId) =>
+    isUserFocusedOnConversation(userId, conversationId);
 
   return io;
 }
