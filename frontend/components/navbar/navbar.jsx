@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { navItems } from "./nav-items";
 
@@ -12,6 +13,7 @@ const EASE_SMOOTH_OUT = [0.22, 1, 0.36, 1];
 
 export function Navbar() {
     const reduce = useReducedMotion();
+    const pathname = usePathname();
     const [open, setOpen] = useState(false);
 
     const navRef = useRef(null);
@@ -137,7 +139,7 @@ export function Navbar() {
         >
             <div
                 ref={containerRef}
-                className="relative w-full max-w-3xl"
+                className="relative w-full max-w-4xl"
             >
                 <motion.nav
                     ref={navRef}
@@ -166,16 +168,22 @@ export function Navbar() {
                         variants={itemVariants}
                         className="hidden flex-1 justify-center gap-2 md:flex"
                     >
-                        {navItems.map((item) => (
+                        {navItems.map((item) => {
+                            const active = pathname === item.href;
+                            return (
                             <li key={item.label}>
                                 <a
                                     href={item.href}
-                                    className="kivo-nav-link kivo-focus rounded-pills px-4 py-2 text-[14px] font-medium text-ink-black/90"
+                                    aria-current={active ? "page" : undefined}
+                                    className={`kivo-nav-link kivo-focus rounded-pills px-3 py-2 text-[14px] font-medium sm:px-4 ${
+                                        active ? "text-ink bg-ink/8" : "text-ink-black/90"
+                                    }`}
                                 >
                                     {item.label}
                                 </a>
                             </li>
-                        ))}
+                            );
+                        })}
                     </motion.ul>
 
                     {/* Auth — desktop */}
@@ -231,6 +239,7 @@ export function Navbar() {
                                         <a
                                             href={item.href}
                                             role="menuitem"
+                                            aria-current={pathname === item.href ? "page" : undefined}
                                             onClick={() => setOpen(false)}
                                             className="kivo-nav-link kivo-focus flex min-h-[44px] items-center rounded-lg px-3 text-[15px] font-medium text-ink-black/90"
                                         >
