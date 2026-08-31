@@ -24,6 +24,8 @@
 ## ✨ Highlights
 
 - ⚡ **Real-time everything** — messages, typing, presence, and read receipts via Socket.IO (no polling).
+- 🔔 **Full notification system** — in-app notifications with a bell + center, web push for offline users, and DM-focused suppression.
+- 📱 **Progressive Web App** — installable on any device with a service worker, manifest, and offline push delivery.
 - 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
@@ -90,12 +92,15 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Text messaging (send, **reply**, edit, soft-delete, reactions, emoji picker, receipts)
 - **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
 - **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
+- **Notification system** (in-app notification center + notification sounds + bell with unread badge)
+- **Web Push** (PWA service worker, VAPID subscriptions, offline push delivery)
+- **Progressive Web App** (installable, manifest, service worker)
 - Typing indicators & presence (realtime via Socket.IO)
 - Theme system (5 themes, live switching)
 - Animated landing page
 
 ### 🚧 Planned / Not Started
-- Threads · Notifications (Appwrite push)
+- Threads · Mention notifications
 - Search (conversation / message) · File attachments · Image sharing
 - Voice channels / video calls
 
@@ -128,7 +133,8 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 | **Zod 4** | Request validation |
 | **JWT (jsonwebtoken)** | Authentication |
 | **bcryptjs** | Password hashing (12 rounds) |
-| **Appwrite** | File storage & push notifications |
+| **web-push** | VAPID web push notifications (offline delivery) |
+| **Appwrite** | File storage |
 | **Redis** | Caching, rate limiting (planned) |
 
 > **Runtime:** [Bun](https://bun.sh) — package manager & runtime for dev.
@@ -141,15 +147,15 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 kivo/
 ├── frontend/            # Next.js 16 app (App Router, React 19)
 │   ├── app/             # Routes: landing, login, signup, app, profile, invite
-│   ├── components/      # UI, dashboard, chat, auth, navbar, spaces
-│   └── lib/             # theme, api, auth, chat, spaces, avatar helpers
+│   ├── components/      # UI, dashboard, chat, auth, navbar, spaces, notifications
+│   └── lib/             # theme, api, auth, chat, spaces, push, sound, avatar helpers
 │
 ├── backend/             # Express 5 + Socket.IO + Mongoose
 │   └── src/
-│       ├── config/      # DB + env config
+│       ├── config/      # DB, env, webpush config
 │       ├── middleware/  # auth, errorHandler, rateLimiter
-│       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space
-│       ├── modules/     # auth, users, conversations, messages, friends, spaces, admin
+│       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space, Notification, PushSubscription
+│       ├── modules/     # auth, users, conversations, messages, friends, spaces, notifications, push, admin
 │       ├── socket/      # Socket.IO init, presence, room helpers, events
 │       └── utils/       # helpers & errors
 │
@@ -170,6 +176,8 @@ Each backend module follows a clean **4-file pattern**: `*.routes.js` → `*.con
 - [Bun](https://bun.sh) (>= 1.3)
 - [MongoDB](https://www.mongodb.com/atlas) (Atlas or local)
 - [Appwrite](https://appwrite.io) account (for avatar storage)
+
+> For web push notifications, generate VAPID keys with `npx web-push generate-vapid-keys` and add them to your backend `.env`.
 
 ### 1. Backend
 
@@ -204,6 +212,7 @@ bun run lint  # biome check
 |---|---|---|
 | `MONGODB_URI` | backend | MongoDB connection string |
 | `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` | backend | JWT signing secrets |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | backend | Web push (VAPID) keys for offline notifications |
 | `APPWRITE_*` | backend | Appwrite endpoint, project, key, bucket (avatar upload) |
 | `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend base URL (HTTP + Socket.IO) |
@@ -251,6 +260,7 @@ Registration / Login
 | `conversation:updated` / `admin-changed` / `removed` | Server → Room | Group updates |
 | `space:updated` / `space:member-*` / `space:channel-*` | Server → Space | Space, members & channels |
 | `space:deleted` / `space:joined` / `space:removed` | Server → All | Space lifecycle |
+| `notification:new` | Server → User | New in-app notification (fanned out to online recipients) |
 
 > All socket events are **authenticated** via JWT handshake, and **authorized** — the server verifies conversation membership before accepting sensitive events.
 
@@ -319,6 +329,20 @@ Themes apply via CSS custom properties, persist in `localStorage`, and switch **
 - Profile **banner** image
 - User detail panel (desktop XL+) with member-since info
 
+### 🔔 Notifications
+- In-app notification center — a bell with an unread count badge and a dropdown list
+- Covers messages (DM / group / space), friend requests & accepts; cursor-paginated with "mark all read"
+- **DM-focused suppression** — if you're actively viewing a DM, notifications for it are skipped server-side
+- Notification **sounds** on new messages
+- Realtime delivery via socket (`notification:new`) with per-recipient fan-out
+
+### 📱 PWA & Web Push
+- **Installable PWA** — `manifest.json` with icons, standalone display, and a service worker (`sw.js`)
+- **Web push** powered by VAPID (`web-push`) — offline users receive DMs, group messages, and friend events as native notifications
+- Permission is opt-in via explicit user action (`requestPermission`); `syncSubscription` only auto-subscribes when permission is already granted
+- Push subscriptions are stored per user; expired/unsubscribed endpoints (404/410) are cleaned up automatically
+- Notification click actions in the service worker deep-link into the app
+
 ---
 
 ## 🧠 Architecture Design
@@ -351,8 +375,8 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, customization |
-| **Phase 2** | Threads, pinned/saved messages, stronger search, notifications (Appwrite push) |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications, PWA, customization |
+| **Phase 2** | Threads, pinned/saved messages, stronger search, mention notifications |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |
 

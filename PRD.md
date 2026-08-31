@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.1
-**Last Updated:** August 30, 2026
-**Status:** MVP Development (Core Messaging + Spaces Complete)
+**Version:** 2.2
+**Last Updated:** August 31, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications Complete)
 
 ---
 
@@ -54,6 +54,8 @@ Kivo
 | **Group** | Private small-group conversations (friends, college, projects, gaming) | ✅ Complete |
 | **Space** | Community-level container similar to a Discord server | ✅ Complete |
 | **Channel** | Text / announcement conversation inside a Space | ✅ Complete |
+| **Notification** | In-app + web push events (message, friend, space) | ✅ Complete |
+| **Push Subscription** | Per-user VAPID subscription for offline delivery | ✅ Complete |
 | **Thread** | Message-level discussion inside a channel | Phase 2 |
 
 ---
@@ -78,8 +80,11 @@ Kivo
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
 | Space Discovery | **Complete** | Browse & search public spaces by category |
+| Notification System | **Complete** | In-app notification center + sound + DM-focused suppression |
+| Web Push | **Complete** | VAPID push for offline users, PWA service worker |
+| PWA / Installable | **Complete** | Manifest, icons, service worker |
 | Threads | **Not started** | Phase 2 |
-| Notifications (push) | **Not started** | Planned |
+| Mention Notifications | **Not started** | Planned |
 | Search | **Not started** | Planned (user search complete only) |
 | File Attachments | **Not started** | Planned |
 
@@ -413,9 +418,11 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 - Unread badges per conversation.
 - Online presence indicators.
 - Compose button (start new conversation).
+- **Notification bell** with live unread count (opens the notification center).
 - Theme switcher dropdown.
 - Profile navigation at bottom.
 - Collapsible to icon rail on desktop.
+- Friend/group "add" buttons, Spaces & channels rail (Discord-style).
 
 #### 6.4 Chat Panel
 
@@ -524,17 +531,116 @@ Role ranks: `owner 4 > admin 3 > moderator 2 > member 1`. Access control is rank
 
 ### 8. Notifications
 
-| Type | Status | Notes |
-|---|---|---|
-| In-app notifications | Not started | Planned |
-| Mention notifications | Not started | Planned |
-| Push notifications | Not started | Will use Appwrite Messaging |
+End-to-end notification system covering **in-app** delivery and **web push** for offline users, layered on a PWA.
 
-- Per-user notification preferences: not started.
+#### 8.1 Notification Types
+
+| Type | Trigger |
+|---|---|
+| `dm_message` | New message in a 1:1 DM |
+| `group_message` | New message in a group conversation |
+| `space_message` | New message in a space channel |
+| `friend_request` | A user sends you a friend request |
+| `friend_accept` | A user accepts your friend request |
+| `space_invite` | Reserved for future space invites |
+| `mention` | Reserved for future @mentions |
+
+#### 8.2 Delivery Model
+
+| Delivery | Condition | Mechanism |
+|---|---|---|
+| **In-app** | Recipient is online | Socket `notification:new` fanned out to the recipient |
+| **Web push** | Recipient is offline | VAPID push to all stored subscriptions (non-blocking; delivery status persisted) |
+
+- **DM-focused suppression** — when a recipient is actively viewing a DM (`io.isUserFocusedOnConversation`), notifications for that conversation are skipped entirely (spec: "when user is on the dm do not send them notification").
+- System messages (`type: "system"`) never create notifications, and users are never notified of their own messages.
+- For group/space messages, one notification document is fanned out **per recipient** (excluding the sender).
+- Expired push endpoints (HTTP 404/410) are removed automatically; overall push delivery success/error is tracked on the notification's `delivery` field.
+
+#### 8.3 Notification Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/notifications/unread-count` | Yes | Unread notification count (badge) |
+| GET | `/api/v1/notifications` | Yes | Cursor-paginated list; `?cursor=&limit=&unreadOnly=` (limit 1–100, default 20) |
+| PATCH | `/api/v1/notifications/read` | Yes | `{ ids: [...] }` and/or `{ all: true }` mark read |
+
+#### 8.4 Notification Schema
+
+```
+Notification {
+  recipientId:  ObjectId → User (required, indexed)
+  senderId:     ObjectId → User (nullable)
+  type:         enum ["dm_message","group_message","space_message",
+                      "friend_request","friend_accept","space_invite","mention"]
+  conversationId: ObjectId → Conversation (nullable, indexed)
+  messageId:    ObjectId → Message (nullable)
+  spaceId:      ObjectId → Space (nullable)
+  title:        String (required)
+  body:         String (default "")
+  avatarUrl:    String (nullable)
+  read:         Boolean (default false)
+  seen:         Boolean (default false)
+  delivery: {
+    inAppDelivered: Boolean,
+    pushDelivered:  Boolean,
+    pushError:      String
+  }
+  createdAt / updatedAt
+}
+```
+
+**Indexes:** `{ recipientId, createdAt }`, `{ recipientId, read }`, `{ recipientId, type }`.
+
+#### 8.5 UI
+
+- `notification-bell.jsx` — bell icon with a live unread count badge.
+- `notification-center.jsx` — dropdown feed with list, cursor-pagination, and mark-read actions.
+- Notification **sounds** on new messages (`lib/sound.js`).
 
 ---
 
-### 9. Attachments
+### 9. PWA & Web Push
+
+#### 9.1 Progressive Web App
+
+- `public/manifest.json` — app name, icons (192/512 + apple-touch-icon), standalone display.
+- `public/sw.js` — service worker handling `push` events and notification click actions (deep-links into the app).
+- Registered via `components/pwa-register.jsx` + `lib/pwa.js` on the app layout.
+
+#### 9.2 Web Push (VAPID)
+
+Backend uses the `web-push` library with VAPID keys (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`).
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/push/vapid-public-key` | No | Public VAPID key (fetched by the SW before subscribing) |
+| POST | `/api/v1/push/subscribe` | Yes | Register a push subscription `{ endpoint, keys: { p256dh, auth }, expirationTime? }` |
+| DELETE | `/api/v1/push/unsubscribe` | Yes | Remove a subscription by endpoint |
+
+**Ownership rules**
+- Permission is opt-in via explicit user action (`requestPermission()`); no auto-prompt.
+- `syncSubscription()` only auto-subscribes when permission is already granted and no subscription exists.
+- `PushSubscription` is unique per user + endpoint; one user may hold multiple devices.
+
+#### 9.3 PushSubscription Schema
+
+```
+PushSubscription {
+  userId:          ObjectId → User (required, indexed)
+  endpoint:        String (required, unique)
+  keys: { p256dh: String, auth: String }
+  expirationTime:  Date (nullable)
+  userAgent:       String (nullable)
+  createdAt / updatedAt
+}
+```
+
+**Index:** `{ userId, endpoint }` unique.
+
+---
+
+### 10. Attachments
 
 | Type | Status | Notes |
 |---|---|---|
@@ -614,10 +720,35 @@ Refresh token is sent automatically via httpOnly cookie.
 | Method | Path | Auth | Body |
 |---|---|---|---|
 | POST | `/api/v1/conversations` | Yes | `{ participantId }` |
+| POST | `/api/v1/conversations/group` | Yes | Multipart: `{ name, participantIds, avatar? }` |
 | GET | `/api/v1/conversations` | Yes | — |
+| PATCH | `/api/v1/conversations/:id` | Group admin | `{ name?, avatar? }` |
+| POST | `/api/v1/conversations/:id/members` | Group admin | `{ userId }` |
+| DELETE | `/api/v1/conversations/:id/members/:userId` | Group admin, or self | — |
+| POST | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
+| DELETE | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | GET | `/api/v1/conversations/:id/messages` | Yes | `?cursor=&limit=` |
 | POST | `/api/v1/conversations/:id/messages` | Yes | `{ content, replyToMessageId? }` |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
+
+#### Spaces
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| POST | `/api/v1/spaces` | Yes | `{ name, description?, category? }` |
+| GET | `/api/v1/spaces` | Yes | Own spaces |
+| GET | `/api/v1/spaces/discover` | Yes | `?q=&category=` |
+| GET | `/api/v1/spaces/:id` | Member | — |
+| PATCH | `/api/v1/spaces/:id` | Admin+ | `{ name?, description?, category? }` |
+| DELETE | `/api/v1/spaces/:id` | Owner | — |
+| POST | `/api/v1/spaces/:id/join` | Yes | Join public space |
+| POST | `/api/v1/spaces/:id/members` | Admin+ | `{ userId }` |
+| DELETE | `/api/v1/spaces/:id/members/:userId` | Admin+, or self | — |
+| PATCH | `/api/v1/spaces/:id/members/:userId/role` | Admin+ | `{ role }` |
+| POST | `/api/v1/spaces/:id/channels` | Admin+ | `{ name, type }` |
+| GET | `/api/v1/spaces/:id/channels` | Member | — |
+| PATCH | `/api/v1/spaces/:id/channels/:channelId` | Admin+ | `{ name?, type? }` |
+| DELETE | `/api/v1/spaces/:id/channels/:channelId` | Admin+ | Last channel protected |
 
 #### Messages
 
@@ -638,6 +769,22 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/friends/requests/:id/decline` | Yes | — |
 | GET | `/api/v1/friends` | Yes | — |
 | DELETE | `/api/v1/friends/:id` | Yes | — |
+
+#### Notifications
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| GET | `/api/v1/notifications/unread-count` | Yes | — |
+| GET | `/api/v1/notifications` | Yes | `?cursor=&limit=&unreadOnly=` |
+| PATCH | `/api/v1/notifications/read` | Yes | `{ ids: [...], all?: boolean }` |
+
+#### Push
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| GET | `/api/v1/push/vapid-public-key` | No | — |
+| POST | `/api/v1/push/subscribe` | Yes | `{ endpoint, keys: { p256dh, auth }, expirationTime? }` |
+| DELETE | `/api/v1/push/unsubscribe` | Yes | `{ endpoint }` |
 
 #### Admin
 
@@ -687,7 +834,8 @@ kivo/
 | Zod 4.4.3 | Request validation |
 | JWT (jsonwebtoken 9) | Authentication |
 | bcryptjs 2.4.3 | Password hashing |
-| Appwrite | File storage + push notifications |
+| web-push 3.6.7 | VAPID web push notifications |
+| Appwrite | File storage |
 
 **Runtime:** Bun (package manager + runtime for dev).
 
@@ -697,7 +845,8 @@ kivo/
 backend/src/
 ├── config/
 │   ├── db.js              # Mongoose connection
-│   └── env.js             # Environment config with validation
+│   ├── env.js             # Environment config with validation
+│   └── webpush.js         # VAPID Web Push client
 ├── lib/
 │   └── appwrite.js        # Appwrite Storage client
 ├── middleware/
@@ -709,16 +858,22 @@ backend/src/
 │   ├── Session.js
 │   ├── Conversation.js
 │   ├── Message.js
-│   └── FriendRequest.js
+│   ├── FriendRequest.js
+│   ├── Space.js
+│   ├── Notification.js
+│   └── PushSubscription.js
 ├── modules/
 │   ├── auth/              # Register, login, refresh, logout
 │   ├── users/             # Profile, avatar, search
-│   ├── conversations/     # DM creation, list, messages
+│   ├── conversations/     # DM/group creation, list, messages
 │   ├── messages/          # Edit, delete, reactions
 │   ├── friends/           # Request, accept, decline, list
+│   ├── spaces/            # Spaces, channels, moderation, discovery
+│   ├── notifications/     # In-app + push notification service
+│   ├── push/              # VAPID push subscriptions
 │   └── admin/             # Force logout, user listing
 ├── socket/
-│   ├── index.js           # Socket.IO init, presence, events
+│   ├── index.js           # Socket.IO init, presence, focus tracking, events
 │   └── io.js              # Room helpers, emit utilities
 └── utils/
     ├── asyncHandler.js    # Express async wrapper
@@ -768,8 +923,10 @@ Each module follows a 4-file pattern:
 #### Conversation
 ```
 {
-  type:           String (enum: ["dm", "group"], default: "dm")
+  type:           String (enum: ["dm", "group", "space_channel"], default: "dm")
   participants:   [ObjectId → User] (indexed)
+  spaceId:        ObjectId → Space (nullable, for space channels)
+  name:           String (nullable, for groups/space channels)
   lastMessageAt:  Date (indexed, nullable)
   createdAt:      Date
   updatedAt:      Date
@@ -805,6 +962,59 @@ Each module follows a 4-file pattern:
 ```
 **Indexes:** `{ from, to }` unique, `{ to, status }`, `{ from, status }`.
 
+#### Space
+```
+{
+  name:           String (required)
+  slug:           String (unique)
+  description:    String
+  category:       String (SPACE_CATEGORIES)
+  ownerId:        ObjectId → User
+  avatar:         String
+  banner:         String
+  channels:       [{ name, type: "text"|"announcement", slug }] (embedded)
+  members:        [{ userId, role: "owner"|"admin"|"moderator"|"member" }]
+  createdAt:      Date
+  updatedAt:      Date
+}
+```
+
+#### Notification
+```
+{
+  recipientId:       ObjectId → User (required, indexed)
+  senderId:          ObjectId → User (nullable)
+  type:              enum ["dm_message","group_message","space_message",
+                           "friend_request","friend_accept","space_invite","mention"]
+  conversationId:    ObjectId → Conversation (nullable, indexed)
+  messageId:         ObjectId → Message (nullable)
+  spaceId:           ObjectId → Space (nullable)
+  title:             String (required)
+  body:              String (default "")
+  avatarUrl:         String (nullable)
+  read:              Boolean (default false)
+  seen:              Boolean (default false)
+  delivery: { inAppDelivered: Boolean, pushDelivered: Boolean, pushError: String }
+  createdAt:         Date
+  updatedAt:         Date
+}
+```
+**Indexes:** `{ recipientId, createdAt }`, `{ recipientId, read }`, `{ recipientId, type }`.
+
+#### PushSubscription
+```
+{
+  userId:           ObjectId → User (required, indexed)
+  endpoint:         String (required, unique)
+  keys: { p256dh: String, auth: String }
+  expirationTime:   Date (nullable)
+  userAgent:        String (nullable)
+  createdAt:        Date
+  updatedAt:        Date
+}
+```
+**Index:** `{ userId, endpoint }` unique.
+
 ### Frontend Pages
 
 | Route | File | Purpose | Auth |
@@ -822,6 +1032,7 @@ components/
 ├── auth-guard.jsx            # GuestGate + AuthGate
 ├── socket-provider.jsx       # Socket.IO context
 ├── theme-provider.jsx        # Theme context
+├── pwa-register.jsx          # Service worker/PWA registration
 ├── Hero.jsx                  # Re-export barrel
 ├── saa-s-template.jsx        # Unused SaaS template
 ├── auth/
@@ -834,6 +1045,9 @@ components/
 │   └── nav-items.js          # Navigation data
 ├── chat/
 │   └── chat-bubble.jsx       # Reusable chat bubble
+├── notifications/
+│   ├── notification-bell.jsx # Bell with unread badge
+│   └── notification-center.jsx # Notification feed dropdown
 ├── dashboard/
 │   ├── dashboard-shell.jsx   # Main dashboard orchestrator
 │   ├── sidebar.jsx           # Conversation list + controls
@@ -842,12 +1056,23 @@ components/
 │   ├── avatar.jsx            # Avatar with initials fallback
 │   ├── emoji-picker.jsx      # 9-category emoji picker
 │   ├── friends-modal.jsx     # Friends management modal
+│   ├── group-create-modal.jsx # Group creation modal
+│   ├── group-settings-panel.jsx # Group member/admin management
 │   ├── profile-edit-modal.jsx # Profile editing modal
 │   └── user-panel.jsx        # Right-hand detail panel
+├── spaces/
+│   ├── space-sidebar.jsx     # Space channel list
+│   ├── space-settings-panel.jsx # Space moderation panel
+│   ├── space-discover-modal.jsx # Discover public spaces
+│   ├── space-create-modal.jsx # Create space modal
+│   ├── space-card.jsx        # Space card for discovery
+│   └── channel-list.jsx      # Channels within a space
 └── ui/
     ├── button.jsx            # shadcn Button
     └── bubble.jsx            # shadcn Bubble primitive
 ```
+
+**Note:** `lib/` also includes `push.js` (web push helpers), `sound.js` (notification sounds), `pwa.js`, `banners.js` (animated GIF profile banners), and `avatar-styles.js`.
 
 ---
 
@@ -927,7 +1152,8 @@ components/
 | Backend | Render/Railway | Must support long-lived WebSocket connections |
 | Database | MongoDB Atlas | Managed MongoDB |
 | Storage | Appwrite Storage | Avatars, future attachments |
-| Push | Appwrite Messaging | Planned |
+| Push | Web Push (VAPID) | Shipped — offline web push delivery |
+| Push (future) | Appwrite Messaging | Planned for FCM/APNs native push |
 
 ### Environment Variables
 
@@ -940,6 +1166,9 @@ components/
 - `APPWRITE_PROJECT_ID`
 - `APPWRITE_API_KEY`
 - `APPWRITE_BUCKET_ID`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT`
 - `CORS_ORIGIN`
 - `NODE_ENV`
 
@@ -974,12 +1203,15 @@ These may be considered after the core communication experience is stable.
 ### Phase 1 — Core Communication (Current)
 
 - DMs, realtime messaging, friends, profiles, customization, landing page.
-- Group chats (backend ready, UI pending).
+- Group chats (create, manage members, admins).
+- Spaces & Channels with moderation and discovery.
+- End-to-end notification system (in-app + web push via PWA).
 
 ### Phase 2 — Enhanced Messaging
 
-- Spaces & Channels (Discord-like communities).
 - Threads.
+- Mention notifications / @mentions.
+- Notification preferences per user.
 - Pinned messages.
 - Saved messages.
 - Custom emoji.
