@@ -101,12 +101,14 @@ export async function createForMessage({ message, conversation }) {
   const senderName = sender?.displayName || sender?.username || "Someone";
   const avatarUrl = sender?.avatarUrl || null;
 
+  const mentions = (message.mentions || []).map((m) => m.toString());
+
   // For dm: single recipient, for group/space: all participants except sender
   const participants = (conversation.participants || []).map((p) => p.toString());
   const recipientIds = participants.filter((id) => id !== senderId);
   if (recipientIds.length === 0) return [];
 
-  const title =
+  const defaultTitle =
     convType === "group" ? conversation.name || senderName : senderName;
   const body = (message.content || "").trim().slice(0, 120);
 
@@ -116,9 +118,12 @@ export async function createForMessage({ message, conversation }) {
   for (const recipientId of recipientIds) {
     if (!mongoose.Types.ObjectId.isValid(recipientId)) continue;
 
+    const isMentioned = mentions.includes(recipientId);
+    const recipientNotifType = isMentioned ? "mention" : notifType;
+
     // DM-focused suppression: don't create a notification if recipient is currently
     // viewing this DM with the sender (spec: "when user is on the dm do not send")
-    if (notifType === "dm_message") {
+    if (recipientNotifType === "dm_message") {
       try {
         if (io && io.isUserFocusedOnConversation && io.isUserFocusedOnConversation(recipientId, String(conversation._id))) {
           continue;
@@ -126,14 +131,20 @@ export async function createForMessage({ message, conversation }) {
       } catch {}
     }
 
+    const recipientTitle = isMentioned
+      ? (convType === "group" || convType === "space_channel"
+          ? `${senderName} mentioned you`
+          : `${senderName} mentioned you`)
+      : defaultTitle;
+
     const doc = await Notification.create({
       recipientId,
       senderId,
-      type: notifType,
+      type: recipientNotifType,
       conversationId: conversation._id,
       messageId: message._id,
       spaceId: conversation.spaceId || null,
-      title,
+      title: recipientTitle,
       body,
       avatarUrl,
       read: false,
@@ -161,14 +172,14 @@ export async function createForMessage({ message, conversation }) {
       // but awaited here so delivery status is persisted before return. Wrapped so
       // push failures never break the message flow (see catch inside helper).
       const pushPayload = {
-        title,
+        title: recipientTitle,
         body,
         icon: avatarUrl || "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         data: {
           conversationId: conversation._id.toString(),
           notificationId: doc._id.toString(),
-          type: notifType,
+          type: recipientNotifType,
         },
       };
       try {

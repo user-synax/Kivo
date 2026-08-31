@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
+import { MentionAutocomplete } from "@/components/mentions/mention-autocomplete";
 import { useSocket } from "@/components/socket-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
@@ -201,6 +202,16 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
   const [editText, setEditText] = useState("");
   const [replyingTo, setReplyingTo] = useState(null); // message being replied to
   const [showEmoji, setShowEmoji] = useState(false);
+
+  // Mention autocomplete state
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionPos, setMentionPos] = useState(null);
+
+  // Live online presence tracking set
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
 
@@ -210,10 +221,111 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
   const typingTimer = useRef(null);
   const bottomRef = useRef(null);
 
-  // Sync presence dot when switching conversations.
+  // Sync presence set when conversation changes
   useEffect(() => {
     setOtherOnline(online);
-  }, [online]);
+    const nextSet = new Set();
+    if (conversation?.participants) {
+      if (!isGroup && !isChannel && otherId && online) {
+        nextSet.add(otherId.toString());
+      }
+      if (Array.isArray(conversation.online) && Array.isArray(conversation.otherParticipantIds)) {
+        conversation.otherParticipantIds.forEach((id, idx) => {
+          if (conversation.online[idx]) nextSet.add(id.toString());
+        });
+      }
+    }
+    setOnlineUsers(nextSet);
+  }, [conversation, online, otherId, isGroup, isChannel]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onOnline = (p) => {
+      if (p?.userId) {
+        setOnlineUsers((prev) => new Set(prev).add(p.userId.toString()));
+      }
+    };
+    const onOffline = (p) => {
+      if (p?.userId) {
+        setOnlineUsers((prev) => {
+          const next = new Set(prev);
+          next.delete(p.userId.toString());
+          return next;
+        });
+      }
+    };
+    socket.on("presence:online", onOnline);
+    socket.on("presence:offline", onOffline);
+    return () => {
+      socket.off("presence:online", onOnline);
+      socket.off("presence:offline", onOffline);
+    };
+  }, [socket]);
+
+  const isUserOnline = (uid) => {
+    if (!uid) return false;
+    const str = uid.toString();
+    if (str === userId) return true;
+    return onlineUsers.has(str);
+  };
+
+  const getFilteredParticipants = (queryStr) => {
+    return (conversation?.participants || []).filter((p) => {
+      if (!p) return false;
+      const pid = (p.id || p._id || p)?.toString?.();
+      if (pid === userId) return false;
+      const u = p.username || "";
+      const d = p.displayName || "";
+      const q = queryStr.toLowerCase();
+      return u.toLowerCase().startsWith(q) || d.toLowerCase().startsWith(q);
+    });
+  };
+
+  const checkMentionTrigger = (val, cursorPosition) => {
+    const pos = cursorPosition ?? textareaRef.current?.selectionStart ?? val.length;
+    const textBeforeCaret = val.slice(0, pos);
+    const lastAt = textBeforeCaret.lastIndexOf("@");
+
+    if (lastAt !== -1) {
+      const isStartOrSpace = lastAt === 0 || /\s/.test(val[lastAt - 1]);
+      const sub = val.slice(lastAt + 1, pos);
+      if (isStartOrSpace && !/\s/.test(sub)) {
+        const matching = getFilteredParticipants(sub);
+
+        if (matching.length > 0) {
+          setMentionOpen(true);
+          setMentionQuery(sub);
+          setMentionPos(lastAt);
+          setMentionIndex(0);
+          return;
+        }
+      }
+    }
+    setMentionOpen(false);
+  };
+
+  const handleSelectMention = (p) => {
+    if (!p || mentionPos === null) return;
+    const handle = p.username || p.displayName;
+    if (!handle) return;
+
+    const pos = textareaRef.current?.selectionStart ?? text.length;
+    const before = text.slice(0, mentionPos);
+    const after = text.slice(pos);
+    const inserted = `@${handle} `;
+    const newText = before + inserted + after;
+    const newCursorPos = mentionPos + inserted.length;
+
+    setText(newText);
+    setMentionOpen(false);
+
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+  };
 
   // Load message history when the conversation changes.
   useEffect(() => {
@@ -461,6 +573,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
     };
     setMessages((prev) => [...prev, optimistic]);
     setText("");
+    setMentionOpen(false);
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (socket) socket.emit("typing:stop", { conversationId: convId });
     try {
@@ -732,6 +845,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
                     isReplying={replyingTo?.id === m.id}
                     replyTo={replyTo}
                     receipt={receipt}
+                    participants={conversation?.participants || []}
+                    isUserOnline={isUserOnline}
                   />
                 </SwipeToReply>
               </div>
@@ -752,7 +867,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
       </div>
 
        {/* Composer */}
-       <div className="shrink-0 overflow-x-hidden border-t border-[var(--border)] p-3">
+       <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3">
           <div className="mx-auto max-w-3xl">
             {replyingTo && canPost && (
               <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
@@ -785,7 +900,15 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
                 <span>Only admins can post in this announcement channel</span>
               </div>
             ) : (
-              <div className="relative flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
+              <div className="relative z-20 flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
+          {mentionOpen && (
+            <MentionAutocomplete
+              participants={getFilteredParticipants(mentionQuery)}
+              query={mentionQuery}
+              selectedIndex={mentionIndex}
+              onSelect={handleSelectMention}
+            />
+          )}
           <button
             ref={emojiBtnRef}
             type="button"
@@ -807,10 +930,48 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
             ref={textareaRef}
             value={text}
             onChange={(e) => {
-              setText(e.target.value);
+              const val = e.target.value;
+              setText(val);
               emitTyping();
+              checkMentionTrigger(val, e.target.selectionStart);
+            }}
+            onClick={(e) => {
+              checkMentionTrigger(text, e.target.selectionStart);
+            }}
+            onKeyUp={(e) => {
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+                checkMentionTrigger(text, e.target.selectionStart);
+              }
             }}
             onKeyDown={(e) => {
+              if (mentionOpen) {
+                const filtered = getFilteredParticipants(mentionQuery);
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setMentionIndex((prev) => (filtered.length ? (prev + 1) % filtered.length : 0));
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setMentionIndex((prev) => (filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0));
+                  return;
+                }
+                if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                  e.preventDefault();
+                  if (filtered[mentionIndex]) {
+                    handleSelectMention(filtered[mentionIndex]);
+                  } else {
+                    setMentionOpen(false);
+                  }
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setMentionOpen(false);
+                  return;
+                }
+              }
+
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 send();

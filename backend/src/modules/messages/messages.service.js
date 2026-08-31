@@ -27,6 +27,7 @@ export function publicMessage(message) {
       userId: r.userId.toString(),
       readAt: r.readAt,
     })),
+    mentions: (obj.mentions || []).map((id) => id.toString()),
     isEdited: obj.isEdited,
     isDeleted: obj.isDeleted,
     createdAt: obj.createdAt,
@@ -75,6 +76,31 @@ export async function listMessages({ conversationId, userId, cursor, limit }) {
   return { messages, nextCursor };
 }
 
+// Parse @username tokens from message content and resolve them against conversation participants.
+async function resolveMentions(content, participantIds) {
+  if (!content || !participantIds || participantIds.length === 0) return [];
+  const matches = content.match(/@([a-zA-Z0-9_.-]+)/g);
+  if (!matches) return [];
+
+  const extractedUsernames = [...new Set(matches.map((m) => m.slice(1).toLowerCase()))];
+  if (extractedUsernames.length === 0) return [];
+
+  const users = await User.find({
+    _id: { $in: participantIds },
+    username: { $exists: true, $ne: null },
+  })
+    .select("_id username")
+    .lean();
+
+  const resolvedIds = [];
+  for (const user of users) {
+    if (user.username && extractedUsernames.includes(user.username.toLowerCase())) {
+      resolvedIds.push(user._id);
+    }
+  }
+  return resolvedIds;
+}
+
 export async function createMessage({ conversationId, userId, content, replyToMessageId }) {
   const conversation = await assertMembership(conversationId, userId);
 
@@ -102,11 +128,14 @@ export async function createMessage({ conversationId, userId, content, replyToMe
     }
   }
 
+  const mentionIds = await resolveMentions(content, conversation.participants);
+
   const message = await Message.create({
     conversationId,
     senderId: userId,
     content,
     replyToMessageId: replyToMessageId || null,
+    mentions: mentionIds,
   });
 
   // Bump the conversation's activity timestamp for inbox ordering.
@@ -128,7 +157,7 @@ export async function createMessage({ conversationId, userId, content, replyToMe
 export async function editMessage({ messageId, userId, content }) {
   const message = await Message.findById(messageId);
   if (!message) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
-  await assertMembership(message.conversationId.toString(), userId);
+  const conversation = await assertMembership(message.conversationId.toString(), userId);
 
   if (message.senderId.toString() !== userId) {
     throw forbidden("You can only edit your own messages", "NOT_SENDER");
@@ -137,7 +166,10 @@ export async function editMessage({ messageId, userId, content }) {
     throw badRequest("Cannot edit a deleted message", "ALREADY_DELETED");
   }
 
+  const mentionIds = await resolveMentions(content, conversation.participants);
+
   message.content = content;
+  message.mentions = mentionIds;
   message.isEdited = true;
   await message.save();
 

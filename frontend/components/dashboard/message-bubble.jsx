@@ -25,6 +25,66 @@ import { cn } from "@/lib/utils";
 // Behavior (edit, delete, reactions, receipts, retry) is unchanged from before —
 // all state lives in the parent (chat-panel) and is passed in as props.
 
+import { MentionToken } from "@/components/mentions/mention-token";
+
+function MessageContent({ content, mentions = [], participants = [], isUserOnline }) {
+  if (!content) return null;
+
+  const resolvedUsernames = {};
+  const mentionsSet = new Set((mentions || []).map((m) => m.toString()));
+
+  for (const p of participants || []) {
+    if (!p) continue;
+    const pid = (p.id || p._id || p)?.toString?.();
+    if (pid && mentionsSet.has(pid) && p.username) {
+      resolvedUsernames[p.username.toLowerCase()] = p;
+    }
+  }
+
+  if (Object.keys(resolvedUsernames).length === 0) {
+    return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</span>;
+  }
+
+  const parts = [];
+  let lastIndex = 0;
+  const regex = /@([a-zA-Z0-9_.-]+)/g;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    const rawMatch = match[0];
+    const uname = match[1];
+    const lower = uname.toLowerCase();
+
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+
+    if (resolvedUsernames[lower]) {
+      const user = resolvedUsernames[lower];
+      const uid = (user.id || user._id)?.toString?.();
+      const online = Boolean(isUserOnline?.(uid));
+      parts.push(
+        <MentionToken
+          key={`${match.index}-${lower}`}
+          username={uname}
+          user={user}
+          isOnline={online}
+        />
+      );
+    } else {
+      parts.push(rawMatch);
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
+  return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{parts}</span>;
+}
+
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 export function MessageBubble({
@@ -49,6 +109,8 @@ export function MessageBubble({
   className,
   contentClassName,
   replyTo,
+  participants = [],
+  isUserOnline,
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
@@ -108,7 +170,12 @@ export function MessageBubble({
           ) : deleted ? (
             <span className="opacity-70">This message was deleted</span>
           ) : (
-            <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</span>
+            <MessageContent
+              content={message.content}
+              mentions={message.mentions}
+              participants={participants}
+              isUserOnline={isUserOnline}
+            />
           )}
         </BubbleContent>
 

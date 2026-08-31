@@ -65,6 +65,12 @@ const messageSchema = new mongoose.Schema(
 
     readBy: { type: [readBySchema], default: [] },
 
+    // User ObjectIds resolved from @username mentions in the content.
+    mentions: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+
     isEdited: { type: Boolean, default: false },
     // Soft delete: keep the row (so replies/ordering remain stable) but blank it.
     isDeleted: { type: Boolean, default: false },
