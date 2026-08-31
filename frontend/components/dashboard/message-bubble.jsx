@@ -168,7 +168,7 @@ export function MessageBubble({
               ref={editRef}
             />
           ) : deleted ? (
-            <span className="opacity-70">This message was deleted</span>
+            <span className="opacity-20 bg-transparent bg-red-800">This message was deleted</span>
           ) : (
             <MessageContent
               content={message.content}
