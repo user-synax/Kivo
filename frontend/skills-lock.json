@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "beui": {
+      "source": "starc007/ui-components",
+      "sourceType": "github",
+      "skillPath": "skills/beui/SKILL.md",
+      "computedHash": "c26ac007b804613b5275c9c1836a997ded209de8c71c039e4c82564d7befcaba"
+    },
     "brandkit": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
