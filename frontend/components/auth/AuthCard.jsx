@@ -26,25 +26,13 @@ export function AuthCard({ children }) {
           className="mb-8 flex items-center justify-center gap-2 rounded-pills px-2 text-ink-black transition-opacity duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-80"
           aria-label="Kivo home"
         >
-          <svg
-            width="26"
-            height="26"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            className="shrink-0"
-          >
-            <defs>
-              <linearGradient id="kivoAuthMark" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#7a40ed" />
-                <stop offset="100%" stopColor="#17082c" />
-              </linearGradient>
-            </defs>
-            <rect x="1" y="1" width="22" height="22" rx="7" fill="url(#kivoAuthMark)" />
-            <path
-              d="M7 9.2A1.6 1.6 0 0 1 8.6 7.6h6.8A1.6 1.6 0 0 1 17 9.2v4.1a1.6 1.6 0 0 1-1.6 1.6H10l-2.6 2.2v-2.2H8.6A1.6 1.6 0 0 1 7 13.3V9.2Z"
-              fill="#ffffff"
-            />
-          </svg>
+          <img
+            src="/icons/icon-192.png"
+            alt="Kivo"
+            width="40"
+            height="40"
+            className="size-10 shrink-0 rounded-[10px] object-cover"
+          />
           <span className="font-goga text-[22px] font-medium tracking-tight text-ink-black">
             Kivo
           </span>

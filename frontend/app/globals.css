@@ -353,6 +353,8 @@
     html {
         @apply bg-canvas text-ink font-sans antialiased;
         color-scheme: dark;
+        scroll-behavior: smooth;
+        scroll-padding-top: 88px;
     }
 
     body {

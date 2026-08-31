@@ -265,29 +265,15 @@ export function Navbar() {
     );
 }
 
-/* Brand mark — a violet→plum gradient tile carrying a white chat glyph.
-   Swap for <img src="/logo.svg" alt="Kivo" /> once the final asset lands. */
 function BrandMark() {
     return (
-        <svg
+        <img
+            src="/icons/icon-192.png"
+            alt="Kivo"
             width="24"
             height="24"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            className="shrink-0"
-        >
-            <defs>
-                <linearGradient id="kivoMark" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#4ba9e1" />
-                    <stop offset="100%" stopColor="#1c1c1c" />
-                </linearGradient>
-            </defs>
-            <rect x="1" y="1" width="22" height="22" rx="7" fill="url(#kivoMark)" />
-            <path
-                d="M7 9.2A1.6 1.6 0 0 1 8.6 7.6h6.8A1.6 1.6 0 0 1 17 9.2v4.1a1.6 1.6 0 0 1-1.6 1.6H10l-2.6 2.2v-2.2H8.6A1.6 1.6 0 0 1 7 13.3V9.2Z"
-                fill="#ffffff"
-            />
-        </svg>
+            className="size-6 shrink-0 rounded-[6px] object-cover"
+        />
     );
 }
 
