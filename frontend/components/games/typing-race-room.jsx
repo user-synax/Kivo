@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Flag, Trophy, Clock, Target, X, Zap } from "lucide-react";
+import { Flag, Trophy, Clock, Target, X, Zap, Hourglass } from "lucide-react";
 import { connectGamesSocket } from "@/lib/games-socket";
 import { getSession } from "@/lib/auth";
 import { getCachedFinishedRace, setCachedFinishedRace } from "@/lib/cache";
@@ -38,6 +38,7 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
   const [joinedCount, setJoinedCount] = useState(1);
   const [expectedCount, setExpectedCount] = useState(2);
   const [namesMap, setNamesMap] = useState({}); // userId -> displayName
+  const [waitingTimeLeft, setWaitingTimeLeft] = useState(null); // seconds remaining before auto-close
 
   // preload enriched match to get full names for all players
   useEffect(() => {
@@ -80,6 +81,14 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
   useEffect(() => {
     let active = true;
     let s = null;
+    let cleanupFns = [];
+
+    const emitJoin = () => {
+      const sock = socketRef.current;
+      if (sock && sock.connected) {
+        sock.emit("race:join", { matchId: String(matchId) });
+      }
+    };
 
     (async () => {
       try {
@@ -161,25 +170,33 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
           }
         };
 
+        // When the socket (re)connects, re-emit race:join so the server
+        // re-adds us to the room — critical after production deploys or
+        // network blips that clear the in-memory game state.
+        const onConnect = () => {
+          emitJoin();
+        };
+
         s.on("race:joined", onJoined);
         s.on("race:waiting", onWaiting);
         s.on("race:start", onStart);
         s.on("race:progress", onProgress);
         s.on("race:finished", onFinished);
         s.on("race:completed", onCompleted);
+        s.on("connect", onConnect);
 
-        // emit join
-        s.emit("race:join", { matchId: String(matchId) });
-
-        // cleanup
-        s._kivo_cleanup = () => {
+        cleanupFns.push(() => {
           s.off("race:joined", onJoined);
           s.off("race:waiting", onWaiting);
           s.off("race:start", onStart);
           s.off("race:progress", onProgress);
           s.off("race:finished", onFinished);
           s.off("race:completed", onCompleted);
-        };
+          s.off("connect", onConnect);
+        });
+
+        // emit join (if already connected) or wait for onConnect
+        emitJoin();
       } catch (err) {
         console.error("[TypingRaceRoom] connect failed", err);
       }
@@ -187,7 +204,7 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
 
     return () => {
       active = false;
-      if (s && s._kivo_cleanup) s._kivo_cleanup();
+      for (const fn of cleanupFns) fn();
       // leave room
       try {
         s?.emit("race:leave", { matchId: String(matchId) });
@@ -201,6 +218,50 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
     const iv = setInterval(() => setElapsed(Date.now() - startTime), 200);
     return () => clearInterval(iv);
   }, [status, startTime]);
+
+  // Waiting timeout — auto-close after 60 s if no opponent joins.
+  const waitingTimerRef = useRef(null);
+  const waitingTickRef = useRef(null);
+
+  useEffect(() => {
+    if (status !== "waiting") {
+      // clear any running timers when we leave the waiting state
+      if (waitingTimerRef.current) { clearTimeout(waitingTimerRef.current); waitingTimerRef.current = null; }
+      if (waitingTickRef.current) { clearInterval(waitingTickRef.current); waitingTickRef.current = null; }
+      setWaitingTimeLeft(null);
+      return;
+    }
+
+    // already all players joined — no timeout needed
+    if (joinedCount >= expectedCount) {
+      setWaitingTimeLeft(null);
+      return;
+    }
+
+    const TOTAL_SECONDS = 60;
+    setWaitingTimeLeft(TOTAL_SECONDS);
+
+    waitingTickRef.current = setInterval(() => {
+      setWaitingTimeLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(waitingTickRef.current);
+          waitingTickRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    waitingTimerRef.current = setTimeout(() => {
+      onClose();
+    }, TOTAL_SECONDS * 1000);
+
+    return () => {
+      if (waitingTimerRef.current) { clearTimeout(waitingTimerRef.current); waitingTimerRef.current = null; }
+      if (waitingTickRef.current) { clearInterval(waitingTickRef.current); waitingTickRef.current = null; }
+      setWaitingTimeLeft(null);
+    };
+  }, [status, joinedCount, expectedCount, onClose]);
 
   // throttled progress emission: every 300ms or word boundary
   const emitProgress = useCallback(
@@ -315,6 +376,14 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
                 {joinedCount} of {expectedCount} players joined — race starts when everyone joins
               </p>
             </div>
+            {waitingTimeLeft !== null && (
+              <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2">
+                <Hourglass className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                <span className="text-xs font-medium text-[var(--text-muted)]">
+                  Auto-closes in <span className="font-semibold text-[var(--text-primary)]">{waitingTimeLeft}s</span>
+                </span>
+              </div>
+            )}
             <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
               <p className="text-xs font-medium text-[var(--text-muted)]">Prompt preview</p>
               <p className="mt-1 text-sm text-[var(--text-primary)]">{prompt}</p>

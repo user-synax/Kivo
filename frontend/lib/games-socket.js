@@ -12,7 +12,10 @@ export function getGamesSocket() {
 }
 
 export async function connectGamesSocket() {
-  if (gamesSocket?.connected) return gamesSocket;
+  // Return existing socket even if reconnecting — the caller listens for
+  // 'connect' to re-emit join events. Creating a new socket would orphan
+  // the old one and leave existing event handlers stranded.
+  if (gamesSocket) return gamesSocket;
   if (gamesSocketPromise) return gamesSocketPromise;
 
   const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -45,6 +48,14 @@ export async function connectGamesSocket() {
           s.auth = { token: fresh };
           s.connect();
         } catch {}
+      }
+    });
+
+    s.on("disconnect", () => {
+      // Clear the singleton so a future connectGamesSocket() call can create
+      // a fresh socket if reconnection has given up.
+      if (!s.recovered && !s.active) {
+        gamesSocket = null;
       }
     });
 

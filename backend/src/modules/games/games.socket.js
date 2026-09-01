@@ -59,6 +59,7 @@ export function initGamesNamespace(io) {
 
         // ensure in-memory state exists
         let state = gameStates.get(String(matchId));
+        let wasReconstructed = false;
         if (!state) {
           state = {
             matchId: String(matchId),
@@ -74,11 +75,30 @@ export function initGamesNamespace(io) {
             startedAt: match.startedAt || null,
           };
           gameStates.set(String(matchId), state);
+          wasReconstructed = true;
         }
 
         socket.join(roomName(matchId));
         state.joined.add(String(userId));
         socket.data.matchId = String(matchId);
+
+        // If state was just reconstructed (e.g. after a server restart) and the
+        // match is already active or completed, sync the reconnecting player
+        // with whatever was persisted in the DB so they don't get stuck on
+        // the waiting screen.
+        if (wasReconstructed && (state.status === "active" || state.status === "completed")) {
+          // restore finished players from the DB document
+          for (const p of match.players) {
+            if (p.rank) {
+              state.finished.set(String(p.userId), {
+                wpm: p.wpm,
+                accuracy: p.accuracy,
+                rank: p.rank,
+                finishedAt: p.finishedAt,
+              });
+            }
+          }
+        }
 
         // notify room about updated joined count
         const joinedList = [...state.joined];
@@ -112,6 +132,12 @@ export function initGamesNamespace(io) {
               prompt: state.textPrompt,
               countdown: 0,
               startedAt: state.startedAt,
+            });
+          } else if (state.status === "completed") {
+            socket.emit("race:completed", {
+              matchId: String(matchId),
+              results: match.players,
+              endedAt: match.endedAt,
             });
           } else {
             // still pending, send prompt so client can prepare
