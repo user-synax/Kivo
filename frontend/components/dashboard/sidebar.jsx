@@ -577,17 +577,6 @@ export function Sidebar({
               collapsed={collapsed}
             />
           )}
-
-          {showToggle && (
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="kivo-focus hover:cursor-pointer flex size-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-            >
-              <PanelLeft className="h-5 w-5" strokeWidth={1.6} />
-            </button>
-          )}
         </div>
       </div>
 

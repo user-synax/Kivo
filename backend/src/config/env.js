@@ -43,6 +43,13 @@ const env = {
   vapidPublicKey: required("VAPID_PUBLIC_KEY", process.env.VAPID_PUBLIC_KEY),
   vapidPrivateKey: required("VAPID_PRIVATE_KEY", process.env.VAPID_PRIVATE_KEY),
   vapidSubject: required("VAPID_SUBJECT", process.env.VAPID_SUBJECT),
+
+  // Admin panel — standalone credential pair, NOT a DB user account.
+  adminEmail: process.env.ADMIN_EMAIL || "",
+  adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",
+  adminJwtSecret: process.env.ADMIN_JWT_SECRET || process.env.ACCESS_TOKEN_SECRET + "_admin",
+  adminJwtTtl: process.env.ADMIN_JWT_TTL || "30m",
+  adminCookieName: process.env.ADMIN_COOKIE_NAME || "admin_token",
 };
 
 // Convenience: seconds for the Redis session TTL, derived from refresh token TTL.

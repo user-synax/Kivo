@@ -104,6 +104,15 @@ export async function loginUser({ identifier, password, deviceInfo }) {
     throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
   }
 
+  // Defense in depth: reject banned users at login even if the socket layer
+  // also disconnects them immediately on ban.
+  if (user.isBanned) {
+    throw unauthorized(
+      "This account has been suspended",
+      "ACCOUNT_BANNED",
+    );
+  }
+
   const ok = await user.comparePassword(password);
   if (!ok) {
     throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");

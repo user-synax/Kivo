@@ -76,6 +76,11 @@ const userSchema = new mongoose.Schema(
       default: [],
       index: true,
     },
+    // Admin ban fields — the user document is preserved (not deleted) so the
+    // email stays locked and re-registration is impossible.
+    isBanned: { type: Boolean, default: false, index: true },
+    bannedAt: { type: Date, default: null },
+    bannedReason: { type: String, default: null, maxlength: 500 },
   },
   { timestamps: true }
 );

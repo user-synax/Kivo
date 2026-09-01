@@ -34,7 +34,7 @@ app.get("/health", (req, res) => res.json({ success: true, data: { status: "ok" 
 
 // API routes.
 app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/admin", adminRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/v1/conversations", conversationRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/users", userRoutes);

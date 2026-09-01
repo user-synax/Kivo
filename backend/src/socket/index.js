@@ -64,7 +64,7 @@ function isOnline(userId) {
 // Verify the access token presented during the Socket.IO handshake. We reuse
 // the exact same secret/algorithm as the HTTP `authenticate` middleware so the
 // auth surface is single-source. Re-runs on every (re)connection automatically.
-function verifyHandshakeToken(socket, next) {
+async function verifyHandshakeToken(socket, next) {
   try {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
     if (!token) {
@@ -78,6 +78,14 @@ function verifyHandshakeToken(socket, next) {
     }
     if (!payload.userId) {
       throw unauthorized("Invalid socket auth token", "SOCKET_UNAUTHENTICATED");
+    }
+    // Defense in depth: reject banned users at reconnect time.
+    const user = await User.findById(payload.userId).select("isBanned").lean();
+    if (!user) {
+      throw unauthorized("User no longer exists", "SOCKET_UNAUTHENTICATED");
+    }
+    if (user.isBanned) {
+      throw unauthorized("Account has been suspended", "ACCOUNT_BANNED");
     }
     socket.userId = payload.userId;
     socket.sessionId = payload.sessionId || null;
