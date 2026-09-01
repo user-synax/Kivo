@@ -36,36 +36,6 @@ const FRAMER = {
     scrollbarThumbHover: "#3a3a3a",
 };
 
-const CLOUD = {
-    ...FRAMER,
-    base: "#0b0d12",
-    surface: "#14171f",
-    elevated: "#1b1f29",
-    border: "#283040",
-    scrollbarThumb: "#283040",
-    scrollbarThumbHover: "#3a4456",
-};
-
-const SAND = {
-    ...FRAMER,
-    base: "#100d0a",
-    surface: "#1a1611",
-    elevated: "#221d16",
-    border: "#2e2820",
-    scrollbarThumb: "#2e2820",
-    scrollbarThumbHover: "#403a30",
-};
-
-const INK = {
-    ...FRAMER,
-    base: "#0c0c0e",
-    surface: "#151517",
-    elevated: "#1c1c1f",
-    border: "#2a2a2e",
-    scrollbarThumb: "#2a2a2e",
-    scrollbarThumbHover: "#3a3a40",
-};
-
 const MIDNIGHT = {
     ...FRAMER,
     base: "#0a0e16",
@@ -74,6 +44,72 @@ const MIDNIGHT = {
     border: "#26334a",
     scrollbarThumb: "#26334a",
     scrollbarThumbHover: "#36486a",
+};
+
+// Graphite — cool, sophisticated slate. Deeper contrast steps between
+// surface/elevated than Midnight, for a more premium, "machined metal" feel.
+const GRAPHITE = {
+    ...FRAMER,
+    base: "#0d0f12",
+    surface: "#171a1f",
+    elevated: "#1f2329",
+    border: "#2b3038",
+    scrollbarThumb: "#2b3038",
+    scrollbarThumbHover: "#3c434e",
+};
+
+// Espresso — rich, warm dark canvas with a wider tonal ramp (base → surface →
+// elevated → border) than a flat brown, so layers read as genuinely lifted.
+const ESPRESSO = {
+    ...FRAMER,
+    base: "#130e0a",
+    surface: "#201811",
+    elevated: "#2a2016",
+    border: "#3a2c1c",
+    scrollbarThumb: "#3a2c1c",
+    scrollbarThumbHover: "#5c4527",
+};
+
+// Light palettes --------------------------------------------------------
+// Same single blue accent, same shape as the dark palettes — only the ink
+// relationship inverts: dark text on a light canvas, with the "sent bubble"
+// still taking the ink extreme (as white did on dark canvases).
+const PORCELAIN = {
+    base: "#faf9f7",
+    surface: "#ffffff",
+    elevated: "#ffffff",
+    textPrimary: "#161615",
+    textMuted: "#7a7770",
+    border: "#e6e3dd",
+    accent: "#4ba9e1",
+    hover: "rgba(22, 22, 21, 0.05)",
+    bubbleSent: "#161615",
+    bubbleSentFg: "#faf9f7",
+    bubbleReceived: "#f1efe9",
+    unreadBadge: "#4ba9e1",
+    onAccent: "#090909",
+    online: "#22c55e",
+    accentSoft: "rgba(75, 169, 225, 0.14)",
+    glassHighlight: "rgba(22, 22, 21, 0.04)",
+    scrollbarThumb: "#ddd9d0",
+    scrollbarThumbHover: "#c9c4b8",
+};
+
+const LINEN = {
+    ...PORCELAIN,
+    base: "#f8f4ec",
+    surface: "#fffdf8",
+    elevated: "#ffffff",
+    textPrimary: "#20180f",
+    textMuted: "#8a7c66",
+    border: "#e9dfc9",
+    hover: "rgba(32, 24, 15, 0.05)",
+    bubbleSent: "#20180f",
+    bubbleSentFg: "#f8f4ec",
+    bubbleReceived: "#f1e8d6",
+    glassHighlight: "rgba(32, 24, 15, 0.04)",
+    scrollbarThumb: "#e2d5b8",
+    scrollbarThumbHover: "#cbb98f",
 };
 
 export const themes = {
@@ -85,30 +121,6 @@ export const themes = {
         colors: FRAMER,
     },
 
-    // Cloud — cool, slightly blue-tinted canvas.
-    cloud: {
-        id: "cloud",
-        label: "Cloud",
-        swatch: "#4ba9e1",
-        colors: CLOUD,
-    },
-
-    // Sand — faint warm cast on the canvas.
-    sand: {
-        id: "sand",
-        label: "Sand",
-        swatch: "#4ba9e1",
-        colors: SAND,
-    },
-
-    // Ink — neutral near-black.
-    ink: {
-        id: "ink",
-        label: "Ink",
-        swatch: "#4ba9e1",
-        colors: INK,
-    },
-
     // Midnight — deep navy canvas.
     midnight: {
         id: "midnight",
@@ -116,9 +128,41 @@ export const themes = {
         swatch: "#4ba9e1",
         colors: MIDNIGHT,
     },
+
+    // Graphite — cool slate, premium metallic depth.
+    graphite: {
+        id: "graphite",
+        label: "Graphite",
+        swatch: "#4ba9e1",
+        colors: GRAPHITE,
+    },
+
+    // Espresso — rich warm dark, deep tonal ramp.
+    espresso: {
+        id: "espresso",
+        label: "Espresso",
+        swatch: "#4ba9e1",
+        colors: ESPRESSO,
+    },
+
+    // Porcelain — clean, neutral off-white canvas.
+    porcelain: {
+        id: "porcelain",
+        label: "Porcelain",
+        swatch: "#4ba9e1",
+        colors: PORCELAIN,
+    },
+
+    // Linen — warm cream canvas.
+    linen: {
+        id: "linen",
+        label: "Linen",
+        swatch: "#4ba9e1",
+        colors: LINEN,
+    },
 };
 
-export const themeOrder = ["framer", "cloud", "sand", "ink", "midnight"];
+export const themeOrder = ["framer", "midnight", "graphite", "espresso", "porcelain", "linen"];
 export const defaultThemeId = "framer";
 export const THEME_STORAGE_KEY = "kivo:theme";
 

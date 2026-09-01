@@ -755,23 +755,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             type="button"
             onClick={onBack}
             aria-label="Back to conversations"
-            className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            className="flex items-center gap-1 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] px-3 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors duration-200 hover:bg-[#232323]"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M15 5l-7 7 7 7"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <span aria-hidden="true">&lt;</span> Back
           </button>
         )}
         <Avatar

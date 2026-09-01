@@ -320,6 +320,9 @@ export function DashboardShell() {
     notificationsRef.current = notifications;
   }, [notifications]);
   const lastFocusedRef = useRef(null);
+  const chatSwipeStartRef = useRef({ x: 0, y: 0 });
+  const chatSwipeIsHorizontalRef = useRef(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
   const socket = useSocket();
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
@@ -472,6 +475,26 @@ export function DashboardShell() {
     if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
     else localStorage.removeItem(SELECTED_KEY);
   }, [selectedId]);
+
+  // Mobile: trap browser back / edge swipe so it returns to list (DM/Group/Space), not to /login.
+  useEffect(() => {
+    if (isDesktop || !selectedId) return;
+    const url = window.location.href;
+    try {
+      window.history.pushState({ kivoChat: selectedId }, "", url);
+    } catch {}
+    const onPopState = () => {
+      setSelectedId((curr) => (curr ? null : curr));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      // clean up the pushed entry if user went back via our drag (setSelectedId null) without pop
+      try {
+        if (window.history.state?.kivoChat) window.history.back();
+      } catch {}
+    };
+  }, [isDesktop, selectedId]);
 
   // Reusable list loader (also used to pull in a conversation that just appeared).
   const loadConversations = useCallback(() => {
@@ -1076,8 +1099,63 @@ export function DashboardShell() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={slide}
-              className="absolute inset-0 bg-[var(--bg-base)]"
+              drag={reduce ? false : "x"}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.22}
+              dragMomentum={false}
+              dragDirectionLock
+              onDrag={(_, info) => {
+                const p = Math.min(Math.abs(info.offset.x) / 90, 1);
+                setSwipeProgress(p);
+              }}
+              onDragEnd={(_, info) => {
+                const offset = info?.offset?.x ?? 0;
+                const velocity = info?.velocity?.x ?? 0;
+                setSwipeProgress(0);
+                if (Math.abs(offset) > 90 || Math.abs(velocity) > 700) setSelectedId(null);
+              }}
+              onTouchStart={(e) => {
+                const t = e.touches?.[0];
+                if (!t) return;
+                chatSwipeStartRef.current = { x: t.clientX, y: t.clientY };
+                chatSwipeIsHorizontalRef.current = false;
+              }}
+              onTouchMove={(e) => {
+                const t = e.touches?.[0];
+                if (!t) return;
+                const dx = t.clientX - chatSwipeStartRef.current.x;
+                const dy = t.clientY - chatSwipeStartRef.current.y;
+                if (!chatSwipeIsHorizontalRef.current && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                  chatSwipeIsHorizontalRef.current = true;
+                }
+                if (chatSwipeIsHorizontalRef.current && Math.abs(dx) > 12) {
+                  if (e.cancelable) e.preventDefault();
+                  const p = Math.min(Math.abs(dx) / 90, 1);
+                  setSwipeProgress(p);
+                }
+              }}
+              onTouchEnd={() => {
+                chatSwipeIsHorizontalRef.current = false;
+                setSwipeProgress(0);
+              }}
+              className="absolute inset-0 bg-[var(--bg-base)] touch-pan-y overscroll-x-contain overscroll-contain"
+              style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
             >
+              {/* Swipe indicator — dark pill with "< Back", blur smooth (keep) */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2"
+                style={{
+                  opacity: swipeProgress,
+                  filter: reduce ? undefined : `blur(${(1 - swipeProgress) * 6}px)`,
+                  transform: `translateY(-50%) translateX(${(1 - swipeProgress) * -12}px)`,
+                  transition: "opacity 180ms cubic-bezier(0.22,1,0.36,1), filter 220ms cubic-bezier(0.22,1,0.36,1), transform 220ms cubic-bezier(0.22,1,0.36,1)",
+                }}
+              >
+                <div className="flex items-center gap-1.5 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] px-3 py-1.5 shadow-lg">
+                  <span className="text-[13px] font-medium text-white">&lt; Back</span>
+                </div>
+              </div>
               <ChatPanel
                 conversation={selected}
                 space={selectedSpace}
