@@ -30,15 +30,15 @@ const SIZE = {
         dot: "-bottom-px -right-px size-1.5 ring-1",
         badgeOffset: "-bottom-0.5 -right-0.5",
     },
-    // Default: sidebar list rows, profile nav.
+    // Default: sidebar list rows, profile nav — bumped for chat list (little big on mobile).
     md: {
-        box: "size-9 text-[13px] sm:size-10 sm:text-sm",
+        box: "size-11 text-sm sm:size-12 sm:text-[15px]",
 
         borderClass: "border-2",
         borderWidth: 2,
         ringPad: "p-[2px]",
         radius: "rounded-lg",
-        dot: "-bottom-0.5 -right-0.5 size-2 ring-2",
+        dot: "-bottom-0.5 -right-0.5 size-2.5 ring-2",
         badgeOffset: "-bottom-1 -right-1",
     },
     // Hero: detail panel / profile editor. Scales up modestly with the viewport

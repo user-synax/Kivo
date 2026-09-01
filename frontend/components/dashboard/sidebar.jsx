@@ -503,6 +503,8 @@ export function Sidebar({
   onProfileUpdate,
   notificationBell = null,
   hideSpaces = false,
+  hideGroups = false,
+  hideDMs = false,
 }) {
   const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -609,21 +611,25 @@ export function Sidebar({
           <EmptyState message={`No friends match “${query.trim()}”`} />
         ) : (
           <>
-            <ConversationSection
-              label="Direct Messages"
-              items={dms}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              collapsed={collapsed}
-            />
-            <ConversationSection
-              label="Groups"
-              items={groups}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              collapsed={collapsed}
-              onNewGroup={onNewGroup}
-            />
+            {!hideDMs && (
+              <ConversationSection
+                label="Direct Messages"
+                items={dms}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                collapsed={collapsed}
+              />
+            )}
+            {!hideGroups && (
+              <ConversationSection
+                label="Groups"
+                items={groups}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                collapsed={collapsed}
+                onNewGroup={onNewGroup}
+              />
+            )}
             {!hideSpaces && (
               <SpacesSection
                 spaces={spaces}

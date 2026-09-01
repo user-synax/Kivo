@@ -1057,6 +1057,12 @@ export function DashboardShell() {
   const selected = conversations.find((c) => c.id === selectedId) || null;
   const selectedSpace = selected?.type === "space_channel" ? spaces.find((s) => s.id === selected.spaceId) || null : null;
   const listItems = conversations.map((c) => toListItem(c, currentUser, spaces));
+  const tabUnread = {
+    chats: conversations.some((c) => c.type === "dm" && (c.unreadCount || 0) > 0),
+    groups: conversations.some((c) => c.type === "group" && (c.unreadCount || 0) > 0),
+    spaces: conversations.some((c) => c.type === "space_channel" && (c.unreadCount || 0) > 0),
+    profile: false,
+  };
 
   // The "other" participant of the open DM, used by the detail panel.
   const selectedOtherOnline = selected
@@ -1194,6 +1200,28 @@ export function DashboardShell() {
                       onProfileUpdate={refreshUser}
                       notificationBell={notificationBellNode}
                       hideSpaces
+                      hideGroups
+                    />
+                  </div>
+                )}
+                {mobileTab === "groups" && (
+                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                    <Sidebar
+                      conversations={listItems}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                      collapsed={false}
+                      showToggle={false}
+                      onCompose={handleCompose}
+                      onNewGroup={handleNewGroup}
+                      onCreateSpace={() => setShowSpaceCreate(true)}
+                      onDiscoverSpaces={() => setShowDiscover(true)}
+                      spaces={spaces}
+                      currentUser={currentUser}
+                      onProfileUpdate={refreshUser}
+                      notificationBell={notificationBellNode}
+                      hideSpaces
+                      hideDMs
                     />
                   </div>
                 )}
@@ -1210,7 +1238,7 @@ export function DashboardShell() {
                   <MobileProfileTab currentUser={currentUser} onProfileUpdate={refreshUser} />
                 )}
               </div>
-              <BottomTabBar active={mobileTab} onChange={setMobileTab} />
+              <BottomTabBar active={mobileTab} onChange={setMobileTab} unread={tabUnread} />
             </motion.div>
           )}
         </AnimatePresence>
