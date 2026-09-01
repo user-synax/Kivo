@@ -31,6 +31,7 @@ import {
   setCachedSpaces,
 } from "@/lib/cache";
 import { useIsDesktop } from "@/lib/use-breakpoint";
+import { useOfflineStatus } from "@/lib/hooks/use-offline-status";
 import { UserPanel } from "./user-panel";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { Avatar } from "./avatar";
@@ -326,6 +327,7 @@ export function DashboardShell() {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [panelDragDisabled, setPanelDragDisabled] = useState(false);
   const socket = useSocket();
+  const isOffline = useOfflineStatus(socket);
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
   const [currentUser, setCurrentUser] = useState(() => getSession());
@@ -1203,6 +1205,7 @@ export function DashboardShell() {
                   else setShowGroupSettings(true);
                 }}
                 onConversationUpdate={upsertConversation}
+                isOffline={isOffline}
               />
             </motion.div>
           ) : (
@@ -1233,6 +1236,7 @@ export function DashboardShell() {
                       notificationBell={notificationBellNode}
                       hideSpaces
                       hideGroups
+                      isOffline={isOffline}
                     />
                   </div>
                 )}
@@ -1254,6 +1258,7 @@ export function DashboardShell() {
                       notificationBell={notificationBellNode}
                       hideSpaces
                       hideDMs
+                      isOffline={isOffline}
                     />
                   </div>
                 )}
@@ -1380,6 +1385,7 @@ export function DashboardShell() {
           currentUser={currentUser}
           onProfileUpdate={refreshUser}
           notificationBell={notificationBellNode}
+          isOffline={isOffline}
         />
       </motion.div>
 
@@ -1392,6 +1398,7 @@ export function DashboardShell() {
             else setShowGroupSettings(true);
           }}
           onConversationUpdate={upsertConversation}
+          isOffline={isOffline}
         />
       </div>
 

@@ -506,6 +506,7 @@ export function Sidebar({
   hideSpaces = false,
   hideGroups = false,
   hideDMs = false,
+  isOffline = false,
 }) {
   const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -576,6 +577,14 @@ export function Sidebar({
           )}
         </div>
       </div>
+
+      {/* Offline banner */}
+      {!collapsed && isOffline && (
+        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-[var(--destructive)]/20 bg-[var(--destructive)]/8 px-3 py-2">
+          <span className="size-2 shrink-0 rounded-full bg-[var(--destructive)] animate-pulse" />
+          <span className="text-[12px] font-medium text-[var(--destructive)]">You are offline</span>
+        </div>
+      )}
 
       {/* Search */}
       {!collapsed && (

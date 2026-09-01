@@ -15,6 +15,11 @@ import {
   participantAvatarName,
   participantName,
 } from "@/lib/chat";
+import {
+  getCachedMessages,
+  setCachedMessages,
+  mergeCachedMessage,
+} from "@/lib/cache";
 
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useIsDesktop } from "@/lib/use-breakpoint";
@@ -147,7 +152,7 @@ function receiptState(message, userId, otherId) {
   return "sent";
 }
 
-export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate }) {
+export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate, isOffline }) {
   const socket = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
@@ -394,7 +399,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     });
   };
 
-  // Load message history when the conversation changes.
+  // Load message history when the conversation changes — stale-while-revalidate.
+  // Render cached messages instantly, then silently revalidate via REST.
   useEffect(() => {
     if (!convId) {
       setMessages([]);
@@ -404,20 +410,45 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       return undefined;
     }
     let active = true;
+    setReplyingTo(null);
+
+    // 1) Hydrate from IndexedDB cache immediately (stale-while-revalidate)
+    getCachedMessages(convId)
+      .then((cached) => {
+        if (!active || !cached) return;
+        if (Array.isArray(cached.messages) && cached.messages.length) {
+          setMessages(cached.messages);
+          // If the cache still has a cursor, restore pagination state
+          if (cached.nextCursor) {
+            setNextCursor(cached.nextCursor);
+            setHasMore(true);
+          }
+        }
+      })
+      .catch(() => {});
+
+    // 2) Revalidate from REST in the background
     setLoadingHistory(true);
     apiGet(`/api/v1/conversations/${convId}/messages?limit=50`)
       .then((data) => {
         if (!active) return;
-        setMessages(data?.messages || []);
+        const msgs = data?.messages || [];
+        setMessages(msgs);
         setNextCursor(data?.nextCursor || null);
         setHasMore(Boolean(data?.nextCursor));
+        // Update cache with the fresh server response
+        setCachedMessages(convId, msgs, {
+          nextCursor: data?.nextCursor || null,
+          hasMore: Boolean(data?.nextCursor),
+        }).catch(() => {});
       })
       .catch(() => {
-        if (active) setMessages([]);
+        // Network failed — keep whatever was in cache (or empty)
       })
       .finally(() => {
         if (active) setLoadingHistory(false);
       });
+
     return () => {
       active = false;
     };
@@ -482,6 +513,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     const onNew = (msg) => {
       if (msg.conversationId !== convId) return;
       reconcile(msg);
+      // Persist the new message into IDB cache
+      if (msg?.id) mergeCachedMessage(convId, msg).catch(() => {});
       socket.emit("message:delivered", { messageId: msg.id });
       if (msg.senderId !== userId) {
         apiPatch(`/api/v1/conversations/${convId}/read`, {
@@ -540,9 +573,17 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       if (p?.userId === otherId) setOtherOnline(false);
     };
 
+    // Wrap reconcile so it also persists the updated message to IDB cache
+    const reconcileAndCache = (msg) => {
+      reconcile(msg);
+      if (convId && msg?.id) {
+        mergeCachedMessage(convId, msg).catch(() => {});
+      }
+    };
+
     socket.on("message:new", onNew);
-    socket.on("message:edited", reconcile);
-    socket.on("message:deleted", reconcile);
+    socket.on("message:edited", reconcileAndCache);
+    socket.on("message:deleted", reconcileAndCache);
     socket.on("message:reaction", onReaction);
     socket.on("message:read", onRead);
     socket.on("message:delivery-updated", onDelivery);
@@ -553,8 +594,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
     return () => {
       socket.off("message:new", onNew);
-      socket.off("message:edited", reconcile);
-      socket.off("message:deleted", reconcile);
+      socket.off("message:edited", reconcileAndCache);
+      socket.off("message:deleted", reconcileAndCache);
       socket.off("message:reaction", onReaction);
       socket.off("message:read", onRead);
       socket.off("message:delivery-updated", onDelivery);
@@ -1210,12 +1251,22 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             rows={1}
             className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
           />
+            {isOffline && (
+              <span className="absolute -top-6 right-0 text-[11px] text-[var(--text-muted)]">
+                You are offline
+              </span>
+            )}
             <motion.button
               type="button"
               onClick={send}
-              disabled={!text.trim() && !pendingFiles.some((f) => f.status === "pending")}
+              disabled={isOffline || (!text.trim() && !pendingFiles.some((f) => f.status === "pending"))}
+              title={isOffline ? "Send requires network connection" : undefined}
               whileTap={reduce ? undefined : { scale: 0.96 }}
-              className="rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 disabled:opacity-40 active:scale-[0.97]"
+              className={`rounded-nav px-4 py-2 text-[13px] font-medium transition-[filter,opacity,transform] duration-200 active:scale-[0.97] ${
+                isOffline
+                  ? "cursor-not-allowed bg-[var(--text-muted)]/30 text-[var(--text-muted)] opacity-60"
+                  : "bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 disabled:opacity-40"
+              }`}
             >
               <Send className="h-5 w-5" />
             </motion.button>
