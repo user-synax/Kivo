@@ -35,7 +35,10 @@
 - 👤 **Rich profiles** — display name, custom status, bio, banner, avatar frames, and uploads hosted on Appwrite Storage.
 - 🤝 **Complete friends system** — send, accept, decline, remove, search, and jump straight into a DM.
 - 📱 **Mobile-first polish** — responsive three-panel layout with a bottom tab bar for phone navigation that works beautifully from phone to XL desktop.
-- 🗄️ **Offline caching** — conversations, Spaces, friends, and friend requests cached in IndexedDB for instant paint on reload.
+- 🗄️ **Offline caching** — conversations, Spaces, friends, and message history cached in IndexedDB for instant paint on reload.
+- 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
+- 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation.
+- 📴 **Offline indicator** — "You are offline" banner when both browser and socket signals indicate disconnection.
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
 
@@ -103,13 +106,15 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Typing indicators & presence (realtime via Socket.IO)
 - Theme system (5 themes, live switching, no reload)
 - **Mobile UX overhaul** (bottom tab bar, responsive panels, safe-area handling)
-- **Offline caching** (IndexedDB cache for conversations, Spaces, friends, friend requests)
+- **Offline caching** (IndexedDB cache for conversations, Spaces, friends, messages)
 - **File & image attachments** (images, PDFs, documents — upload via Appwrite, lightbox, inline preview)
+- **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
+- **Admin panel** — standalone dashboard with user/group/space management, ban/unban, audit logging
+- **Offline indicator** — "You are offline" banner, disabled composer when offline
 - Animated landing page
 
 ### 🚧 Planned / Not Started
 - Threads · Mention notifications
-- Search (conversation / message)
 - Voice channels / video calls (Phase 1 backend wired, frontend not built)
 - 2FA — second-factor authentication
 
@@ -157,17 +162,18 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 ```
 kivo/
 ├── frontend/            # Next.js 16 app (App Router, React 19)
-│   ├── app/             # Routes: landing, login, signup, app, profile, docs
+│   ├── app/             # Routes: landing, login, signup, app, profile, docs, admin
 │   ├── components/      # UI, dashboard, chat, auth, navbar, spaces, notifications, docs
-│   └── lib/             # theme, api, auth, chat, spaces, push, sound, cache, avatar helpers
+│   ├── lib/             # theme, api, auth, chat, spaces, push, sound, cache, avatar helpers
+│   └── components/admin # admin-gate.jsx
 │
 ├── backend/             # Express 5 + Socket.IO + Mongoose
 │   └── src/
 │       ├── config/      # DB, env, webpush config
 │       ├── lib/         # Appwrite client, attachment upload helpers
-│       ├── middleware/  # auth, errorHandler, rateLimiter
-│       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space, Notification, PushSubscription
-│       ├── modules/     # auth, users, conversations, messages, friends, spaces, notifications, push, admin, attachments
+│       ├── middleware/  # auth, adminAuth, errorHandler, rateLimiter
+│       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space, Notification, PushSubscription, AdminActionLog
+│       ├── modules/     # auth, users, conversations, messages, friends, spaces, notifications, push, admin, attachments, search
 │       ├── socket/      # Socket.IO init, presence, room helpers, events
 │       └── utils/       # helpers & errors
 │
@@ -229,6 +235,10 @@ bun run lint  # biome check
 | `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket ID for message attachments (separate from avatar bucket) |
 | `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend base URL (HTTP + Socket.IO) |
+| `ADMIN_EMAIL` | backend | Admin panel login email |
+| `ADMIN_PASSWORD_HASH` | backend | Bcrypt hash of the admin password |
+| `ADMIN_JWT_SECRET` | backend | Secret for admin JWT signing |
+| `ADMIN_JWT_TTL` | backend | Admin token lifetime (default 30m) |
 
 > See `backend/.env.example` for the full list with comments. Never commit real secrets — `*.env` is gitignored.
 

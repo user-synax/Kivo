@@ -510,18 +510,102 @@ Use this to explain the product; actual chat is only after signup.
 
 ---
 
-## 18. Admin (operators)
+## 18. Global search (Ctrl+K)
 
-If a user’s `role` is **`admin`** (set in the database, not in the profile editor):
+**Open:** press **Ctrl+K** (or **Cmd+K** on Mac), or click the search icon in the sidebar header.
 
-- `GET /api/v1/admin/users` — list users  
-- `POST /api/v1/admin/users/:id/force-logout` — revoke that user’s sessions  
+A command-palette overlay opens with a single search field.
 
-There is **no admin UI** in the app today; these are API-only.
+### What you can search
+
+| Category | What it matches | Click behavior |
+|----------|-----------------|----------------|
+| **Messages** | Content of messages in conversations you belong to | Opens the conversation and jumps to that message |
+| **People** | Username or display name | Opens the person's profile |
+| **Spaces** | Space names you are a member of | Navigates into the space |
+
+- Search is **debounced** (300ms) and results load independently per category.
+- Minimum **2 characters** required.
+- Results are capped at **5 per category**.
+
+### Jump to message
+
+Clicking a message result closes the overlay, opens the conversation, and **scrolls directly to that message** with a brief blue highlight flash.
 
 ---
 
-## What is not in the product yet
+## 19. Admin panel
+
+Kivo has a standalone admin panel at **`/admin`** — completely independent of the regular user app.
+
+### Access
+
+1. Go to `/admin`.
+2. Enter the admin **email** and **password** (configured via environment variables, not a DB user account).
+3. You land on the admin dashboard.
+
+The admin panel uses a separate JWT cookie (`admin_token`) that is never accepted by the regular user auth system.
+
+### Dashboard tabs
+
+| Tab | What it shows |
+|-----|---------------|
+| **Overview** | Total users, banned users, groups, spaces, messages |
+| **Users** | Paginated user table with search, ban status filter, ban/unban actions |
+| **Groups** | All group conversations with member count, admins, delete action |
+| **Spaces** | All spaces with member/channel count, owner, delete action |
+
+### User management
+
+- **Ban a user**: Sets `isBanned` on the user document (does not delete it — the email stays locked). Immediately disconnects their sockets and revokes all sessions. The user is also rejected at login.
+- **Unban a user**: Clears the ban fields so they can log in again.
+
+### Group & space management
+
+- **Delete** a group or space for moderation — this is a hard delete (removes the conversation/space and all its messages).
+
+### Security
+
+- Rate-limited to **5 login attempts per 15 minutes** per IP.
+- Admin cookie is `httpOnly`, `SameSite=Lax`, `Path=/`.
+- Every moderation action (ban, unban, force-logout, delete) is logged with IP and timestamp.
+
+### Environment variables
+
+```
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD_HASH=<bcrypt hash>
+ADMIN_JWT_SECRET=<random secret>
+ADMIN_JWT_TTL=30m
+ADMIN_COOKIE_NAME=admin_token
+```
+
+Generate the password hash with:
+```bash
+node -e "const b=require('bcryptjs');b.hash('your-password',12).then(h=>console.log(h))"
+```
+
+---
+
+## 20. Offline support
+
+### Message caching
+
+Messages are cached in IndexedDB (per conversation, last 50 messages). On load or conversation switch, cached messages render **instantly** while a background revalidation fetches fresh data from the server.
+
+Cache is updated in real-time during online use:
+- After initial REST fetch
+- On every incoming `message:new`, `message:edited`, `message:deleted`, `message:reaction` socket event
+
+Cache is cleared on logout.
+
+### Offline indicator
+
+A small **"You are offline"** banner appears in the sidebar when both signals indicate disconnection:
+- `navigator.onLine` (browser online/offline events)
+- Socket.IO connection state
+
+The message composer's send button is disabled and grayed out while offline, with a subtle note that network is required.## What is not in the product yet
 
 Do not expect these in the current MVP:
 
@@ -560,6 +644,10 @@ Do not expect these in the current MVP:
 | Offline list caching (conversations, Spaces, friends) | Automatic via IndexedDB |
 | File & image attachments (images, PDFs, docs) | Paperclip button in composer |
 | Image lightbox (fullscreen, arrows, download) | Click any image in chat |
+| Global search (Ctrl+K) | Ctrl+K or search icon in sidebar |
+| Admin panel | `/admin` — standalone dashboard |
+| Offline message caching | IndexedDB, last 50 messages per conversation |
+| Offline indicator | "You are offline" banner in sidebar |
 | Health check (ops) | `GET /health` on the API |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).

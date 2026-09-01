@@ -1,6 +1,6 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.4
+**Version:** 2.5
 **Last Updated:** September 1, 2026
 **Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments Complete)
 
@@ -91,7 +91,9 @@ Kivo
 | File & Image Attachments | **Complete** | Upload images + docs via Appwrite, lightbox, inline preview, download cards |
 | Threads | **Not started** | Phase 2 |
 | Mention Notifications | **Complete** | `@mention` feature shipped |
-| Search | **Not started** | Planned (user search complete only) |
+| **Global Search (Ctrl+K)** | **Complete** | Unified search: messages, people, spaces; jump-to-message |
+| **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, audit logging |
+| **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, disabled composer |
 | Voice / 2FA | **Partially wired** | LiveKit backend stubbed for voice; frontend not built; 2FA planned |
 
 ---
@@ -530,15 +532,55 @@ Role ranks: `owner 4 > admin 3 > moderator 2 > member 1`. Access control is rank
 
 ### 8. Search
 
+#### 8.1 User Search (Friend Discovery)
+
 | Search Type | Status | Notes |
 |---|---|---|
 | User search | **Complete** | By username, email, displayName; includes friend relationship status |
-| Space search | Not started | Post-MVP |
-| Conversation search | Not started | Post-MVP |
-| Message search | Not started | Post-MVP |
 
 - Endpoint: `GET /api/v1/users/search?q=`
 - Debounced on frontend.
+
+#### 8.2 Global Search (Ctrl+K Command Palette)
+
+Unified search across messages, people, and spaces in a single overlay.
+
+| Search Type | Status | Notes |
+|---|---|---|
+| Message search | **Complete** | Regex on content, scoped to user's conversations |
+| People search | **Complete** | Prefix + substring match on username/displayName |
+| Space search | **Complete** | Regex on name, scoped to user's member spaces |
+
+**Endpoint:** `GET /api/v1/search?q=<query>&limit=5` (auth required)
+
+**Response:**
+```json
+{
+  "messages": [{ id, content, senderName, conversationName, ... }],
+  "users": [{ id, displayName, username, avatarUrl, ... }],
+  "spaces": [{ id, name, category, channelCount, ... }]
+}
+```
+
+**Rules:**
+- Minimum 2 characters (enforced server-side).
+- Results capped at 5 per category (default).
+- Messages are scoped: only searches conversations the user participates in (DMs, groups, space channels).
+- People exclude the requesting user.
+- Spaces are scoped to spaces the user is a member of.
+
+**MongoDB indexes:**
+- `Message.content` (text index)
+- `User.username`, `User.displayName`
+- `Space.name`
+
+**Frontend:** Ctrl+K / Cmd+K opens a command-palette overlay. 300ms debounce. Per-category loading states. Click message → jump to conversation + highlight. Click user → profile drawer. Click space → navigate.
+
+#### 8.3 Anchor-Based Message Fetch
+
+Extended `GET /api/v1/conversations/:id/messages` with optional `around=<messageId>` query param.
+
+Returns a page of messages centered around the target message (half older, half newer). Used by jump-to-message from search results.
 
 ---
 
@@ -695,6 +737,32 @@ Response: `{ attachments: [{ fileId, bucketId, fileName, mimeType, size, kind, u
 
 `POST /api/v1/conversations/:id/messages` body: `{ content?, attachments?, replyToMessageId? }` — at least one of `content` or `attachments` is required.
 
+---
+
+### 11. Offline Support
+
+#### 11.1 Message Caching
+
+- Per-conversation cache in IndexedDB (keyed `messages:<conversationId>`), capped to last **50 messages**.
+- **Stale-while-revalidate:** on conversation switch, render cached messages instantly, then silently revalidate via REST.
+- Cache is updated in real-time during online use: after initial REST fetch, and on every incoming `message:new`, `message:edited`, `message:deleted`, `message:reaction` socket event.
+- Cache is cleared on logout via `clearUserCache()`.
+
+#### 11.2 Offline Indicator
+
+- Derives `isOffline` from two signals: `navigator.onLine` (browser events) + Socket.IO connection state.
+- User is offline only when **both** signals indicate disconnection (avoids flicker during brief reconnects).
+- Shows a persistent "You are offline" banner in the sidebar.
+- Message composer send button is disabled and grayed out with a subtle note.
+
+#### 11.3 Anchor-Based Message Fetch
+
+- Extended `GET /api/v1/conversations/:id/messages` with `around=<messageId>` query param.
+- Returns a centered page of messages (half older, half newer) around the target.
+- Used by jump-to-message from search results.
+
+---
+
 ## API Reference
 
 ### Base URL
@@ -833,12 +901,28 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/push/subscribe` | Yes | `{ endpoint, keys: { p256dh, auth }, expirationTime? }` |
 | DELETE | `/api/v1/push/unsubscribe` | Yes | `{ endpoint }` |
 
-#### Admin
+#### Admin (standalone panel at `/admin`)
+
+Admin auth uses a separate JWT cookie (`admin_token`) — never mixed with user auth.
 
 | Method | Path | Auth | Body |
 |---|---|---|---|
-| POST | `/api/v1/admin/users/:id/force-logout` | Admin | — |
-| GET | `/api/v1/admin/users` | Admin | — |
+| POST | `/api/admin/login` | No (rate-limited 5/15min) | `{ email, password }` |
+| POST | `/api/admin/logout` | Admin cookie | — |
+| GET | `/api/admin/verify` | Admin cookie | — |
+| GET | `/api/admin/stats` | Admin cookie | — |
+| GET | `/api/admin/users` | Admin cookie | `?page=&limit=&q=&banned=` |
+| GET | `/api/admin/users/:id` | Admin cookie | — |
+| POST | `/api/admin/users/:id/ban` | Admin cookie | `{ reason? }` |
+| POST | `/api/admin/users/:id/unban` | Admin cookie | — |
+| GET | `/api/admin/groups` | Admin cookie | `?page=&limit=` |
+| DELETE | `/api/admin/groups/:id` | Admin cookie | — |
+| GET | `/api/admin/spaces` | Admin cookie | `?page=&limit=` |
+| DELETE | `/api/admin/spaces/:id` | Admin cookie | — |
+
+**Environment variables:** `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` (bcrypt), `ADMIN_JWT_SECRET`, `ADMIN_JWT_TTL`, `ADMIN_COOKIE_NAME`.
+
+**Audit log:** `AdminActionLog` model records every ban/unban/force-logout/delete with `action`, `targetType`, `targetId`, `reason`, `ip`, `performedAt`.
 
 ---
 
@@ -951,6 +1035,10 @@ Each module follows a 4-file pattern:
   avatarFileId:   String (select: false)
   passwordHash:   String (select: false)
   role:           String (enum: ["user", "admin"], default: "user")
+  blockedUsers:   [ObjectId → User]
+  isBanned:       Boolean (default: false, indexed)
+  bannedAt:       Date (nullable)
+  bannedReason:   String (nullable, max 500)
   createdAt:      Date
   updatedAt:      Date
 }
@@ -1065,6 +1153,20 @@ Each module follows a 4-file pattern:
 ```
 **Index:** `{ userId, endpoint }` unique.
 
+#### AdminActionLog
+```
+{
+  action:         String (enum: ["ban_user", "unban_user", "force_logout", "delete_group", "delete_space"])
+  targetType:     String (enum: ["user", "group", "space"])
+  targetId:       ObjectId (required)
+  targetName:     String (nullable)
+  reason:         String (nullable, max 500)
+  ip:             String (nullable)
+  performedAt:    Date (indexed)
+}
+```
+**Index:** `{ targetType, targetId }`.
+
 ### Frontend Pages
 
 | Route | File | Purpose | Auth |
@@ -1075,6 +1177,8 @@ Each module follows a 4-file pattern:
 | `/app` | `app/app/page.jsx` | Main dashboard | AuthGate |
 | `/app/profile` | `app/app/profile/page.jsx` | User profile | AuthGate |
 | `/docs` | `app/docs/page.jsx` | How-to-use guide | Anyone |
+| `/admin` | `app/admin/page.jsx` | Admin login | Admin cookie |
+| `/admin/dashboard` | `app/admin/dashboard/page.jsx` | Admin dashboard | Admin cookie |
 
 ### Frontend Component Tree
 
