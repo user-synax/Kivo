@@ -42,10 +42,6 @@ export function publicMessage(message) {
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
   };
-  if (obj.gameMatchId) base.gameMatchId = obj.gameMatchId.toString();
-  if (obj.gameType) base.gameType = obj.gameType;
-  // also expose matchId alias for convenience
-  if (obj.gameMatchId) base.matchId = obj.gameMatchId.toString();
   return base;
 }
 

@@ -384,7 +384,40 @@ All themes share the same layout and corner radius; only colors change. If your 
 
 ---
 
-## 11. Notifications
+## 11. File & image attachments
+
+You can send files and images in any DM, group, or Space channel.
+
+### Attach a file
+
+1. In the chat composer, click the **paperclip** button.
+2. Pick one or more files from your device.
+3. Each file shows a **preview chip** with name, size, and a progress bar while uploading.
+4. Type an optional caption, then **Enter** to send.
+5. The message appears with the files below your text.
+
+**Allowed types:**
+- **Images:** JPG, PNG, GIF, WebP — max 30 MB each
+- **Documents:** PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, TXT — max 30 MB each
+
+Multiple files of mixed types can be sent in a single message.
+
+### View images
+
+- Click any image thumbnail in chat to open the **fullscreen lightbox**.
+- The image opens centered on screen with a dark backdrop.
+- Use the **left/right arrows** or **keyboard arrows** to navigate between images in the same message.
+- Click the **download** button (top right) to save the image.
+- Press **Escape** or click the backdrop to close.
+
+### View documents
+
+- PDF, DOC, XLS, PPT, and TXT files show as **download cards** with an icon, filename, and file size.
+- Click the card to open the file in a new tab (or download it directly from Appwrite).
+
+---
+
+## 13. Notifications
 
 ### In-app bell
 
@@ -424,7 +457,7 @@ Permission is **opt-in**. There is no auto-prompt on first page load.
 
 ---
 
-## 12. Install as an app (PWA)
+## 14. Install as an app (PWA)
 
 Kivo is installable:
 
@@ -436,7 +469,7 @@ It opens in **standalone** mode starting at `/app`. Icons and name come from `fr
 
 ---
 
-## 13. Presence and live updates
+## 15. Presence and live updates
 
 While you are connected:
 
@@ -449,7 +482,7 @@ If the connection drops, reconnect when the network returns; history still loads
 
 ---
 
-## 14. Keyboard and accessibility
+## 16. Keyboard and accessibility
 
 | Action | Shortcut |
 |--------|----------|
@@ -465,7 +498,7 @@ Interactive controls use visible **focus** styles. Modals have labels for assist
 
 ---
 
-## 15. Landing page (marketing)
+## 17. Landing page (marketing)
 
 On `/` (logged out):
 
@@ -477,7 +510,7 @@ Use this to explain the product; actual chat is only after signup.
 
 ---
 
-## 16. Admin (operators)
+## 18. Admin (operators)
 
 If a user’s `role` is **`admin`** (set in the database, not in the profile editor):
 
@@ -493,7 +526,6 @@ There is **no admin UI** in the app today; these are API-only.
 Do not expect these in the current MVP:
 
 - WhatsApp/Discord-style **search** inside messages, conversations, or Spaces (user search only)  
-- **File / image attachments** in chat (avatars and Space/group images only)  
 - **Threads**, pinned messages, saved messages  
 - **Voice / video** — phase 1 backend is wired but no call UI yet  
 - **2FA** (two-factor authentication)  
@@ -501,6 +533,7 @@ Do not expect these in the current MVP:
 - Custom user-created themes  
 - Invite links for private Spaces  
 - Full offline **message** history in the PWA (chat lists are cached; messages still need the network)  
+- Video/audio attachments (images and documents only in this pass)  
 
 ---
 
@@ -525,6 +558,8 @@ Do not expect these in the current MVP:
 | Install PWA | Browser install / Add to Home Screen |
 | Mobile bottom tab bar (Chats / Spaces / Profile) | On phone-sized screens |
 | Offline list caching (conversations, Spaces, friends) | Automatic via IndexedDB |
+| File & image attachments (images, PDFs, docs) | Paperclip button in composer |
+| Image lightbox (fullscreen, arrows, download) | Click any image in chat |
 | Health check (ops) | `GET /health` on the API |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).

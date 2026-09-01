@@ -1273,10 +1273,6 @@ export function DashboardShell() {
               <BottomTabBar
                 active={mobileTab}
                 onChange={(id) => {
-                  if (id === "games") {
-                    window.location.href = "/app/mini-games";
-                    return;
-                  }
                   setMobileTab(id);
                 }}
                 unread={tabUnread}

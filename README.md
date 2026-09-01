@@ -30,6 +30,7 @@
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
 - ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), `@mentions`, edit, and soft-delete.
+- 📎 **File & image attachments** — upload images, PDFs, documents, and text files in any chat; image lightbox with navigation, inline previews, and download.
 - 🎨 **5 live-switchable themes** with a Framer-style dark palette, persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status, bio, banner, avatar frames, and uploads hosted on Appwrite Storage.
 - 🤝 **Complete friends system** — send, accept, decline, remove, search, and jump straight into a DM.
@@ -63,6 +64,7 @@ Kivo
     └── Channels (text & announcement)         ✅ Done
         └── Messages                           ✅ Done
             └── Replies (quote reply)          ✅ Done
+            └── Attachments (images & docs)    ✅ Done
             └── Threads (future)               🚧 Phase 2
 ```
 
@@ -77,6 +79,7 @@ Although Kivo is a **student project**, the messaging core is **fully functional
 - 🏠 **Your own Spaces & Channels** — run a community, moderate members, and organize chat by channel
 - 🔎 **Discover public spaces** by category or search and join with one click
 - 🎨 **Personalizing your chat** with 5 live-switchable Framer-style themes
+- 📎 **Sharing files and images** — drag or click to upload, preview images in a lightbox, view documents inline
 - 🟢 Real-time presence, typing indicators, read receipts, `@mentions`, and message replies
 - 📱 A **bottom tab bar** (Chats / Spaces / Profile) makes the app feel native on phones
 
@@ -101,11 +104,12 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Theme system (5 themes, live switching, no reload)
 - **Mobile UX overhaul** (bottom tab bar, responsive panels, safe-area handling)
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, friend requests)
+- **File & image attachments** (images, PDFs, documents — upload via Appwrite, lightbox, inline preview)
 - Animated landing page
 
 ### 🚧 Planned / Not Started
 - Threads · Mention notifications
-- Search (conversation / message) · File attachments · Image sharing
+- Search (conversation / message)
 - Voice channels / video calls (Phase 1 backend wired, frontend not built)
 - 2FA — second-factor authentication
 
@@ -140,7 +144,8 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 | **JWT (jsonwebtoken)** | Authentication |
 | **bcryptjs** | Password hashing (12 rounds) |
 | **web-push** | VAPID web push notifications (offline delivery) |
-| **Appwrite** | File storage |
+| **Appwrite** | File & attachment storage (avatars + message attachments) |
+| **Multer** | Multipart file upload handling |
 | **Redis** | Caching, rate limiting (planned) |
 
 > **Runtime:** [Bun](https://bun.sh) — package manager & runtime for dev.
@@ -159,9 +164,10 @@ kivo/
 ├── backend/             # Express 5 + Socket.IO + Mongoose
 │   └── src/
 │       ├── config/      # DB, env, webpush config
+│       ├── lib/         # Appwrite client, attachment upload helpers
 │       ├── middleware/  # auth, errorHandler, rateLimiter
 │       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space, Notification, PushSubscription
-│       ├── modules/     # auth, users, conversations, messages, friends, spaces, notifications, push, admin
+│       ├── modules/     # auth, users, conversations, messages, friends, spaces, notifications, push, admin, attachments
 │       ├── socket/      # Socket.IO init, presence, room helpers, events
 │       └── utils/       # helpers & errors
 │
@@ -219,7 +225,8 @@ bun run lint  # biome check
 | `MONGODB_URI` | backend | MongoDB connection string |
 | `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` | backend | JWT signing secrets |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | backend | Web push (VAPID) keys for offline notifications |
-| `APPWRITE_*` | backend | Appwrite endpoint, project, key, bucket (avatar upload) |
+| `APPWRITE_*` | backend | Appwrite endpoint, project, key, bucket (avatar + attachment storage) |
+| `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket ID for message attachments (separate from avatar bucket) |
 | `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend base URL (HTTP + Socket.IO) |
 
@@ -267,6 +274,7 @@ Registration / Login
 | `space:updated` / `space:member-*` / `space:channel-*` | Server → Space | Space, members & channels |
 | `space:deleted` / `space:joined` / `space:removed` | Server → All | Space lifecycle |
 | `notification:new` | Server → User | New in-app notification (fanned out to online recipients) |
+| `message:new` (with attachments) | Server → Room | Message carrying file/image attachments |
 
 > All socket events are **authenticated** via JWT handshake, and **authorized** — the server verifies conversation membership before accepting sensitive events.
 
@@ -301,6 +309,15 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 ---
 
 ## 🧱 Key Features
+
+### 📎 File & Image Attachments
+- Upload images (jpg, png, gif, webp) and documents (pdf, doc, xlsx, ppt, txt) — max 30MB each
+- Multiple attachments per message, mixed types allowed
+- Per-file upload progress indicator in the composer
+- **Image lightbox** — click any image to open a fullscreen centered modal with arrow-key navigation, download, and filename label
+- PDF, document, and text files render as download cards with file icon, name, and size
+- Drag-and-click paperclip button to attach files
+- Server-side MIME validation and Appwrite storage
 
 ### 💬 Messaging
 - Cursor-based pagination with infinite scroll (newest-first)
@@ -384,9 +401,9 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications, PWA, customization, mobile UX, offline caching |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications, PWA, customization, mobile UX, offline caching, file & image attachments |
 | **Phase 1.5** | DM & group voice calls (LiveKit), voice channel frontend, 2FA |
-| **Phase 2** | Threads, pinned/saved messages, stronger search, attachments (images & files) |
+| **Phase 2** | Threads, pinned/saved messages, stronger search, video/audio attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |
 

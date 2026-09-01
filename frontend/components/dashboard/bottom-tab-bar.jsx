@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, MessageCircle, Users, User, Gamepad2 } from "lucide-react";
+import { Layers, MessageCircle, Users, User } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +8,6 @@ const TABS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
   { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
-  { id: "games", label: "Games", icon: Gamepad2 },
   { id: "profile", label: "Profile", icon: User },
 ];
 

@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.3
+**Version:** 2.4
 **Last Updated:** September 1, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications Complete)
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments Complete)
 
 ---
 
@@ -45,6 +45,7 @@ Kivo
 └── Spaces (community-level containers)
     └── Channels (text conversations inside Spaces)
         └── Messages
+            └── Attachments (images & documents) ✅
             └── Threads (future)
 ```
 
@@ -56,6 +57,7 @@ Kivo
 | **Channel** | Text / announcement conversation inside a Space | ✅ Complete |
 | **Notification** | In-app + web push events (message, friend, space) | ✅ Complete |
 | **Push Subscription** | Per-user VAPID subscription for offline delivery | ✅ Complete |
+| **Attachment** | Image/document file attached to a message | ✅ Complete |
 | **Thread** | Message-level discussion inside a channel | Phase 2 |
 
 ---
@@ -86,10 +88,10 @@ Kivo
 | PWA / Installable | **Complete** | Manifest, icons, service worker |
 | Mobile UX | **Complete** | Bottom tab bar, responsive panels, safe-area handling |
 | Offline Caching | **Complete** | IndexedDB (`idb-keyval`) cache for conversations, Spaces, friends, requests |
+| File & Image Attachments | **Complete** | Upload images + docs via Appwrite, lightbox, inline preview, download cards |
 | Threads | **Not started** | Phase 2 |
 | Mention Notifications | **Complete** | `@mention` feature shipped |
 | Search | **Not started** | Planned (user search complete only) |
-| File Attachments | **Not started** | Planned |
 | Voice / 2FA | **Partially wired** | LiveKit backend stubbed for voice; frontend not built; 2FA planned |
 
 ---
@@ -651,19 +653,47 @@ PushSubscription {
 
 ---
 
-### 10. Attachments
+### 10. File & Image Attachments
 
 | Type | Status | Notes |
 |---|---|---|
 | Avatar uploads | **Complete** | Via Appwrite Storage, 4MB max |
-| Image attachments | Not started | Post-MVP |
-| Document/file attachments | Not started | Post-MVP |
+| Image attachments | **Complete** | jpg, png, gif, webp — max 30MB each |
+| Document attachments | **Complete** | pdf, doc, docx, xlsx, xls, ppt, pptx, txt — max 30MB each |
 
-- File size/type validation enforced server-side.
-- Preview where supported.
-- Safe storage via Appwrite Storage.
+- Multiple attachments per message, mixed types allowed.
+- Content (text) becomes optional when attachments are present.
+- Server-side MIME validation and 30MB cap per file, enforced via Multer + Appwrite upload.
+- Separate `attachments` bucket in Appwrite (public read, server-only write).
+- **Image lightbox** — fullscreen centered modal with arrow-key navigation, download, filename label.
+- PDF, document, and text files render as download cards.
+- Per-file upload progress indicator in the composer.
 
----
+#### Attachment Schema (on Message)
+
+```
+attachments: [{
+  fileId:    String (Appwrite file ID)
+  bucketId:  String (Appwrite bucket ID)
+  fileName:  String (original filename)
+  mimeType:  String (MIME type)
+  size:      Number (bytes)
+  kind:      String (enum: ["image", "document"])
+  url:       String (Appwrite view/preview URL)
+}]
+```
+
+#### Attachment Endpoints
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| POST | `/api/v1/attachments/upload` | Yes | Multipart: `{ conversationId, files[] }` (max 10 files, 30MB each) |
+
+Response: `{ attachments: [{ fileId, bucketId, fileName, mimeType, size, kind, url }] }`
+
+#### Message Create (updated)
+
+`POST /api/v1/conversations/:id/messages` body: `{ content?, attachments?, replyToMessageId? }` — at least one of `content` or `attachments` is required.
 
 ## API Reference
 
@@ -739,7 +769,7 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | DELETE | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | GET | `/api/v1/conversations/:id/messages` | Yes | `?cursor=&limit=` |
-| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content, replyToMessageId? }` |
+| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId? }` (at least content or attachments required) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
 
 #### Spaces
@@ -769,6 +799,12 @@ Refresh token is sent automatically via httpOnly cookie.
 | DELETE | `/api/v1/messages/:id` | Yes | — |
 | POST | `/api/v1/messages/:id/reactions` | Yes | `{ emoji }` |
 | DELETE | `/api/v1/messages/:id/reactions/:reactionId` | Yes | — |
+
+#### Attachments
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| POST | `/api/v1/attachments/upload` | Yes | Multipart: `{ conversationId, files[] }` (max 10 files, 30MB each) |
 
 #### Friends
 
@@ -846,7 +882,8 @@ kivo/
 | JWT (jsonwebtoken 9) | Authentication |
 | bcryptjs 2.4.3 | Password hashing |
 | web-push 3.6.7 | VAPID web push notifications |
-| Appwrite | File storage |
+| Multer | Multipart file upload handling |
+| Appwrite | File & attachment storage (avatars + message attachments) |
 
 **Runtime:** Bun (package manager + runtime for dev).
 
@@ -859,7 +896,8 @@ backend/src/
 │   ├── env.js             # Environment config with validation
 │   └── webpush.js         # VAPID Web Push client
 ├── lib/
-│   └── appwrite.js        # Appwrite Storage client
+│   ├── appwrite.js        # Appwrite Storage client
+│   └── attachments.js     # Attachment upload + validation helpers
 ├── middleware/
 │   ├── auth.js            # JWT verification + role authorization
 │   ├── errorHandler.js    # Centralized error + 404 handler
@@ -882,6 +920,7 @@ backend/src/
 │   ├── spaces/            # Spaces, channels, moderation, discovery
 │   ├── notifications/     # In-app + push notification service
 │   ├── push/              # VAPID push subscriptions
+│   ├── attachments/       # File/image upload to Appwrite
 │   └── admin/             # Force logout, user listing
 ├── socket/
 │   ├── index.js           # Socket.IO init, presence, focus tracking, events
@@ -1072,6 +1111,9 @@ components/
 │   ├── group-settings-panel.jsx # Group member/admin management
 │   ├── profile-edit-modal.jsx # Profile editing modal
 │   └── user-panel.jsx        # Right-hand detail panel
+├── chat/
+│   ├── attachments.jsx       # Image grid, lightbox, PDF/doc download cards
+│   └── chat-bubble.jsx       # Reusable chat bubble
 ├── spaces/
 │   ├── space-sidebar.jsx     # Space channel list
 │   ├── space-settings-panel.jsx # Space moderation panel
@@ -1079,12 +1121,14 @@ components/
 │   ├── space-create-modal.jsx # Create space modal
 │   ├── space-card.jsx        # Space card for discovery
 │   └── channel-list.jsx      # Channels within a space
+├── docs/
+│   └── docs-screen.jsx       # In-app how-to-use guide
 └── ui/
     ├── button.jsx            # shadcn Button
     └── bubble.jsx            # shadcn Bubble primitive
 ```
 
-**Note:** `lib/` also includes `push.js` (web push helpers), `sound.js` (notification sounds), `pwa.js`, `banners.js` (animated GIF profile banners), and `avatar-styles.js`.
+**Note:** `lib/` also includes `push.js` (web push helpers), `sound.js` (notification sounds), `pwa.js`, `banners.js` (animated GIF profile banners), `avatar-styles.js`, `use-file-upload.js` (attachment upload hook), and `chat.js` (message send helpers).
 
 ---
 

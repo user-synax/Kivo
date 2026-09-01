@@ -13,6 +13,7 @@ const TOC = [
   { id: "friends", label: "Friends" },
   { id: "dms", label: "Direct messages" },
   { id: "messaging", label: "Sending messages" },
+  { id: "attachments", label: "File & image attachments" },
   { id: "groups", label: "Group chats" },
   { id: "spaces", label: "Spaces & channels" },
   { id: "profile", label: "Profile & themes" },
@@ -161,6 +162,7 @@ export function DocsScreen() {
                 <Bullet>Private groups with admins</Bullet>
                 <Bullet>Public Spaces you can discover and join</Bullet>
                 <Bullet>Mentions, reactions, replies, and themes</Bullet>
+                <Bullet>File & image attachments in chat</Bullet>
               </ul>
             </Section>
 
@@ -311,6 +313,48 @@ export function DocsScreen() {
                 delivered → read. When someone else is typing, you see it in
                 the open chat. Opening a chat marks it read. System lines like
                 “Admin added X” do not add to unread.
+              </p>
+            </Section>
+
+            <Section id="attachments" title="File & image attachments">
+              <p>
+                You can share files and images in any DM, group, or Space
+                channel.
+              </p>
+              <h3 className="doc-h3">Attach a file</h3>
+              <Steps
+                items={[
+                  "Click the paperclip button in the chat composer.",
+                  "Pick one or more files from your device (images or documents).",
+                  "Each file shows a preview chip with name, size, and upload progress.",
+                  "Type an optional caption, then Enter to send.",
+                ]}
+              />
+              <p>
+                Allowed types: JPG, PNG, GIF, WebP, PDF, DOC/DOCX, XLS/XLSX,
+                PPT/PPTX, and TXT — max 30 MB each. Multiple files of mixed
+                types can be sent in one message.
+              </p>
+              <h3 className="doc-h3">View images</h3>
+              <ul className="mt-3 flex flex-col gap-2">
+                <Bullet>
+                  Click any image thumbnail in chat to open the fullscreen
+                  lightbox — centered on screen with a dark backdrop.
+                </Bullet>
+                <Bullet>
+                  Use the left/right arrows or keyboard arrows to navigate
+                  between images.
+                </Bullet>
+                <Bullet>
+                  Click the download button (top right) to save. Press Escape
+                  or click the backdrop to close.
+                </Bullet>
+              </ul>
+              <h3 className="doc-h3">View documents</h3>
+              <p>
+                PDF, DOC, XLS, PPT, and TXT files show as download cards
+                with an icon, filename, and file size. Click to open or
+                download.
               </p>
             </Section>
 
@@ -490,9 +534,6 @@ export function DocsScreen() {
               <ul className="mt-4 flex flex-col gap-2">
                 <Bullet>Search inside messages or conversations</Bullet>
                 <Bullet>
-                  Images or files attached to a message
-                </Bullet>
-                <Bullet>
                   Voice or video calls — the backend is wired but there is no
                   call UI yet
                 </Bullet>
@@ -500,6 +541,7 @@ export function DocsScreen() {
                 <Bullet>Threads, pins, and saved messages</Bullet>
                 <Bullet>Unfriend in the Friends window</Bullet>
                 <Bullet>Private invite links for Spaces</Bullet>
+                <Bullet>Video/audio attachments (images & documents only)</Bullet>
                 <Bullet>
                   Using the installed app fully offline — chat lists are
                   cached, but messages still need the network

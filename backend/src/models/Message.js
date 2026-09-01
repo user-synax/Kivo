@@ -45,11 +45,7 @@ const messageSchema = new mongoose.Schema(
     // "text" for normal chat messages; "system" for centered info notices
     // (e.g. a member was removed from a group). System messages render as a
     // non-interactive chip and never bump unread counts.
-    type: { type: String, enum: ["text", "system", "game_invite"], default: "text" },
-
-    // Game invite payload — only for type "game_invite". Points to the GameMatch.
-    gameMatchId: { type: mongoose.Schema.Types.ObjectId, ref: "GameMatch", default: null, index: true },
-    gameType: { type: String, enum: ["typing_race"], default: null },
+    type: { type: String, enum: ["text", "system"], default: "text" },
 
     // Optional reference to the message this one replies to (threaded replies).
     replyToMessageId: {
