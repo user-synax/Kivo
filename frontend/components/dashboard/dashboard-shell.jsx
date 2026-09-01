@@ -322,7 +322,9 @@ export function DashboardShell() {
   const lastFocusedRef = useRef(null);
   const chatSwipeStartRef = useRef({ x: 0, y: 0 });
   const chatSwipeIsHorizontalRef = useRef(false);
+  const chatSwipeIgnoreRef = useRef(false);
   const [swipeProgress, setSwipeProgress] = useState(0);
+  const [panelDragDisabled, setPanelDragDisabled] = useState(false);
   const socket = useSocket();
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
@@ -1105,28 +1107,56 @@ export function DashboardShell() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={slide}
-              drag={reduce ? false : "x"}
+              drag={reduce || panelDragDisabled ? false : "x"}
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.22}
               dragMomentum={false}
               dragDirectionLock
+              onDragStart={(_, info) => {
+                if (chatSwipeIgnoreRef.current) return false;
+              }}
               onDrag={(_, info) => {
+                if (chatSwipeIgnoreRef.current) return;
                 const p = Math.min(Math.abs(info.offset.x) / 90, 1);
                 setSwipeProgress(p);
               }}
               onDragEnd={(_, info) => {
+                const wasBubble = chatSwipeIgnoreRef.current;
+                setSwipeProgress(0);
+                chatSwipeIgnoreRef.current = false;
+                setPanelDragDisabled(false);
+                if (wasBubble) return;
                 const offset = info?.offset?.x ?? 0;
                 const velocity = info?.velocity?.x ?? 0;
-                setSwipeProgress(0);
                 if (Math.abs(offset) > 90 || Math.abs(velocity) > 700) setSelectedId(null);
+              }}
+              onPointerDown={(e) => {
+                const target = e.target;
+                const isBubble =
+                  target.closest?.('[data-slot="bubble"]') ||
+                  target.closest?.('[data-slot="bubble-content"]') ||
+                  target.closest?.('.t-bubble');
+                if (isBubble) {
+                  chatSwipeIgnoreRef.current = true;
+                  setPanelDragDisabled(true);
+                }
               }}
               onTouchStart={(e) => {
                 const t = e.touches?.[0];
                 if (!t) return;
+                const target = e.target;
+                const isBubble =
+                  target.closest?.('[data-slot="bubble"]') ||
+                  target.closest?.('[data-slot="bubble-content"]') ||
+                  target.closest?.('.t-bubble') ||
+                  target.closest?.('[data-slot="bubble-group"]');
+                chatSwipeIgnoreRef.current = !!isBubble;
+                setPanelDragDisabled(!!isBubble);
                 chatSwipeStartRef.current = { x: t.clientX, y: t.clientY };
                 chatSwipeIsHorizontalRef.current = false;
               }}
               onTouchMove={(e) => {
+                if (chatSwipeIgnoreRef.current) return;
                 const t = e.touches?.[0];
                 if (!t) return;
                 const dx = t.clientX - chatSwipeStartRef.current.x;
@@ -1142,6 +1172,8 @@ export function DashboardShell() {
               }}
               onTouchEnd={() => {
                 chatSwipeIsHorizontalRef.current = false;
+                chatSwipeIgnoreRef.current = false;
+                setPanelDragDisabled(false);
                 setSwipeProgress(0);
               }}
               className="absolute inset-0 bg-[var(--bg-base)] touch-pan-y overscroll-x-contain overscroll-contain"
