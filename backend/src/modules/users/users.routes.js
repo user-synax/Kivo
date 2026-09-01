@@ -12,6 +12,7 @@ router.patch("/me/avatar", usersController.updateAvatar);
 router.delete("/me/avatar", usersController.deleteAvatar);
 router.get("/search", usersController.search);
 router.get("/blocked", usersController.listBlocked);
+router.get("/:username/profile", usersController.getProfileByUsername);
 router.post("/:id/block", usersController.blockUser);
 router.post("/:id/unblock", usersController.unblockUser);
 router.get("/:id", usersController.getUserById);

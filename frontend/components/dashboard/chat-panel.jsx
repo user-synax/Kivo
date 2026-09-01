@@ -16,6 +16,7 @@ import {
   participantName,
 } from "@/lib/chat";
 
+import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 
 const TYPING_IDLE_MS = 1500;
@@ -205,6 +206,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   const [showMore, setShowMore] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
   const moreRef = useRef(null);
+
+  // Mention → profile drawer (local, no route change)
+  const [profileUsername, setProfileUsername] = useState(null);
 
   // Live online presence tracking set
   const [onlineUsers, setOnlineUsers] = useState(new Set());
@@ -970,6 +974,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                         receipt={receipt}
                         participants={conversation?.participants || []}
                         isUserOnline={isUserOnline}
+                        onOpenProfile={setProfileUsername}
                         className="!max-w-full"
                         contentClassName="max-w-full"
                       />
@@ -1173,8 +1178,19 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
               )}
             </AnimatePresence>
            </div>
-         </div>
-       </div>
+          </div>
+
+      {/* Mention profile drawer — local state, does not change route */}
+      <ProfileDrawer
+        username={profileUsername}
+        open={Boolean(profileUsername)}
+        onClose={() => setProfileUsername(null)}
+        onMessage={(conv) => {
+          setProfileUsername(null);
+          if (onConversationUpdate && conv) onConversationUpdate(conv);
+        }}
+      />
+      </div>
    );
 }
 

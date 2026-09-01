@@ -3,9 +3,11 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { badRequest } from "../../utils/errors.js";
 import {
   parseBody,
+  parseParams,
   parseQuery,
   searchQuerySchema,
   updateMeSchema,
+  usernameParamSchema,
 } from "./users.validation.js";
 import * as usersService from "./users.service.js";
 
@@ -47,6 +49,15 @@ export const search = asyncHandler(async (req, res) => {
 export const getUserById = asyncHandler(async (req, res) => {
   const user = await usersService.getUserById({ otherId: req.params.id });
   res.status(200).json({ success: true, data: user });
+});
+
+export const getProfileByUsername = asyncHandler(async (req, res) => {
+  const { username } = parseParams(usernameParamSchema, req.params);
+  const profile = await usersService.getProfileByUsername({
+    requesterId: req.user.userId,
+    username,
+  });
+  res.status(200).json({ success: true, data: profile });
 });
 
 // Avatar upload. multer parses multipart; we then hand the buffer to the

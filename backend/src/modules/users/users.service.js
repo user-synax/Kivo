@@ -83,6 +83,59 @@ export async function getUserById({ otherId }) {
   return publicUser(user);
 }
 
+// Public-safe profile shape for GET /users/:username/profile.
+// Explicitly omits email, role, avatarFileId, passwordHash.
+function publicProfile(user) {
+  const u = user.toObject ? user.toObject() : user;
+  return {
+    id: u._id.toString(),
+    username: u.username || null,
+    displayName: u.displayName || null,
+    avatarUrl: u.avatarUrl || null,
+    avatarStyle: u.avatarStyle || null,
+    banner: u.banner || null,
+    bio: u.bio || null,
+    status: u.status || null,
+    joinedAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
+  };
+}
+
+export async function getProfileByUsername({ requesterId, username }) {
+  const user = await User.findOne({ username }).select(
+    "displayName username bio status avatarStyle avatarUrl banner createdAt blockedUsers",
+  );
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+
+  const targetId = user._id.toString();
+  const isSelf = requesterId && requesterId.toString() === targetId;
+
+  let isBlockedByMe = false;
+  let isBlockedByOther = false;
+  let rel = "none";
+
+  if (requesterId && !isSelf) {
+    const [requester, targetBlocked] = await Promise.all([
+      User.findById(requesterId).select("blockedUsers").lean(),
+      // user already has blockedUsers; no extra fetch needed for target side
+      Promise.resolve(user),
+    ]);
+    const requesterBlocked = new Set((requester?.blockedUsers || []).map((id) => id.toString()));
+    const targetBlockedSet = new Set((targetBlocked?.blockedUsers || []).map((id) => id.toString()));
+    isBlockedByMe = requesterBlocked.has(targetId);
+    isBlockedByOther = targetBlockedSet.has(requesterId.toString());
+    rel = await relationship(requesterId.toString(), targetId);
+  } else if (isSelf) {
+    rel = "self";
+  }
+
+  return {
+    ...publicProfile(user),
+    relationship: rel,
+    isBlockedByMe,
+    isBlockedByOther,
+  };
+}
+
 // Persist an uploaded display picture. The buffer comes from multer; we push it
 // to Appwrite Storage, retire the previous file, and store the resulting public
 // URL (and its file id) on the user.

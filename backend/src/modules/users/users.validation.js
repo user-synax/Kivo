@@ -35,6 +35,28 @@ export const updateMeSchema = z.object({
   banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),
 });
 
+export const usernameParamSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(30)
+    .regex(/^[a-zA-Z0-9_]+$/, "Username may only contain letters, numbers and underscores"),
+});
+
+export function parseParams(schema, params) {
+  const result = schema.safeParse(params);
+  if (!result.success) {
+    const first = result.error.issues[0];
+    const err = new Error(first?.message || "Validation failed");
+    err.statusCode = 400;
+    err.code = "VALIDATION_ERROR";
+    err.issues = result.error.issues;
+    throw err;
+  }
+  return result.data;
+}
+
 // Convenience parsers that throw a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {
   const result = schema.safeParse(body);

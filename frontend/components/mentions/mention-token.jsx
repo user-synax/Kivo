@@ -11,7 +11,7 @@ const EASE = [0.22, 1, 0.36, 1];
 const HOVER_OPEN_DELAY = 250;
 const HOVER_CLOSE_DELAY = 180;
 
-export function MentionToken({ username, user, isOnline = false }) {
+export function MentionToken({ username, user, isOnline = false, onOpenProfile }) {
   const [isDesktopHover, setIsDesktopHover] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, side: "top" });
@@ -86,15 +86,30 @@ export function MentionToken({ username, user, isOnline = false }) {
   const avatarName = participantAvatarName(user) || username;
   const handleTag = `@${username}`;
 
+  const openProfile = () => {
+    if (onOpenProfile) onOpenProfile(username);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openProfile();
+    }
+  };
+
   return (
     <>
       <span
         ref={tokenRef}
+        role="button"
+        tabIndex={0}
+        onClick={openProfile}
+        onKeyDown={handleKeyDown}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
         className={cn(
-          "inline-flex items-center rounded bg-[var(--accent)]/15 px-1 py-0.5 text-xs font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/25",
-          isDesktopHover && "cursor-pointer",
+          "inline-flex items-center rounded bg-[var(--accent)]/15 px-1 py-0.5 text-xs font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--canvas)]",
+          "cursor-pointer",
         )}
       >
         {handleTag}
@@ -120,7 +135,16 @@ export function MentionToken({ username, user, isOnline = false }) {
                 }}
                 className="z-[9999] w-60 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-3.5 shadow-2xl backdrop-blur-xl"
               >
-                <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    openProfile();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl text-left transition-colors hover:bg-[var(--hover)] -m-1 p-1"
+                  aria-label={`View profile of ${handleTag}`}
+                >
                   <Avatar
                     name={avatarName}
                     online={isOnline}
@@ -147,7 +171,7 @@ export function MentionToken({ username, user, isOnline = false }) {
                       </span>
                     </div>
                   </div>
-                </div>
+                </button>
               </motion.div>
             )}
           </AnimatePresence>,

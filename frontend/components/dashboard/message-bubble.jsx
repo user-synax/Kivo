@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 
 import { MentionToken } from "@/components/mentions/mention-token";
 
-function MessageContent({ content, mentions = [], participants = [], isUserOnline }) {
+function MessageContent({ content, mentions = [], participants = [], isUserOnline, onOpenProfile }) {
   if (!content) return null;
 
   const resolvedUsernames = {};
@@ -69,6 +69,7 @@ function MessageContent({ content, mentions = [], participants = [], isUserOnlin
           username={uname}
           user={user}
           isOnline={online}
+          onOpenProfile={onOpenProfile}
         />
       );
     } else {
@@ -111,6 +112,7 @@ export function MessageBubble({
   replyTo,
   participants = [],
   isUserOnline,
+  onOpenProfile,
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
@@ -175,6 +177,7 @@ export function MessageBubble({
               mentions={message.mentions}
               participants={participants}
               isUserOnline={isUserOnline}
+              onOpenProfile={onOpenProfile}
             />
           )}
         </BubbleContent>
