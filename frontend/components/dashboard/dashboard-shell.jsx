@@ -1270,7 +1270,17 @@ export function DashboardShell() {
                   <MobileProfileTab currentUser={currentUser} onProfileUpdate={refreshUser} />
                 )}
               </div>
-              <BottomTabBar active={mobileTab} onChange={setMobileTab} unread={tabUnread} />
+              <BottomTabBar
+                active={mobileTab}
+                onChange={(id) => {
+                  if (id === "games") {
+                    window.location.href = "/app/mini-games";
+                    return;
+                  }
+                  setMobileTab(id);
+                }}
+                unread={tabUnread}
+              />
             </motion.div>
           )}
         </AnimatePresence>

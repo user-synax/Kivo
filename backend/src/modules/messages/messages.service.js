@@ -10,7 +10,7 @@ import * as notificationsService from "../notifications/notifications.service.js
 // Public message shape returned to clients and used as the socket payload base.
 export function publicMessage(message) {
   const obj = message.toObject ? message.toObject() : message;
-  return {
+  const base = {
     id: obj._id.toString(),
     conversationId: obj.conversationId.toString(),
     senderId: obj.senderId.toString(),
@@ -33,6 +33,11 @@ export function publicMessage(message) {
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
   };
+  if (obj.gameMatchId) base.gameMatchId = obj.gameMatchId.toString();
+  if (obj.gameType) base.gameType = obj.gameType;
+  // also expose matchId alias for convenience
+  if (obj.gameMatchId) base.matchId = obj.gameMatchId.toString();
+  return base;
 }
 
 // Ensure the user is a participant of the conversation; throws otherwise.

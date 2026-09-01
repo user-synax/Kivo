@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, UserMinus, Users, X } from "lucide-react";
+import { Ban, Gamepad2, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, Swords, UserMinus, Users, X, Zap } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -18,6 +18,8 @@ import {
 
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useIsDesktop } from "@/lib/use-breakpoint";
+import { TypingRaceInviteCard } from "@/components/games/typing-race-invite-card";
+import { TypingRaceRoom } from "@/components/games/typing-race-room";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -213,6 +215,11 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   // Live online presence tracking set
   const [onlineUsers, setOnlineUsers] = useState(new Set());
 
+  // Typing race — active match overlay
+  const [activeRace, setActiveRace] = useState(null); // { matchId, prompt }
+  const [raceBusy, setRaceBusy] = useState(false);
+  const [dismissedInvites, setDismissedInvites] = useState(new Set());
+
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
 
@@ -278,6 +285,42 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     } finally {
       setBlockBusy(false);
     }
+  };
+
+  const handleInviteRace = async () => {
+    if (!convId || raceBusy) return;
+    setRaceBusy(true);
+    try {
+      const res = await apiPost("/api/v1/games/typing-race/invite", { conversationId: convId });
+      const match = res?.match;
+      if (match?.id) {
+        setActiveRace({ matchId: match.id, prompt: match.textPrompt });
+      }
+    } catch (err) {
+      window.alert(err?.message || "Could not invite to typing race");
+    } finally {
+      setRaceBusy(false);
+    }
+  };
+
+  const handleAcceptRace = (matchId, msg) => {
+    // fetch prompt if needed, then open room
+    let prompt = msg?.content?.replace("Typing race invited — ", "") || "";
+    // try to fetch full match for accurate prompt
+    if (matchId) {
+      apiGet(`/api/v1/games/typing-race/${matchId}`)
+        .then((m) => {
+          prompt = m?.textPrompt || prompt;
+          setActiveRace({ matchId, prompt });
+        })
+        .catch(() => setActiveRace({ matchId, prompt }));
+    } else {
+      setActiveRace({ matchId, prompt });
+    }
+  };
+
+  const handleDeclineRace = (matchId) => {
+    if (matchId) setDismissedInvites((prev) => new Set(prev).add(String(matchId)));
   };
 
   const scrollRef = useRef(null);
@@ -875,6 +918,18 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             if (m.type === "system") {
               return <SystemNotice key={m.id} content={m.content} />;
             }
+            if (m.type === "game_invite" && m.gameMatchId) {
+              if (dismissedInvites.has(String(m.gameMatchId))) return null;
+              return (
+                <TypingRaceInviteCard
+                  key={m.id}
+                  message={m}
+                  currentUserId={userId}
+                  onAccept={handleAcceptRace}
+                  onDecline={handleDeclineRace}
+                />
+              );
+            }
             const receipt = receiptState(m, userId, otherId);
             const replySource = m.replyToMessageId
               ? messages.find((x) => x.id === m.replyToMessageId)
@@ -1190,6 +1245,16 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           if (onConversationUpdate && conv) onConversationUpdate(conv);
         }}
       />
+
+      {/* Typing race overlay — same join flow as hub, now participants enrich names */}
+      {activeRace && (
+        <TypingRaceRoom
+          matchId={activeRace.matchId}
+          initialPrompt={activeRace.prompt}
+          participants={conversation?.participants || []}
+          onClose={() => setActiveRace(null)}
+        />
+      )}
       </div>
    );
 }

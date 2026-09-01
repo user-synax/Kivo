@@ -3,6 +3,7 @@
 import {
   ChevronDown,
   Compass,
+  Gamepad2,
   Hash,
   Layers,
   Megaphone,
@@ -10,12 +11,14 @@ import {
   Pencil,
   Plus,
   Search,
+  Trophy,
   UserPlus,
   Users,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
 import { useTheme } from "@/components/theme-provider";
@@ -531,6 +534,10 @@ export function Sidebar({
     [filtered],
   );
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const isMiniGames = pathname?.startsWith("/app/mini-games");
+
   return (
     <div className="flex h-full min-w-0 flex-col bg-(--bg-elevated) pt-[max(env(safe-area-inset-top),1rem)]">
       {/* Header */}
@@ -571,6 +578,37 @@ export function Sidebar({
           )}
         </div>
       </div>
+
+      {/* Mini-Games nav */}
+      {!collapsed && (
+        <div className="shrink-0 px-3 pt-2">
+          <button
+            type="button"
+            onClick={() => router.push("/app/mini-games")}
+            aria-current={isMiniGames ? "page" : undefined}
+            className={`flex hover:cursor-pointer w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition ${isMiniGames ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-primary)]" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"}`}
+          >
+            <span className={`flex size-7 items-center justify-center rounded-lg ${isMiniGames ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
+              <Gamepad2 className="h-4 w-4" />
+            </span>
+            <span className="flex-1">Mini-Games</span>
+            <span className="flex items-center gap-1 rounded-full bg-[#a3e635]/15 px-2 py-0.5 text-[11px] font-semibold text-[#a3e635]">New</span>
+          </button>
+        </div>
+      )}
+      {collapsed && (
+        <div className="shrink-0 px-2 pt-2">
+          <button
+            type="button"
+            onClick={() => router.push("/app/mini-games")}
+            aria-label="Mini-Games"
+            aria-current={isMiniGames ? "page" : undefined}
+            className={`mx-auto flex size-9 items-center justify-center rounded-xl border transition ${isMiniGames ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)]" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)]"}`}
+          >
+            <Gamepad2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       {!collapsed && (

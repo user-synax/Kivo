@@ -6,6 +6,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import { unauthorized } from "../utils/errors.js";
 import { roomName } from "./io.js";
+import { initGamesNamespace } from "../modules/games/games.socket.js";
 
 // Socket.IO server instance (lazily set by initSocket). getIO() lets REST
 // controllers emit events into rooms after a DB write.
@@ -203,6 +204,13 @@ export function initSocket(server) {
       // Socket.IO leaves its rooms automatically on disconnect.
     });
   });
+
+  // Dedicated /games namespace — isolated from main chat rooms/presence.
+  try {
+    initGamesNamespace(io);
+  } catch (err) {
+    console.error("[socket] failed to init /games namespace", err);
+  }
 
   // Expose current online state for the REST layer (e.g. conversation list). A
   // helper so controllers don't import the Map directly.

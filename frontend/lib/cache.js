@@ -128,3 +128,48 @@ export async function clearUserCache(userId) {
     // ignore
   }
 }
+
+function kFinishedRace(matchId) {
+  return `finished-race:${matchId}`;
+}
+
+export async function getCachedFinishedRace(matchId) {
+  if (!matchId) return null;
+  try {
+    const store = getStore();
+    const data = await get(kFinishedRace(matchId), store);
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedFinishedRace(matchId, data) {
+  if (!matchId || !data) return;
+  // Only cache completed races — guard caller, double-check here
+  if (data.status !== "completed") return;
+  try {
+    const store = getStore();
+    await set(kFinishedRace(matchId), data, store);
+  } catch {
+    // ignore
+  }
+}
+
+export async function getCachedFinishedRaces(matchIds) {
+  if (!Array.isArray(matchIds) || matchIds.length === 0) return {};
+  try {
+    const store = getStore();
+    const entries = await Promise.all(
+      matchIds.map(async (id) => {
+        const v = await get(kFinishedRace(id), store).catch(() => null);
+        return [id, v];
+      }),
+    );
+    const map = {};
+    for (const [id, v] of entries) if (v) map[id] = v;
+    return map;
+  } catch {
+    return {};
+  }
+}

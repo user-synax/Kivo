@@ -14,6 +14,7 @@ import friendRoutes from "./modules/friends/friends.routes.js";
 import spaceRoutes from "./modules/spaces/spaces.routes.js";
 import notificationRoutes from "./modules/notifications/notifications.routes.js";
 import pushRoutes from "./modules/push/push.routes.js";
+import gameRoutes from "./modules/games/games.routes.js";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/v1/friends", friendRoutes);
 app.use("/api/v1/spaces", spaceRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/push", pushRoutes);
+app.use("/api/v1/games", gameRoutes);
 
 // 404 + centralized error handler (must be registered last).
 app.use(notFoundHandler);
