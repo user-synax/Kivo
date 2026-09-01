@@ -1086,6 +1086,7 @@ export function DashboardShell() {
                   if (selected?.type === "space_channel") setShowSpaceSettings(true);
                   else setShowGroupSettings(true);
                 }}
+                onConversationUpdate={upsertConversation}
               />
             </motion.div>
           ) : (
@@ -1114,6 +1115,7 @@ export function DashboardShell() {
                       currentUser={currentUser}
                       onProfileUpdate={refreshUser}
                       notificationBell={notificationBellNode}
+                      hideSpaces
                     />
                   </div>
                 )}
@@ -1245,6 +1247,7 @@ export function DashboardShell() {
             if (selected?.type === "space_channel") setShowSpaceSettings(true);
             else setShowGroupSettings(true);
           }}
+          onConversationUpdate={upsertConversation}
         />
       </div>
 
@@ -1256,6 +1259,8 @@ export function DashboardShell() {
             loading={otherLoading}
             online={selectedOtherOnline}
             conversationCreatedAt={selected?.createdAt}
+            conversation={selected}
+            onConversationUpdate={upsertConversation}
           />
         ) : null}
       </AnimatePresence>

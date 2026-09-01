@@ -1,6 +1,7 @@
 "use client";
 
-import { Lock, Reply, Send, Smile, Users, X } from "lucide-react";
+import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, Smile, UserMinus, Users, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
@@ -143,7 +144,7 @@ function receiptState(message, userId, otherId) {
   return "sent";
 }
 
-export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) {
+export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate }) {
   const socket = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
@@ -161,6 +162,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
   const online = Array.isArray(conversation?.online)
     ? conversation.online.some(Boolean)
     : Boolean(conversation?.online);
+  const isDm = Boolean(conversation && conversation.type === "dm");
+  const isBlockedByMe = Boolean(conversation?.isBlockedByMe);
+  const isBlockedByOther = Boolean(conversation?.isBlockedByOther);
 
   // Index group members by id so we can render sender names/avatars per message.
   const membersById = {};
@@ -198,6 +202,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionPos, setMentionPos] = useState(null);
+  const [showMore, setShowMore] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const moreRef = useRef(null);
 
   // Live online presence tracking set
   const [onlineUsers, setOnlineUsers] = useState(new Set());
@@ -207,6 +214,67 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
 
   const isDesktop = useIsDesktop();
   const isMobile = !isDesktop;
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    if (!showMore) return;
+    function onDoc(e) {
+      if (moreRef.current && !moreRef.current.contains(e.target)) setShowMore(false);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") setShowMore(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showMore]);
+
+  const handleBlock = async () => {
+    if (!otherId || blockBusy) return;
+    setBlockBusy(true);
+    try {
+      await apiPost(`/api/v1/users/${otherId}/block`, {});
+      setShowMore(false);
+      if (onConversationUpdate && conversation) {
+        onConversationUpdate({ ...conversation, isBlockedByMe: true, isBlockedByOther: false });
+      }
+    } catch (err) {
+      window.alert(err?.message || "Could not block user");
+    } finally {
+      setBlockBusy(false);
+    }
+  };
+  const handleUnblock = async () => {
+    if (!otherId || blockBusy) return;
+    setBlockBusy(true);
+    try {
+      await apiPost(`/api/v1/users/${otherId}/unblock`, {});
+      setShowMore(false);
+      if (onConversationUpdate && conversation) {
+        onConversationUpdate({ ...conversation, isBlockedByMe: false, isBlockedByOther: false });
+      }
+    } catch (err) {
+      window.alert(err?.message || "Could not unblock user");
+    } finally {
+      setBlockBusy(false);
+    }
+  };
+  const handleRemoveFriend = async () => {
+    if (!otherId || blockBusy) return;
+    if (!window.confirm(`Remove ${otherName} from friends?`)) return;
+    setBlockBusy(true);
+    try {
+      await apiDelete(`/api/v1/friends/${otherId}`);
+      setShowMore(false);
+    } catch (err) {
+      window.alert(err?.message || "Could not remove friend");
+    } finally {
+      setBlockBusy(false);
+    }
+  };
 
   const scrollRef = useRef(null);
   const typingTimer = useRef(null);
@@ -735,6 +803,64 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
             <Users className="h-5 w-5" />
           </button>
         )}
+        {isDm && otherId && isMobile && (
+          <div ref={moreRef} className="relative">
+            <motion.button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={showMore}
+              aria-label="More options"
+              whileTap={reduce ? undefined : { scale: 0.96 }}
+              className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </motion.button>
+            <AnimatePresence>
+              {showMore && (
+                <motion.div
+                  role="menu"
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.98, filter: "blur(4px)" }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute right-0 top-full z-30 mt-2 min-w-48 origin-top-right overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1.5 shadow-xl"
+                >
+                  {isBlockedByMe ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={blockBusy}
+                      onClick={handleUnblock}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)] disabled:opacity-40"
+                    >
+                      <ShieldBan className="h-4 w-4" /> Unblock {otherName}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={blockBusy}
+                      onClick={handleBlock}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--destructive)] hover:bg-[var(--hover)] disabled:opacity-40"
+                    >
+                      <Ban className="h-4 w-4" /> Block {otherName}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={blockBusy}
+                    onClick={handleRemoveFriend}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--destructive)] disabled:opacity-40"
+                  >
+                    <UserMinus className="h-4 w-4" /> Remove friend
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -884,7 +1010,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
         {/* Composer */}
         <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
           <div className="mx-auto max-w-3xl">
-            {replyingTo && canPost && (
+            {replyingTo && !isBlockedByMe && !isBlockedByOther && canPost && (
               <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
                 <div className="flex items-start gap-2 min-w-0">
                   <span className="shrink-0 text-[var(--accent)]">
@@ -909,13 +1035,64 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
                 </div>
               </div>
             )}
-            {!canPost ? (
-              <div className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]">
-                <Lock className="h-4 w-4 shrink-0" />
-                <span>Only admins can post in this announcement channel</span>
-              </div>
-            ) : (
-              <div className="relative z-20 flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]">
+            <AnimatePresence mode="wait">
+              {isBlockedByOther ? (
+                <motion.div
+                  key="blocked-other"
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6, filter: "blur(4px)" }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--destructive)]/30 bg-[var(--destructive)]/10 px-4 py-3 text-sm text-[var(--destructive)]"
+                >
+                  <Ban className="h-4 w-4 shrink-0" />
+                  <span>{otherName} blocked you</span>
+                </motion.div>
+              ) : isBlockedByMe ? (
+                <motion.div
+                  key="blocked-me"
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6, filter: "blur(4px)" }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-center justify-between gap-3 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Ban className="h-4 w-4 shrink-0" />
+                    <span>You blocked {otherName}</span>
+                  </span>
+                  <motion.button
+                    type="button"
+                    disabled={blockBusy}
+                    onClick={handleUnblock}
+                    whileTap={reduce ? undefined : { scale: 0.96 }}
+                    whileHover={reduce ? undefined : { scale: 1.02 }}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:opacity-40"
+                  >
+                    Unblock
+                  </motion.button>
+                </motion.div>
+              ) : !canPost ? (
+                <motion.div
+                  key="announcement"
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
+                >
+                  <Lock className="h-4 w-4 shrink-0" />
+                  <span>Only admins can post in this announcement channel</span>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="composer"
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative z-20 flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]"
+                >
           {mentionOpen && (
             <MentionAutocomplete
               participants={getFilteredParticipants(mentionQuery)}
@@ -997,20 +1174,22 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
             rows={1}
             className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
           />
-           <button
-             type="button"
-             onClick={send}
-             disabled={!text.trim()}
-             className=" rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
-           >
-             <Send className="h-5 w-5" />
-           </button>
-             </div>
-            )}
-          </div>
-        </div>
-      </div>
-  );
+            <motion.button
+              type="button"
+              onClick={send}
+              disabled={!text.trim()}
+              whileTap={reduce ? undefined : { scale: 0.96 }}
+              className="rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 disabled:opacity-40 active:scale-[0.97]"
+            >
+              <Send className="h-5 w-5" />
+            </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+           </div>
+         </div>
+       </div>
+   );
 }
 
 export default ChatPanel;

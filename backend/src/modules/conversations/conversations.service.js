@@ -44,13 +44,17 @@ function toId(v) {
   return v.toString();
 }
 
-function publicConversation(conversation, userId, onlineLookup) {
+function publicConversation(conversation, userId, onlineLookup, blockFlags) {
   const participants = (conversation.participants || []).map(normalizeParticipant);
   const otherParticipantIds = participants
     .map((p) => p.id)
     .filter((id) => id !== userId);
 
   const admins = (conversation.admins || []).map(toId).filter(Boolean);
+
+  const isDm = conversation.type === "dm";
+  const isBlockedByMe = isDm ? Boolean(blockFlags?.isBlockedByMe) : false;
+  const isBlockedByOther = isDm ? Boolean(blockFlags?.isBlockedByOther) : false;
 
   return {
     id: conversation._id.toString(),
@@ -69,6 +73,8 @@ function publicConversation(conversation, userId, onlineLookup) {
     online: onlineLookup
       ? otherParticipantIds.map((id) => Boolean(onlineLookup(id)))
       : undefined,
+    isBlockedByMe,
+    isBlockedByOther,
   };
 }
 
@@ -109,13 +115,23 @@ export async function createOrGetDm({ userId, participantId }) {
     throw notFound("User not found", "USER_NOT_FOUND");
   }
 
+  const [me, them] = await Promise.all([
+    User.findById(userId).select("blockedUsers").lean(),
+    User.findById(participantId).select("blockedUsers").lean(),
+  ]);
+  const meBlocked = new Set((me?.blockedUsers || []).map((id) => id.toString()));
+  const themBlocked = new Set((them?.blockedUsers || []).map((id) => id.toString()));
+  const isBlockedByMe = meBlocked.has(participantId.toString());
+  const isBlockedByOther = themBlocked.has(userId.toString());
+  const blockFlags = { isBlockedByMe, isBlockedByOther };
+
   // Normalize participant order so the $all query is order-independent.
   const existing = await Conversation.findOne({
     type: "dm",
     participants: { $all: [userId, participantId] },
   }).populate("participants", "id displayName username email avatarStyle avatarUrl");
   if (existing) {
-    return publicConversation(existing, userId, onlineSnapshot());
+    return publicConversation(existing, userId, onlineSnapshot(), blockFlags);
   }
 
   const created = await Conversation.create({
@@ -128,7 +144,7 @@ export async function createOrGetDm({ userId, participantId }) {
   joinUserToRoom(userId, created._id.toString());
   joinUserToRoom(participantId, created._id.toString());
 
-  return publicConversation(created, userId, onlineSnapshot());
+  return publicConversation(created, userId, onlineSnapshot(), blockFlags);
 }
 
 // List the current user's conversations, newest activity first. Includes a
@@ -142,9 +158,34 @@ export async function listConversations({ userId }) {
 
   const lookup = onlineSnapshot();
   const uid = new mongoose.Types.ObjectId(userId);
+
+  // Pre-fetch blockedUsers for DM flag computation
+  const me = await User.findById(userId).select("blockedUsers").lean();
+  const meBlocked = new Set((me?.blockedUsers || []).map((id) => id.toString()));
+  const dmOtherIds = [
+    ...new Set(
+      conversations
+        .filter((c) => c.type === "dm")
+        .flatMap((c) => (c.participants || []).map((p) => (p._id || p).toString()).filter((id) => id !== userId.toString()))
+    ),
+  ];
+  const otherUsers = dmOtherIds.length
+    ? await User.find({ _id: { $in: dmOtherIds } }).select("blockedUsers").lean()
+    : [];
+  const otherBlockedMap = new Map(otherUsers.map((u) => [u._id.toString(), new Set((u.blockedUsers || []).map((id) => id.toString()))]));
+
   const result = [];
   for (const c of conversations) {
-    const base = publicConversation(c, userId, lookup);
+    let blockFlags = null;
+    if (c.type === "dm") {
+      const otherId = (c.participants || [])
+        .map((p) => (p._id || p).toString())
+        .find((id) => id !== userId.toString());
+      const isBlockedByMe = otherId ? meBlocked.has(otherId) : false;
+      const isBlockedByOther = otherId ? (otherBlockedMap.get(otherId)?.has(userId.toString()) || false) : false;
+      blockFlags = { isBlockedByMe, isBlockedByOther };
+    }
+    const base = publicConversation(c, userId, lookup, blockFlags);
     const unread = await Message.countDocuments({
       conversationId: c._id,
       senderId: { $ne: uid },

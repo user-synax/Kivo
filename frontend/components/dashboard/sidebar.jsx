@@ -502,6 +502,7 @@ export function Sidebar({
   currentUser,
   onProfileUpdate,
   notificationBell = null,
+  hideSpaces = false,
 }) {
   const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -623,14 +624,16 @@ export function Sidebar({
               collapsed={collapsed}
               onNewGroup={onNewGroup}
             />
-            <SpacesSection
-              spaces={spaces}
-              channels={channels}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              collapsed={collapsed}
-              onCreateSpace={onCreateSpace}
-            />
+            {!hideSpaces && (
+              <SpacesSection
+                spaces={spaces}
+                channels={channels}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                collapsed={collapsed}
+                onCreateSpace={onCreateSpace}
+              />
+            )}
           </>
         )}
       </div>

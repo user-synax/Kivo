@@ -86,3 +86,18 @@ export const deleteAvatar = asyncHandler(async (req, res) => {
   const user = await usersService.deleteAvatar({ userId: req.user.userId });
   res.status(200).json({ success: true, data: user });
 });
+
+export const listBlocked = asyncHandler(async (req, res) => {
+  const users = await usersService.listBlockedUsers({ userId: req.user.userId });
+  res.status(200).json({ success: true, data: users });
+});
+
+export const blockUser = asyncHandler(async (req, res) => {
+  const result = await usersService.blockUser({ userId: req.user.userId, targetId: req.params.id });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const unblockUser = asyncHandler(async (req, res) => {
+  const result = await usersService.unblockUser({ userId: req.user.userId, targetId: req.params.id });
+  res.status(200).json({ success: true, data: result });
+});

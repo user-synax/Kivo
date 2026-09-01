@@ -1,9 +1,12 @@
-import { unauthorized, notFound, conflict, badRequest } from "../../utils/errors.js";
+import { unauthorized, notFound, conflict, badRequest, forbidden } from "../../utils/errors.js";
 import mongoose from "mongoose";
 import User from "../../models/User.js";
 import FriendRequest from "../../models/FriendRequest.js";
+import Conversation from "../../models/Conversation.js";
 import { uploadAvatar, getStorageSafe } from "../../lib/appwrite.js";
 import env from "../../config/env.js";
+import { emitToUser } from "../../socket/io.js";
+import { getIO } from "../../socket/index.js";
 
 // Public user shape returned in search/friend results and self profile.
 function publicUser(user) {
@@ -113,6 +116,132 @@ export async function deleteAvatar({ userId }) {
   user.avatarFileId = null;
   await user.save();
   return publicUser(user);
+}
+
+// --- Block / Unblock helpers ---
+
+async function emitBlockSync({ blockerId, blockedId }) {
+  const dms = await Conversation.find({ type: "dm", participants: { $all: [blockerId, blockedId] } })
+    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .lean();
+  if (dms.length === 0) return;
+  // Fetch fresh blockedUsers for both to compute flags
+  const [blocker, blocked] = await Promise.all([
+    User.findById(blockerId).select("blockedUsers").lean(),
+    User.findById(blockedId).select("blockedUsers").lean(),
+  ]);
+  const blockerSet = new Set((blocker?.blockedUsers || []).map((id) => id.toString()));
+  const blockedSet = new Set((blocked?.blockedUsers || []).map((id) => id.toString()));
+
+  const blockerHasBlocked = blockerSet.has(blockedId.toString());
+  const blockedHasBlocked = blockedSet.has(blockerId.toString());
+
+  for (const dm of dms) {
+    // Build two viewer-specific payloads
+    const baseForBlocker = buildPublicConversationForEmit(dm, blockerId.toString(), blockerHasBlocked, blockedHasBlocked);
+    const baseForBlocked = buildPublicConversationForEmit(dm, blockedId.toString(), blockedHasBlocked, blockerHasBlocked);
+    emitToUser(blockerId.toString(), "conversation:updated", { conversation: baseForBlocker });
+    emitToUser(blockedId.toString(), "conversation:updated", { conversation: baseForBlocked });
+  }
+}
+
+function normalizeParticipantForBlock(p) {
+  const id = typeof p === "string" ? p : p?._id?.toString?.() || p?.toString?.();
+  const populated = p && typeof p === "object" && (p.displayName !== undefined || p.username !== undefined);
+  return {
+    id,
+    displayName: populated ? (p.displayName ?? null) : null,
+    username: populated ? (p.username ?? null) : null,
+    email: populated ? (p.email ?? null) : null,
+    avatarStyle: populated ? (p.avatarStyle ?? null) : null,
+    avatarUrl: populated ? (p.avatarUrl ?? null) : null,
+  };
+}
+function toIdForBlock(v) {
+  if (!v) return null;
+  if (typeof v === "string") return v;
+  if (v._id) return v._id.toString();
+  if (v.id) return v.id.toString();
+  return v.toString();
+}
+function buildPublicConversationForEmit(conversation, viewerId, viewerHasBlockedOther, otherHasBlockedViewer) {
+  const participants = (conversation.participants || []).map(normalizeParticipantForBlock);
+  const otherParticipantIds = participants.map((p) => p.id).filter((id) => id !== viewerId);
+  const admins = (conversation.admins || []).map(toIdForBlock).filter(Boolean);
+  const io = getIO();
+  const onlineLookup = io?.isUserOnline ? (id) => io.isUserOnline(id) : null;
+  return {
+    id: conversation._id.toString(),
+    type: conversation.type,
+    name: conversation.type === "group" || conversation.type === "space_channel" ? (conversation.name || null) : null,
+    participants,
+    otherParticipantIds,
+    admins,
+    createdBy: conversation.createdBy ? toIdForBlock(conversation.createdBy) : null,
+    isAdmin: conversation.type === "group" ? admins.includes(viewerId) : false,
+    avatarUrl: conversation.avatarUrl || null,
+    lastMessageAt: conversation.lastMessageAt || null,
+    createdAt: conversation.createdAt,
+    spaceId: conversation.spaceId ? conversation.spaceId.toString() : null,
+    channelId: conversation.channelId ? conversation.channelId.toString() : null,
+    online: onlineLookup ? otherParticipantIds.map((id) => Boolean(onlineLookup(id))) : undefined,
+    isBlockedByMe: conversation.type === "dm" ? Boolean(viewerHasBlockedOther) : false,
+    isBlockedByOther: conversation.type === "dm" ? Boolean(otherHasBlockedViewer) : false,
+  };
+}
+
+export async function listBlockedUsers({ userId }) {
+  const user = await User.findById(userId).populate("blockedUsers", "displayName username email avatarStyle avatarUrl").lean();
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  return (user.blockedUsers || []).map((u) => ({
+    id: u._id.toString(),
+    displayName: u.displayName || null,
+    username: u.username || null,
+    email: u.email,
+    avatarStyle: u.avatarStyle || null,
+    avatarUrl: u.avatarUrl || null,
+  }));
+}
+
+export async function blockUser({ userId, targetId }) {
+  if (!mongoose.Types.ObjectId.isValid(targetId)) throw badRequest("Invalid user id", "INVALID_ID");
+  if (userId.toString() === targetId.toString()) throw badRequest("You cannot block yourself", "SELF_BLOCK");
+
+  const target = await User.findById(targetId).select("_id");
+  if (!target) throw notFound("User not found", "USER_NOT_FOUND");
+
+  const requester = await User.findById(userId).select("blockedUsers");
+  if (!requester) throw notFound("User not found", "USER_NOT_FOUND");
+  const already = (requester.blockedUsers || []).some((id) => id.toString() === targetId.toString());
+  if (already) throw conflict("User already blocked", "ALREADY_BLOCKED");
+
+  await User.findByIdAndUpdate(userId, { $addToSet: { blockedUsers: targetId } });
+
+  // End friendship if exists (accepted edge) and remove any pending requests either direction
+  await FriendRequest.deleteMany({
+    $or: [
+      { from: userId, to: targetId },
+      { from: targetId, to: userId },
+    ],
+  });
+
+  await emitBlockSync({ blockerId: userId, blockedId: targetId });
+
+  return { blocked: true };
+}
+
+export async function unblockUser({ userId, targetId }) {
+  if (!mongoose.Types.ObjectId.isValid(targetId)) throw badRequest("Invalid user id", "INVALID_ID");
+  if (userId.toString() === targetId.toString()) throw badRequest("You cannot unblock yourself", "SELF_BLOCK");
+
+  const target = await User.findById(targetId).select("_id");
+  if (!target) throw notFound("User not found", "USER_NOT_FOUND");
+
+  await User.findByIdAndUpdate(userId, { $pull: { blockedUsers: targetId } });
+
+  await emitBlockSync({ blockerId: userId, blockedId: targetId });
+
+  return { blocked: false };
 }
 
 // Partial self-profile update. Validates username uniqueness when changed and

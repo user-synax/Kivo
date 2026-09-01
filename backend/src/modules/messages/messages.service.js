@@ -48,6 +48,27 @@ async function assertMembership(conversationId, userId) {
   return conversation;
 }
 
+async function assertDmNotBlocked(conversation, userId) {
+  if (conversation.type !== "dm") return;
+  const participantIds = conversation.participants.map((p) => p.toString());
+  const otherId = participantIds.find((id) => id !== userId.toString());
+  if (!otherId) return;
+  const [me, other] = await Promise.all([
+    User.findById(userId).select("blockedUsers").lean(),
+    User.findById(otherId).select("blockedUsers").lean(),
+  ]);
+  const meBlocked = new Set((me?.blockedUsers || []).map((id) => id.toString()));
+  const otherBlocked = new Set((other?.blockedUsers || []).map((id) => id.toString()));
+  const isBlockedByMe = meBlocked.has(otherId.toString());
+  const isBlockedByOther = otherBlocked.has(userId.toString());
+  if (isBlockedByOther) {
+    throw forbidden("The recipient has blocked you", "BLOCKED");
+  }
+  if (isBlockedByMe) {
+    throw forbidden("You have blocked the recipient", "BLOCKED");
+  }
+}
+
 export async function listMessages({ conversationId, userId, cursor, limit }) {
   await assertMembership(conversationId, userId);
 
@@ -103,6 +124,7 @@ async function resolveMentions(content, participantIds) {
 
 export async function createMessage({ conversationId, userId, content, replyToMessageId }) {
   const conversation = await assertMembership(conversationId, userId);
+  await assertDmNotBlocked(conversation, userId);
 
   // Announcement channels: only owner/admin can send
   if (conversation.type === "space_channel" && conversation.spaceId && conversation.channelId) {
@@ -158,6 +180,7 @@ export async function editMessage({ messageId, userId, content }) {
   const message = await Message.findById(messageId);
   if (!message) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
   const conversation = await assertMembership(message.conversationId.toString(), userId);
+  await assertDmNotBlocked(conversation, userId);
 
   if (message.senderId.toString() !== userId) {
     throw forbidden("You can only edit your own messages", "NOT_SENDER");
@@ -202,7 +225,8 @@ export async function deleteMessage({ messageId, userId }) {
 export async function toggleReaction({ messageId, userId, emoji }) {
   const message = await Message.findById(messageId);
   if (!message) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
-  await assertMembership(message.conversationId.toString(), userId);
+  const conv = await assertMembership(message.conversationId.toString(), userId);
+  await assertDmNotBlocked(conv, userId);
   if (message.isDeleted) {
     throw badRequest("Cannot react to a deleted message", "ALREADY_DELETED");
   }

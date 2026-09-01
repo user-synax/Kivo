@@ -7,13 +7,14 @@ import {
   MessageCircle,
   Search,
   SearchX,
+  UserMinus,
   UserPlus,
   Users,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
   getCachedFriends,
@@ -246,6 +247,27 @@ export function FriendsModal({ open, onClose, onStartChat }) {
 
   const startChat = (friendId) => onStartChat(friendId);
 
+  const removeFriend = async (friendId) => {
+    if (!friendId) return;
+    const friend = friends.find((f) => f.id === friendId);
+    const name = friend ? (friend.displayName || friend.username || friend.email) : "this friend";
+    if (!window.confirm(`Remove ${name} from friends?`)) return;
+    setBusyId(friendId);
+    try {
+      await apiDelete(`/api/v1/friends/${friendId}`);
+      setFriends((prev) => {
+        const next = prev.filter((f) => f.id !== friendId);
+        const uid = getSession()?.id;
+        if (uid) setCachedFriends(uid, next).catch(() => {});
+        return next;
+      });
+    } catch (err) {
+      window.alert(err?.message || "Could not remove friend");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (!render) return null;
 
   const tabsNode = (
@@ -296,9 +318,21 @@ export function FriendsModal({ open, onClose, onStartChat }) {
           {friends.length === 0 && <EmptyState icon={Users} title="No friends yet" hint="Add someone from the “Add friend” tab." />}
           {friends.map((f) => (
             <PersonRow key={f.id} person={{ ...f, name: fullName(f) }} subtitle={handle(f)}>
-              <button type="button" onClick={() => startChat(f.id)} className={btnSecondary}>
-                <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.8} /> Message
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button type="button" onClick={() => startChat(f.id)} className={btnSecondary}>
+                  <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.8} /> Message
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === f.id}
+                  onClick={() => removeFriend(f.id)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--destructive)]/10 hover:text-[var(--destructive)] hover:border-[var(--destructive)]/30 disabled:opacity-40"
+                  aria-label={`Remove ${fullName(f)}`}
+                >
+                  {busyId === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <UserMinus className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                  Remove
+                </button>
+              </div>
             </PersonRow>
           ))}
         </div>

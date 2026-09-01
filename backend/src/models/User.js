@@ -71,6 +71,11 @@ const userSchema = new mongoose.Schema(
       enum: ROLES,
       default: "user",
     },
+    blockedUsers: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+      index: true,
+    },
   },
   { timestamps: true }
 );
