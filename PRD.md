@@ -1,7 +1,7 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.2
-**Last Updated:** August 31, 2026
+**Version:** 2.3
+**Last Updated:** September 1, 2026
 **Status:** MVP Development (Core Messaging + Spaces + Notifications Complete)
 
 ---
@@ -71,11 +71,12 @@ Kivo
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
 | DM Conversations | **Complete** | Create, list, message history, unread counts |
 | Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts |
+| **@Mentions** | **Complete** | Autocomplete + mention notifications |
 | Message Replies | **Complete** | Reply-to with inline quote preview |
 | Typing Indicators | **Complete** | Realtime via Socket.IO |
 | Presence | **Complete** | Online/offline, snapshot on connect |
 | Realtime Events | **Complete** | Socket.IO with authenticated connections |
-| Theme System | **Complete** | 5 themes with live switching, persisted in localStorage |
+| Theme System | **Complete** | 5 Framer-style themes with live switching, persisted in localStorage |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
@@ -83,10 +84,13 @@ Kivo
 | Notification System | **Complete** | In-app notification center + sound + DM-focused suppression |
 | Web Push | **Complete** | VAPID push for offline users, PWA service worker |
 | PWA / Installable | **Complete** | Manifest, icons, service worker |
+| Mobile UX | **Complete** | Bottom tab bar, responsive panels, safe-area handling |
+| Offline Caching | **Complete** | IndexedDB (`idb-keyval`) cache for conversations, Spaces, friends, requests |
 | Threads | **Not started** | Phase 2 |
-| Mention Notifications | **Not started** | Planned |
+| Mention Notifications | **Complete** | `@mention` feature shipped |
 | Search | **Not started** | Planned (user search complete only) |
 | File Attachments | **Not started** | Planned |
+| Voice / 2FA | **Partially wired** | LiveKit backend stubbed for voice; frontend not built; 2FA planned |
 
 ---
 
@@ -339,39 +343,43 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 
 - 5 built-in themes stored in `lib/theme.js`.
 - Theme applied via CSS custom properties at the `:root` level.
-- Persisted in `localStorage` under `kivo:theme`.
+- Persisted in `localStorage` under `kivo:theme` (`THEME_STORAGE_KEY`).
 - Live switching — no page reload required.
+- Geometry (radius + shadow) is global design tokens in `globals.css`, so all themes share the same shape; only colors re-skin.
 
 #### 5.2 Available Themes
 
-| Theme | Style | Radii | Shadows | Surfaces |
-|---|---|---|---|---|
-| **Replit** (default) | Flat, border-driven | 40px cards, pill buttons | Minimal | Cream/dark |
-| **Replit Soft** | Gentle floating elevation | 28px cards | Subtle | Cream/dark |
-| **Replit Crisp** | Geometric, precise | 14px cards | Hairline | Cream/dark |
-| **Replit Float** | Bold, pillowy | 48px cards | Prominent | Cream/dark |
-| **Replit Ink** | Dark variant of default | 40px cards | Minimal | Near-black |
-
-#### 5.3 Color Palette ("Nexus")
-
-| Token | Light Value | Dark Value |
+| Theme | Style | Canvas |
 |---|---|---|
-| primary | `#F68B1F` (ember orange) | `#F68B1F` |
-| secondary | `#F2EAD3` (warm cream) | `#1e1a12` |
-| accent | `#FDB813` (gold) | `#FDB813` |
-| background | `#F2EAD3` | `#14110b` |
-| surface | `#FFFFFF` | `#1e1a12` |
-| text-primary | `#111827` | `#F2EAD3` |
-| text-secondary | `#4B5563` | `#9ca3af` |
-| border | `#E5E7EB` | `#2d2719` |
+| **Framer** (default) | Dark Framer-style, blue accent | `#090909` |
+| **Cloud** | Cool, slightly blue-tinted | `#0b0d12` |
+| **Sand** | Warm, faint brown-tinted | `#100d0a` |
+| **Ink** | Neutral near-black | `#0c0c0e` |
+| **Midnight** | Deep navy | `#0a0e16` |
+
+#### 5.3 Color Palette ("Framer" Dark)
+
+Framer is the default palette; other themes only vary the canvas/surface hue cast on top of the same family.
+
+| Token | Value (Framer) |
+|---|---|
+| base (canvas) | `#090909` |
+| surface | `#141414` |
+| elevated | `#1c1c1c` |
+| text-primary | `#ffffff` |
+| text-muted | `#999999` |
+| border (hairline) | `#262626` |
+| accent (blue signal) | `#4ba9e1` |
+| online indicator | `#22c55e` |
+| scrollbar-thumb | `#2a2a2a` |
 
 #### 5.4 Typography
 
-| Role | Font | Weight |
-|---|---|---|
-| Display / Headings | Inter | 500 |
-| Body | Playfair Display | 400 |
-| Mono / Labels | JetBrains Mono | 600 |
+| Role | Font |
+|---|---|
+| Display / Headings | Goga |
+| Body | Inter |
+| Mono / Labels | JetBrains Mono |
 
 #### 5.5 Motion System
 
@@ -408,9 +416,12 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 
 | Breakpoint | Layout |
 |---|---|
-| Mobile (< 768px) | Stack navigation: conversation list → chat panel → detail panel |
+| Mobile (< 768px) | Stack: conversation list → chat panel → detail panel, with a **bottom tab bar** (Chats / Spaces / Profile) |
 | Desktop (768px+) | Sidebar + chat panel + optional detail panel |
 | Desktop XL (1280px+) | Three-column: sidebar + chat + user detail panel |
+
+- `useIsDesktop()` (matchMedia 768px) drives responsive rendering across the shell, modals, and notification center.
+- Safe-area insets handled for notch devices on mobile.
 
 #### 6.3 Sidebar
 
@@ -543,7 +554,7 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 | `friend_request` | A user sends you a friend request |
 | `friend_accept` | A user accepts your friend request |
 | `space_invite` | Reserved for future space invites |
-| `mention` | Reserved for future @mentions |
+| `mention` | `@mention` in a message (shipped) |
 
 #### 8.2 Delivery Model
 
@@ -1024,6 +1035,7 @@ Each module follows a 4-file pattern:
 | `/signup` | `app/(auth)/signup/page.jsx` | Signup form | GuestGate |
 | `/app` | `app/app/page.jsx` | Main dashboard | AuthGate |
 | `/app/profile` | `app/app/profile/page.jsx` | User profile | AuthGate |
+| `/docs` | `app/docs/page.jsx` | How-to-use guide | Anyone |
 
 ### Frontend Component Tree
 
@@ -1182,7 +1194,7 @@ Maintain `.env.example` in both frontend and backend.
 ## Out of Scope for MVP
 
 - Slack-style work-management features
-- Voice channels / video calls / screen sharing
+- Full voice channels / video calls / screen sharing (Phase 1.5 backend wiring in progress)
 - End-to-end encryption
 - Bots / webhooks / integrations
 - Marketplace
@@ -1206,11 +1218,19 @@ These may be considered after the core communication experience is stable.
 - Group chats (create, manage members, admins).
 - Spaces & Channels with moderation and discovery.
 - End-to-end notification system (in-app + web push via PWA).
+- `@mention` feature with autocomplete + mention notifications.
+- Mobile UX (bottom tab bar, responsive panels) + IndexedDB offline caching.
+
+### Phase 1.5 — Voice Foundations
+
+- Voice backend wiring (LiveKit) — Phase 1 backend stub wired.
+- DM & group voice calls.
+- Voice channel frontend.
+- 2FA — second-factor authentication.
 
 ### Phase 2 — Enhanced Messaging
 
 - Threads.
-- Mention notifications / @mentions.
 - Notification preferences per user.
 - Pinned messages.
 - Saved messages.
@@ -1218,6 +1238,7 @@ These may be considered after the core communication experience is stable.
 - Advanced permissions.
 - Scheduled messages.
 - Stronger search (message, conversation, space).
+- File / image attachments.
 
 ### Phase 3 — Rich Communication
 
@@ -1252,13 +1273,13 @@ The MVP is successful when:
 
 ## Visual Direction
 
-Design source of truth: `Design.md`
+Design source of truth: `frontend/Design.md`
 
-- **Primary:** `#F68B1F` (ember orange)
-- **Secondary:** `#F2EAD3` (warm cream)
-- **Accent:** `#FDB813` (gold)
-- **Dark canvas:** `#14110b`
-- **Dark surface:** `#1e1a12`
+- **Canvas:** `#090909` (near-black)
+- **Surface:** `#141414` / **Elevated:** `#1c1c1c`
+- **Accent:** `#4ba9e1` (blue signal)
+- **Text:** `#ffffff` / muted `#999999`
+- **Border (hairline):** `#262626`
 
 Design ratio: **85% minimal / 15% personality**.
 
@@ -1266,11 +1287,11 @@ Personality comes from product UI, customization previews, reactions, and micro-
 
 ### Design Principles
 
-- Near-black canvas with warm tones.
+- Near-black canvas.
 - Hairline borders.
 - Generous whitespace.
 - Minimal shadows.
-- Strong geometric headings (Inter).
+- Strong geometric headings (Goga).
 - Clean UI surfaces.
 - Restrained motion with purpose.
 

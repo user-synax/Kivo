@@ -39,6 +39,7 @@ Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for
 | `/signup` | Guests | Create an account. |
 | `/app` | Signed-in users | Main chat: sidebar, conversations, Spaces. |
 | `/app/profile` | Signed-in users | Read-only profile summary and **Log out**. |
+| `/docs` | Anyone | In-app "How to use Kivo" guide. |
 
 ---
 
@@ -84,11 +85,11 @@ After login you see three regions (on a wide screen):
 2. **Center chat** — the open conversation or channel.
 3. **Right panel** (XL desktop, DMs) — the other person’s profile. For groups and Spaces, a **settings drawer** can slide in from the right.
 
-**Mobile:** conversation list first. Open a chat to see messages. Use **Back** in the chat header to return to the list. Group/Space settings open as a full-height drawer.
+**Mobile:** On a phone, Kivo shows a **bottom tab bar** with three sections — **Chats**, **Spaces**, and **Profile** — so navigation feels native. Open a chat to see messages; use **Back** in the chat header to return to the list. Group/Space settings open as a full-height drawer. Safe-area insets are handled on notched devices.
 
 **Collapse the sidebar:** use the panel icon in the sidebar header (desktop). Collapsed state is remembered.
 
-**Remember last chat:** the last selected conversation is restored after refresh.
+**Remember last chat & instant paint:** the last selected conversation is restored after refresh. Your conversations, Spaces, friends, and friend requests are cached in the browser (IndexedDB), so the list paints instantly while fresh data loads.
 
 ---
 
@@ -431,7 +432,7 @@ Kivo is installable:
 - **Android:** Add to Home Screen / Install app.
 - **iOS Safari:** Share → **Add to Home Screen**.
 
-It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push; there is no full offline chat cache yet (you still need the network to send/receive messages).
+It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push. Kivo caches your conversation, Space, friend, and friend-request **lists** in IndexedDB so they paint instantly on reload, but there is **no full offline message cache** yet (you still need the network to send/receive messages and see full history).
 
 ---
 
@@ -491,14 +492,15 @@ There is **no admin UI** in the app today; these are API-only.
 
 Do not expect these in the current MVP:
 
-- Message, conversation, or Space **search** (user search only)  
+- WhatsApp/Discord-style **search** inside messages, conversations, or Spaces (user search only)  
 - **File / image attachments** in chat (avatars and Space/group images only)  
 - **Threads**, pinned messages, saved messages  
-- **Voice / video**  
+- **Voice / video** — phase 1 backend is wired but no call UI yet  
+- **2FA** (two-factor authentication)  
 - Unfriend button in the UI  
 - Custom user-created themes  
 - Invite links for private Spaces  
-- Full offline message history in the PWA  
+- Full offline **message** history in the PWA (chat lists are cached; messages still need the network)  
 
 ---
 
@@ -517,10 +519,12 @@ Do not expect these in the current MVP:
 | Group create / members / admins | New group + group settings |
 | Spaces, channels, roles, Discover | Sidebar Spaces + Discover + Space settings |
 | Profile, avatar, frame, banner, bio, status | Sidebar profile |
-| Five themes | Sidebar theme switcher |
+| Five Framer-style themes | Sidebar theme switcher |
 | In-app notifications | Bell |
 | Web push | Allow notifications when opening the bell |
 | Install PWA | Browser install / Add to Home Screen |
+| Mobile bottom tab bar (Chats / Spaces / Profile) | On phone-sized screens |
+| Offline list caching (conversations, Spaces, friends) | Automatic via IndexedDB |
 | Health check (ops) | `GET /health` on the API |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).

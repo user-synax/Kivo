@@ -29,11 +29,12 @@
 - 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
-- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), edit, and soft-delete.
-- 🎨 **5 live-switchable themes** with a warm "Nexus" color palette, persisted without a page reload.
+- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), `@mentions`, edit, and soft-delete.
+- 🎨 **5 live-switchable themes** with a Framer-style dark palette, persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status, bio, banner, avatar frames, and uploads hosted on Appwrite Storage.
 - 🤝 **Complete friends system** — send, accept, decline, remove, search, and jump straight into a DM.
-- 📱 **Mobile-first polish** — responsive three-panel layout that works beautifully from phone to XL desktop.
+- 📱 **Mobile-first polish** — responsive three-panel layout with a bottom tab bar for phone navigation that works beautifully from phone to XL desktop.
+- 🗄️ **Offline caching** — conversations, Spaces, friends, and friend requests cached in IndexedDB for instant paint on reload.
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
 
@@ -75,8 +76,9 @@ Although Kivo is a **student project**, the messaging core is **fully functional
 - 👥 **Group conversations** (e.g. college projects, gaming squads) with admins & member management
 - 🏠 **Your own Spaces & Channels** — run a community, moderate members, and organize chat by channel
 - 🔎 **Discover public spaces** by category or search and join with one click
-- 🎨 **Personalizing your chat** with 5 live-switchable themes
-- 🟢 Real-time presence, typing indicators, read receipts, and message replies
+- 🎨 **Personalizing your chat** with 5 live-switchable Framer-style themes
+- 🟢 Real-time presence, typing indicators, read receipts, `@mentions`, and message replies
+- 📱 A **bottom tab bar** (Chats / Spaces / Profile) makes the app feel native on phones
 
 It's a great platform for **normal, everyday conversations** — no enterprise features needed.
 
@@ -89,20 +91,23 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - User profiles (name, username, bio, custom status, **banner**, avatar upload)
 - Friends system (request / accept / decline / list / search / remove)
 - DM conversations (create, list, history, unread counts)
-- Text messaging (send, **reply**, edit, soft-delete, reactions, emoji picker, receipts)
+- Text messaging (send, **reply**, **@mentions**, edit, soft-delete, reactions, emoji picker, receipts)
 - **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
 - **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
 - **Notification system** (in-app notification center + notification sounds + bell with unread badge)
 - **Web Push** (PWA service worker, VAPID subscriptions, offline push delivery)
 - **Progressive Web App** (installable, manifest, service worker)
 - Typing indicators & presence (realtime via Socket.IO)
-- Theme system (5 themes, live switching)
+- Theme system (5 themes, live switching, no reload)
+- **Mobile UX overhaul** (bottom tab bar, responsive panels, safe-area handling)
+- **Offline caching** (IndexedDB cache for conversations, Spaces, friends, friend requests)
 - Animated landing page
 
 ### 🚧 Planned / Not Started
 - Threads · Mention notifications
 - Search (conversation / message) · File attachments · Image sharing
-- Voice channels / video calls
+- Voice channels / video calls (Phase 1 backend wired, frontend not built)
+- 2FA — second-factor authentication
 
 ---
 
@@ -118,6 +123,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 | **shadcn/ui** + Base UI | Component primitives |
 | **Motion (Framer Motion)** | Animations |
 | **Socket.IO Client** | Realtime |
+| **idb-keyval** | IndexedDB offline caching |
 | **Biome** | Linting & formatting |
 
 > JavaScript only — no TypeScript, by design.
@@ -146,9 +152,9 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 ```
 kivo/
 ├── frontend/            # Next.js 16 app (App Router, React 19)
-│   ├── app/             # Routes: landing, login, signup, app, profile, invite
-│   ├── components/      # UI, dashboard, chat, auth, navbar, spaces, notifications
-│   └── lib/             # theme, api, auth, chat, spaces, push, sound, avatar helpers
+│   ├── app/             # Routes: landing, login, signup, app, profile, docs
+│   ├── components/      # UI, dashboard, chat, auth, navbar, spaces, notifications, docs
+│   └── lib/             # theme, api, auth, chat, spaces, push, sound, cache, avatar helpers
 │
 ├── backend/             # Express 5 + Socket.IO + Mongoose
 │   └── src/
@@ -266,29 +272,31 @@ Registration / Login
 
 ---
 
-## 🎨 Theme System — "Nexus" Palette
+## 🎨 Theme System — "Framer" Dark Palette
 
 | Theme | Style |
 |---|---|
-| **Replit** (default) | Flat, border-driven · 40px cards · minimal shadows |
-| **Replit Soft** | Gentle floating elevation · 28px cards |
-| **Replit Crisp** | Geometric, precise · 14px cards · hairline borders |
-| **Replit Float** | Bold, pillowy · 48px cards · prominent shadows |
-| **Replit Ink** | Dark variant of Replit · near-black surfaces |
+| **Framer** (default) | Dark Framer-style canvas · near-black surfaces · blue accent |
+| **Cloud** | Cool, slightly blue-tinted canvas |
+| **Sand** | Warm, faint brown-tinted canvas |
+| **Ink** | Neutral near-black canvas |
+| **Midnight** | Deep navy canvas |
 
-**Brand colors**
+**Core tokens (default "Framer")**
 
-| Token | Light | Dark |
-|---|---|---|
-| Primary | `#F68B1F` (ember) | `#F68B1F` |
-| Secondary | `#F2EAD3` (cream) | `#1e1a12` |
-| Accent | `#FDB813` (gold) | `#FDB813` |
-| Canvas | `#F2EAD3` | `#14110b` |
-| Surface | `#FFFFFF` | `#1e1a12` |
+| Token | Value |
+|---|---|
+| Canvas (`--bg-base`) | `#090909` (near-black) |
+| Surface (`--bg-surface`) | `#141414` |
+| Elevated (`--bg-elevated`) | `#1c1c1c` |
+| Accent (`--accent`) | `#4ba9e1` (blue signal) |
+| Text primary | `#ffffff` |
+| Border (`--border`) | `#262626` (hairline) |
+| Online indicator | `#22c55e` |
 
-**Typography:** Inter (display) · Playfair Display (body) · JetBrains Mono (labels)
+**Typography:** Goga (display/heading) · Inter (body) · JetBrains Mono (mono/labels)
 
-Themes apply via CSS custom properties, persist in `localStorage`, and switch **live** with zero reload — all while respecting `prefers-reduced-motion`.
+Themes share one geometry — corner radius, elevation, and layout languages are global design tokens in `globals.css`, so switching a theme only re-skims colors. Palettes apply via CSS custom properties, persist in `localStorage` under `kivo:theme`, and switch **live** with zero reload — all while respecting `prefers-reduced-motion`. The single source of truth for palette colors is `frontend/lib/theme.js`; the visual system is documented in `frontend/Design.md`.
 
 ---
 
@@ -298,6 +306,7 @@ Themes apply via CSS custom properties, persist in `localStorage`, and switch **
 - Cursor-based pagination with infinite scroll (newest-first)
 - Optimistic UI with sent → delivered → read states + retry on failure
 - **Quote replies** with inline preview of the original message
+- **`@mentions`** with autocomplete (conversation participants only) + mention notifications
 - Reactions, edit, and soft-delete
 - 60-second message grouping & hover actions (bubble menu)
 - Emoji picker — 9 categories, 270+ emojis
@@ -325,7 +334,7 @@ Themes apply via CSS custom properties, persist in `localStorage`, and switch **
 
 ### 👤 Profiles
 - Display name, unique username, bio (280), custom status (60)
-- 8 preset avatar styles + real avatar upload (Appwrite, 4MB max)
+- 9 preset avatar styles + real avatar upload (Appwrite, 4MB max)
 - Profile **banner** image
 - User detail panel (desktop XL+) with member-since info
 
@@ -375,8 +384,9 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications, PWA, customization |
-| **Phase 2** | Threads, pinned/saved messages, stronger search, mention notifications |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications, PWA, customization, mobile UX, offline caching |
+| **Phase 1.5** | DM & group voice calls (LiveKit), voice channel frontend, 2FA |
+| **Phase 2** | Threads, pinned/saved messages, stronger search, attachments (images & files) |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |
 
