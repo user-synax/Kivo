@@ -15,21 +15,11 @@ import {
   participantName,
 } from "@/lib/chat";
 
+import { useIsDesktop } from "@/lib/use-breakpoint";
+
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
 const GROUP_WINDOW_MS = 60000;
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return isMobile;
-}
 
 function SwipeToReply({ children, onReply, enabled }) {
   const [offset, setOffset] = useState(0);
@@ -215,7 +205,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
 
-  const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
 
   const scrollRef = useRef(null);
   const typingTimer = useRef(null);
@@ -800,55 +791,79 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
                 GROUP_WINDOW_MS;
             const showSender = (isGroup || isChannel) && !grouped && !mine;
             const sAvatar = senderAvatar(m.senderId);
+            const senderLabel = senderName(m.senderId);
             return (
               <div
                 key={m.id}
-                className={`t-msg-in group flex min-w-0 flex-col ${mine ? "items-end" : "items-start"} ${
+                className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
                   i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
                 }`}
               >
                 {showSender && (
-                  <div className="mb-1 flex items-center gap-1.5 pl-1">
-                    <Avatar
-                      name={senderName(m.senderId)}
-                      avatarStyle={sAvatar.avatarStyle}
-                      url={sAvatar.avatarUrl}
-                      size="sm"
-                    />
-                    <span className="text-[12px] font-medium text-[var(--text-primary)]">
-                      {mine ? "You" : senderName(m.senderId)}
-                    </span>
-                  </div>
+                  <span className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}>
+                    {senderLabel}
+                  </span>
                 )}
-                <SwipeToReply enabled={isMobile} onReply={() => handleReply(m)}>
-                  <MessageBubble
-                    message={m}
-                    mine={mine}
-                    showMeta={groupLast}
-                    reactionOpen={reactionFor === m.id}
-                    isEditing={editingId === m.id}
-                    editText={editText}
-                    onEditTextChange={setEditText}
-                    onSaveEdit={() => saveEdit(m.id)}
-                    onCancelEdit={() => setEditingId(null)}
-                    onToggleReactionPicker={() =>
-                      setReactionFor(reactionFor === m.id ? null : m.id)
-                    }
-                    onReact={(emoji) => toggleReaction(m.id, emoji)}
-                    onEdit={() => {
-                      setEditingId(m.id);
-                      setEditText(m.content);
-                    }}
-                    onDelete={() => removeMessage(m.id)}
-                    onRetry={() => retry(m.tempId)}
-                    onReply={handleReply}
-                    isReplying={replyingTo?.id === m.id}
-                    replyTo={replyTo}
-                    receipt={receipt}
-                    participants={conversation?.participants || []}
-                    isUserOnline={isUserOnline}
-                  />
-                </SwipeToReply>
+                <div className={`flex w-fit max-w-[78%] gap-2 ${mine ? "flex-row-reverse self-end" : "flex-row self-start"} items-end min-w-0 sm:max-w-[62%]`}>
+                  {(isGroup || isChannel) && !mine ? (
+                    grouped ? (
+                      <span className="hidden sm:block w-7 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <span className="hidden sm:flex shrink-0 mb-1">
+                        <Avatar
+                          name={senderLabel}
+                          avatarStyle={sAvatar.avatarStyle}
+                          url={sAvatar.avatarUrl}
+                          size="sm"
+                        />
+                      </span>
+                    )
+                  ) : null}
+                  {/* Mobile avatar — show only on first of group to keep clean */}
+                  {(isGroup || isChannel) && !mine && !grouped ? (
+                    <span className="flex sm:hidden shrink-0 mb-1">
+                      <Avatar
+                        name={senderLabel}
+                        avatarStyle={sAvatar.avatarStyle}
+                        url={sAvatar.avatarUrl}
+                        size="sm"
+                      />
+                    </span>
+                  ) : null}
+                  <div className="flex min-w-0 flex-1 flex-col max-w-full">
+                    <SwipeToReply enabled={isMobile} onReply={() => handleReply(m)} className="w-full min-w-0">
+                      <MessageBubble
+                        message={m}
+                        mine={mine}
+                        showMeta={groupLast}
+                        reactionOpen={reactionFor === m.id}
+                        isEditing={editingId === m.id}
+                        editText={editText}
+                        onEditTextChange={setEditText}
+                        onSaveEdit={() => saveEdit(m.id)}
+                        onCancelEdit={() => setEditingId(null)}
+                        onToggleReactionPicker={() =>
+                          setReactionFor(reactionFor === m.id ? null : m.id)
+                        }
+                        onReact={(emoji) => toggleReaction(m.id, emoji)}
+                        onEdit={() => {
+                          setEditingId(m.id);
+                          setEditText(m.content);
+                        }}
+                        onDelete={() => removeMessage(m.id)}
+                        onRetry={() => retry(m.tempId)}
+                        onReply={handleReply}
+                        isReplying={replyingTo?.id === m.id}
+                        replyTo={replyTo}
+                        receipt={receipt}
+                        participants={conversation?.participants || []}
+                        isUserOnline={isUserOnline}
+                        className="!max-w-full"
+                        contentClassName="max-w-full"
+                      />
+                    </SwipeToReply>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -866,8 +881,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings }) 
         </div>
       </div>
 
-       {/* Composer */}
-       <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3">
+        {/* Composer */}
+        <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
           <div className="mx-auto max-w-3xl">
             {replyingTo && canPost && (
               <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">

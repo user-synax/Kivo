@@ -24,9 +24,26 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { requestPermission, subscribe, syncSubscription } from "@/lib/push";
 import { playDmSound } from "@/lib/sound";
+import {
+  getCachedConversations,
+  getCachedSpaces,
+  setCachedConversations,
+  setCachedSpaces,
+} from "@/lib/cache";
+import { useIsDesktop } from "@/lib/use-breakpoint";
+import { UserPanel } from "./user-panel";
+import { BottomTabBar } from "./bottom-tab-bar";
+import { Avatar } from "./avatar";
+import { ProfileEditModal } from "./profile-edit-modal";
+import { useTheme } from "@/components/theme-provider";
+
+// Restrained easing — matches the rest of the app (no bounce).
+const EASE = [0.22, 1, 0.36, 1];
+const COLLAPSE_KEY = "kivo:sidebar-collapsed";
+const SELECTED_KEY = "kivo:selected-conversation";
 
 // Group settings surface: a slide-in drawer on smaller screens (with a dimmed
-// backdrop) and a persistent side column on wide desktops (xl+). The inner
+// backdrop) and a persistent side column on wide desktops (md+). The inner
 // GroupSettingsPanel owns the content; this wrapper only controls positioning
 // and the enter/exit transition so it works in both the mobile and desktop
 // layouts.
@@ -43,7 +60,7 @@ function GroupSettingsOverlay({ open, conversation, onClose, onConversationUpdat
           exit={{ opacity: 0 }}
           transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           onClick={onClose}
-          className="fixed inset-0 z-30 bg-black/40 xl:hidden"
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
         />
       )}
       {open && conversation && (
@@ -53,7 +70,7 @@ function GroupSettingsOverlay({ open, conversation, onClose, onConversationUpdat
           animate={{ x: 0 }}
           exit={{ x: "100%" }}
           transition={slide}
-          className="fixed right-0 top-0 z-40 h-[100dvh] w-[320px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-none"
+          className="fixed right-0 top-0 z-40 h-[100dvh] w-[320px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl md:static md:z-auto md:h-full md:max-w-none md:shadow-none"
         >
           <GroupSettingsPanel
             conversation={conversation}
@@ -79,7 +96,7 @@ function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLe
           exit={{ opacity: 0 }}
           transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           onClick={onClose}
-          className="fixed inset-0 z-30 bg-black/40 xl:hidden"
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
         />
       )}
       {open && space && (
@@ -89,7 +106,7 @@ function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLe
           animate={{ x: 0 }}
           exit={{ x: "100%" }}
           transition={slide}
-          className="fixed right-0 top-0 z-40 h-[100dvh] w-[360px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-none"
+          className="fixed right-0 top-0 z-40 h-[100dvh] w-[360px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl md:static md:z-auto md:h-full md:max-w-none md:shadow-none"
         >
           <SpaceSettingsPanel space={space} onClose={onClose} onUpdated={onUpdated} onDeleted={onDeleted} onLeft={onLeft} />
         </motion.aside>
@@ -97,24 +114,136 @@ function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLe
     </AnimatePresence>
   );
 }
-import { UserPanel } from "./user-panel";
 
-// Restrained easing — matches the rest of the app (no bounce).
-const EASE = [0.22, 1, 0.36, 1];
-const COLLAPSE_KEY = "kivo:sidebar-collapsed";
-const SELECTED_KEY = "kivo:selected-conversation";
-const MOBILE_QUERY = "(min-width: 768px)";
+function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover }) {
+  const hasSpaces = Array.isArray(spaces) && spaces.length > 0;
+  return (
+    <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+      <div className="flex shrink-0 items-center justify-between px-5 py-3.5">
+        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Spaces</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onDiscover}
+            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            Discover
+          </button>
+          <button
+            type="button"
+            onClick={onCreateSpace}
+            className="rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90"
+          >
+            New
+          </button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5">
+        {!hasSpaces ? (
+          <div className="px-3 py-10 text-center">
+            <p className="text-[13px] text-[var(--text-muted)]">No spaces yet</p>
+            <button type="button" onClick={onCreateSpace} className="mt-2 text-[12px] font-medium text-[#a3e635] hover:underline">
+              Create a space
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {spaces.map((space) => {
+              const spaceChannels = channels.filter((c) => c.spaceId === space.id);
+              return (
+                <div key={space.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={space.name} url={space.avatarUrl} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{space.name}</p>
+                      <p className="truncate text-[11px] text-[var(--text-muted)]">{space.category} • {spaceChannels.length} channel{spaceChannels.length !== 1 ? "s" : ""}</p>
+                    </div>
+                  </div>
+                  {spaceChannels.length > 0 && (
+                    <div className="mt-2 space-y-0.5 border-t border-[var(--border)] pt-2">
+                      {spaceChannels.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => onSelect(c.id)}
+                          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                        >
+                          <span className="truncate text-[12px]">#{c.name?.split("/").pop()?.replace(/^#/, "") || c.name}</span>
+                          {c.unread > 0 && (
+                            <span className="ml-auto flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-semibold text-[var(--on-accent)]">
+                              {c.unread > 9 ? "9+" : c.unread}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(true);
-  useEffect(() => {
-    const mq = window.matchMedia(MOBILE_QUERY);
-    const update = () => setIsDesktop(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return isDesktop;
+function MobileProfileTab({ currentUser, onProfileUpdate }) {
+  const { themeId, themes, setThemeId } = useTheme();
+  const [editOpen, setEditOpen] = useState(false);
+  if (!currentUser) return null;
+  const displayName = currentUser.displayName || currentUser.username || currentUser.email || "Account";
+  return (
+    <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+      <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
+        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Profile</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(64px+env(safe-area-inset-bottom))] pt-6">
+        <div className="flex flex-col items-center text-center">
+          <Avatar name={displayName} avatarStyle={currentUser.avatarStyle} url={currentUser.avatarUrl} size="xl" />
+          <h2 className="mt-3 text-[18px] font-semibold text-[var(--text-primary)]">{displayName}</h2>
+          {currentUser.username && <p className="text-[13px] text-[var(--text-muted)]">@{currentUser.username}</p>}
+          <p className="text-[12px] text-[var(--text-muted)]">{currentUser.email}</p>
+          {currentUser.status && (
+            <p className="mt-3 w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 text-[13px] italic text-[var(--text-muted)]">
+              {currentUser.status}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => setEditOpen(true)}
+            className="mt-4 rounded-full border border-[var(--border)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--hover)]"
+          >
+            Edit profile
+          </button>
+        </div>
+        <div className="mt-6">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Theme</p>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-2">
+            {themes.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setThemeId(t.id)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-[var(--hover)] ${t.id === themeId ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+              >
+                <span className="size-5 shrink-0 rounded-full ring-1 ring-[var(--border)]" style={{ background: t.swatch }} />
+                <span className="flex-1 truncate">{t.label}</span>
+                {t.id === themeId && <span className="size-2 shrink-0 rounded-full bg-[#a3e635]" />}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Details</p>
+          <div className="mt-2 space-y-1 text-[13px]">
+            {currentUser.bio ? <p className="text-[var(--text-primary)]">{currentUser.bio}</p> : <p className="text-[var(--text-muted)]">No bio yet.</p>}
+          </div>
+        </div>
+      </div>
+      <ProfileEditModal open={editOpen} currentUser={currentUser} onClose={() => setEditOpen(false)} onSaved={() => onProfileUpdate?.()} />
+    </div>
+  );
 }
 
 // Convert a backend conversation into the shape the Sidebar renders.
@@ -178,6 +307,7 @@ export function DashboardShell() {
   const [showSpaceSettings, setShowSpaceSettings] = useState(false);
   const [selectedSpaceId, setSelectedSpaceId] = useState(null);
   const [showDiscover, setShowDiscover] = useState(false);
+  const [mobileTab, setMobileTab] = useState("chats");
   // Notifications — bell badge + center list, live via notification:new
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -359,10 +489,17 @@ export function DashboardShell() {
     if (!space?.id) return;
     setSpaces((prev) => {
       const idx = prev.findIndex((s) => s.id === space.id);
-      if (idx === -1) return [space, ...prev];
-      const copy = [...prev];
-      copy[idx] = { ...copy[idx], ...space };
-      return copy;
+      const next =
+        idx === -1
+          ? [space, ...prev]
+          : (() => {
+              const copy = [...prev];
+              copy[idx] = { ...copy[idx], ...space };
+              return copy;
+            })();
+      const uid = getSession()?.id;
+      if (uid) setCachedSpaces(uid, next).catch(() => {});
+      return next;
     });
   }, []);
 
@@ -378,24 +515,42 @@ export function DashboardShell() {
     };
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === conv.id);
-      if (idx === -1) return [merged, ...prev];
-      const copy = [...prev];
-      copy[idx] = {
-        ...copy[idx],
-        ...merged,
-        unreadCount: merged.unreadCount ?? copy[idx].unreadCount,
-      };
-      return copy;
+      const next =
+        idx === -1
+          ? [merged, ...prev]
+          : (() => {
+              const copy = [...prev];
+              copy[idx] = {
+                ...copy[idx],
+                ...merged,
+                unreadCount: merged.unreadCount ?? copy[idx].unreadCount,
+              };
+              return copy;
+            })();
+      const uid = me?.id;
+      if (uid) setCachedConversations(uid, next).catch(() => {});
+      return next;
     });
   }, []);
 
-  // Load spaces once on mount.
+  // Load spaces once on mount — stale-while-revalidate via IndexedDB.
   useEffect(() => {
     let active = true;
+    const uid = getSession()?.id;
+    if (uid) {
+      getCachedSpaces(uid)
+        .then((cached) => {
+          if (!active) return;
+          if (Array.isArray(cached) && cached.length) setSpaces(cached);
+        })
+        .catch(() => {});
+    }
     loadSpaces()
       .then((data) => {
         if (!active) return;
-        setSpaces(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setSpaces(list);
+        if (uid) setCachedSpaces(uid, list).catch(() => {});
       })
       .catch(() => {
         if (active) setSpaces([]);
@@ -405,14 +560,34 @@ export function DashboardShell() {
     };
   }, [loadSpaces]);
 
-  // Load the conversation list once on mount.
+  // Load the conversation list once on mount — stale-while-revalidate via IndexedDB.
   useEffect(() => {
     let active = true;
+    const uid = getSession()?.id;
+    if (uid) {
+      getCachedConversations(uid)
+        .then((cached) => {
+          if (!active) return;
+          if (Array.isArray(cached) && cached.length) {
+            setConversations(cached);
+            const sel =
+              typeof window !== "undefined"
+                ? localStorage.getItem(SELECTED_KEY)
+                : null;
+            if (sel && !cached.some((c) => c.id === sel)) {
+              localStorage.removeItem(SELECTED_KEY);
+              setSelectedId(null);
+            }
+          }
+        })
+        .catch(() => {});
+    }
     loadConversations()
       .then((data) => {
         if (!active) return;
         const list = Array.isArray(data) ? data : [];
         setConversations(list);
+        if (uid) setCachedConversations(uid, list).catch(() => {});
         // The open conversation may have been restored from localStorage before
         // this fetch resolved — clear its unread now so the badge doesn't stick.
         const restored = selectedIdRef.current;
@@ -420,9 +595,13 @@ export function DashboardShell() {
           apiPatch(`/api/v1/conversations/${restored}/read`, {}).catch(
             () => {},
           );
-          setConversations((prev) =>
-            prev.map((c) => (c.id === restored ? { ...c, unreadCount: 0 } : c)),
-          );
+          setConversations((prev) => {
+            const next = prev.map((c) =>
+              c.id === restored ? { ...c, unreadCount: 0 } : c,
+            );
+            if (uid) setCachedConversations(uid, next).catch(() => {});
+            return next;
+          });
         }
       })
       .catch(() => {
@@ -464,9 +643,12 @@ export function DashboardShell() {
   useEffect(() => {
     if (!selectedId) return undefined;
     apiPatch(`/api/v1/conversations/${selectedId}/read`, {}).catch(() => {});
-    setConversations((prev) =>
-      prev.map((c) => (c.id === selectedId ? { ...c, unreadCount: 0 } : c)),
-    );
+    setConversations((prev) => {
+      const next = prev.map((c) => (c.id === selectedId ? { ...c, unreadCount: 0 } : c));
+      const uid = getSession()?.id;
+      if (uid) setCachedConversations(uid, next).catch(() => {});
+      return next;
+    });
     return undefined;
   }, [selectedId]);
 
@@ -509,7 +691,10 @@ export function DashboardShell() {
               : (prev[idx].unreadCount || 0) + 1,
         };
         const rest = prev.filter((c) => c.id !== msg.conversationId);
-        return [updated, ...rest];
+        const next = [updated, ...rest];
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, next).catch(() => {});
+        return next;
       });
       // Brand-new DM from a user not yet in the list: pull the full list once so
       // it appears live (guarded so a burst of messages doesn't refetch repeatedly).
@@ -519,7 +704,11 @@ export function DashboardShell() {
       ) {
         fetchingRef.current.add(msg.conversationId);
         loadConversations()
-          .then((list) => setConversations(list))
+          .then((list) => {
+            setConversations(list);
+            const uid = getSession()?.id;
+            if (uid) setCachedConversations(uid, list).catch(() => {});
+          })
           .finally(() => fetchingRef.current.delete(msg.conversationId));
       }
     };
@@ -576,7 +765,12 @@ export function DashboardShell() {
     };
     const onConversationRemoved = ({ conversationId }) => {
       if (!conversationId) return;
-      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      setConversations((prev) => {
+        const next = prev.filter((c) => c.id !== conversationId);
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, next).catch(() => {});
+        return next;
+      });
       setSelectedId((id) => (id === conversationId ? null : id));
       setShowGroupSettings(false);
     };
@@ -588,10 +782,28 @@ export function DashboardShell() {
     socket.on("conversation:removed", onConversationRemoved);
 
     const onSpaceUpdated = ({ space }) => { if (space) upsertSpace(space); };
-    const onSpaceChannel = ({ space }) => { if (space) upsertSpace(space); loadConversations().then((list) => setConversations(list)); };
+    const onSpaceChannel = ({ space }) => {
+      if (space) upsertSpace(space);
+      loadConversations().then((list) => {
+        setConversations(list);
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, list).catch(() => {});
+      });
+    };
     const onSpaceRemoved = ({ spaceId }) => {
       if (!spaceId) return;
-      setSpaces((prev) => prev.filter((s) => s.id !== spaceId));
+      setSpaces((prev) => {
+        const next = prev.filter((s) => s.id !== spaceId);
+        const uid = getSession()?.id;
+        if (uid) setCachedSpaces(uid, next).catch(() => {});
+        return next;
+      });
+      setConversations((prev) => {
+        const next = prev.filter((c) => c.spaceId !== spaceId);
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, next).catch(() => {});
+        return next;
+      });
       const selId = selectedIdRef.current;
       const selConv = conversationsRef.current.find((c) => c.id === selId);
       if (selConv?.spaceId === spaceId) setSelectedId(null);
@@ -599,7 +811,11 @@ export function DashboardShell() {
     };
     const onSpaceJoined = ({ space }) => {
       if (space) upsertSpace(space);
-      loadConversations().then((list) => setConversations(list));
+      loadConversations().then((list) => {
+        setConversations(list);
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, list).catch(() => {});
+      });
     };
 
     socket.on("space:updated", onSpaceUpdated);
@@ -727,6 +943,8 @@ export function DashboardShell() {
         try {
           const list = await loadConversations();
           setConversations(list);
+          const uid = getSession()?.id;
+          if (uid) setCachedConversations(uid, list).catch(() => {});
         } catch {}
       }
       setSelectedId(notif.conversationId);
@@ -741,7 +959,10 @@ export function DashboardShell() {
       const conv = await apiPost("/api/v1/conversations", { participantId });
       setConversations((prev) => {
         if (prev.some((c) => c.id === conv.id)) return prev;
-        return [conv, ...prev];
+        const next = [conv, ...prev];
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, next).catch(() => {});
+        return next;
       });
       setSelectedId(conv.id);
       setShowGroupSettings(false);
@@ -755,7 +976,10 @@ export function DashboardShell() {
   const handleGroupCreated = (conv) => {
     setConversations((prev) => {
       if (prev.some((c) => c.id === conv.id)) return prev;
-      return [conv, ...prev];
+      const next = [conv, ...prev];
+      const uid = getSession()?.id;
+      if (uid) setCachedConversations(uid, next).catch(() => {});
+      return next;
     });
     setSelectedId(conv.id);
     setShowGroupSettings(false);
@@ -765,8 +989,16 @@ export function DashboardShell() {
 
   const handleSpaceCreated = (space) => {
     upsertSpace(space);
-    loadSpaces().then((list) => setSpaces(list));
-    loadConversations().then((list) => setConversations(list));
+    loadSpaces().then((list) => {
+      setSpaces(list);
+      const uid = getSession()?.id;
+      if (uid) setCachedSpaces(uid, list).catch(() => {});
+    });
+    loadConversations().then((list) => {
+      setConversations(list);
+      const uid = getSession()?.id;
+      if (uid) setCachedConversations(uid, list).catch(() => {});
+    });
     setShowSpaceCreate(false);
     // auto-select first channel if available
     if (space.channels?.[0]) {
@@ -780,8 +1012,16 @@ export function DashboardShell() {
 
   const handleDiscoverJoined = (space) => {
     upsertSpace(space);
-    loadSpaces().then((list) => setSpaces(list));
-    loadConversations().then((list) => setConversations(list));
+    loadSpaces().then((list) => {
+      setSpaces(list);
+      const uid = getSession()?.id;
+      if (uid) setCachedSpaces(uid, list).catch(() => {});
+    });
+    loadConversations().then((list) => {
+      setConversations(list);
+      const uid = getSession()?.id;
+      if (uid) setCachedConversations(uid, list).catch(() => {});
+    });
   };
 
   // Selecting any conversation closes an open group-settings drawer.
@@ -855,23 +1095,42 @@ export function DashboardShell() {
               animate={{ x: 0 }}
               exit={{ x: "-28%" }}
               transition={slide}
-              className="absolute inset-0 bg-[var(--bg-base)]"
+              className="absolute inset-0 flex flex-col bg-[var(--bg-base)]"
             >
-              <Sidebar
-                conversations={listItems}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-                collapsed={false}
-                showToggle={false}
-                onCompose={handleCompose}
-                onNewGroup={handleNewGroup}
-                onCreateSpace={() => setShowSpaceCreate(true)}
-                onDiscoverSpaces={() => setShowDiscover(true)}
-                spaces={spaces}
-                currentUser={currentUser}
-                onProfileUpdate={refreshUser}
-                notificationBell={notificationBellNode}
-              />
+              <div className="min-h-0 flex-1 overflow-hidden">
+                {mobileTab === "chats" && (
+                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                    <Sidebar
+                      conversations={listItems}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                      collapsed={false}
+                      showToggle={false}
+                      onCompose={handleCompose}
+                      onNewGroup={handleNewGroup}
+                      onCreateSpace={() => setShowSpaceCreate(true)}
+                      onDiscoverSpaces={() => setShowDiscover(true)}
+                      spaces={spaces}
+                      currentUser={currentUser}
+                      onProfileUpdate={refreshUser}
+                      notificationBell={notificationBellNode}
+                    />
+                  </div>
+                )}
+                {mobileTab === "spaces" && (
+                  <MobileSpacesTab
+                    spaces={spaces}
+                    channels={listItems.filter((c) => c.type === "space_channel")}
+                    onSelect={handleSelect}
+                    onCreateSpace={() => setShowSpaceCreate(true)}
+                    onDiscover={() => setShowDiscover(true)}
+                  />
+                )}
+                {mobileTab === "profile" && (
+                  <MobileProfileTab currentUser={currentUser} onProfileUpdate={refreshUser} />
+                )}
+              </div>
+              <BottomTabBar active={mobileTab} onChange={setMobileTab} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -916,14 +1175,34 @@ export function DashboardShell() {
         onClose={() => setShowSpaceSettings(false)}
         onUpdated={upsertSpace}
         onDeleted={(id) => {
-          setSpaces((prev) => prev.filter((s) => s.id !== id));
-          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSpaces((prev) => {
+            const next = prev.filter((s) => s.id !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedSpaces(uid, next).catch(() => {});
+            return next;
+          });
+          setConversations((prev) => {
+            const next = prev.filter((c) => c.spaceId !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedConversations(uid, next).catch(() => {});
+            return next;
+          });
           setSelectedId(null);
           setShowSpaceSettings(false);
         }}
         onLeft={(id) => {
-          setSpaces((prev) => prev.filter((s) => s.id !== id));
-          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSpaces((prev) => {
+            const next = prev.filter((s) => s.id !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedSpaces(uid, next).catch(() => {});
+            return next;
+          });
+          setConversations((prev) => {
+            const next = prev.filter((c) => c.spaceId !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedConversations(uid, next).catch(() => {});
+            return next;
+          });
           setSelectedId(null);
           setShowSpaceSettings(false);
         }}
@@ -997,14 +1276,34 @@ export function DashboardShell() {
         onClose={() => setShowSpaceSettings(false)}
         onUpdated={upsertSpace}
         onDeleted={(id) => {
-          setSpaces((prev) => prev.filter((s) => s.id !== id));
-          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSpaces((prev) => {
+            const next = prev.filter((s) => s.id !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedSpaces(uid, next).catch(() => {});
+            return next;
+          });
+          setConversations((prev) => {
+            const next = prev.filter((c) => c.spaceId !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedConversations(uid, next).catch(() => {});
+            return next;
+          });
           setSelectedId(null);
           setShowSpaceSettings(false);
         }}
         onLeft={(id) => {
-          setSpaces((prev) => prev.filter((s) => s.id !== id));
-          setConversations((prev) => prev.filter((c) => c.spaceId !== id));
+          setSpaces((prev) => {
+            const next = prev.filter((s) => s.id !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedSpaces(uid, next).catch(() => {});
+            return next;
+          });
+          setConversations((prev) => {
+            const next = prev.filter((c) => c.spaceId !== id);
+            const uid = getSession()?.id;
+            if (uid) setCachedConversations(uid, next).catch(() => {});
+            return next;
+          });
           setSelectedId(null);
           setShowSpaceSettings(false);
         }}

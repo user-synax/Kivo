@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
 import { useTheme } from "@/components/theme-provider";
+import { useIsDesktop } from "@/lib/use-breakpoint";
 
 // Restrained, no-bounce easing shared across every micro-interaction.
 const EASE = "cubic-bezier(0.22,1,0.36,1)";
@@ -502,6 +503,7 @@ export function Sidebar({
   onProfileUpdate,
   notificationBell = null,
 }) {
+  const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -633,13 +635,17 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Footer — theme + profile */}
-      <ThemeSwitcher collapsed={collapsed} />
-      <ProfileNav
-        currentUser={currentUser}
-        onEditProfile={() => setProfileOpen(true)}
-        collapsed={collapsed}
-      />
+      {/* Footer — theme + profile (hidden on mobile; lives in Profile tab) */}
+      {isDesktop && (
+        <>
+          <ThemeSwitcher collapsed={collapsed} />
+          <ProfileNav
+            currentUser={currentUser}
+            onEditProfile={() => setProfileOpen(true)}
+            collapsed={collapsed}
+          />
+        </>
+      )}
 
       <ProfileEditModal
         open={profileOpen}

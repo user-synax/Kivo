@@ -213,10 +213,12 @@ export function DocsScreen() {
                 </Bullet>
               </ul>
               <p>
-                On a phone you see the conversation list first. Open a chat,
-                then use Back in the header to return. You can collapse the
-                sidebar on desktop; Kivo remembers that, and the last chat you
-                had open.
+                On a phone you see the conversation list with a bottom tab bar
+                — Chats, Spaces, and Profile — so it feels like a native app.
+                Open a chat, then use Back in the header to return. The
+                sidebar can be collapsed on desktop; Kivo remembers that, and
+                the last chat you had open. Your lists load instantly from a
+                local browser cache while fresh data arrives.
               </p>
             </Section>
 
@@ -442,8 +444,9 @@ export function DocsScreen() {
                 <Bullet>iPhone: Share → Add to Home Screen.</Bullet>
               </ul>
               <p>
-                Installed Kivo opens the chat app. You still need a network
-                connection to send and receive messages.
+                Installed Kivo opens the chat app. It caches your lists for a
+                fast start, but you still need a network connection to send and
+                receive messages.
               </p>
             </Section>
 
@@ -486,12 +489,21 @@ export function DocsScreen() {
               </p>
               <ul className="mt-4 flex flex-col gap-2">
                 <Bullet>Search inside messages or conversations</Bullet>
-                <Bullet>Images or files attached to a message</Bullet>
-                <Bullet>Voice or video calls</Bullet>
+                <Bullet>
+                  Images or files attached to a message
+                </Bullet>
+                <Bullet>
+                  Voice or video calls — the backend is wired but there is no
+                  call UI yet
+                </Bullet>
+                <Bullet>2FA (two-factor authentication)</Bullet>
                 <Bullet>Threads, pins, and saved messages</Bullet>
                 <Bullet>Unfriend in the Friends window</Bullet>
                 <Bullet>Private invite links for Spaces</Bullet>
-                <Bullet>Using the installed app fully offline</Bullet>
+                <Bullet>
+                  Using the installed app fully offline — chat lists are
+                  cached, but messages still need the network
+                </Bullet>
               </ul>
             </Section>
 

@@ -50,6 +50,13 @@ export function setToken(token) {
 }
 
 export function clearSession() {
+  let uid = null;
+  try {
+    const s = getSession();
+    uid = s?.id || null;
+  } catch {
+    uid = null;
+  }
   memoryToken = null;
   clearTokenRefresh();
   if (typeof window !== "undefined") {
@@ -58,6 +65,13 @@ export function clearSession() {
     } catch {
       // ignore
     }
+  }
+  if (uid) {
+    // Fire-and-forget: IDB clear must never block logout or throw.
+    // Dynamic import avoids circular dependency (cache.js is standalone).
+    import("./cache.js")
+      .then((m) => m.clearUserCache(uid).catch(() => {}))
+      .catch(() => {});
   }
 }
 

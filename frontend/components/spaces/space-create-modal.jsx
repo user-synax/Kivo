@@ -5,6 +5,8 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { apiPostForm } from "@/lib/api";
 import { BANNER_OPTIONS } from "@/lib/banners";
 import { SPACE_CATEGORIES } from "@/lib/space-categories";
+import { useIsDesktop } from "@/lib/use-breakpoint";
+import { motion, useReducedMotion } from "motion/react";
 
 const inputCls =
   "w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none";
@@ -21,6 +23,9 @@ export function SpaceCreateModal({ open, onClose, onCreated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const fileRef = useRef(null);
+  const isDesktop = useIsDesktop();
+  const reduce = useReducedMotion();
+  const EASE = [0.22, 1, 0.36, 1];
 
   useEffect(() => {
     if (open) {
@@ -73,6 +78,69 @@ export function SpaceCreateModal({ open, onClose, onCreated }) {
     } finally { setBusy(false); }
   };
 
+  const body = (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3.5">
+        <Avatar name={name || "Space"} url={avatarPreview} size="lg" />
+        <div className="min-w-0 flex-1">
+          <input value={name} maxLength={50} onChange={(e) => setName(e.target.value)} placeholder="Space name" className={inputCls} />
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleAvatar} className="hidden" />
+          <button type="button" onClick={() => fileRef.current?.click()} className="mt-2 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">{avatarPreview ? "Change icon" : "Add icon"}</button>
+        </div>
+      </div>
+      <div>
+        <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-muted)]">Description</span>
+        <textarea value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} placeholder="What is this space about?" className={`${inputCls} min-h-[72px] resize-none`} />
+      </div>
+      <div>
+        <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-muted)]">Category</span>
+        <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
+          {SPACE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">Banner</span>
+        <div className="relative h-20 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
+          {banner ? <img src={banner} alt="" aria-hidden="true" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />}
+        </div>
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          <button type="button" onClick={() => setBanner("")} aria-pressed={!banner} className={`flex h-12 items-center justify-center rounded-lg border text-[11px] font-medium ${!banner ? "border-[var(--accent)] bg-[var(--hover)] text-[var(--text-primary)]" : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]"}`}>None</button>
+          {BANNER_OPTIONS.slice(0,7).map((opt) => {
+            const active = banner === opt.url;
+            return <button key={opt.id} type="button" onClick={() => setBanner(opt.url)} aria-pressed={active} className={`relative h-12 overflow-hidden rounded-lg border ${active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}><img src={opt.url} alt="" aria-hidden="true" className="h-full w-full object-cover" /></button>;
+          })}
+        </div>
+      </div>
+      {error && <p className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-[12px] text-[var(--text-muted)]">{error}</p>}
+    </div>
+  );
+
+  const footer = (
+    <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] px-5 py-4 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-4">
+      <button type="button" onClick={onClose} className="rounded-lg border border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--hover)]">Cancel</button>
+      <button type="button" onClick={submit} disabled={busy || !name.trim()} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:opacity-40"><Check className="h-4 w-4" /> {busy ? "Creating…" : "Create Space"}</button>
+    </div>
+  );
+
+  if (!isDesktop) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <motion.div role="dialog" aria-modal="true" aria-label="Create space" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={reduce ? { duration: 0 } : { duration: 0.28, ease: EASE }} className="relative z-10 flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)]">
+          <div className="mx-auto mt-3 h-1.5 w-9 shrink-0 rounded-full bg-[var(--border)]" aria-hidden="true" />
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3.5">
+            <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">New Space</h2>
+            <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)]">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-5">{body}</div>
+          {footer}
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
       <button type="button" aria-label="Close" onClick={onClose} className={`t-modal-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm ${show ? "is-open" : ""}`} />
@@ -81,44 +149,8 @@ export function SpaceCreateModal({ open, onClose, onCreated }) {
           <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">New Space</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-          <div className="flex items-center gap-3.5">
-            <Avatar name={name || "Space"} url={avatarPreview} size="lg" />
-            <div className="min-w-0 flex-1">
-              <input value={name} maxLength={50} onChange={(e) => setName(e.target.value)} placeholder="Space name" className={inputCls} />
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleAvatar} className="hidden" />
-              <button type="button" onClick={() => fileRef.current?.click()} className="mt-2 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">{avatarPreview ? "Change icon" : "Add icon"}</button>
-            </div>
-          </div>
-          <div>
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-muted)]">Description</span>
-            <textarea value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} placeholder="What is this space about?" className={`${inputCls} min-h-[72px] resize-none`} />
-          </div>
-          <div>
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-muted)]">Category</span>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-              {SPACE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">Banner</span>
-            <div className="relative h-20 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
-              {banner ? <img src={banner} alt="" aria-hidden="true" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />}
-            </div>
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              <button type="button" onClick={() => setBanner("")} aria-pressed={!banner} className={`flex h-12 items-center justify-center rounded-lg border text-[11px] font-medium ${!banner ? "border-[var(--accent)] bg-[var(--hover)] text-[var(--text-primary)]" : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]"}`}>None</button>
-              {BANNER_OPTIONS.slice(0,7).map((opt) => {
-                const active = banner === opt.url;
-                return <button key={opt.id} type="button" onClick={() => setBanner(opt.url)} aria-pressed={active} className={`relative h-12 overflow-hidden rounded-lg border ${active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}><img src={opt.url} alt="" aria-hidden="true" className="h-full w-full object-cover" /></button>;
-              })}
-            </div>
-          </div>
-          {error && <p className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-[12px] text-[var(--text-muted)]">{error}</p>}
-        </div>
-        <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-[var(--border)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--hover)]">Cancel</button>
-          <button type="button" onClick={submit} disabled={busy || !name.trim()} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:opacity-40"><Check className="h-4 w-4" /> {busy ? "Creating…" : "Create Space"}</button>
-        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">{body}</div>
+        {footer}
       </div>
     </div>
   );
