@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, Smile, UserMinus, Users, X } from "lucide-react";
+import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, UserMinus, Users, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -757,7 +757,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             aria-label="Back to conversations"
             className="flex items-center gap-1 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] px-3 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors duration-200 hover:bg-[#232323]"
           >
-            <span aria-hidden="true">&lt;</span> Back
+            <ChevronLeft  />
           </button>
         )}
         <Avatar
@@ -855,7 +855,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           onScroll={(e) => {
             if (e.currentTarget.scrollTop <= 8) loadOlder();
           }}
-          className="t-scroll mt-12 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
+          className="t-scroll mt-12 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4" style={{ overscrollBehavior: "contain" }}
         >
         {loadingHistory && (
           <p className="py-2 text-center text-[12px] text-[var(--text-muted)]">

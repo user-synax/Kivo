@@ -138,7 +138,7 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5" style={{ overscrollBehavior: "contain" }}>
         {!hasSpaces ? (
           <div className="px-3 py-10 text-center">
             <p className="text-[13px] text-[var(--text-muted)]">No spaces yet</p>
@@ -198,7 +198,7 @@ function MobileProfileTab({ currentUser, onProfileUpdate }) {
       <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
         <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Profile</span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(64px+env(safe-area-inset-bottom))] pt-6">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-5 pb-[calc(64px+env(safe-area-inset-bottom))] pt-6" style={{ overscrollBehavior: "contain" }}>
         <div className="flex flex-col items-center text-center">
           <Avatar name={displayName} avatarStyle={currentUser.avatarStyle} url={currentUser.avatarUrl} size="xl" />
           <h2 className="mt-3 text-[18px] font-semibold text-[var(--text-primary)]">{displayName}</h2>
@@ -1093,10 +1093,10 @@ export function DashboardShell() {
     </div>
   );
 
-  // Mobile: stack navigation.
+  // Mobile: native-like fixed viewport — no rubber-band, no back-area scroll
   if (!isDesktop) {
     return (
-      <div className="relative h-[100dvh] overflow-hidden bg-[var(--bg-base)]">
+      <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none" style={{ overscrollBehavior: "none", touchAction: "none" }}>
         <AnimatePresence initial={false}>
           {selected ? (
             <motion.div

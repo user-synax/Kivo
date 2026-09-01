@@ -604,7 +604,7 @@ export function Sidebar({
       )}
 
       {/* Conversation list */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-1.5">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5" style={{ overscrollBehavior: "contain" }}>
         {conversations.length === 0 ? (
           <EmptyState message="No conversations yet" />
         ) : filtered.length === 0 ? (

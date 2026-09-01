@@ -1005,3 +1005,24 @@
         animation: none !important;
     }
 }
+
+/* ── Native mobile lock — prevent rubber-band / pull-to-refresh / back-area scroll ─ */
+html,
+body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 767px) {
+    html,
+    body {
+        height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: pan-y;
+    }
+    /* inner scrollables handle their own pan */
+    .t-scroll {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+}
