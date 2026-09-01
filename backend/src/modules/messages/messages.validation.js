@@ -1,9 +1,23 @@
 import { z } from "zod";
 
-export const createMessageSchema = z.object({
-  content: z.string().trim().min(1, "Message cannot be empty").max(4000, "Message too long"),
-  replyToMessageId: z.string().optional(),
+const attachmentSchema = z.object({
+  fileId: z.string().min(1),
+  bucketId: z.string().min(1),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1),
+  size: z.number().int().positive(),
+  kind: z.enum(["image", "document"]),
+  url: z.string().url(),
 });
+
+export const createMessageSchema = z.object({
+  content: z.string().trim().max(4000, "Message too long").optional(),
+  replyToMessageId: z.string().optional(),
+  attachments: z.array(attachmentSchema).max(10).optional(),
+}).refine(
+  (data) => (data.content && data.content.length > 0) || (data.attachments && data.attachments.length > 0),
+  { message: "Message must have content or at least one attachment", path: ["content"] },
+);
 
 export const updateMessageSchema = z.object({
   content: z.string().trim().min(1, "Message cannot be empty").max(4000, "Message too long"),

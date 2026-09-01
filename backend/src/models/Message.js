@@ -75,6 +75,21 @@ const messageSchema = new mongoose.Schema(
       default: [],
     },
 
+    // File attachments — images and documents uploaded via the attachments endpoint.
+    attachments: {
+      type: [
+        {
+          fileId: { type: String, required: true },
+          bucketId: { type: String, required: true },
+          fileName: { type: String, required: true },
+          mimeType: { type: String, required: true },
+          size: { type: Number, required: true },
+          kind: { type: String, enum: ["image", "document"], required: true },
+          url: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
     isEdited: { type: Boolean, default: false },
     // Soft delete: keep the row (so replies/ordering remain stable) but blank it.
     isDeleted: { type: Boolean, default: false },

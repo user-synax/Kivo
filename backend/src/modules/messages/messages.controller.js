@@ -21,12 +21,13 @@ export const listMessages = asyncHandler(async (req, res) => {
 });
 
 export const createMessage = asyncHandler(async (req, res) => {
-  const { content, replyToMessageId } = parseBody(createMessageSchema, req.body);
+  const { content, replyToMessageId, attachments } = parseBody(createMessageSchema, req.body);
   const message = await messagesService.createMessage({
     conversationId: req.params.id,
     userId: req.user.userId,
     content,
     replyToMessageId,
+    attachments,
   });
   res.status(201).json({ success: true, data: message });
 });

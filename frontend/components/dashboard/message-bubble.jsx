@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 // all state lives in the parent (chat-panel) and is passed in as props.
 
 import { MentionToken } from "@/components/mentions/mention-token";
+import { AttachmentBubble } from "@/components/chat/attachments";
 
 function MessageContent({ content, mentions = [], participants = [], isUserOnline, onOpenProfile }) {
   if (!content) return null;
@@ -183,13 +184,16 @@ export function MessageBubble({
           ) : deleted ? (
             <span className="opacity-20 bg-transparent bg-red-800">This message was deleted</span>
           ) : (
-            <MessageContent
-              content={message.content}
-              mentions={message.mentions}
-              participants={participants}
-              isUserOnline={isUserOnline}
-              onOpenProfile={onOpenProfile}
-            />
+            <>
+              <MessageContent
+                content={message.content}
+                mentions={message.mentions}
+                participants={participants}
+                isUserOnline={isUserOnline}
+                onOpenProfile={onOpenProfile}
+              />
+              <AttachmentBubble attachments={message.attachments} />
+            </>
           )}
         </BubbleContent>
 

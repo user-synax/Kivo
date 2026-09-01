@@ -28,6 +28,15 @@ export function publicMessage(message) {
       readAt: r.readAt,
     })),
     mentions: (obj.mentions || []).map((id) => id.toString()),
+    attachments: (obj.attachments || []).map((a) => ({
+      fileId: a.fileId,
+      bucketId: a.bucketId,
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      size: a.size,
+      kind: a.kind,
+      url: a.url,
+    })),
     isEdited: obj.isEdited,
     isDeleted: obj.isDeleted,
     createdAt: obj.createdAt,
@@ -127,7 +136,7 @@ async function resolveMentions(content, participantIds) {
   return resolvedIds;
 }
 
-export async function createMessage({ conversationId, userId, content, replyToMessageId }) {
+export async function createMessage({ conversationId, userId, content, replyToMessageId, attachments }) {
   const conversation = await assertMembership(conversationId, userId);
   await assertDmNotBlocked(conversation, userId);
 
@@ -160,9 +169,10 @@ export async function createMessage({ conversationId, userId, content, replyToMe
   const message = await Message.create({
     conversationId,
     senderId: userId,
-    content,
+    content: content || "",
     replyToMessageId: replyToMessageId || null,
     mentions: mentionIds,
+    attachments: attachments || [],
   });
 
   // Bump the conversation's activity timestamp for inbox ordering.

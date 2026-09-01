@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Gamepad2, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, Swords, UserMinus, Users, X, Zap } from "lucide-react";
+import { Ban, Gamepad2, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, Swords, UserMinus, Users, X, Zap, Paperclip } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -20,6 +20,8 @@ import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { TypingRaceInviteCard } from "@/components/games/typing-race-invite-card";
 import { TypingRaceRoom } from "@/components/games/typing-race-room";
+import { useFileUpload } from "@/lib/use-file-upload";
+import { UploadPreview, AttachmentBubble } from "@/components/chat/attachments";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -222,6 +224,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const { files: pendingFiles, addFiles, removeFile, clearAll, uploadAll, uploading: uploadBusy } = useFileUpload();
 
   const isDesktop = useIsDesktop();
   const isMobile = !isDesktop;
@@ -659,16 +663,33 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
   const send = async () => {
     const content = text.trim();
-    if (!content || !convId) return;
+    const hasFiles = pendingFiles.some((f) => f.status === "pending");
+    if ((!content && !hasFiles) || !convId) return;
     const tempId = `t_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const replyToId = replyingTo?.id ?? null;
     setReplyingTo(null);
+
+    // Upload files first if any are pending
+    let attachments = [];
+    if (hasFiles) {
+      try {
+        attachments = await uploadAll(convId);
+      } catch {
+        // Upload errors are already shown per-file
+      }
+      // If upload failed and there's no text, don't send an empty message
+      if (attachments.length === 0 && !content) {
+        return;
+      }
+    }
+
     const optimistic = {
       id: tempId,
       tempId,
       conversationId: convId,
       senderId: userId,
       content,
+      attachments,
       reactions: [],
       deliveredTo: [],
       readBy: [],
@@ -679,6 +700,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     };
     setMessages((prev) => [...prev, optimistic]);
     setText("");
+    clearAll();
     setMentionOpen(false);
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (socket) socket.emit("typing:stop", { conversationId: convId });
@@ -686,8 +708,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       const msg = await apiPost(
         `/api/v1/conversations/${convId}/messages`,
         {
-          content,
+          content: content || undefined,
           ...(replyToId && { replyToMessageId: replyToId }),
+          ...(attachments.length > 0 && { attachments }),
         },
       );
       setMessages((prev) =>
@@ -1138,8 +1161,21 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
                   transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="relative z-20 flex items-end gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]"
+                  className="relative z-20 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]"
                 >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <UploadPreview files={pendingFiles} onRemove={removeFile} />
+          <div className="flex items-end gap-2">
           {mentionOpen && (
             <MentionAutocomplete
               participants={getFilteredParticipants(mentionQuery)}
@@ -1148,6 +1184,14 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
               onSelect={handleSelectMention}
             />
           )}
+          <button
+            type="button"
+            aria-label="Attach file"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
           <button
             ref={emojiBtnRef}
             type="button"
@@ -1224,12 +1268,13 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             <motion.button
               type="button"
               onClick={send}
-              disabled={!text.trim()}
+              disabled={!text.trim() && !pendingFiles.some((f) => f.status === "pending")}
               whileTap={reduce ? undefined : { scale: 0.96 }}
               className="rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity,transform] duration-200 hover:brightness-110 disabled:opacity-40 active:scale-[0.97]"
             >
               <Send className="h-5 w-5" />
             </motion.button>
+          </div>
                 </motion.div>
               )}
             </AnimatePresence>
