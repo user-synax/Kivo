@@ -85,7 +85,10 @@ export function TypingRaceRoom({ matchId, initialPrompt, onClose, participants }
 
     const emitJoin = () => {
       const sock = socketRef.current;
-      if (sock && sock.connected) {
+      if (sock) {
+        // Don't guard on sock.connected — Socket.IO buffers emits
+        // until the transport is ready. Guarding silently drops the
+        // join in production where connect events can race.
         sock.emit("race:join", { matchId: String(matchId) });
       }
     };
