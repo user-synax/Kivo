@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Search,
+  SearchCode,
   UserPlus,
   Users,
   X,
@@ -507,6 +508,7 @@ export function Sidebar({
   hideGroups = false,
   hideDMs = false,
   isOffline = false,
+  onSearchOpen,
 }) {
   const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -555,6 +557,17 @@ export function Sidebar({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {notificationBell}
+          {onSearchOpen && (
+            <button
+              type="button"
+              onClick={onSearchOpen}
+              aria-label="Search"
+              title="Search (Ctrl+K)"
+              className="kivo-focus flex size-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            >
+              <SearchCode className="h-5 w-5" strokeWidth={1.6} />
+            </button>
+          )}
           {onCompose && (
             <NewMenu
               onFriends={onCompose}

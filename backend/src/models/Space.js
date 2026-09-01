@@ -59,6 +59,7 @@ const spaceSchema = new mongoose.Schema(
 );
 
 spaceSchema.index({ "members.userId": 1 });
+spaceSchema.index({ name: 1 });
 
 export const SPACE_ROLES = ROLES;
 export const SPACE_CHANNEL_TYPES = CHANNEL_TYPES;

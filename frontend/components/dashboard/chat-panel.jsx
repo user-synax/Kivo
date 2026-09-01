@@ -152,7 +152,7 @@ function receiptState(message, userId, otherId) {
   return "sent";
 }
 
-export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate, isOffline }) {
+export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate, isOffline, highlightMessageId, onHighlightCleared }) {
   const socket = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
@@ -401,6 +401,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
   // Load message history when the conversation changes — stale-while-revalidate.
   // Render cached messages instantly, then silently revalidate via REST.
+  // If highlightMessageId is set, use the anchor-based fetch (around=) instead.
   useEffect(() => {
     if (!convId) {
       setMessages([]);
@@ -412,54 +413,105 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     let active = true;
     setReplyingTo(null);
 
-    // 1) Hydrate from IndexedDB cache immediately (stale-while-revalidate)
-    getCachedMessages(convId)
-      .then((cached) => {
-        if (!active || !cached) return;
-        if (Array.isArray(cached.messages) && cached.messages.length) {
-          setMessages(cached.messages);
-          // If the cache still has a cursor, restore pagination state
-          if (cached.nextCursor) {
-            setNextCursor(cached.nextCursor);
-            setHasMore(true);
-          }
-        }
-      })
-      .catch(() => {});
+    const useAnchor = highlightMessageId && convId;
 
-    // 2) Revalidate from REST in the background
-    setLoadingHistory(true);
-    apiGet(`/api/v1/conversations/${convId}/messages?limit=50`)
-      .then((data) => {
-        if (!active) return;
-        const msgs = data?.messages || [];
-        setMessages(msgs);
-        setNextCursor(data?.nextCursor || null);
-        setHasMore(Boolean(data?.nextCursor));
-        // Update cache with the fresh server response
-        setCachedMessages(convId, msgs, {
-          nextCursor: data?.nextCursor || null,
-          hasMore: Boolean(data?.nextCursor),
-        }).catch(() => {});
-      })
-      .catch(() => {
-        // Network failed — keep whatever was in cache (or empty)
-      })
-      .finally(() => {
-        if (active) setLoadingHistory(false);
-      });
+    if (useAnchor) {
+      // Anchor-based fetch: jump to the specific message
+      setLoadingHistory(true);
+      apiGet(`/api/v1/conversations/${convId}/messages?limit=50&around=${highlightMessageId}`)
+        .then((data) => {
+          if (!active) return;
+          const msgs = data?.messages || [];
+          setMessages(msgs);
+          // Anchor-based fetch doesn't paginate from newest end
+          setNextCursor(null);
+          setHasMore(false);
+        })
+        .catch(() => {
+          if (active) setMessages([]);
+        })
+        .finally(() => {
+          if (active) setLoadingHistory(false);
+        });
+    } else {
+      // Normal fetch: stale-while-revalidate
+      // 1) Hydrate from IndexedDB cache immediately
+      getCachedMessages(convId)
+        .then((cached) => {
+          if (!active || !cached) return;
+          if (Array.isArray(cached.messages) && cached.messages.length) {
+            setMessages(cached.messages);
+            if (cached.nextCursor) {
+              setNextCursor(cached.nextCursor);
+              setHasMore(true);
+            }
+          }
+        })
+        .catch(() => {});
+
+      // 2) Revalidate from REST in the background
+      setLoadingHistory(true);
+      apiGet(`/api/v1/conversations/${convId}/messages?limit=50`)
+        .then((data) => {
+          if (!active) return;
+          const msgs = data?.messages || [];
+          setMessages(msgs);
+          setNextCursor(data?.nextCursor || null);
+          setHasMore(Boolean(data?.nextCursor));
+          setCachedMessages(convId, msgs, {
+            nextCursor: data?.nextCursor || null,
+            hasMore: Boolean(data?.nextCursor),
+          }).catch(() => {});
+        })
+        .catch(() => {
+          // Network failed — keep whatever was in cache (or empty)
+        })
+        .finally(() => {
+          if (active) setLoadingHistory(false);
+        });
+    }
 
     return () => {
       active = false;
     };
-  }, [convId]);
+  }, [convId, highlightMessageId]);
 
   // Keep pinned to the bottom on new messages / typing changes.
+  // Skip auto-scroll when we have a highlight target (jump-to-message).
   useEffect(() => {
+    if (highlightMessageId) return;
     void messages.length;
     void typing;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, typing]);
+  }, [messages.length, typing, highlightMessageId]);
+
+  // Jump-to-message highlight: when highlightMessageId is set, scroll to it
+  // and apply a brief background flash once the messages are loaded.
+  // Only activate if the highlighted message belongs to this conversation.
+  useEffect(() => {
+    if (!highlightMessageId || messages.length === 0) return;
+    // Guard: only highlight if the message is in the current conversation
+    const inConv = messages.some((m) => m.id === highlightMessageId);
+    if (!inConv) return;
+    // Wait a tick for the DOM to render the target message
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(`msg-${highlightMessageId}`);
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        // Apply highlight
+        el.style.transition = "background-color 0.6s ease";
+        el.style.backgroundColor = "rgba(75, 169, 225, 0.15)";
+        // Remove after 2s
+        const timer = setTimeout(() => {
+          el.style.backgroundColor = "transparent";
+          onHighlightCleared?.();
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+      onHighlightCleared?.();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [highlightMessageId, messages, onHighlightCleared]);
 
   // Load older messages (prepend) when the user scrolls to the top.
   const loadOlder = () => {
@@ -975,6 +1027,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             return (
               <div
                 key={m.id}
+                id={`msg-${m.id}`}
                 className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
                   i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
                 }`}

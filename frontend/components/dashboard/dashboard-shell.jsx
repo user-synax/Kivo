@@ -32,6 +32,8 @@ import {
 } from "@/lib/cache";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { useOfflineStatus } from "@/lib/hooks/use-offline-status";
+import { SearchOverlay } from "@/components/dashboard/search-overlay";
+import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { UserPanel } from "./user-panel";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { Avatar } from "./avatar";
@@ -328,6 +330,11 @@ export function DashboardShell() {
   const [panelDragDisabled, setPanelDragDisabled] = useState(false);
   const socket = useSocket();
   const isOffline = useOfflineStatus(socket);
+  // Search overlay state
+  const [searchOpen, setSearchOpen] = useState(false);
+  // Message highlight state: when a search result is clicked, we store the
+  // target message id and conversation id so ChatPanel can scroll + highlight it.
+  const [highlightMessageId, setHighlightMessageId] = useState(null);
   // currentUser is state (not a bare getSession() read) so the sidebar avatar
   // re-renders after the user saves a new avatar style in the edit modal.
   const [currentUser, setCurrentUser] = useState(() => getSession());
@@ -479,6 +486,18 @@ export function DashboardShell() {
     if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
     else localStorage.removeItem(SELECTED_KEY);
   }, [selectedId]);
+
+  // Ctrl+K / Cmd+K global keyboard shortcut for search
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Mobile: trap browser back / edge swipe so it returns to list (DM/Group/Space), not to /login.
   useEffect(() => {
@@ -1058,6 +1077,36 @@ export function DashboardShell() {
     setSelectedId(id);
   };
 
+  // Search result handlers
+  const handleSearchMessage = useCallback((msg) => {
+    if (!msg.conversationId) return;
+    setSelectedId(msg.conversationId);
+    setShowGroupSettings(false);
+    setShowSpaceSettings(false);
+    // Delay to allow conversation to mount, then trigger highlight
+    setHighlightMessageId(msg.id);
+  }, []);
+
+  const handleSearchUser = useCallback((user) => {
+    if (user.username) {
+      // Open profile drawer by username
+      setProfileUsernameSearch(user.username);
+    }
+  }, []);
+  const [profileUsernameSearch, setProfileUsernameSearch] = useState(null);
+
+  const handleSearchSpace = useCallback((space) => {
+    // Find the space channel conversation in the list
+    const channelConv = conversationsRef.current.find(
+      (c) => c.type === "space_channel" && c.spaceId === space.id
+    );
+    if (channelConv) {
+      setSelectedId(channelConv.id);
+      setShowGroupSettings(false);
+      setShowSpaceSettings(false);
+    }
+  }, []);
+
   const selected = conversations.find((c) => c.id === selectedId) || null;
   const selectedSpace = selected?.type === "space_channel" ? spaces.find((s) => s.id === selected.spaceId) || null : null;
   const listItems = conversations.map((c) => toListItem(c, currentUser, spaces));
@@ -1206,6 +1255,8 @@ export function DashboardShell() {
                 }}
                 onConversationUpdate={upsertConversation}
                 isOffline={isOffline}
+                highlightMessageId={highlightMessageId}
+                onHighlightCleared={() => setHighlightMessageId(null)}
               />
             </motion.div>
           ) : (
@@ -1237,6 +1288,7 @@ export function DashboardShell() {
                       hideSpaces
                       hideGroups
                       isOffline={isOffline}
+                      onSearchOpen={() => setSearchOpen(true)}
                     />
                   </div>
                 )}
@@ -1259,6 +1311,7 @@ export function DashboardShell() {
                       hideSpaces
                       hideDMs
                       isOffline={isOffline}
+                      onSearchOpen={() => setSearchOpen(true)}
                     />
                   </div>
                 )}
@@ -1309,6 +1362,13 @@ export function DashboardShell() {
         onJoined={handleDiscoverJoined}
       />
 
+      <SearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSelectMessage={handleSearchMessage}
+        onSelectUser={handleSearchUser}
+        onSelectSpace={handleSearchSpace}
+      />
 
       <GroupSettingsOverlay
         open={selected?.type === "group" && showGroupSettings}
@@ -1358,6 +1418,22 @@ export function DashboardShell() {
           setShowSpaceSettings(false);
         }}
       />
+
+      <ProfileDrawer
+        username={profileUsernameSearch}
+        open={Boolean(profileUsernameSearch)}
+        onClose={() => setProfileUsernameSearch(null)}
+        onMessage={(conv) => {
+          setProfileUsernameSearch(null);
+          if (conv) {
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === conv.id)) return prev;
+              return [conv, ...prev];
+            });
+            setSelectedId(conv.id);
+          }
+        }}
+      />
     </div>
   );
   }
@@ -1386,6 +1462,7 @@ export function DashboardShell() {
           onProfileUpdate={refreshUser}
           notificationBell={notificationBellNode}
           isOffline={isOffline}
+          onSearchOpen={() => setSearchOpen(true)}
         />
       </motion.div>
 
@@ -1399,6 +1476,8 @@ export function DashboardShell() {
           }}
           onConversationUpdate={upsertConversation}
           isOffline={isOffline}
+          highlightMessageId={highlightMessageId}
+          onHighlightCleared={() => setHighlightMessageId(null)}
         />
       </div>
 
@@ -1487,6 +1566,30 @@ export function DashboardShell() {
         open={showDiscover}
         onClose={() => setShowDiscover(false)}
         onJoined={handleDiscoverJoined}
+      />
+
+      <SearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSelectMessage={handleSearchMessage}
+        onSelectUser={handleSearchUser}
+        onSelectSpace={handleSearchSpace}
+      />
+
+      <ProfileDrawer
+        username={profileUsernameSearch}
+        open={Boolean(profileUsernameSearch)}
+        onClose={() => setProfileUsernameSearch(null)}
+        onMessage={(conv) => {
+          setProfileUsernameSearch(null);
+          if (conv) {
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === conv.id)) return prev;
+              return [conv, ...prev];
+            });
+            setSelectedId(conv.id);
+          }
+        }}
       />
 
     </div>

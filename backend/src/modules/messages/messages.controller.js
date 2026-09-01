@@ -10,14 +10,15 @@ import {
 import * as messagesService from "./messages.service.js";
 
 export const listMessages = asyncHandler(async (req, res) => {
-  const { cursor, limit } = parseQuery(listMessagesQuerySchema, req.query);
-  const { messages, nextCursor } = await messagesService.listMessages({
+  const { cursor, around, limit } = parseQuery(listMessagesQuerySchema, req.query);
+  const result = await messagesService.listMessages({
     conversationId: req.params.id,
     userId: req.user.userId,
     cursor,
+    around,
     limit,
   });
-  res.status(200).json({ success: true, data: { messages, nextCursor } });
+  res.status(200).json({ success: true, data: result });
 });
 
 export const createMessage = asyncHandler(async (req, res) => {

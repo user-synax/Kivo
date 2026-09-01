@@ -98,5 +98,8 @@ messageSchema.index({ conversationId: 1, createdAt: -1 });
 // Secondary: "messages sent by a user" (e.g. for moderation/search later).
 messageSchema.index({ senderId: 1, createdAt: -1 });
 
+// Text index for full-text search on message content.
+messageSchema.index({ content: "text" }, { weights: { content: 1 } });
+
 export const Message = mongoose.model("Message", messageSchema);
 export default Message;

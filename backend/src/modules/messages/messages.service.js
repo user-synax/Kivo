@@ -79,8 +79,47 @@ async function assertDmNotBlocked(conversation, userId) {
   }
 }
 
-export async function listMessages({ conversationId, userId, cursor, limit }) {
+export async function listMessages({ conversationId, userId, cursor, around, limit }) {
   await assertMembership(conversationId, userId);
+
+  // Anchor-based fetch: return a page of messages centered around `around`.
+  // Used by jump-to-message from search results.
+  if (around) {
+    if (!mongoose.Types.ObjectId.isValid(around)) {
+      throw badRequest("Invalid around message id", "INVALID_CURSOR");
+    }
+    const anchorMsg = await Message.findById(around).select("createdAt");
+    if (!anchorMsg) {
+      throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+    }
+    // Fetch `limit` messages: half before the anchor, half after.
+    const half = Math.ceil(limit / 2);
+    const [before, after] = await Promise.all([
+      // Messages created AFTER (newer than) the anchor, for context below it
+      Message.find({
+        conversationId,
+        createdAt: { $gt: anchorMsg.createdAt },
+      })
+        .sort({ createdAt: 1 })
+        .limit(half)
+        .lean(),
+      // Messages created BEFORE (older than) the anchor, for context above it
+      Message.find({
+        conversationId,
+        createdAt: { $lt: anchorMsg.createdAt },
+      })
+        .sort({ createdAt: -1 })
+        .limit(half)
+        .lean(),
+    ]);
+
+    // Combine: older messages (reversed to ascending) + anchor + newer messages
+    const olderReversed = [...after].reverse();
+    const allDocs = [...olderReversed, anchorMsg.toObject(), ...before];
+    const messages = allDocs.map((m) => publicMessage(m));
+
+    return { messages, nextCursor: null, anchorId: around };
+  }
 
   const filter = { conversationId };
   if (cursor) {

@@ -88,6 +88,10 @@ userSchema.statics.hashPassword = function (plain) {
   return bcrypt.hash(plain, 12);
 };
 
+// Indexes for search lookups.
+userSchema.index({ username: 1 });
+userSchema.index({ displayName: 1 });
+
 export const Role = Object.freeze({ USER: "user", ADMIN: "admin" });
 export const User = mongoose.model("User", userSchema);
 export default User;
