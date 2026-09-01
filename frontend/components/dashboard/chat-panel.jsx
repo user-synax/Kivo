@@ -1032,6 +1032,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                         onOpenProfile={setProfileUsername}
                         className="!max-w-full"
                         contentClassName="max-w-full"
+                        isMobile={isMobile}
                       />
                     </SwipeToReply>
                   </div>

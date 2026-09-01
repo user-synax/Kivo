@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, CheckCheck, FaceGrinning, Pencil, Reply, Trash } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
@@ -113,14 +114,23 @@ export function MessageBubble({
   participants = [],
   isUserOnline,
   onOpenProfile,
+  isMobile = false,
 }) {
   const deleted = message.isDeleted;
   const editRef = useRef(null);
   const [pressing, setPressing] = useState(false);
+  const [likeAnimKey, setLikeAnimKey] = useState(0);
 
   useEffect(() => {
     if (isEditing) editRef.current?.focus();
   }, [isEditing]);
+
+  const handleDoubleClickLike = () => {
+    if (!isMobile || deleted || isEditing) return;
+    if (navigator.vibrate) navigator.vibrate(20);
+    setLikeAnimKey((k) => k + 1);
+    onReact?.("❤️");
+  };
 
   // Sent messages use the primary (accent) bubble, received use the secondary.
   const bubbleVariant = variant ?? (mine ? "default" : "secondary");
@@ -142,6 +152,7 @@ export function MessageBubble({
           onPointerUp={() => setPressing(false)}
           onPointerLeave={() => setPressing(false)}
           onPointerCancel={() => setPressing(false)}
+          onDoubleClick={handleDoubleClickLike}
         >
         <BubbleContent className={cn("min-w-0", contentClassName)}>
           {replyTo ? (
@@ -181,6 +192,23 @@ export function MessageBubble({
             />
           )}
         </BubbleContent>
+
+        <AnimatePresence>
+          {likeAnimKey > 0 && (
+            <motion.div
+              key={likeAnimKey}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 1] }}
+              exit={{ scale: 1.4, opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            >
+              <span className="select-none text-5xl drop-shadow-lg" aria-hidden="true">
+                ❤️
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Reaction picker */}
         {reactionOpen && (
