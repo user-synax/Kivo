@@ -1,5 +1,5 @@
 "use client";;
-import { OTPFieldPreview as OTPField } from "@base-ui/react/otp-field";
+import { OTPField } from "@base-ui/react/otp-field";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createContext, Fragment, forwardRef, useContext, useId, useMemo } from "react";
 
