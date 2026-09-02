@@ -8,14 +8,21 @@ import { ApiError, ErrorCodes } from "../utils/errors.js";
 //   windowSeconds: size of the window in seconds
 //   max: max requests per window
 //   keyPrefix: logical bucket name (e.g. "login", "refresh")
-//   keyFrom(req): optional custom key extractor (defaults to req.ip)
+//   keyFrom(req): optional custom key extractor (defaults to authenticated user if present, else req.ip)
 const buckets = new Map();
+
+// Prefer authenticated user id over IP so multiple users behind one NAT don't
+// share a bucket and a single abusive user can't bypass by switching networks.
+// Falls back to IP for pre-auth routes (login/refresh/etc.).
+export function userKey(req) {
+  return req.user?.userId || req.user?.id || req.ip || "unknown";
+}
 
 export function rateLimiter({
   windowSeconds,
   max,
   keyPrefix,
-  keyFrom = (req) => req.ip || "unknown",
+  keyFrom = userKey,
 }) {
   return (req, res, next) => {
     const key = `ratelimit:${keyPrefix}:${keyFrom(req)}`;
@@ -24,7 +31,7 @@ export function rateLimiter({
 
     const entry = buckets.get(key);
     if (!entry || now - entry.start > windowMs) {
-      buckets.set(key, { start: now, count: 1 });
+      buckets.set(key, { start: now, count: 1, windowMs });
     } else {
       entry.count += 1;
     }
@@ -43,4 +50,23 @@ export function rateLimiter({
     }
     next();
   };
+}
+
+// Periodic sweep to evict expired buckets so long-running processes don't leak
+// memory as more distinct users/IPs are seen over time. Uses per-entry windowMs
+// so heterogeneous windows are handled correctly.
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+if (!global._kivoRateLimitSweep) {
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of buckets) {
+      const win = entry.windowMs || 0;
+      if (now - entry.start > win) {
+        buckets.delete(key);
+      }
+    }
+  }, SWEEP_INTERVAL_MS);
+  // Don't keep the process alive solely for the sweep timer.
+  if (typeof sweep.unref === "function") sweep.unref();
+  global._kivoRateLimitSweep = sweep;
 }

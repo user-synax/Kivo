@@ -19,6 +19,11 @@ import searchRoutes from "./modules/search/search.routes.js";
 
 const app = express();
 
+// Trust the first proxy (Render/Railway/Heroku LB) so req.ip respects
+// X-Forwarded-For. Required for correct IP fallback when rate-limiting
+// pre-auth routes (login, refresh, etc.).
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(
   cors({
