@@ -33,6 +33,14 @@ export const updateMeSchema = z.object({
   status: z.string().trim().max(60).optional(),
   avatarStyle: z.enum(AVATAR_STYLE_IDS).nullable().optional(),
   banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),
+  country: z
+    .string()
+    .trim()
+    .max(2)
+    .regex(/^[A-Z]{2}$/, "Country must be a 2-letter ISO code (e.g. US, IN)")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
 });
 
 export const usernameParamSchema = z.object({

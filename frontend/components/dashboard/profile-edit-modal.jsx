@@ -4,10 +4,12 @@ import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
+import { CountryPicker } from "@/components/profile/country-picker";
 import { apiPatch, apiUpload, apiDelete } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import { AVATAR_STYLES } from "@/lib/avatar-styles";
 import { BANNER_OPTIONS } from "@/lib/banners";
+import { COUNTRIES } from "@/lib/countries";
 
 function Field({ label, hint, children }) {
   return (
@@ -39,6 +41,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
   const [status, setStatus] = useState("");
   const [avatarStyle, setAvatarStyle] = useState("default");
   const [banner, setBanner] = useState("");
+  const [country, setCountry] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -101,6 +104,11 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
       setStatus(me?.status || "");
       setAvatarStyle(me?.avatarStyle || "default");
       setBanner(me?.banner || "");
+      setCountry(
+        me?.country
+          ? COUNTRIES.find((c) => c.code === me.country) || null
+          : null,
+      );
       setError(null);
       setRender(true);
       const id = requestAnimationFrame(() => setShown(true));
@@ -136,6 +144,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
         status: status.trim(),
         avatarStyle,
         banner,
+        country: country?.code || "",
       });
       // Persist the refreshed user object (drives the sidebar avatar + session).
       setSession(updated, getToken());
@@ -238,6 +247,10 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
               onChange={(e) => setBio(e.target.value)}
               placeholder="A little about you"
             />
+          </Field>
+
+          <Field label="Country" hint="Shown as a flag on your profile.">
+            <CountryPicker value={country} onChange={setCountry} />
           </Field>
 
           {/* Display picture upload */}

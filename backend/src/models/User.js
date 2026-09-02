@@ -53,6 +53,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // ISO 3166-1 alpha-2 country code (e.g. "US", "IN"). Optional;
+    // displayed as a flag on the public profile next to the @handle.
+    country: {
+      type: String,
+      default: null,
+      maxlength: 2,
+    },
     // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
     // so the previous file can be deleted on re-upload.
     avatarFileId: {
