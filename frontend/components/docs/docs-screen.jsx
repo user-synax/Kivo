@@ -177,12 +177,14 @@ export function DocsScreen() {
               <Steps
                 items={[
                   "Enter a display name, username, email, and password (at least 8 characters).",
-                  "Confirm the password and submit. You land in chat at /app.",
+                  "Submit. You land in chat at /app — then check your inbox.",
+                  "Open the emailed verify link to confirm your email (expires in 24 hours).",
                 ]}
               />
               <p>
                 Username must be unique: 3–30 characters, letters, numbers, and
-                underscores. Email must be unique too.
+                underscores. Email must be unique too. Until your email is
+                verified, a banner offers a Resend option.
               </p>
               <p>
                 To log in later, use{" "}
@@ -190,6 +192,14 @@ export function DocsScreen() {
                   Log in
                 </a>{" "}
                 with either your email or username.
+              </p>
+              <p>
+                Forgot your password? Use{" "}
+                <a className="kivo-focus rounded-sm font-medium text-accent-blue underline-offset-2 hover:underline" href="/forgot-password">
+                  Forgot password
+                </a>{" "}
+                on the login page — Kivo emails a reset link (expires in 1
+                hour). Resetting signs you out on every device.
               </p>
               <p>
                 To log out, open your profile from the bottom of the sidebar,
@@ -260,7 +270,7 @@ export function DocsScreen() {
               <Steps
                 items={[
                   "Find them under Direct in the sidebar, or use the search field.",
-                  "Click the row. Unread counts show as a badge. A green dot on the avatar means they are online.",
+                  "Click the row. Unread counts show as a badge. A green dot on the avatar means they are online; when offline, Kivo shows their last-active time.",
                 ]}
               />
             </Section>
@@ -313,6 +323,13 @@ export function DocsScreen() {
                 delivered → read. When someone else is typing, you see it in
                 the open chat. Opening a chat marks it read. System lines like
                 “Admin added X” do not add to unread.
+              </p>
+              <h3 className="doc-h3">Mark as unread</h3>
+              <p>
+                Right-click (or long-press) a conversation in the sidebar →
+                Mark as unread. Reopen it and a labelled “New messages” line
+                marks where your unread messages begin. It clears as you scroll
+                to the latest.
               </p>
             </Section>
 

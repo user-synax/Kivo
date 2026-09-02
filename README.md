@@ -39,6 +39,9 @@
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
 - 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation.
 - 📴 **Offline indicator** — "You are offline" banner when both browser and socket signals indicate disconnection.
+- 📧 **Transaction email** — signup triggers an **email verification** link, and **forgot/reset password** emails work end-to-end via Gmail SMTP.
+- 🕒 **Last online status** — "active X min/hour ago" instead of a bare offline state.
+- 📬 **Mark as unread** — right-click any conversation and re-mark it unread; a "New messages" separator shows where unread hits start.
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
 
@@ -94,6 +97,8 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 
 ### ✅ Complete
 - Authentication & sessions (JWT + httpOnly refresh cookie)
+- Email verification (verification link emailed on signup, resend option, verification banner)
+- Password reset (forgot/reset password via emailed token, invalidates all sessions)
 - User profiles (name, username, bio, custom status, **banner**, avatar upload)
 - Friends system (request / accept / decline / list / search / remove)
 - DM conversations (create, list, history, unread counts)
@@ -111,6 +116,8 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
 - **Admin panel** — standalone dashboard with user/group/space management, ban/unban, audit logging
 - **Offline indicator** — "You are offline" banner, disabled composer when offline
+- **Last online status** — "active … ago" labels for offline users in DMs & profiles
+- **Mark as unread** — context menu on conversations + "New messages" separator in chat
 - Animated landing page
 
 ### 🚧 Planned / Not Started
@@ -149,6 +156,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 | **JWT (jsonwebtoken)** | Authentication |
 | **bcryptjs** | Password hashing (12 rounds) |
 | **web-push** | VAPID web push notifications (offline delivery) |
+| **nodemailer** | Transactional email (verification, password reset) via Gmail SMTP |
 | **Appwrite** | File & attachment storage (avatars + message attachments) |
 | **Multer** | Multipart file upload handling |
 | **Redis** | Caching, rate limiting (planned) |
@@ -235,6 +243,9 @@ bun run lint  # biome check
 | `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket ID for message attachments (separate from avatar bucket) |
 | `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend base URL (HTTP + Socket.IO) |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | backend | Gmail SMTP credentials for transactional email (verification, password reset) |
+| `EMAIL_FROM` | backend | "From" header for outgoing emails |
+| `FRONTEND_URL` | backend | Frontend base URL used to build email verify/reset links |
 | `ADMIN_EMAIL` | backend | Admin panel login email |
 | `ADMIN_PASSWORD_HASH` | backend | Bcrypt hash of the admin password |
 | `ADMIN_JWT_SECRET` | backend | Secret for admin JWT signing |
@@ -262,7 +273,13 @@ Registration / Login
 
 - **GuestGate** redirects logged-in users away from `/login` & `/signup`.
 - **AuthGate** redirects unauthenticated users from `/app/*` to `/login`.
-- Rate limits: login `10/15min`, refresh `30/60s`.
+- Rate limits: login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`.
+
+### Email verification & password reset
+
+- On **signup**, Kivo emails a **verify-email** link (24h expiry). Until the email is verified, an in-app banner nudges the user to verify (with a **resend** option, rate-limited to 1/min). The verify link works without logging in at `/verify-email?token=…`.
+- **Forgot password** (`/forgot-password`) emails the user a reset link (1h expiry). **Reset password** (`/reset-password?token=…`) sets a new password and invalidates **all** existing sessions in one go.
+- All transactional email is sent over **Gmail SMTP** via `nodemailer` (see env vars below). Email sending is fire-and-forget, so signup/login never blocks on the mail server.
 
 ---
 
@@ -275,6 +292,7 @@ Registration / Login
 | `message:deleted` | Server → Room | Message soft-deleted |
 | `message:reaction` | Server → Room | Reaction added/removed |
 | `message:read` | Server → Room | Marked as read |
+| `message:unread` | Server → Room | Conversation marked unread (badge + separator) |
 | `message:delivery-updated` | Server → Room | Delivery state changed |
 | `typing:start` / `typing:stop` | Client → Room | Typing indicator |
 | `presence:online` / `offline` | Server → All | Presence broadcast |
@@ -336,6 +354,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - **`@mentions`** with autocomplete (conversation participants only) + mention notifications
 - Reactions, edit, and soft-delete
 - 60-second message grouping & hover actions (bubble menu)
+- **New messages separator** — a labelled divider sits where your unread messages begin (auto-clears as you read to the bottom)
 - Emoji picker — 9 categories, 270+ emojis
 - Delivery & read receipts
 

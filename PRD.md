@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.5
-**Last Updated:** September 1, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments Complete)
+**Version:** 2.6
+**Last Updated:** September 2, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset Complete)
 
 ---
 
@@ -69,6 +69,8 @@ Kivo
 | Area | Status | Notes |
 |---|---|---|
 | Authentication & Sessions | **Complete** | JWT access + httpOnly refresh cookie, session-backed |
+| Email Verification | **Complete** | Verify link emailed on signup (24h), resend + verification banner |
+| Password Reset | **Complete** | Forgot/reset via emailed token (1h), invalidates all sessions |
 | User Profiles | **Complete** | Display name, username, bio, custom status, avatar upload, banner |
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
 | DM Conversations | **Complete** | Create, list, message history, unread counts |
@@ -94,6 +96,8 @@ Kivo
 | **Global Search (Ctrl+K)** | **Complete** | Unified search: messages, people, spaces; jump-to-message |
 | **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, audit logging |
 | **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, disabled composer |
+| **Last Online Status** | **Complete** | "active … ago" labels for offline users (DMs + profiles) |
+| **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
 | Voice / 2FA | **Partially wired** | LiveKit backend stubbed for voice; frontend not built; 2FA planned |
 
 ---
@@ -113,7 +117,17 @@ Kivo
 
 - Passwords hashed with bcrypt (12 rounds).
 - On success: user document created, session document created, access token returned, refresh token set as httpOnly cookie.
+- An **email verification** link is emailed (fire-and-forget, 24h expiry). The user is signed in immediately but is nudged to verify via an in-app banner until they do.
 - Duplicate email/username returns `CONFLICT` error.
+
+#### 1.1.1 Email Verification
+
+| Item | Detail |
+|---|---|
+| Verify link | `GET /api/v1/auth/verify-email?token=…` — marks `isEmailVerified = true` (24h expiry) |
+| Resend | `POST /api/v1/auth/resend-verification` (authenticated, limit 1/min). No-op if already verified. |
+| Banner | `verification-banner.jsx` shown until verified, with a **Resend** action |
+| Token storage | SHA-256 hash stored on the user (`emailVerificationTokenHash`), never the raw token |
 
 #### 1.2 Login
 
@@ -135,6 +149,21 @@ Kivo
 
 - `POST /api/v1/auth/logout` — destroys current session, clears refresh cookie.
 - `POST /api/v1/auth/logout-all` — destroys all sessions for the user.
+
+#### 1.4.1 Password Reset
+
+| Step | Endpoint | Behavior |
+|---|---|---|
+| Request | `POST /api/v1/auth/forgot-password` | Rate-limited `5/5min`; emails a reset link (1h expiry). Always returns success (no account enumeration). |
+| Reset | `POST /api/v1/auth/reset-password` | Rate-limited `10/5min`; sets the new password and invalidates **all** sessions (force re-login everywhere). |
+
+- Both endpoints are public (no auth).
+- Frontend pages: `/forgot-password` and `/reset-password?token=…`.
+- Token is stored hashed (`passwordResetTokenHash`); never the raw token.
+
+#### 1.4.2 Transactional Email
+
+All transactional email (verification, password reset) is sent via **nodemailer** over **Gmail SMTP**. Sending is fire-and-forget so signup/login never blocks. Env vars: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `EMAIL_FROM`, `FRONTEND_URL` (base URL for building email links; default `http://localhost:3000`).
 
 #### 1.5 Route Protection
 
@@ -261,9 +290,17 @@ Message {
 - Failed messages show a retry button.
 - Delivery states: sending → sent → delivered → read.
 
+### 3.7 Mark as Unread & New Messages Separator
+
+- Right-clicking a conversation in the sidebar opens a context menu with **Mark as unread**.
+- `POST /api/v1/conversations/:id/unread` — with `{ messageId }` marks unread from that message forward; without one it uses the newest others' message as the anchor.
+- Unread badges re-appear on the row, and opening the conversation shows a labelled **"New messages"** separator right where the unread run begins.
+- The separator auto-clears (marks read) when the user scrolls to the bottom of the chat, or via the existing `PATCH /read` call.
+- `message:unread` socket event keeps the sidebar badge in sync live.
+
 ---
 
-### 3.7 Group Messaging
+### 3.8 Group Messaging
 
 Group chats are private multi-person conversations (2+ members) for friends, college, projects, and gaming squads.
 
@@ -283,7 +320,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 - Membership changes join/leave the live Socket.IO room immediately.
 - System info messages are emitted for member joins/leaves ("Admin added X", "Y left the group") and render as centered chips — they never bump unread counts.
 
-### 3.8 Message Replies
+### 3.9 Message Replies
 
 - Any message can be replied to via `replyToMessageId` (either in `POST /conversations/:id/messages` or on edit).
 - The client renders an inline quote preview of the original message above the reply.
@@ -309,6 +346,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 
 - In-memory `Map<userId, Set<socketId>>` — single-instance only.
 - Exposed to REST layer via `io.isUserOnline(userId)`.
+- **Last online** — `lastActiveAt` on the user (and last-seen tracking) drives "active X ago" labels for offline users in DMs and profiles (`frontend/lib/last-active.js`).
 
 #### 4.3 Messaging Events
 
@@ -319,6 +357,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | `message:deleted` | Server → Room | Message soft-deleted |
 | `message:reaction` | Server → Room | Reaction added or removed |
 | `message:read` | Server → Room | Messages marked as read |
+| `message:unread` | Server → Room | Conversation marked unread (badge + "New messages" separator) |
 | `message:delivered` | Client → Server | Acknowledge receipt of `message:new` |
 | `message:delivery-updated` | Server → Room | Broadcast updated `deliveredTo` array |
 
@@ -807,11 +846,15 @@ Refresh token is sent automatically via httpOnly cookie.
 
 | Method | Path | Auth | Rate Limit | Body |
 |---|---|---|---|---|
-| POST | `/api/v1/auth/register` | No | No | `{ displayName, username, email, password }` |
-| POST | `/api/v1/auth/login` | No | 10/15min | `{ emailOrUsername, password }` |
+| POST | `/api/v1/auth/register` | No | No | `{ displayName?, username?, email, password }` (emails verify link) |
+| POST | `/api/v1/auth/login` | No | 10/15min | `{ identifier, password }` |
 | POST | `/api/v1/auth/refresh-token` | No | 30/60s | Cookie only |
 | POST | `/api/v1/auth/logout` | Yes | No | — |
 | POST | `/api/v1/auth/logout-all` | Yes | No | — |
+| GET | `/api/v1/auth/verify-email` | No | No | `?token=` (24h expiry) |
+| POST | `/api/v1/auth/resend-verification` | Yes | 1/min | — |
+| POST | `/api/v1/auth/forgot-password` | No | 5/5min | `{ email }` |
+| POST | `/api/v1/auth/reset-password` | No | 10/5min | `{ token, newPassword }` |
 
 #### Users
 
@@ -836,9 +879,10 @@ Refresh token is sent automatically via httpOnly cookie.
 | DELETE | `/api/v1/conversations/:id/members/:userId` | Group admin, or self | — |
 | POST | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | DELETE | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
-| GET | `/api/v1/conversations/:id/messages` | Yes | `?cursor=&limit=` |
+| GET | `/api/v1/conversations/:id/messages` | Yes | `?cursor=&limit=&around=` |
 | POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId? }` (at least content or attachments required) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
+| POST | `/api/v1/conversations/:id/unread` | Yes | `{ messageId? }` — mark unread from a message (or latest others') forward |
 
 #### Spaces
 
@@ -966,6 +1010,7 @@ kivo/
 | JWT (jsonwebtoken 9) | Authentication |
 | bcryptjs 2.4.3 | Password hashing |
 | web-push 3.6.7 | VAPID web push notifications |
+| nodemailer | Transactional email (verification, password reset) via Gmail SMTP |
 | Multer | Multipart file upload handling |
 | Appwrite | File & attachment storage (avatars + message attachments) |
 
@@ -1035,6 +1080,12 @@ Each module follows a 4-file pattern:
   avatarFileId:   String (select: false)
   passwordHash:   String (select: false)
   role:           String (enum: ["user", "admin"], default: "user")
+  isEmailVerified:   Boolean (default: false)
+  emailVerificationTokenHash: String (select: false, nullable)
+  emailVerificationExpires:   Date (select: false, nullable)
+  passwordResetTokenHash:     String (select: false, nullable)
+  passwordResetExpires:       Date (select: false, nullable)
+  lastActiveAt:   Date (nullable)   # last-online status
   blockedUsers:   [ObjectId → User]
   isBanned:       Boolean (default: false, indexed)
   bannedAt:       Date (nullable)
@@ -1174,6 +1225,9 @@ Each module follows a 4-file pattern:
 | `/` | `app/page.js` | Landing page (hero + navbar) | GuestGate |
 | `/login` | `app/(auth)/login/page.jsx` | Login form | GuestGate |
 | `/signup` | `app/(auth)/signup/page.jsx` | Signup form | GuestGate |
+| `/forgot-password` | `app/(auth)/forgot-password/page.jsx` | Request password reset | GuestGate |
+| `/reset-password` | `app/(auth)/reset-password/page.jsx` | Set new password via token | GuestGate |
+| `/verify-email` | `app/(auth)/verify-email/page.jsx` | Verify email from emailed link | GuestGate |
 | `/app` | `app/app/page.jsx` | Main dashboard | AuthGate |
 | `/app/profile` | `app/app/profile/page.jsx` | User profile | AuthGate |
 | `/docs` | `app/docs/page.jsx` | How-to-use guide | Anyone |
@@ -1329,6 +1383,9 @@ components/
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT`
+- `GMAIL_USER` / `GMAIL_APP_PASSWORD` (transactional email — verification, password reset)
+- `EMAIL_FROM` (From header for outgoing mail)
+- `FRONTEND_URL` (base URL for email verify/reset links)
 - `CORS_ORIGIN`
 - `NODE_ENV`
 
@@ -1368,6 +1425,9 @@ These may be considered after the core communication experience is stable.
 - End-to-end notification system (in-app + web push via PWA).
 - `@mention` feature with autocomplete + mention notifications.
 - Mobile UX (bottom tab bar, responsive panels) + IndexedDB offline caching.
+- File & image attachments (images, PDFs, docs) with lightbox & inline previews.
+- **Email verification** (signup email link, resend, banner) and **password reset** (forgot/reset via email).
+- **Last online status** and **Mark as unread / New messages separator**.
 
 ### Phase 1.5 — Voice Foundations
 
@@ -1386,7 +1446,6 @@ These may be considered after the core communication experience is stable.
 - Advanced permissions.
 - Scheduled messages.
 - Stronger search (message, conversation, space).
-- File / image attachments.
 
 ### Phase 3 — Rich Communication
 

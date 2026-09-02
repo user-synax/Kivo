@@ -47,14 +47,16 @@ Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for
 
 **Where:** `/signup`
 
-1. Enter **display name**, **username**, **email**, **password**, and **confirm password**.
+1. Enter **display name**, **username**, **email**, and **password** (at least 8 characters).
 2. Submit. You are signed in and taken to `/app`.
+3. Check your inbox — Kivo emails you a **verify email** link (expires in 24 hours). Click it (or paste the link) to mark your email as verified.
 
 **Rules**
 
 - Password: at least 8 characters.
 - Username: 3–30 characters; letters, numbers, and underscores only. Unique.
 - Email: unique, valid format.
+- Until your email is verified, an in-app banner at the top of the chat shows a **Resend verification** option (rate-limited, 1 per minute).
 - Login is rate-limited (10 attempts per 15 minutes).
 
 ---
@@ -67,6 +69,13 @@ Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for
 2. Submit. You go to `/app`.
 
 Sessions use a short-lived access token plus an httpOnly refresh cookie. The app refreshes the access token automatically before it expires.
+
+**Forgot your password?**
+
+1. On the login page, click **Forgot password** (→ `/forgot-password`).
+2. Enter your account email. Kivo sends a **reset link** (expires in 1 hour).
+3. Open the link (→ `/reset-password`), choose a new password, and submit.
+4. All your existing sessions are signed out — log in again with the new password.
 
 **Log out**
 
@@ -210,6 +219,10 @@ On your own bubbles:
 - Filled / read state: the other participant(s) **read** it
 
 The chat is marked read when you have it open. System messages (e.g. “Admin added X”) do not bump unread counts.
+
+### Mark a conversation unread
+
+Right-click (or long-press on mobile) a conversation in the sidebar → **Mark as unread**. The unread badge returns to that row, and when you reopen the chat a labelled **“New messages”** line shows where your unread messages begin. The separator clears automatically once you scroll to the latest messages (the chat is then marked read again).
 
 ### Typing indicator
 
@@ -474,6 +487,7 @@ It opens in **standalone** mode starting at `/app`. Icons and name come from `fr
 While you are connected:
 
 - Friends and DM partners can see you as **online** (green indicator).
+- When someone is offline, Kivo shows how long ago they were **last active** (e.g. “active 12 min ago”), in DMs and on their profile, instead of a bare offline state.
 - New messages, edits, deletes, reactions, and receipts appear **without refresh**.
 - Group and Space membership, channel list, and settings updates stream in live.
 - New notifications arrive over the same realtime connection.
@@ -648,6 +662,10 @@ Do not expect these in the current MVP:
 | Admin panel | `/admin` — standalone dashboard |
 | Offline message caching | IndexedDB, last 50 messages per conversation |
 | Offline indicator | "You are offline" banner in sidebar |
+| Email verification | Verification link emailed on signup + Resend banner |
+| Forgot / reset password | `/forgot-password` → emailed link → `/reset-password` |
+| Last online status | "active … ago" in DMs & profiles when offline |
+| Mark as unread | Right-click conversation → Mark as unread |
 | Health check (ops) | `GET /health` on the API |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).

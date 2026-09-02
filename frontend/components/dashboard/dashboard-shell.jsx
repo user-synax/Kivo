@@ -17,6 +17,7 @@ import { FriendsModal } from "./friends-modal";
 import { GroupCreateModal } from "./group-create-modal";
 import { GroupSettingsPanel } from "./group-settings-panel";
 import { Sidebar } from "./sidebar";
+import { NestedSidebar } from "./nested-sidebar";
 import { SpaceCreateModal } from "@/components/spaces/space-create-modal";
 import { SpaceSettingsPanel } from "@/components/spaces/space-settings-panel";
 import { SpaceDiscoverModal } from "@/components/spaces/space-discover-modal";
@@ -1515,27 +1516,16 @@ export function DashboardShell() {
   );
   }
 
-  // Desktop: sidebar + chat side by side.
+  // Desktop: nested icon-rail + panel sidebar + chat side by side.
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
       <VerificationBanner user={currentUser} />
       <div className="flex min-h-0 flex-1">
-      <motion.div
-        animate={{ width: collapsed ? 76 : 320 }}
-        transition={reduce ? { duration: 0 } : { duration: 0.28, ease: EASE }}
-        className="h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)]"
-      >
-        <Sidebar
+      <div className="hidden h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
+        <NestedSidebar
           conversations={listItems}
           selectedId={selectedId}
           onSelect={handleSelect}
-          collapsed={collapsed}
-          showToggle
-          onToggle={() => setCollapsed((v) => !v)}
-          onCompose={handleCompose}
-          onNewGroup={handleNewGroup}
-          onCreateSpace={() => setShowSpaceCreate(true)}
-          onDiscoverSpaces={() => setShowDiscover(true)}
           spaces={spaces}
           currentUser={currentUser}
           onProfileUpdate={refreshUser}
@@ -1543,8 +1533,12 @@ export function DashboardShell() {
           isOffline={isOffline}
           onSearchOpen={() => setSearchOpen(true)}
           onMarkUnread={(id) => handleMarkUnread(id)}
+          onCompose={handleCompose}
+          onNewGroup={handleNewGroup}
+          onCreateSpace={() => setShowSpaceCreate(true)}
+          onDiscoverSpaces={() => setShowDiscover(true)}
         />
-      </motion.div>
+      </div>
 
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <ChatPanel

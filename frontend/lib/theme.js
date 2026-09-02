@@ -70,6 +70,30 @@ const ESPRESSO = {
     scrollbarThumbHover: "#5c4527",
 };
 
+// Pine — deep forest canvas. Same near-black weight as Framer, with a quiet
+// green cast instead of blue/brown, so it reads calm rather than cold.
+const PINE = {
+    ...FRAMER,
+    base: "#0a160f",
+    surface: "#12261a",
+    elevated: "#183222",
+    border: "#264a33",
+    scrollbarThumb: "#264a33",
+    scrollbarThumbHover: "#366a48",
+};
+
+// Plum — deep aubergine canvas. Purple cast with the same tonal ramp weight
+// as Espresso, for a moodier, more editorial dark option.
+const PLUM = {
+    ...FRAMER,
+    base: "#100a14",
+    surface: "#1c1222",
+    elevated: "#26182e",
+    border: "#3a2646",
+    scrollbarThumb: "#3a2646",
+    scrollbarThumbHover: "#5a365b",
+};
+
 // Light palettes --------------------------------------------------------
 // Same single blue accent, same shape as the dark palettes — only the ink
 // relationship inverts: dark text on a light canvas, with the "sent bubble"
@@ -112,6 +136,44 @@ const LINEN = {
     scrollbarThumbHover: "#cbb98f",
 };
 
+// Mist — cool, blue-gray light canvas. Porcelain's neutral structure with a
+// quiet cool cast instead of a warm one, for a crisper, more "studio" feel.
+const MIST = {
+    ...PORCELAIN,
+    base: "#f5f7fa",
+    surface: "#ffffff",
+    elevated: "#ffffff",
+    textPrimary: "#12161c",
+    textMuted: "#707a87",
+    border: "#dde3ea",
+    hover: "rgba(18, 22, 28, 0.05)",
+    bubbleSent: "#12161c",
+    bubbleSentFg: "#f5f7fa",
+    bubbleReceived: "#edf1f5",
+    glassHighlight: "rgba(18, 22, 28, 0.04)",
+    scrollbarThumb: "#d3dbe3",
+    scrollbarThumbHover: "#b3c0cd",
+};
+
+// Sage — soft, green-tinted light canvas. Linen's warmth swapped for a muted
+// botanical cast, for a calmer, more organic light option.
+const SAGE = {
+    ...PORCELAIN,
+    base: "#f5f7f1",
+    surface: "#fbfdf7",
+    elevated: "#ffffff",
+    textPrimary: "#151d12",
+    textMuted: "#79826c",
+    border: "#dfe6d4",
+    hover: "rgba(21, 29, 18, 0.05)",
+    bubbleSent: "#151d12",
+    bubbleSentFg: "#f5f7f1",
+    bubbleReceived: "#eef2e6",
+    glassHighlight: "rgba(21, 29, 18, 0.04)",
+    scrollbarThumb: "#d5dec4",
+    scrollbarThumbHover: "#b7c49f",
+};
+
 export const themes = {
     // Framer — the default dark palette: near-black canvas, white ink, blue signal.
     framer: {
@@ -145,6 +207,22 @@ export const themes = {
         colors: ESPRESSO,
     },
 
+    // Pine — deep forest dark, quiet green cast.
+    pine: {
+        id: "pine",
+        label: "Pine",
+        swatch: "#4ba9e1",
+        colors: PINE,
+    },
+
+    // Plum — deep aubergine dark, moody purple cast.
+    plum: {
+        id: "plum",
+        label: "Plum",
+        swatch: "#4ba9e1",
+        colors: PLUM,
+    },
+
     // Porcelain — clean, neutral off-white canvas.
     porcelain: {
         id: "porcelain",
@@ -160,9 +238,36 @@ export const themes = {
         swatch: "#4ba9e1",
         colors: LINEN,
     },
+
+    // Mist — cool blue-gray light canvas.
+    mist: {
+        id: "mist",
+        label: "Mist",
+        swatch: "#4ba9e1",
+        colors: MIST,
+    },
+
+    // Sage — soft green-tinted light canvas.
+    sage: {
+        id: "sage",
+        label: "Sage",
+        swatch: "#4ba9e1",
+        colors: SAGE,
+    },
 };
 
-export const themeOrder = ["framer", "midnight", "graphite", "espresso", "porcelain", "linen"];
+export const themeOrder = [
+    "framer",
+    "midnight",
+    "graphite",
+    "espresso",
+    "pine",
+    "plum",
+    "porcelain",
+    "linen",
+    "mist",
+    "sage",
+];
 export const defaultThemeId = "framer";
 export const THEME_STORAGE_KEY = "kivo:theme";
 
