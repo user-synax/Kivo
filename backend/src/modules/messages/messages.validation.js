@@ -30,6 +30,7 @@ export const reactionSchema = z.object({
 export const listMessagesQuerySchema = z.object({
   cursor: z.string().optional(),
   around: z.string().optional(),
+  after: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 

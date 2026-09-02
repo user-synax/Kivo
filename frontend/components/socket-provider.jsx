@@ -13,7 +13,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { getToken, refreshAccessToken } from "@/lib/auth";
 
-const SocketContext = createContext(null);
+const SocketContext = createContext({ socket: null, isConnected: false, reconnectNonce: 0 });
 
 export function useSocket() {
   return useContext(SocketContext);
@@ -21,7 +21,10 @@ export function useSocket() {
 
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
   const socketRef = useRef(null);
+  const hasConnectedOnceRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -64,10 +67,22 @@ export function SocketProvider({ children }) {
         });
 
         s.on("connect", () => {
-          if (active) setSocket(s);
+          if (!active) return;
+          setSocket(s);
+          setIsConnected(true);
+          if (hasConnectedOnceRef.current) {
+            // Successful reconnect after a prior disconnect — distinct from first connect
+            setReconnectNonce((n) => n + 1);
+          } else {
+            hasConnectedOnceRef.current = true;
+          }
         });
         s.on("disconnect", () => {
-          if (active) setSocket(null);
+          if (!active) return;
+          setIsConnected(false);
+          // Keep socket instance (don't null it) so consumers can keep listeners
+          // and we can distinguish mid-reconnect (isConnected false, socket non-null)
+          // from never-connected. Consumers should use isConnected, not Boolean(socket).
         });
       });
     };
@@ -93,11 +108,12 @@ export function SocketProvider({ children }) {
       if (s) s.disconnect();
       socketRef.current = null;
       setSocket(null);
+      setIsConnected(false);
     };
   }, []);
 
   return (
-    <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>
+    <SocketContext.Provider value={{ socket, isConnected, reconnectNonce }}>{children}</SocketContext.Provider>
   );
 }
 

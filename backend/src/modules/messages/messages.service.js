@@ -79,8 +79,32 @@ async function assertDmNotBlocked(conversation, userId) {
   }
 }
 
-export async function listMessages({ conversationId, userId, cursor, around, limit }) {
+export async function listMessages({ conversationId, userId, cursor, around, after, limit }) {
   await assertMembership(conversationId, userId);
+
+  // Catch-up fetch: messages newer than `after` (for reconnect gap-fill).
+  // Reuses cursor infrastructure but traverses forward (ascending) and caps at limit.
+  if (after) {
+    if (!mongoose.Types.ObjectId.isValid(after)) {
+      throw badRequest("Invalid after message id", "INVALID_CURSOR");
+    }
+    const anchorMsg = await Message.findById(after).select("createdAt conversationId");
+    if (!anchorMsg) {
+      throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+    }
+    if (anchorMsg.conversationId.toString() !== String(conversationId)) {
+      throw badRequest("Message is not in this conversation", "INVALID_MESSAGE");
+    }
+    const docs = await Message.find({
+      conversationId,
+      createdAt: { $gt: anchorMsg.createdAt },
+    })
+      .sort({ createdAt: 1 })
+      .limit(limit)
+      .lean();
+    const messages = docs.map((m) => publicMessage(m));
+    return { messages, nextCursor: null };
+  }
 
   // Anchor-based fetch: return a page of messages centered around `around`.
   // Used by jump-to-message from search results.

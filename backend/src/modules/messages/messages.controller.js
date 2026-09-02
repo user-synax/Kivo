@@ -11,12 +11,13 @@ import {
 import * as messagesService from "./messages.service.js";
 
 export const listMessages = asyncHandler(async (req, res) => {
-  const { cursor, around, limit } = parseQuery(listMessagesQuerySchema, req.query);
+  const { cursor, around, after, limit } = parseQuery(listMessagesQuerySchema, req.query);
   const result = await messagesService.listMessages({
     conversationId: req.params.id,
     userId: req.user.userId,
     cursor,
     around,
+    after,
     limit,
   });
   res.status(200).json({ success: true, data: result });

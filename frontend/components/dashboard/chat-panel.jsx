@@ -206,7 +206,7 @@ function receiptState(message, userId, otherId) {
 }
 
 export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate, isOffline, highlightMessageId, onHighlightCleared }) {
-  const socket = useSocket();
+  const { socket, reconnectNonce } = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
 
@@ -245,6 +245,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   };
 
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -612,6 +614,56 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       .catch(() => {})
       .finally(() => setLoadingHistory(false));
   };
+
+  // Reconnect catch-up: fetch messages newer than the newest known message
+  // via the `after` cursor and merge through the same reconcile path. Once
+  // per successful reconnect (reconnectNonce), not per retry. Fails silently.
+  useEffect(() => {
+    if (reconnectNonce === 0) return;
+    if (!convId) return;
+    const msgs = messagesRef.current || [];
+    // Find newest real message id (skip optimistic tempIds)
+    const lastReal = [...msgs].reverse().find((m) => m?.id && !String(m.id).startsWith("t_"));
+    const afterId = lastReal?.id;
+    if (!afterId) return;
+    apiGet(`/api/v1/conversations/${convId}/messages?after=${afterId}&limit=100`)
+      .then((data) => {
+        const incoming = data?.messages || [];
+        if (!incoming.length) return;
+        setMessages((prev) => {
+          let next = [...prev];
+          for (const msg of incoming) {
+            const byId = next.findIndex((m) => m.id === msg.id);
+            if (byId >= 0) {
+              next[byId] = { ...next[byId], ...msg, status: "sent" };
+              continue;
+            }
+            if (msg.senderId === userId) {
+              const t = next.findIndex(
+                (m) =>
+                  m.tempId &&
+                  m.senderId === userId &&
+                  m.content === msg.content &&
+                  (m.status === "sending" || m.status === "failed"),
+              );
+              if (t >= 0) {
+                next[t] = { ...msg, status: "sent" };
+                continue;
+              }
+            }
+            next.push({ ...msg, status: "sent" });
+          }
+          // Keep chronological order; incoming is already ascending, but sort defensively
+          next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+          return next;
+        });
+        // Persist gap-filled messages to IDB cache via same pipeline as live events
+        for (const m of incoming) {
+          if (m?.id) mergeCachedMessage(convId, m).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [reconnectNonce, convId, userId]);
 
   // Realtime event wiring for this conversation.
   // biome-ignore lint/correctness/useExhaustiveDependencies: chat-panel rebuilds sender/name helpers per conversation; the effect re-subscribes on convId/userId.

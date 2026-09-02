@@ -400,8 +400,8 @@ export function DashboardShell() {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [panelDragDisabled, setPanelDragDisabled] = useState(false);
   const [lastActiveByUser, setLastActiveByUser] = useState({});
-  const socket = useSocket();
-  const isOffline = useOfflineStatus(socket);
+  const { socket, isConnected, reconnectNonce } = useSocket();
+  const isOffline = useOfflineStatus(isConnected);
   // Search overlay state
   const [searchOpen, setSearchOpen] = useState(false);
   // Message highlight state: when a search result is clicked, we store the
@@ -729,6 +729,21 @@ export function DashboardShell() {
       active = false;
     };
   }, [loadConversations]);
+
+  // Reconnect catch-up: refresh conversation list so unread counts,
+  // lastMessageAt and previews correct themselves for conversations that
+  // received messages while disconnected. Runs once per successful reconnect,
+  // not on every backoff retry. Fails silently — next reconnect will retry.
+  useEffect(() => {
+    if (reconnectNonce === 0) return;
+    loadConversations()
+      .then((list) => {
+        setConversations(list);
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, list).catch(() => {});
+      })
+      .catch(() => {});
+  }, [reconnectNonce, loadConversations]);
 
   // Load the "other" participant's full profile whenever the open DM changes,
   // so the right-hand detail panel stays in sync. Group conversations have no
