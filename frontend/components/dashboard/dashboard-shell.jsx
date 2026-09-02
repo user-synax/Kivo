@@ -329,6 +329,7 @@ export function DashboardShell() {
   const chatSwipeIgnoreRef = useRef(false);
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [panelDragDisabled, setPanelDragDisabled] = useState(false);
+  const [lastActiveByUser, setLastActiveByUser] = useState({});
   const socket = useSocket();
   const isOffline = useOfflineStatus(socket);
   // Search overlay state
@@ -760,19 +761,35 @@ export function DashboardShell() {
       }
     };
 
-    const onPresence = (userId, online) => {
+    const onPresence = (payload, online) => {
+      const userId = payload?.userId;
+      const lastActiveAt = payload?.lastActiveAt;
       if (!userId) return;
+      if (lastActiveAt) {
+        setLastActiveByUser((prev) => ({ ...prev, [userId]: lastActiveAt }));
+      } else if (!online) {
+        // offline without timestamp — assume now
+        setLastActiveByUser((prev) => ({ ...prev, [userId]: new Date().toISOString() }));
+      }
       setConversations((prev) =>
         prev.map((c) => {
-          const other = otherParticipant(c, currentUser?.id);
-          if (other && other.id === userId) {
-            const others = c.otherParticipantIds || [];
-            const onlineArr = others.map((id) =>
-              id === userId ? online : c.online?.[others.indexOf(id)],
-            );
-            return { ...c, online: onlineArr };
+          let patched = c;
+          // patch participants lastActiveAt if present
+          const pIdx = (c.participants || []).findIndex((p) => (p.id || p._id || p).toString() === userId.toString());
+          if (pIdx >= 0 && lastActiveAt) {
+            const newParts = [...c.participants];
+            newParts[pIdx] = { ...newParts[pIdx], lastActiveAt };
+            patched = { ...patched, participants: newParts };
           }
-          return c;
+          const other = otherParticipant(patched, currentUser?.id);
+          if (other && other.id === userId) {
+            const others = patched.otherParticipantIds || [];
+            const onlineArr = others.map((id) =>
+              id === userId ? online : patched.online?.[others.indexOf(id)],
+            );
+            return { ...patched, online: onlineArr };
+          }
+          return patched;
         }),
       );
     };
@@ -791,8 +808,8 @@ export function DashboardShell() {
     };
 
     socket.on("message:new", onNew);
-    socket.on("presence:online", (p) => onPresence(p?.userId, true));
-    socket.on("presence:offline", (p) => onPresence(p?.userId, false));
+    socket.on("presence:online", (p) => onPresence(p, true));
+    socket.on("presence:offline", (p) => onPresence(p, false));
     socket.on("presence:snapshot", onSnapshot);
 
     // Group membership / settings changes pushed from the server. These keep the
@@ -1124,6 +1141,13 @@ export function DashboardShell() {
       ? Boolean(selected.online[0])
       : Boolean(selected.online)
     : false;
+  const selectedOtherLastActive =
+    selectedOtherId
+      ? lastActiveByUser[selectedOtherId] ||
+        selected?.participants?.find((p) => (p.id || p._id || p).toString() === selectedOtherId)?.lastActiveAt ||
+        otherProfile?.lastActiveAt ||
+        null
+      : null;
   const showUserPanel = Boolean(
     selected && selected.type === "dm" && selectedOtherId,
   );
@@ -1502,6 +1526,7 @@ export function DashboardShell() {
             profile={otherProfile}
             loading={otherLoading}
             online={selectedOtherOnline}
+            lastActiveAt={selectedOtherLastActive}
             conversationCreatedAt={selected?.createdAt}
             conversation={selected}
             onConversationUpdate={upsertConversation}

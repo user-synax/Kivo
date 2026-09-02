@@ -134,9 +134,11 @@ export function initSocket(server) {
 
     // Presence: announce first-connection online status to mutual participants.
     const becameOnline = markOnline(userId, socket.id);
+    // Keep lastActiveAt fresh while online (fire-and-forget)
+    User.findByIdAndUpdate(userId, { lastActiveAt: new Date() }).catch(() => {});
     if (becameOnline) {
       // Notify other participants in this user's conversations.
-      socket.broadcast.emit("presence:online", { userId });
+      socket.broadcast.emit("presence:online", { userId, lastActiveAt: new Date().toISOString() });
     }
 
     // Push the current online state of this user's peers directly to the
@@ -201,10 +203,14 @@ export function initSocket(server) {
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       const becameOffline = markOffline(userId, socket.id);
       if (becameOffline) {
-        socket.broadcast.emit("presence:offline", { userId });
+        const now = new Date();
+        try {
+          await User.findByIdAndUpdate(userId, { lastActiveAt: now });
+        } catch {}
+        socket.broadcast.emit("presence:offline", { userId, lastActiveAt: now.toISOString() });
         // Clear focused state when last socket disconnects — user is no longer viewing anything
         focusedConversationByUser.delete(userId);
       }

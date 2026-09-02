@@ -5,13 +5,15 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { apiDelete, apiPost } from "@/lib/api";
+import { useLiveLastActive } from "@/lib/last-active";
 
 // Online / Offline status label — reuses the transitions-dev text-swap: the
 // keyed span remounts on change so it blur-rises in (reduced-motion safe).
-function StatusText({ online }) {
+function StatusText({ online, lastActiveAt }) {
+  const label = useLiveLastActive(lastActiveAt, online);
   return (
-    <span key={online ? "on" : "off"} className="t-text-swap">
-      {online ? "Online" : "Offline"}
+    <span key={label} className="t-text-swap">
+      {label}
     </span>
   );
 }
@@ -37,7 +39,7 @@ function formatJoined(iso) {
 
 const EASE = [0.22, 1, 0.36, 1];
 
-export function UserPanel({ profile, loading, online, conversationCreatedAt, conversation, onConversationUpdate }) {
+export function UserPanel({ profile, loading, online, lastActiveAt, conversationCreatedAt, conversation, onConversationUpdate }) {
   const reduce = useReducedMotion();
   const [blockBusy, setBlockBusy] = useState(false);
   const isBlockedByMe = Boolean(conversation?.isBlockedByMe);
@@ -155,7 +157,7 @@ export function UserPanel({ profile, loading, online, conversationCreatedAt, con
             <span
               className={`size-2 rounded-full ${online ? "bg-[var(--online)]" : "bg-[var(--color-stone)]"}`}
             />
-            <StatusText online={online} />
+            <StatusText online={online} lastActiveAt={lastActiveAt || profile?.lastActiveAt} />
           </div>
         </motion.div>
 

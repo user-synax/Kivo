@@ -30,6 +30,16 @@ export function authenticate(req, res, next) {
     }
 
     req.user = { userId: payload.userId, sessionId: payload.sessionId };
+    // Touch lastActiveAt — throttled to once per minute to avoid DB spam
+    try {
+      if (!global._lastActiveTouch) global._lastActiveTouch = new Map();
+      const now = Date.now();
+      const last = global._lastActiveTouch.get(payload.userId);
+      if (!last || now - last > 60000) {
+        global._lastActiveTouch.set(payload.userId, now);
+        User.findByIdAndUpdate(payload.userId, { lastActiveAt: new Date(now) }).catch(() => {});
+      }
+    } catch {}
     next();
   } catch (err) {
     next(err);

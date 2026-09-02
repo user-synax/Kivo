@@ -31,6 +31,7 @@ function normalizeParticipant(p) {
     email: populated ? (p.email ?? null) : null,
     avatarStyle: populated ? (p.avatarStyle ?? null) : null,
     avatarUrl: populated ? (p.avatarUrl ?? null) : null,
+    lastActiveAt: populated && p.lastActiveAt ? new Date(p.lastActiveAt).toISOString() : null,
   };
 }
 
@@ -129,7 +130,7 @@ export async function createOrGetDm({ userId, participantId }) {
   const existing = await Conversation.findOne({
     type: "dm",
     participants: { $all: [userId, participantId] },
-  }).populate("participants", "id displayName username email avatarStyle avatarUrl");
+  }).populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt");
   if (existing) {
     return publicConversation(existing, userId, onlineSnapshot(), blockFlags);
   }
@@ -138,7 +139,7 @@ export async function createOrGetDm({ userId, participantId }) {
     type: "dm",
     participants: [userId, participantId],
   });
-  await created.populate("participants", "id displayName username email avatarStyle avatarUrl");
+  await created.populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt");
 
   // Join both users' live sockets to the room immediately.
   joinUserToRoom(userId, created._id.toString());
@@ -152,7 +153,7 @@ export async function createOrGetDm({ userId, participantId }) {
 export async function listConversations({ userId }) {
   const conversations = await Conversation.find({ participants: userId })
     .sort({ lastMessageAt: -1, createdAt: -1 })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
     .populate("admins", "id")
     .lean();
 
@@ -268,7 +269,7 @@ export async function createGroup({ userId, name, participantIds, avatar }) {
     avatarUrl,
     avatarFileId,
   });
-  await created.populate("participants", "id displayName username email avatarStyle avatarUrl");
+  await created.populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt");
   await created.populate("admins", "id");
 
   // Join every member's live sockets so they receive the new thread.
@@ -315,7 +316,7 @@ export async function updateGroup({ conversationId, userId, name, avatar }) {
   const updated = await Conversation.findByIdAndUpdate(conversationId, update, {
     new: true,
   })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
     .populate("admins", "id")
     .lean();
 
@@ -351,7 +352,7 @@ export async function addMembers({ conversationId, userId, memberIds }) {
     { $addToSet: { participants: { $each: toAdd } } },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
     .populate("admins", "id")
     .lean();
 
@@ -419,7 +420,7 @@ export async function removeMember({ conversationId, userId, targetUserId }) {
     },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
     .populate("admins", "id")
     .lean();
 
@@ -479,7 +480,7 @@ export async function promoteMember({ conversationId, userId, targetUserId }) {
     { $addToSet: { admins: targetUserId } },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
     .populate("admins", "id")
     .lean();
 
@@ -513,7 +514,7 @@ export async function demoteMember({ conversationId, userId, targetUserId }) {
     { $pull: { admins: targetUserId } },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
     .populate("admins", "id")
     .lean();
 

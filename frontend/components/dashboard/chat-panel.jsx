@@ -25,6 +25,7 @@ import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { useFileUpload } from "@/lib/use-file-upload";
 import { UploadPreview, AttachmentBubble } from "@/components/chat/attachments";
+import { useLiveLastActive } from "@/lib/last-active";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -132,10 +133,12 @@ function SwipeToReply({ children, onReply, enabled }) {
 
 // Online / Offline status label — uses the transitions-dev text-states-swap:
 // the keyed span remounts on change so it blur-rises in (reduced-motion safe).
-function StatusText({ online }) {
+// When offline shows "active X min/hour/day ago" and ticks live every minute.
+function StatusText({ online, lastActiveAt }) {
+  const label = useLiveLastActive(lastActiveAt, online);
   return (
-    <span key={online ? "on" : "off"} className="t-text-swap">
-      {online ? "Online" : "Offline"}
+    <span key={label} className="t-text-swap">
+      {label}
     </span>
   );
 }
@@ -257,6 +260,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
   // Live online presence tracking set
   const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [lastActiveByUser, setLastActiveByUser] = useState({});
 
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
@@ -346,6 +350,15 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       }
     }
     setOnlineUsers(nextSet);
+    // seed lastActive from participants payload
+    const seeded = {};
+    for (const p of conversation?.participants || []) {
+      const pid = (p.id || p._id || p)?.toString?.();
+      if (pid && p.lastActiveAt) seeded[pid] = p.lastActiveAt;
+    }
+    if (Object.keys(seeded).length) {
+      setLastActiveByUser((prev) => ({ ...prev, ...seeded }));
+    }
   }, [conversation, online, otherId, isGroup, isChannel]);
 
   useEffect(() => {
@@ -353,6 +366,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     const onOnline = (p) => {
       if (p?.userId) {
         setOnlineUsers((prev) => new Set(prev).add(p.userId.toString()));
+        if (p.lastActiveAt) {
+          setLastActiveByUser((prev) => ({ ...prev, [p.userId.toString()]: p.lastActiveAt }));
+        }
       }
     };
     const onOffline = (p) => {
@@ -362,6 +378,11 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           next.delete(p.userId.toString());
           return next;
         });
+        if (p.lastActiveAt) {
+          setLastActiveByUser((prev) => ({ ...prev, [p.userId.toString()]: p.lastActiveAt }));
+        } else {
+          setLastActiveByUser((prev) => ({ ...prev, [p.userId.toString()]: new Date().toISOString() }));
+        }
       }
     };
     socket.on("presence:online", onOnline);
@@ -657,10 +678,17 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       if (p.conversationId === convId && p.userId !== userId) setTyping(false);
     };
     const onOnline = (p) => {
-      if (p?.userId === otherId) setOtherOnline(true);
+      if (p?.userId === otherId) {
+        setOtherOnline(true);
+        if (p.lastActiveAt) setLastActiveByUser((prev) => ({ ...prev, [otherId]: p.lastActiveAt }));
+      }
     };
     const onOffline = (p) => {
-      if (p?.userId === otherId) setOtherOnline(false);
+      if (p?.userId === otherId) {
+        setOtherOnline(false);
+        const ts = p.lastActiveAt || new Date().toISOString();
+        setLastActiveByUser((prev) => ({ ...prev, [otherId]: ts }));
+      }
     };
 
     // Wrap reconcile so it also persists the updated message to IDB cache
@@ -933,7 +961,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             {isGroup || isChannel ? (
               <span>{conversation.participants?.length || 0} members{isChannel ? " • Space channel" : ""}</span>
             ) : (
-              <StatusText online={otherOnline} />
+              <StatusText online={otherOnline} lastActiveAt={lastActiveByUser[otherId] || other?.lastActiveAt || null} />
             )}
           </p>
         </div>

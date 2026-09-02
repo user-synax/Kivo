@@ -11,6 +11,8 @@ import { getIO } from "../../socket/index.js";
 // Public user shape returned in search/friend results and self profile.
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
+  const io = getIO();
+  const online = io?.isUserOnline ? io.isUserOnline(u._id.toString()) : false;
   return {
     id: u._id.toString(),
     displayName: u.displayName || null,
@@ -22,6 +24,8 @@ function publicUser(user) {
     avatarUrl: u.avatarUrl || null,
     banner: u.banner || null,
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
+    lastActiveAt: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
+    online,
   };
 }
 
@@ -49,7 +53,7 @@ export async function searchUsers({ userId, q }) {
     _id: { $ne: userId },
     $or: [{ username: regex }, { email: regex }, { displayName: regex }],
   })
-    .select("displayName username email")
+    .select("displayName username email lastActiveAt")
     .limit(20)
     .lean();
 
@@ -65,7 +69,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner role createdAt",
+    "displayName username email bio status avatarStyle avatarUrl banner role createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -77,7 +81,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner role createdAt",
+    "displayName username email bio status avatarStyle avatarUrl banner role createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -87,6 +91,8 @@ export async function getUserById({ otherId }) {
 // Explicitly omits email, role, avatarFileId, passwordHash.
 function publicProfile(user) {
   const u = user.toObject ? user.toObject() : user;
+  const io = getIO();
+  const online = io?.isUserOnline ? io.isUserOnline(u._id.toString()) : false;
   return {
     id: u._id.toString(),
     username: u.username || null,
@@ -97,12 +103,14 @@ function publicProfile(user) {
     bio: u.bio || null,
     status: u.status || null,
     joinedAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
+    lastActiveAt: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
+    online,
   };
 }
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status avatarStyle avatarUrl banner createdAt blockedUsers",
+    "displayName username bio status avatarStyle avatarUrl banner createdAt blockedUsers lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
