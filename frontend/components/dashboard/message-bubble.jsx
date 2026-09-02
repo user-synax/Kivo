@@ -1,8 +1,8 @@
 "use client";
 
 import { Check, CheckCheck, FaceGrinning, Pencil, Reply, Trash } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
   ContextMenu,
@@ -121,17 +121,98 @@ export function MessageBubble({
   const editRef = useRef(null);
   const [pressing, setPressing] = useState(false);
   const [likeAnimKey, setLikeAnimKey] = useState(0);
+  const reduceMotion = useReducedMotion();
+
+  // --- Double-click / double-tap like — optimized ---
+  const lastTapRef = useRef(0);
+  const likeStartRef = useRef(null);
+  const likeCooldownRef = useRef(0);
+  const animTimerRef = useRef(null);
+  const tapResetTimerRef = useRef(null);
 
   useEffect(() => {
     if (isEditing) editRef.current?.focus();
   }, [isEditing]);
 
-  const handleDoubleClickLike = () => {
-    if (!isMobile || deleted || isEditing) return;
+  // cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (animTimerRef.current) clearTimeout(animTimerRef.current);
+      if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+    };
+  }, []);
+
+  const triggerLike = useCallback(() => {
+    if (deleted || isEditing) return;
+    const now = Date.now();
+    // throttle: ignore if liked < 500ms ago (spam / accidental triple tap)
+    if (now - likeCooldownRef.current < 500) return;
+    likeCooldownRef.current = now;
+
     if (navigator.vibrate) navigator.vibrate(20);
+
+    // restart heart pop animation — auto-hide after 850ms for clean exit
     setLikeAnimKey((k) => k + 1);
+    if (animTimerRef.current) clearTimeout(animTimerRef.current);
+    animTimerRef.current = setTimeout(() => setLikeAnimKey(0), 850);
+
     onReact?.("❤️");
-  };
+  }, [deleted, isEditing, onReact]);
+
+  const handleDoubleClick = useCallback(
+    (e) => {
+      // Prevent the browser's word-selection on double-click
+      if (window.getSelection) {
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) sel.removeAllRanges();
+      }
+      // Don't double-like when interacting with nested controls (e.g. mention token)
+      if (e.target.closest?.("a, button")) return;
+      e.preventDefault();
+      triggerLike();
+    },
+    [triggerLike]
+  );
+
+  const handleLikeTouchStart = useCallback((e) => {
+    const t = e.touches?.[0];
+    if (t) likeStartRef.current = { x: t.clientX, y: t.clientY };
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e) => {
+      if (deleted || isEditing) return;
+      // ignore swipes / scrolls — only taps should trigger like
+      const endT = e.changedTouches?.[0];
+      if (likeStartRef.current && endT) {
+        const dx = Math.abs(endT.clientX - likeStartRef.current.x);
+        const dy = Math.abs(endT.clientY - likeStartRef.current.y);
+        if (dx > 10 || dy > 10) {
+          lastTapRef.current = 0;
+          likeStartRef.current = null;
+          return;
+        }
+      }
+      likeStartRef.current = null;
+      const now = Date.now();
+      const delta = now - lastTapRef.current;
+      if (delta > 0 && delta < 300) {
+        // double-tap detected
+        if (e.cancelable) e.preventDefault();
+        lastTapRef.current = 0;
+        if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+        if (e.target.closest?.("a, button")) return;
+        triggerLike();
+      } else {
+        lastTapRef.current = now;
+        if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+        tapResetTimerRef.current = setTimeout(() => {
+          lastTapRef.current = 0;
+        }, 350);
+      }
+    },
+    [deleted, isEditing, triggerLike]
+  );
 
   // Sent messages use the primary (accent) bubble, received use the secondary.
   const bubbleVariant = variant ?? (mine ? "default" : "secondary");
@@ -143,98 +224,119 @@ export function MessageBubble({
           variant={bubbleVariant}
           align={mine ? "end" : "start"}
           className={cn(
-            "group/bubble relative transition-transform will-change-transform",
+            "group/bubble relative transition-transform will-change-transform select-text touch-manipulation",
             pressing && "scale-[0.98]",
             isReplying && "border-l-2 border-[var(--accent)]",
-            className,
+            className
           )}
           style={{ transitionTimingFunction: EASE_OUT_CSS }}
           onPointerDown={() => setPressing(true)}
           onPointerUp={() => setPressing(false)}
           onPointerLeave={() => setPressing(false)}
           onPointerCancel={() => setPressing(false)}
-          onDoubleClick={handleDoubleClickLike}
+          onDoubleClick={handleDoubleClick}
+          onTouchStart={handleLikeTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
-        <BubbleContent className={cn("min-w-0", contentClassName)}>
-          {replyTo ? (
-            <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10">
-              <span className="block truncate text-[11px] font-semibold text-[var(--accent)]">
-                {replyTo.senderName}
-              </span>
-              <span className="block break-words text-[12px] leading-snug text-[var(--text-muted)] [overflow-wrap:anywhere]">
-                {replyTo.content}
-              </span>
-            </div>
-          ) : null}
-          {isEditing ? (
-            <textarea
-              value={editText}
-              onChange={(e) => onEditTextChange?.(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  onSaveEdit?.();
-                }
-                if (e.key === "Escape") onCancelEdit?.();
-              }}
-              className="w-full resize-none bg-transparent text-sm text-current focus:outline-none"
-              rows={2}
-              ref={editRef}
-            />
-          ) : deleted ? (
-            <span className="opacity-20 bg-transparent bg-red-800">This message was deleted</span>
-          ) : (
-            <>
-              <MessageContent
-                content={message.content}
-                mentions={message.mentions}
-                participants={participants}
-                isUserOnline={isUserOnline}
-                onOpenProfile={onOpenProfile}
+          <BubbleContent className={cn("min-w-0", contentClassName)}>
+            {replyTo ? (
+              <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10">
+                <span className="block truncate text-[11px] font-semibold text-[var(--accent)]">
+                  {replyTo.senderName}
+                </span>
+                <span className="block break-words text-[12px] leading-snug text-[var(--text-muted)] [overflow-wrap:anywhere]">
+                  {replyTo.content}
+                </span>
+              </div>
+            ) : null}
+            {isEditing ? (
+              <textarea
+                value={editText}
+                onChange={(e) => onEditTextChange?.(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSaveEdit?.();
+                  }
+                  if (e.key === "Escape") onCancelEdit?.();
+                }}
+                className="w-full resize-none bg-transparent text-sm text-current focus:outline-none"
+                rows={2}
+                ref={editRef}
               />
-              <AttachmentBubble attachments={message.attachments} />
-            </>
-          )}
-        </BubbleContent>
-
-        <AnimatePresence>
-          {likeAnimKey > 0 && (
-            <motion.div
-              key={likeAnimKey}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 1] }}
-              exit={{ scale: 1.4, opacity: 0 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="pointer-events-none absolute inset-0 flex items-center justify-center"
-            >
-              <span className="select-none text-5xl drop-shadow-lg" aria-hidden="true">
-                ❤️
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Reaction picker */}
-        {reactionOpen && (
-          <div
-            className={cn(
-              "absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
-              mine ? "right-0" : "left-0",
+            ) : deleted ? (
+              <span className="opacity-20 bg-transparent bg-red-800">This message was deleted</span>
+            ) : (
+              <>
+                <MessageContent
+                  content={message.content}
+                  mentions={message.mentions}
+                  participants={participants}
+                  isUserOnline={isUserOnline}
+                  onOpenProfile={onOpenProfile}
+                />
+                <AttachmentBubble attachments={message.attachments} />
+              </>
             )}
-          >
-            {REACTION_EMOJIS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => onReact?.(e)}
-                className="rounded px-1 text-base transition-colors hover:bg-[var(--hover)]"
+          </BubbleContent>
+
+          <AnimatePresence>
+            {likeAnimKey > 0 && (
+              <motion.div
+                key={likeAnimKey}
+                initial={reduceMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }}
+                animate={
+                  reduceMotion
+                    ? { opacity: 1 }
+                    : { scale: [0, 1.25, 1], opacity: [0, 1, 1] }
+                }
+                exit={
+                  reduceMotion
+                    ? { opacity: 0 }
+                    : { scale: 1.4, opacity: 0, filter: "blur(2px)" }
+                }
+                transition={
+                  reduceMotion
+                    ? { duration: 0.15 }
+                    : { duration: 0.55, ease: [0.16, 1, 0.3, 1] }
+                }
+                className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                style={{ willChange: "transform, opacity" }}
+                aria-hidden="true"
               >
-                {e}
-              </button>
-            ))}
-          </div>
-        )}
-      </Bubble>
+                <span
+                  className={cn(
+                    "select-none text-5xl drop-shadow-[0_4px_12px_rgba(244,0,81,0.35)]",
+                    !reduceMotion && "animate-[t-like-heart-pop_550ms_cubic-bezier(0.34,1.56,0.64,1)]"
+                  )}
+                >
+                  ❤️
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Reaction picker */}
+          {reactionOpen && (
+            <div
+              className={cn(
+                "absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
+                mine ? "right-0" : "left-0"
+              )}
+            >
+              {REACTION_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => onReact?.(e)}
+                  className="rounded px-1 text-base transition-colors hover:bg-[var(--hover)]"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+        </Bubble>
       </ContextMenuTrigger>
 
       <ContextMenuContent ariaLabel="Message actions">
@@ -269,14 +371,14 @@ export function MessageBubble({
         <div
           className={cn(
             "mt-1 flex max-w-[78%] flex-wrap gap-1",
-            mine ? "justify-end" : "justify-start",
+            mine ? "justify-end" : "justify-start"
           )}
         >
           {Object.entries(
             message.reactions.reduce((acc, r) => {
               acc[r.emoji] = (acc[r.emoji] || 0) + 1;
               return acc;
-            }, {}),
+            }, {})
           ).map(([emoji, count]) => (
             <button
               key={emoji}
@@ -296,26 +398,13 @@ export function MessageBubble({
           <span>{formatTime(message.createdAt)}</span>
           {message.isEdited && <span>· edited</span>}
           {message.status === "failed" && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="text-[var(--accent)] hover:underline"
-            >
+            <button type="button" onClick={onRetry} className="text-[var(--accent)] hover:underline">
               failed · retry
             </button>
           )}
-          {receipt === "sent" && (
-            <Check className="h-3 w-3" aria-label="Sent" />
-          )}
-          {receipt === "delivered" && (
-            <CheckCheck className="h-3 w-3" aria-label="Delivered" />
-          )}
-          {receipt === "read" && (
-            <CheckCheck
-              className="h-3 w-3 text-[var(--accent)]"
-              aria-label="Read"
-            />
-          )}
+          {receipt === "sent" && <Check className="h-3 w-3" aria-label="Sent" />}
+          {receipt === "delivered" && <CheckCheck className="h-3 w-3" aria-label="Delivered" />}
+          {receipt === "read" && <CheckCheck className="h-3 w-3 text-[var(--accent)]" aria-label="Read" />}
         </div>
       )}
     </ContextMenu>

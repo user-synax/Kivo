@@ -44,6 +44,14 @@ const env = {
   vapidPrivateKey: required("VAPID_PRIVATE_KEY", process.env.VAPID_PRIVATE_KEY),
   vapidSubject: required("VAPID_SUBJECT", process.env.VAPID_SUBJECT),
 
+  // Gmail SMTP for transactional email (verification, password reset, etc.).
+  gmailUser: process.env.GMAIL_USER || "",
+  gmailAppPassword: process.env.GMAIL_APP_PASSWORD || "",
+  emailFrom: process.env.EMAIL_FROM || "",
+
+  // Frontend base URL for building email verification / reset links.
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+
   // Admin panel — standalone credential pair, NOT a DB user account.
   adminEmail: process.env.ADMIN_EMAIL || "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",

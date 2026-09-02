@@ -33,37 +33,75 @@ const GROUP_WINDOW_MS = 60000;
 function SwipeToReply({ children, onReply, enabled }) {
   const [offset, setOffset] = useState(0);
   const startRef = useRef(null);
+  const lockRef = useRef(null); // null | 'h' | 'v'
 
   if (!enabled) return children;
 
   const onTouchStart = (e) => {
     const t = e.touches[0];
+    if (!t) return;
     startRef.current = { x: t.clientX, y: t.clientY };
+    lockRef.current = null;
   };
   const onTouchMove = (e) => {
     if (!startRef.current) return;
     const t = e.touches[0];
+    if (!t) return;
     const dx = t.clientX - startRef.current.x;
     const dy = t.clientY - startRef.current.y;
-    if (Math.abs(dy) > Math.abs(dx)) return;
-    if (dx > 0 && dx < 80) setOffset(dx);
+
+    // direction lock — decide once
+    if (lockRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        lockRef.current = "v";
+        return;
+      }
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+        lockRef.current = "h";
+      } else {
+        return;
+      }
+    }
+    if (lockRef.current === "v") return;
+
+    // horizontal swipe — only right swipe triggers reply
+    if (dx > 0) {
+      // prevent parent panel drag / browser back swipe and keep scroll locked
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      const clamped = Math.max(0, Math.min(dx, 80));
+      setOffset(clamped);
+    } else {
+      // left swipe on bubble — don't show reply affordance, let it stay at 0
+      setOffset(0);
+    }
   };
-  const onTouchEnd = () => {
+  const onTouchEnd = (e) => {
     if (!startRef.current) return;
-    if (offset > 45) {
+    const shouldReply = offset > 45 && lockRef.current === "h";
+    if (shouldReply) {
+      e.stopPropagation();
       onReply();
       if (navigator.vibrate) navigator.vibrate(20);
     }
     setOffset(0);
     startRef.current = null;
+    lockRef.current = null;
+  };
+  const onTouchCancel = () => {
+    setOffset(0);
+    startRef.current = null;
+    lockRef.current = null;
   };
 
   return (
     <div
-      className="relative w-full"
+      className="relative w-full touch-pan-y"
+      style={{ touchAction: "pan-y" }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
     >
       <div
         className="absolute inset-y-0 left-1 flex items-center"
@@ -867,9 +905,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         };
 
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)]">
-      {/* Header */}
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] px-4">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] max-md:isolate">
+      {/* Header — keep visible on mobile when keyboard opens (sticky + bg) */}
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0">
         {onBack && (
           <button
             type="button"
@@ -975,7 +1013,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           onScroll={(e) => {
             if (e.currentTarget.scrollTop <= 8) loadOlder();
           }}
-          className="t-scroll mt-12 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4" style={{ overscrollBehavior: "contain" }}
+          className="t-scroll flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12" style={{ overscrollBehavior: "contain" }}
         >
         {loadingHistory && (
           <p className="py-2 text-center text-[12px] text-[var(--text-muted)]">

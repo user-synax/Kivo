@@ -1,6 +1,12 @@
 import env, { refreshTtlSeconds } from "../../config/env.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
-import { parseBody, registerSchema, loginSchema } from "./auth.validation.js";
+import {
+  parseBody,
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./auth.validation.js";
 import * as authService from "./auth.service.js";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
@@ -30,6 +36,8 @@ function deviceInfoFrom(req) {
     ip: req.ip || req.socket?.remoteAddress || null,
   };
 }
+
+// ── Existing routes ─────────────────────────────────────────────────────────
 
 export const register = asyncHandler(async (req, res) => {
   const data = parseBody(registerSchema, req.body);
@@ -84,4 +92,36 @@ export const logoutAll = asyncHandler(async (req, res) => {
   await authService.logoutAllSessions({ userId: req.user.userId });
   clearRefreshCookie(res);
   res.status(200).json({ success: true, data: null });
+});
+
+// ── Email verification ──────────────────────────────────────────────────────
+
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const token = req.query.token;
+  const result = await authService.verifyEmail({ token });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const resendVerification = asyncHandler(async (req, res) => {
+  const result = await authService.resendVerification({
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: result });
+});
+
+// ── Password reset ──────────────────────────────────────────────────────────
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const data = parseBody(forgotPasswordSchema, req.body);
+  const result = await authService.forgotPassword({ email: data.email });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const data = parseBody(resetPasswordSchema, req.body);
+  const result = await authService.resetPassword({
+    token: data.token,
+    newPassword: data.newPassword,
+  });
+  res.status(200).json({ success: true, data: result });
 });

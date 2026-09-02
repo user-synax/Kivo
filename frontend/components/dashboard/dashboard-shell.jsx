@@ -39,6 +39,7 @@ import { BottomTabBar } from "./bottom-tab-bar";
 import { Avatar } from "./avatar";
 import { ProfileEditModal } from "./profile-edit-modal";
 import { useTheme } from "@/components/theme-provider";
+import { VerificationBanner } from "@/components/auth/verification-banner";
 
 // Restrained easing — matches the rest of the app (no bounce).
 const EASE = [0.22, 1, 0.36, 1];
@@ -1149,7 +1150,8 @@ export function DashboardShell() {
   // Mobile: native-like fixed viewport — no rubber-band, no back-area scroll
   if (!isDesktop) {
     return (
-      <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+      <div className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+        <VerificationBanner user={currentUser} />
         <AnimatePresence initial={false}>
           {selected ? (
             <motion.div
@@ -1168,7 +1170,10 @@ export function DashboardShell() {
               }}
               onDrag={(_, info) => {
                 if (chatSwipeIgnoreRef.current) return;
-                const p = Math.min(Math.abs(info.offset.x) / 90, 1);
+                // only right swipe (positive) drives back affordance
+                const dx = info.offset.x;
+                if (dx <= 0) return;
+                const p = Math.min(dx / 90, 1);
                 setSwipeProgress(p);
               }}
               onDragEnd={(_, info) => {
@@ -1179,7 +1184,8 @@ export function DashboardShell() {
                 if (wasBubble) return;
                 const offset = info?.offset?.x ?? 0;
                 const velocity = info?.velocity?.x ?? 0;
-                if (Math.abs(offset) > 90 || Math.abs(velocity) > 700) setSelectedId(null);
+                // only right swipe should go back — left swipe is ignored
+                if ((offset > 90 || velocity > 700) && offset > 0) setSelectedId(null);
               }}
               onPointerDown={(e) => {
                 const target = e.target;
@@ -1201,8 +1207,11 @@ export function DashboardShell() {
                   target.closest?.('[data-slot="bubble-content"]') ||
                   target.closest?.('.t-bubble') ||
                   target.closest?.('[data-slot="bubble-group"]');
-                chatSwipeIgnoreRef.current = !!isBubble;
-                setPanelDragDisabled(!!isBubble);
+                // back swipe is edge-only (<=32px from left); bubbles always block back
+                const isEdge = t.clientX <= 32;
+                const shouldIgnore = !!isBubble || !isEdge;
+                chatSwipeIgnoreRef.current = shouldIgnore;
+                setPanelDragDisabled(shouldIgnore);
                 chatSwipeStartRef.current = { x: t.clientX, y: t.clientY };
                 chatSwipeIsHorizontalRef.current = false;
               }}
@@ -1215,10 +1224,13 @@ export function DashboardShell() {
                 if (!chatSwipeIsHorizontalRef.current && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
                   chatSwipeIsHorizontalRef.current = true;
                 }
-                if (chatSwipeIsHorizontalRef.current && Math.abs(dx) > 12) {
+                if (chatSwipeIsHorizontalRef.current && dx > 12) {
                   if (e.cancelable) e.preventDefault();
-                  const p = Math.min(Math.abs(dx) / 90, 1);
+                  const p = Math.min(dx / 90, 1);
                   setSwipeProgress(p);
+                } else if (chatSwipeIsHorizontalRef.current && dx < 0) {
+                  // left swipe on non-bubble edge area — don't drive back progress
+                  setSwipeProgress(0);
                 }
               }}
               onTouchEnd={() => {
@@ -1440,7 +1452,9 @@ export function DashboardShell() {
 
   // Desktop: sidebar + chat side by side.
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-[var(--bg-base)]">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
+      <VerificationBanner user={currentUser} />
+      <div className="flex min-h-0 flex-1">
       <motion.div
         animate={{ width: collapsed ? 76 : 320 }}
         transition={reduce ? { duration: 0 } : { duration: 0.28, ease: EASE }}
@@ -1592,6 +1606,7 @@ export function DashboardShell() {
         }}
       />
 
+      </div>
     </div>
   );
 }
