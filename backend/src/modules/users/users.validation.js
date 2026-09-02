@@ -49,6 +49,7 @@ export const updateMeSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal("")),
+  showBadge: z.boolean().optional(),
 });
 
 export const usernameParamSchema = z.object({

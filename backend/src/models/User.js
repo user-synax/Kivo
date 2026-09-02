@@ -68,6 +68,17 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxlength: 39,
     },
+    // Whether the account has been verified (admin-set or auto-verified).
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    // Whether to display the verified badge on the public profile.
+    // Defaults to true for verified users so the badge is visible immediately.
+    showBadge: {
+      type: Boolean,
+      default: true,
+    },
     // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
     // so the previous file can be deleted on re-upload.
     avatarFileId: {

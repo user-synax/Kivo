@@ -1,10 +1,12 @@
 "use client";
 
-import { Bell, Palette, Shield } from "lucide-react";
+import { Bell, Eye, EyeOff, Palette, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { Switch } from "@/components/ui/switch";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiGet, apiPatch } from "@/lib/api";
+import { getSession, setSession, getToken } from "@/lib/auth";
 
 function SectionCard({ icon: Icon, title, description, children }) {
   return (
@@ -178,11 +180,63 @@ function NotificationsSection() {
   );
 }
 
+function BadgeSection() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const me = getSession();
+    setUser(me);
+    setLoading(false);
+  }, []);
+
+  const handleToggle = async (nextVal) => {
+    if (!user) return;
+    const prev = user.showBadge;
+    setUser((u) => ({ ...u, showBadge: nextVal }));
+    setSaving(true);
+    try {
+      const updated = await apiPatch("/api/v1/users/me", { showBadge: nextVal });
+      setUser(updated);
+      setSession(updated, getToken());
+    } catch {
+      setUser((u) => ({ ...u, showBadge: prev }));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || !user?.verified) return null;
+
+  return (
+    <SectionCard
+      icon={user.showBadge ? Eye : EyeOff}
+      title="Verification badge"
+      description="Control whether the verified badge is shown on your public profile."
+    >
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <VerifiedBadge size="sm" decorative />
+          <span className="text-[13px] font-medium text-[var(--text-primary)]">Show badge</span>
+        </div>
+        <Switch
+          checked={user.showBadge !== false}
+          ariaLabel="Toggle verification badge"
+          disabled={saving}
+          onCheckedChange={handleToggle}
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
 export function SettingsPanel() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-3">
+          <BadgeSection />
           <ThemeSection />
           <SecuritySection />
           <NotificationsSection />

@@ -17,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -460,8 +461,11 @@ export function ProfileContent({
               </span>
             </motion.span>
             <div className="min-w-0 flex-1 pb-1">
-              <h1 className="truncate font-display text-[22px] font-semibold tracking-tight text-[var(--ink)] sm:text-[24px]">
+              <h1 className="flex items-center gap-1.5 truncate font-display text-[22px] font-semibold tracking-tight text-[var(--ink)] sm:text-[24px]">
                 {name}
+                {profile.verified && profile.showBadge !== false && (
+                  <VerifiedBadge size="sm" decorative />
+                )}
               </h1>
               <p className="flex items-center gap-1.5 truncate text-[13px] text-[var(--ink-muted)]">
                 {handle}
