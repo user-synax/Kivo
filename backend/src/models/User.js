@@ -94,6 +94,15 @@ const userSchema = new mongoose.Schema(
     isBanned: { type: Boolean, default: false, index: true },
     bannedAt: { type: Date, default: null },
     bannedReason: { type: String, default: null, maxlength: 500 },
+
+    notificationPreferences: {
+      directMessages: { type: Boolean, default: true },
+      groupMessages: { type: Boolean, default: true },
+      mentions: { type: Boolean, default: true },
+      friendRequests: { type: Boolean, default: true },
+      spaceMessages: { type: Boolean, default: false },
+      announcements: { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

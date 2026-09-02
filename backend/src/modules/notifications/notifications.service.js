@@ -2,10 +2,70 @@ import mongoose from "mongoose";
 import Notification from "../../models/Notification.js";
 import PushSubscription from "../../models/PushSubscription.js";
 import User from "../../models/User.js";
+import Space from "../../models/Space.js";
 import { badRequest } from "../../utils/errors.js";
 import { getIO } from "../../socket/index.js";
 import { emitToUser } from "../../socket/io.js";
 import webpush from "../../config/webpush.js";
+
+const DEFAULT_PREFS = {
+  directMessages: true,
+  groupMessages: true,
+  mentions: true,
+  friendRequests: true,
+  spaceMessages: false,
+  announcements: true,
+};
+
+function resolvePrefs(raw) {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_PREFS };
+  return {
+    directMessages: typeof raw.directMessages === "boolean" ? raw.directMessages : DEFAULT_PREFS.directMessages,
+    groupMessages: typeof raw.groupMessages === "boolean" ? raw.groupMessages : DEFAULT_PREFS.groupMessages,
+    mentions: typeof raw.mentions === "boolean" ? raw.mentions : DEFAULT_PREFS.mentions,
+    friendRequests: typeof raw.friendRequests === "boolean" ? raw.friendRequests : DEFAULT_PREFS.friendRequests,
+    spaceMessages: typeof raw.spaceMessages === "boolean" ? raw.spaceMessages : DEFAULT_PREFS.spaceMessages,
+    announcements: typeof raw.announcements === "boolean" ? raw.announcements : DEFAULT_PREFS.announcements,
+  };
+}
+
+export function getDefaultPreferences() {
+  return { ...DEFAULT_PREFS };
+}
+
+export async function getPreferences({ userId }) {
+  const user = await User.findById(userId).select("notificationPreferences").lean();
+  return resolvePrefs(user?.notificationPreferences);
+}
+
+export async function updatePreferences({ userId, patch }) {
+  const current = await getPreferences({ userId });
+  const next = { ...current };
+  for (const key of Object.keys(DEFAULT_PREFS)) {
+    if (patch[key] !== undefined) next[key] = Boolean(patch[key]);
+  }
+  await User.findByIdAndUpdate(userId, { $set: { notificationPreferences: next } });
+  return next;
+}
+
+async function isAnnouncementChannel(conversation) {
+  if (conversation.type !== "space_channel" || !conversation.spaceId || !conversation.channelId) return false;
+  try {
+    const space = await Space.findById(conversation.spaceId).select("channels").lean();
+    if (!space) return false;
+    const ch = (space.channels || []).find((c) => c._id.toString() === conversation.channelId.toString());
+    return ch?.type === "announcement";
+  } catch {
+    return false;
+  }
+}
+
+function resolveCategory({ convType, isAnnouncement }) {
+  if (convType === "dm") return "directMessages";
+  if (convType === "group") return "groupMessages";
+  if (convType === "space_channel") return isAnnouncement ? "announcements" : "spaceMessages";
+  return "directMessages";
+}
 
 function publicNotification(doc) {
   const obj = doc.toObject ? doc.toObject() : doc;
@@ -79,6 +139,8 @@ async function sendWebPushToUser(recipientId, pushPayload, doc) {
 /**
  * Create notifications for a newly created message.
  * Skips system messages and self-notify. Fans out 1 doc per recipient for group/space.
+ * Preference gate: resolves category and suppresses entirely if category OFF,
+ * unless recipient is @mentioned (mentions override muted category, respects mentions pref).
  */
 export async function createForMessage({ message, conversation }) {
   // Skip system messages
@@ -115,11 +177,33 @@ export async function createForMessage({ message, conversation }) {
   const io = getIO();
   const created = [];
 
+  // Resolve announcement vs regular once for space channels (gate needs category)
+  const announcement = convType === "space_channel" ? await isAnnouncementChannel(conversation) : false;
+
+  // Batch-load preferences for all recipients (single DB round-trip, single gate)
+  const prefsMap = new Map();
+  try {
+    const users = await User.find({ _id: { $in: recipientIds.filter((id) => mongoose.Types.ObjectId.isValid(id)) } })
+      .select("notificationPreferences")
+      .lean();
+    for (const u of users) prefsMap.set(u._id.toString(), resolvePrefs(u.notificationPreferences));
+  } catch {}
+
   for (const recipientId of recipientIds) {
     if (!mongoose.Types.ObjectId.isValid(recipientId)) continue;
 
     const isMentioned = mentions.includes(recipientId);
     const recipientNotifType = isMentioned ? "mention" : notifType;
+
+    // --- Preference gate (single shared point, before dispatch) ---
+    const prefs = prefsMap.get(recipientId) || { ...DEFAULT_PREFS };
+    if (isMentioned) {
+      // Mentions override muted category, but respect mentions pref itself
+      if (prefs.mentions === false) continue;
+    } else {
+      const category = resolveCategory({ convType, isAnnouncement: announcement });
+      if (prefs[category] === false) continue;
+    }
 
     // DM-focused suppression: don't create a notification if recipient is currently
     // viewing this DM with the sender (spec: "when user is on the dm do not send")
@@ -196,6 +280,12 @@ export async function createForMessage({ message, conversation }) {
 }
 
 export async function createFriendNotification({ recipientId, senderId, type, title, body, avatarUrl }) {
+  // Preference gate for friend request/accept notifications — suppress entirely if friendRequests OFF
+  try {
+    const prefs = await getPreferences({ userId: recipientId.toString() });
+    if (prefs.friendRequests === false) return null;
+  } catch {}
+
   const doc = await Notification.create({
     recipientId,
     senderId: senderId || null,

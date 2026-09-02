@@ -24,6 +24,19 @@ export const markReadSchema = z
     message: "Provide ids[] or all:true",
   });
 
+export const updatePreferencesSchema = z
+  .object({
+    directMessages: z.boolean().optional(),
+    groupMessages: z.boolean().optional(),
+    mentions: z.boolean().optional(),
+    friendRequests: z.boolean().optional(),
+    spaceMessages: z.boolean().optional(),
+    announcements: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one preference field required",
+  });
+
 export function parseBody(schema, body) {
   const result = schema.safeParse(body);
   if (!result.success) {

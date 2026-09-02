@@ -970,9 +970,83 @@
     .t-emoji-picker__emoji:hover {
         background: var(--hover);
     }
+
+    /* ── Toggle / Switch — smooth, fast, hairline border ───────────────── */
+    :root {
+        --toggle-dur: 220ms;
+        --toggle-travel: 16px;
+        --toggle-ov1: 2px;
+        --toggle-ov2: 1px;
+        --toggle-track: 140ms;
+        --toggle-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .t-toggle {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        width: 40px;
+        height: 24px;
+        border-radius: 9999px;
+        border: 1px solid var(--hairline);
+        background: var(--surface-2);
+        cursor: pointer;
+        padding: 2px;
+        flex-shrink: 0;
+        transition:
+            background var(--toggle-track) var(--toggle-ease),
+            border-color var(--toggle-track) var(--toggle-ease);
+    }
+    .t-toggle[data-on="true"] {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+    }
+    .t-toggle:focus-visible {
+        outline: none;
+        box-shadow:
+            0 0 0 2px var(--canvas, #090909),
+            0 0 0 4px var(--accent-blue, #4ba9e1);
+    }
+    .t-toggle:disabled {
+        cursor: not-allowed;
+    }
+    .t-toggle-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 9999px;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        translate: 0 0;
+        will-change: translate;
+    }
+    .t-toggle[data-on="true"] .t-toggle-thumb {
+        translate: var(--toggle-travel) 0;
+    }
+    .t-toggle.is-init[data-on="true"] .t-toggle-thumb {
+        animation: t-toggle-on var(--toggle-dur) var(--toggle-ease) both;
+    }
+    .t-toggle.is-init[data-on="false"] .t-toggle-thumb {
+        animation: t-toggle-off var(--toggle-dur) var(--toggle-ease) both;
+    }
+    @keyframes t-toggle-on {
+        0% { translate: 0 0; }
+        60% { translate: calc(var(--toggle-travel) + var(--toggle-ov1)) 0; }
+        85% { translate: calc(var(--toggle-travel) - var(--toggle-ov2)) 0; }
+        100% { translate: var(--toggle-travel) 0; }
+    }
+    @keyframes t-toggle-off {
+        0% { translate: var(--toggle-travel) 0; }
+        60% { translate: calc(0px - var(--toggle-ov1)) 0; }
+        85% { translate: var(--toggle-ov2) 0; }
+        100% { translate: 0 0; }
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .t-toggle,
+    .t-toggle-thumb {
+        transition: none !important;
+        animation: none !important;
+    }
     .t-dropdown,
     .t-modal,
     .t-modal-backdrop,

@@ -1,7 +1,10 @@
 "use client";
 
-import { Shield, Palette, Bell } from "lucide-react";
+import { Bell, Palette, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
+import { Switch } from "@/components/ui/switch";
+import { apiGet, apiPatch } from "@/lib/api";
 
 function SectionCard({ icon: Icon, title, description, children }) {
   return (
@@ -75,10 +78,102 @@ function SecuritySection() {
   );
 }
 
-function NotificationsPlaceholder() {
+const PREF_DEFS = [
+  { key: "directMessages", label: "Direct Messages" },
+  { key: "groupMessages", label: "Group Messages" },
+  { key: "mentions", label: "Mentions", hint: "Overrides muted categories when you are @mentioned" },
+  { key: "friendRequests", label: "Friend Requests" },
+  { key: "spaceMessages", label: "Space Messages" },
+  { key: "announcements", label: "Announcements" },
+];
+
+function NotificationsSection() {
+  const [prefs, setPrefs] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiGet("/api/v1/notifications/preferences")
+      .then((data) => {
+        if (!active) return;
+        setPrefs(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.message || "Failed to load preferences");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleToggle = async (key, nextVal) => {
+    if (!prefs) return;
+    const prev = prefs[key];
+    setPrefs((p) => ({ ...p, [key]: nextVal }));
+    setSavingKey(key);
+    setError(null);
+    try {
+      const updated = await apiPatch("/api/v1/notifications/preferences", { [key]: nextVal });
+      setPrefs(updated);
+    } catch (err) {
+      setPrefs((p) => ({ ...p, [key]: prev }));
+      setError(err?.message || "Failed to save");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SectionCard icon={Bell} title="Notification preferences" description="Choose which notifications you receive.">
+        <div className="space-y-3">
+          {PREF_DEFS.map((d) => (
+            <div key={d.key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5">
+              <span className="text-[13px] text-[var(--text-muted)]">{d.label}</span>
+              <span className="h-6 w-10 animate-pulse rounded-full bg-[var(--border)]" />
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+    );
+  }
+
   return (
-    <SectionCard icon={Bell} title="Notifications" description="Control how you receive updates.">
-      <p className="text-[12px] text-[var(--text-muted)]">Notification preferences will appear here.</p>
+    <SectionCard icon={Bell} title="Notification preferences" description="Choose which notifications you receive. Mentions always override a muted category when you are @mentioned.">
+      <div className="space-y-2">
+        {PREF_DEFS.map((d) => {
+          const checked = Boolean(prefs?.[d.key]);
+          const isSaving = savingKey === d.key;
+          return (
+            <div
+              key={d.key}
+              className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 transition-colors"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                  {d.label}
+                  <span className="ml-2 text-[11px] font-normal text-[var(--text-muted)]">{checked ? "ON" : "OFF"}</span>
+                </p>
+                {d.hint && <p className="mt-0.5 text-[11px] leading-tight text-[var(--text-muted)]">{d.hint}</p>}
+              </div>
+              <Switch
+                checked={checked}
+                ariaLabel={`${d.label} notifications`}
+                disabled={isSaving}
+                onCheckedChange={(v) => handleToggle(d.key, v)}
+              />
+            </div>
+          );
+        })}
+        {error && <p className="px-1 text-[12px] text-[var(--destructive)]">{error}</p>}
+      </div>
     </SectionCard>
   );
 }
@@ -90,7 +185,7 @@ export function SettingsPanel() {
         <div className="space-y-3">
           <ThemeSection />
           <SecuritySection />
-          <NotificationsPlaceholder />
+          <NotificationsSection />
         </div>
       </div>
     </div>

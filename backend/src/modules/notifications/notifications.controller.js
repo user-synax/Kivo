@@ -1,5 +1,5 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
-import { parseBody, parseQuery, listNotificationsQuerySchema, markReadSchema } from "./notifications.validation.js";
+import { parseBody, parseQuery, listNotificationsQuerySchema, markReadSchema, updatePreferencesSchema } from "./notifications.validation.js";
 import * as notificationsService from "./notifications.service.js";
 
 export const listNotifications = asyncHandler(async (req, res) => {
@@ -26,4 +26,15 @@ export const markRead = asyncHandler(async (req, res) => {
     all,
   });
   res.status(200).json({ success: true, data: result });
+});
+
+export const getPreferences = asyncHandler(async (req, res) => {
+  const prefs = await notificationsService.getPreferences({ userId: req.user.userId });
+  res.status(200).json({ success: true, data: prefs });
+});
+
+export const updatePreferences = asyncHandler(async (req, res) => {
+  const patch = parseBody(updatePreferencesSchema, req.body);
+  const prefs = await notificationsService.updatePreferences({ userId: req.user.userId, patch });
+  res.status(200).json({ success: true, data: prefs });
 });
