@@ -807,7 +807,22 @@ export function DashboardShell() {
       );
     };
 
+    const onRead = (payload) => {
+      if (!payload?.conversationId || payload.userId !== currentUser?.id) return;
+      setConversations((prev) => prev.map((c) => (c.id === payload.conversationId ? { ...c, unreadCount: 0 } : c)));
+    };
+    const onUnread = (payload) => {
+      if (!payload?.conversationId || payload.userId !== currentUser?.id) return;
+      const count = typeof payload.unreadCount === "number" ? payload.unreadCount : null;
+      if (count !== null) {
+        setConversations((prev) => prev.map((c) => (c.id === payload.conversationId ? { ...c, unreadCount: count } : c)));
+      } else {
+        loadConversations().then((list) => setConversations(list));
+      }
+    };
     socket.on("message:new", onNew);
+    socket.on("message:read", onRead);
+    socket.on("message:unread", onUnread);
     socket.on("presence:online", (p) => onPresence(p, true));
     socket.on("presence:offline", (p) => onPresence(p, false));
     socket.on("presence:snapshot", onSnapshot);
@@ -895,6 +910,8 @@ export function DashboardShell() {
 
     return () => {
       socket.off("message:new", onNew);
+      socket.off("message:read", onRead);
+      socket.off("message:unread", onUnread);
       socket.off("presence:online");
       socket.off("presence:offline");
       socket.off("presence:snapshot", onSnapshot);
@@ -1093,6 +1110,28 @@ export function DashboardShell() {
     setShowGroupSettings(false);
     setShowSpaceSettings(false);
     setSelectedId(id);
+  };
+
+  const handleMarkUnread = async (conversationId, messageId) => {
+    try {
+      const body = messageId ? { messageId } : {};
+      const res = await apiPost(`/api/v1/conversations/${conversationId}/unread`, body);
+      const data = res?.data || res;
+      const unreadCount = typeof data?.unreadCount === "number" ? data.unreadCount : null;
+      if (typeof unreadCount === "number") {
+        setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, unreadCount } : c)));
+        const uid = getSession()?.id;
+        if (uid) {
+          const next = conversationsRef.current.map((c) => (c.id === conversationId ? { ...c, unreadCount } : c));
+          setCachedConversations(uid, next).catch(() => {});
+        }
+      } else {
+        const list = await loadConversations();
+        setConversations(list);
+      }
+    } catch (e) {
+      window.alert(e?.message || "Could not mark as unread");
+    }
   };
 
   // Search result handlers
@@ -1325,6 +1364,7 @@ export function DashboardShell() {
                       hideGroups
                       isOffline={isOffline}
                       onSearchOpen={() => setSearchOpen(true)}
+                      onMarkUnread={(id) => handleMarkUnread(id)}
                     />
                   </div>
                 )}
@@ -1348,6 +1388,7 @@ export function DashboardShell() {
                       hideDMs
                       isOffline={isOffline}
                       onSearchOpen={() => setSearchOpen(true)}
+                      onMarkUnread={(id) => handleMarkUnread(id)}
                     />
                   </div>
                 )}
@@ -1501,6 +1542,7 @@ export function DashboardShell() {
           notificationBell={notificationBellNode}
           isOffline={isOffline}
           onSearchOpen={() => setSearchOpen(true)}
+          onMarkUnread={(id) => handleMarkUnread(id)}
         />
       </motion.div>
 

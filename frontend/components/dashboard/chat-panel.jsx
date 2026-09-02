@@ -2,7 +2,7 @@
 
 import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, UserMinus, Users, X, Paperclip } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
@@ -177,6 +177,18 @@ function SystemNotice({ content }) {
       <span className="max-w-[90%] rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-1.5 text-center text-[12px] text-[var(--text-muted)]">
         {content}
       </span>
+    </div>
+  );
+}
+
+function NewMessagesSeparator() {
+  return (
+    <div className="my-4 flex items-center gap-3" role="separator" aria-label="New messages">
+      <div className="h-px flex-1 bg-[var(--border)]" />
+      <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--accent)]">
+        New messages
+      </span>
+      <div className="h-px flex-1 bg-[var(--border)]" />
     </div>
   );
 }
@@ -399,6 +411,18 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     if (str === userId) return true;
     return onlineUsers.has(str);
   };
+
+  const firstUnreadId = useMemo(() => {
+    if (!userId) return null;
+    const found = messages.find(
+      (m) =>
+        !m.isDeleted &&
+        m.type !== "system" &&
+        m.senderId !== userId &&
+        !m.readBy?.some((r) => (r.userId || r)?.toString() === userId.toString())
+    );
+    return found ? found.id : null;
+  }, [messages, userId]);
 
   const getFilteredParticipants = (queryStr) => {
     return (conversation?.participants || []).filter((p) => {
@@ -659,7 +683,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         }),
       );
     };
-    const onDelivery = (payload) => {
+     const onDelivery = (payload) => {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === payload.messageId
@@ -667,6 +691,26 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             : m,
         ),
       );
+    };
+    const onUnread = (payload) => {
+      if (payload.conversationId !== convId) return;
+      // payload contains anchorMessageId and the user who marked unread
+      // For current user, make anchor and newer messages unread (remove readBy)
+      if (payload.userId !== userId) return;
+      const anchorId = payload.anchorMessageId;
+      if (!anchorId) return;
+      setMessages((prev) => {
+        const anchor = prev.find((m) => m.id === anchorId);
+        const anchorTime = anchor ? new Date(anchor.createdAt).getTime() : 0;
+        return prev.map((m) => {
+          if (m.senderId === userId || m.isDeleted || m.type === "system") return m;
+          const t = new Date(m.createdAt).getTime();
+          if (t >= anchorTime) {
+            return { ...m, readBy: (m.readBy || []).filter((r) => (r.userId || r).toString() !== userId.toString()) };
+          }
+          return m;
+        });
+      });
     };
     const onTypingStart = (p) => {
       if (p.conversationId === convId && p.userId !== userId) {
@@ -705,6 +749,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     socket.on("message:reaction", onReaction);
     socket.on("message:read", onRead);
     socket.on("message:delivery-updated", onDelivery);
+    socket.on("message:unread", onUnread);
     socket.on("typing:start", onTypingStart);
     socket.on("typing:stop", onTypingStop);
     socket.on("presence:online", onOnline);
@@ -717,6 +762,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       socket.off("message:reaction", onReaction);
       socket.off("message:read", onRead);
       socket.off("message:delivery-updated", onDelivery);
+      socket.off("message:unread", onUnread);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
       socket.off("presence:online", onOnline);
@@ -911,6 +957,64 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     }
   };
 
+  const markConversationRead = async () => {
+    if (!convId || !firstUnreadId) return;
+    try {
+      await apiPatch(`/api/v1/conversations/${convId}/read`, {});
+      // optimistic: mark all as read locally so separator disappears immediately
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.senderId !== userId && !m.isDeleted && m.type !== "system"
+            ? { ...m, readBy: [...(m.readBy || []), { userId, readAt: new Date().toISOString() }] }
+            : m
+        )
+      );
+      if (onConversationUpdate && conversation) {
+        onConversationUpdate({ ...conversation, unreadCount: 0 });
+      }
+    } catch {}
+  };
+
+  const handleMarkUnread = async (messageId) => {
+    if (!convId || !messageId) return;
+    try {
+      const data = await apiPost(`/api/v1/conversations/${convId}/unread`, { messageId });
+      // optimistic: make this message and all newer messages from others unread
+      const anchor = messages.find((m) => m.id === messageId);
+      const anchorTime = anchor ? new Date(anchor.createdAt).getTime() : 0;
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.senderId === userId || m.isDeleted || m.type === "system") return m;
+          const t = new Date(m.createdAt).getTime();
+          if (t >= anchorTime) {
+            return { ...m, readBy: (m.readBy || []).filter((r) => (r.userId || r).toString() !== userId.toString()) };
+          }
+          return m;
+        })
+      );
+      if (onConversationUpdate && conversation) {
+        const unreadCount = data?.unreadCount ?? data?.data?.unreadCount ?? null;
+        if (typeof unreadCount === "number") {
+          onConversationUpdate({ ...conversation, unreadCount });
+        }
+      }
+    } catch (err) {
+      window.alert(err?.message || "Could not mark as unread");
+    }
+  };
+
+  // Auto-mark read when user scrolls near bottom and unread separator is visible
+  useEffect(() => {
+    if (!firstUnreadId || !scrollRef.current) return;
+    const el = scrollRef.current;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (!isNearBottom) return;
+    const t = setTimeout(() => {
+      markConversationRead();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [firstUnreadId, messages.length]);
+
   if (!conversation) return <EmptyState />;
 
   const headerName = isChannel ? `#${conversation.name || "general"}` : isGroup ? conversation.name || "Group" : otherName;
@@ -1040,6 +1144,12 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           ref={scrollRef}
           onScroll={(e) => {
             if (e.currentTarget.scrollTop <= 8) loadOlder();
+            // if near bottom and unread exists, mark as read (removes separator)
+            if (firstUnreadId) {
+              const el = e.currentTarget;
+              const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+              if (nearBottom) markConversationRead();
+            }
           }}
           className="t-scroll flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12" style={{ overscrollBehavior: "contain" }}
         >
@@ -1054,8 +1164,14 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         >
           {messages.map((m, i) => {
             const mine = m.senderId === userId;
+            const isFirstUnread = m.id === firstUnreadId;
             if (m.type === "system") {
-              return <SystemNotice key={m.id} content={m.content} />;
+              return (
+                <React.Fragment key={m.id}>
+                  {isFirstUnread && <NewMessagesSeparator />}
+                  <SystemNotice content={m.content} />
+                </React.Fragment>
+              );
             }
             const receipt = receiptState(m, userId, otherId);
             const replySource = m.replyToMessageId
@@ -1091,13 +1207,14 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             const sAvatar = senderAvatar(m.senderId);
             const senderLabel = senderName(m.senderId);
             return (
-              <div
-                key={m.id}
-                id={`msg-${m.id}`}
-                className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
-                  i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
-                }`}
-              >
+              <React.Fragment key={m.id}>
+                {isFirstUnread && <NewMessagesSeparator />}
+                <div
+                  id={`msg-${m.id}`}
+                  className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
+                    i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
+                  }`}
+                >
                 {showSender && (
                   <span className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}>
                     {senderLabel}
@@ -1152,6 +1269,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                         onDelete={() => removeMessage(m.id)}
                         onRetry={() => retry(m.tempId)}
                         onReply={handleReply}
+                        onMarkUnread={() => handleMarkUnread(m.id)}
                         isReplying={replyingTo?.id === m.id}
                         replyTo={replyTo}
                         receipt={receipt}
@@ -1166,6 +1284,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                   </div>
                 </div>
               </div>
+              </React.Fragment>
             );
           })}
           {typing && (

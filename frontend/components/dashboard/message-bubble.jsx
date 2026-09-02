@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, FaceGrinning, Pencil, Reply, Trash } from "lucide-react";
+import { Check, CheckCheck, FaceGrinning, Mail, Pencil, Reply, Trash } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -106,6 +106,7 @@ export function MessageBubble({
   onDelete,
   onRetry,
   onReply,
+  onMarkUnread,
   isReplying = false,
   receipt,
   variant,
@@ -348,6 +349,12 @@ export function MessageBubble({
           <Reply className="h-4 w-4" />
           Reply
         </ContextMenuItem>
+        {!mine && !deleted && (
+          <ContextMenuItem onSelect={() => onMarkUnread?.()}>
+            <Mail className="h-4 w-4" />
+            Mark as unread
+          </ContextMenuItem>
+        )}
         {mine && (
           <ContextMenuItem onSelect={() => onEdit?.()}>
             <Pencil className="h-4 w-4" />

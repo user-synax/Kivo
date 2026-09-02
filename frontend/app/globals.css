@@ -1006,21 +1006,20 @@
     }
 }
 
-/* ── Native mobile lock — prevent rubber-band / pull-to-refresh / back-area scroll ─ */
-html,
-body {
+/* ── Scroll / overscroll — keep landing pages scrollable on mobile ─ */
+html {
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
 }
+body {
+    overscroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+}
 @media (max-width: 767px) {
-    html,
-    body {
-        height: 100dvh;
-        overflow: hidden;
+    html {
         overscroll-behavior: none;
-        touch-action: pan-y;
     }
-    /* inner scrollables handle their own pan */
+    /* dashboard handles its own fixed viewport; landing stays scrollable */
     .t-scroll {
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;

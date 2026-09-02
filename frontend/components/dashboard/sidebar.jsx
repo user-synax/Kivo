@@ -5,6 +5,7 @@ import {
   Compass,
   Hash,
   Layers,
+  Mail,
   Megaphone,
   PanelLeft,
   Pencil,
@@ -22,6 +23,12 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
 import { useTheme } from "@/components/theme-provider";
 import { useIsDesktop } from "@/lib/use-breakpoint";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/motion/context-menu";
 
 // Restrained, no-bounce easing shared across every micro-interaction.
 const EASE = "cubic-bezier(0.22,1,0.36,1)";
@@ -34,19 +41,21 @@ function EmptyState({ message }) {
   );
 }
 
-function ConversationItem({ conversation, selected, onSelect, index }) {
+function ConversationItem({ conversation, selected, onSelect, onMarkUnread, index }) {
   const { name, lastMessage, time, unread, online, type } = conversation;
   const isGroup = type === "group";
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-current={selected ? "true" : undefined}
-      style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}
-      className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-200 ease-[${EASE}] motion-reduce:animate-none animate-[t-item-in_0.4s_${EASE}_both] hover:cursor-pointer ${
-        selected ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
-      }`}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger>
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-current={selected ? "true" : undefined}
+          style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}
+          className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-200 ease-[${EASE}] motion-reduce:animate-none animate-[t-item-in_0.4s_${EASE}_both] hover:cursor-pointer ${
+            selected ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
+          }`}
+        >
       <div className="relative shrink-0">
         <Avatar
           name={name}
@@ -80,10 +89,18 @@ function ConversationItem({ conversation, selected, onSelect, index }) {
         </div>
       </div>
     </button>
+      </ContextMenuTrigger>
+      <ContextMenuContent ariaLabel="Conversation actions">
+        <ContextMenuItem onSelect={() => onMarkUnread?.(conversation.id)}>
+          <Mail className="h-4 w-4" />
+          Mark as unread
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
-function ConversationSection({ label, items, selectedId, onSelect, baseIndex = 0, collapsed, onNewGroup }) {
+function ConversationSection({ label, items, selectedId, onSelect, onMarkUnread, baseIndex = 0, collapsed, onNewGroup }) {
   if (!items.length) return null;
   return (
     <div className="mb-1">
@@ -110,6 +127,7 @@ function ConversationSection({ label, items, selectedId, onSelect, baseIndex = 0
           conversation={c}
           selected={c.id === selectedId}
           onSelect={() => onSelect(c.id)}
+          onMarkUnread={onMarkUnread}
           index={baseIndex + i}
         />
       ))}
@@ -509,6 +527,7 @@ export function Sidebar({
   hideDMs = false,
   isOffline = false,
   onSearchOpen,
+  onMarkUnread,
 }) {
   const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -633,6 +652,7 @@ export function Sidebar({
                 items={dms}
                 selectedId={selectedId}
                 onSelect={onSelect}
+                onMarkUnread={onMarkUnread}
                 collapsed={collapsed}
               />
             )}
@@ -642,8 +662,8 @@ export function Sidebar({
                 items={groups}
                 selectedId={selectedId}
                 onSelect={onSelect}
+                onMarkUnread={onMarkUnread}
                 collapsed={collapsed}
-                onNewGroup={onNewGroup}
               />
             )}
             {!hideSpaces && (

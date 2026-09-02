@@ -6,6 +6,7 @@ import {
   updateMessageSchema,
   reactionSchema,
   listMessagesQuerySchema,
+  markUnreadSchema,
 } from "./messages.validation.js";
 import * as messagesService from "./messages.service.js";
 
@@ -75,6 +76,16 @@ export const markRead = asyncHandler(async (req, res) => {
     conversationId: req.params.id,
     userId: req.user.userId,
     upToMessageId: req.body?.upToMessageId,
+  });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const markUnread = asyncHandler(async (req, res) => {
+  const { messageId } = parseBody(markUnreadSchema, req.body || {});
+  const result = await messagesService.markUnread({
+    conversationId: req.params.id,
+    userId: req.user.userId,
+    messageId,
   });
   res.status(200).json({ success: true, data: result });
 });

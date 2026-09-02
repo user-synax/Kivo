@@ -16,6 +16,7 @@ router.get("/", conversationsController.listConversations);
 router.get("/:id/messages", messagesController.listMessages);
 router.post("/:id/messages", messagesController.createMessage);
 router.patch("/:id/read", messagesController.markRead);
+router.post("/:id/unread", messagesController.markUnread);
 
 // Group management (admin-restricted actions enforced in the service layer).
 router.patch("/:id", conversationsController.updateGroup);

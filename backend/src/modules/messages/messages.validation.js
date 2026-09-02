@@ -33,6 +33,10 @@ export const listMessagesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
+export const markUnreadSchema = z.object({
+  messageId: z.string().optional(),
+});
+
 // Convenience parser that throws a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {
   const result = schema.safeParse(body);

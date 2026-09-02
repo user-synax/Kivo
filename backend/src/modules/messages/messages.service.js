@@ -354,3 +354,69 @@ export async function markRead({ conversationId, userId, upToMessageId }) {
   emitToConversation(conversationId, "message:read", payload);
   return payload;
 }
+
+// Mark a conversation as unread from a given message onward (or all if no id).
+// Removes the user's read receipt from that message and all newer messages so
+// the thread appears unread again and the separator re-appears.
+export async function markUnread({ conversationId, userId, messageId }) {
+  await assertMembership(conversationId, userId);
+
+  const uid = new mongoose.Types.ObjectId(userId);
+  const cid = new mongoose.Types.ObjectId(conversationId);
+
+  let anchor = null;
+  if (messageId) {
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      throw badRequest("Invalid messageId", "INVALID_ID");
+    }
+    anchor = await Message.findById(messageId).select("conversationId createdAt");
+    if (!anchor) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+    if (anchor.conversationId.toString() !== cid.toString()) {
+      throw badRequest("Message is not in this conversation", "INVALID_MESSAGE");
+    }
+  } else {
+    // No anchor: use the newest message from others as the unread point
+    anchor = await Message.findOne({
+      conversationId: cid,
+      senderId: { $ne: uid },
+      type: { $ne: "system" },
+      isDeleted: false,
+    })
+      .sort({ createdAt: -1 })
+      .select("createdAt");
+    if (!anchor) {
+      return { conversationId, userId, unreadCount: 0, anchorMessageId: null };
+    }
+  }
+
+  const filter = {
+    conversationId: cid,
+    senderId: { $ne: uid },
+    createdAt: { $gte: anchor.createdAt },
+  };
+
+  const result = await Message.updateMany(filter, {
+    $pull: { readBy: { userId: uid } },
+  });
+
+  // Count remaining unread for this user in the conversation
+  const unreadCount = await Message.countDocuments({
+    conversationId: cid,
+    senderId: { $ne: uid },
+    type: { $ne: "system" },
+    isDeleted: false,
+    readBy: { $not: { $elemMatch: { userId: uid } } },
+  });
+
+  const payload = {
+    conversationId,
+    userId,
+    unreadCount,
+    anchorMessageId: messageId || anchor._id?.toString() || null,
+    modifiedCount: result.modifiedCount || 0,
+  };
+  emitToConversation(conversationId, "message:unread", payload);
+  // Also push an updated conversation-type event so sidebar badge updates live
+  // (listConversations will count correctly on next fetch, but live push is nicer)
+  return payload;
+}
