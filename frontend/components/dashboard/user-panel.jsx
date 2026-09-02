@@ -1,11 +1,12 @@
 "use client";
 
-import { Ban, ShieldBan, UserMinus } from "lucide-react";
+import { Ban, Eye, ShieldBan, UserMinus } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { apiDelete, apiPost } from "@/lib/api";
 import { useLiveLastActive } from "@/lib/last-active";
+import { ProfileDrawer } from "@/components/profile/profile-drawer";
 
 // Online / Offline status label — reuses the transitions-dev text-swap: the
 // keyed span remounts on change so it blur-rises in (reduced-motion safe).
@@ -52,6 +53,7 @@ export function UserPanel({
 }) {
     const reduce = useReducedMotion();
     const [blockBusy, setBlockBusy] = useState(false);
+    const [profileUsername, setProfileUsername] = useState(null);
     const isBlockedByMe = Boolean(conversation?.isBlockedByMe);
     const otherId =
         profile?.id || conversation?.otherParticipantIds?.[0] || null;
@@ -134,6 +136,7 @@ export function UserPanel({
     };
 
     return (
+        <>
         <motion.aside
             initial={
                 reduce ? false : { opacity: 0, x: 28, filter: "blur(4px)" }
@@ -259,6 +262,22 @@ export function UserPanel({
                     You can only see what this person chooses to share.
                 </motion.p>
 
+                {/* Public profile button */}
+                {otherId && profile?.username && (
+                    <motion.div variants={item} className="mt-4">
+                        <motion.button
+                            type="button"
+                            onClick={() => setProfileUsername(profile.username)}
+                            whileTap={reduce ? undefined : { scale: 0.98 }}
+                            whileHover={reduce ? undefined : { scale: 1.01 }}
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--hover)]"
+                        >
+                            <Eye className="h-4 w-4" />
+                            Public profile
+                        </motion.button>
+                    </motion.div>
+                )}
+
                 {otherId && (
                     <motion.div
                         variants={item}
@@ -349,6 +368,13 @@ export function UserPanel({
                 )}
             </motion.div>
         </motion.aside>
+
+        <ProfileDrawer
+            username={profileUsername}
+            open={Boolean(profileUsername)}
+            onClose={() => setProfileUsername(null)}
+        />
+        </>
     );
 }
 

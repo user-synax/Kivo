@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, UserMinus, Users, X, Paperclip } from "lucide-react";
+import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, UserMinus, Users, User, X, Paperclip } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -1154,6 +1154,18 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                   transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                   className="absolute right-0 top-full z-30 mt-2 min-w-48 origin-top-right overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1.5 shadow-xl"
                 >
+                    <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMore(false);
+                      setProfileUsername(other?.username || otherName);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)]"
+                  >
+                    <User className="h-4 w-4" /> Profile
+                  </button>
+                  <div className="mx-3 my-1 h-px bg-[var(--border)]" />
                   {isBlockedByMe ? (
                     <button
                       type="button"
