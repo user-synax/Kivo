@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
-import { getSession, getToken, setSession } from "@/lib/auth";
+import { clearSession, getSession, getToken, setSession } from "@/lib/auth";
 import {
   formatTime,
   otherParticipant,
@@ -39,6 +39,7 @@ import { UserPanel } from "./user-panel";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { Avatar } from "./avatar";
 import { ProfileEditModal } from "./profile-edit-modal";
+import { SettingsPanel } from "./settings-panel";
 import { useTheme } from "@/components/theme-provider";
 import { VerificationBanner } from "@/components/auth/verification-banner";
 
@@ -193,60 +194,128 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
   );
 }
 
+function MobileSettingsTab() {
+  return (
+    <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+      <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
+        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5" style={{ overscrollBehavior: "contain" }}>
+        <SettingsPanel />
+      </div>
+    </div>
+  );
+}
+
 function MobileProfileTab({ currentUser, onProfileUpdate }) {
-  const { themeId, themes, setThemeId } = useTheme();
+  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
-  if (!currentUser) return null;
-  const displayName = currentUser.displayName || currentUser.username || currentUser.email || "Account";
+  const [user, setUser] = useState(currentUser);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    setUser(currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    let active = true;
+    apiGet("/api/v1/users/me")
+      .then((me) => {
+        if (!active) return;
+        setUser(me);
+        setSession(me, getToken());
+        onProfileUpdate?.();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSaved = () => {
+    onProfileUpdate?.();
+    setRefreshing(true);
+    apiGet("/api/v1/users/me")
+      .then((me) => {
+        setUser(me);
+        setSession(me, getToken());
+      })
+      .catch(() => {})
+      .finally(() => setRefreshing(false));
+  };
+
+  async function handleLogout() {
+    const token = getToken();
+    try {
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        credentials: "include",
+      });
+    } catch {}
+    clearSession();
+    router.replace("/login");
+  }
+
+  if (!user) return null;
+
+  const rows = [
+    { label: "Display name", value: user.displayName || "—" },
+    { label: "Username", value: user.username || "—" },
+    { label: "Email", value: user.email },
+    { label: "Status", value: user.status || "—" },
+    { label: "Role", value: user.role },
+  ];
+
   return (
     <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
       <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
         <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Profile</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-5 pb-[calc(64px+env(safe-area-inset-bottom))] pt-6" style={{ overscrollBehavior: "contain" }}>
-        <div className="flex flex-col items-center text-center">
-          <Avatar name={displayName} avatarStyle={currentUser.avatarStyle} url={currentUser.avatarUrl} size="xl" />
-          <h2 className="mt-3 text-[18px] font-semibold text-[var(--text-primary)]">{displayName}</h2>
-          {currentUser.username && <p className="text-[13px] text-[var(--text-muted)]">@{currentUser.username}</p>}
-          <p className="text-[12px] text-[var(--text-muted)]">{currentUser.email}</p>
-          {currentUser.status && (
-            <p className="mt-3 w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 text-[13px] italic text-[var(--text-muted)]">
-              {currentUser.status}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={() => setEditOpen(true)}
-            className="mt-4 rounded-full border border-[var(--border)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--hover)]"
-          >
-            Edit profile
-          </button>
-        </div>
-        <div className="mt-6">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Theme</p>
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-2">
-            {themes.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setThemeId(t.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-[var(--hover)] ${t.id === themeId ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
-              >
-                <span className="size-5 shrink-0 rounded-full ring-1 ring-[var(--border)]" style={{ background: t.swatch }} />
-                <span className="flex-1 truncate">{t.label}</span>
-                {t.id === themeId && <span className="size-2 shrink-0 rounded-full bg-[#a3e635]" />}
-              </button>
-            ))}
+        {user.banner ? (
+          <div className="h-28 w-full overflow-hidden rounded-xl border border-[var(--border)]">
+            <img src={user.banner} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
+          <Avatar name={user.displayName || user.email || "?"} avatarStyle={user.avatarStyle} url={user.avatarUrl} size="lg" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-medium text-[var(--text-primary)]">{user.displayName || "—"}</p>
+            <p className="truncate text-[13px] text-[var(--text-muted)]">{user.status || user.email}</p>
+            {user.username && <p className="truncate text-[12px] text-[var(--text-muted)]">@{user.username}</p>}
           </div>
         </div>
-        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Details</p>
-          <div className="mt-2 space-y-1 text-[13px]">
-            {currentUser.bio ? <p className="text-[var(--text-primary)]">{currentUser.bio}</p> : <p className="text-[var(--text-muted)]">No bio yet.</p>}
-          </div>
+
+        <button
+          type="button"
+          onClick={() => setEditOpen(true)}
+          className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)]"
+        >
+          Edit profile
+        </button>
+
+        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
+          {user.bio ? <p className="mb-4 text-sm text-[var(--text-primary)]">{user.bio}</p> : null}
+          {rows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-4 border-b border-[var(--border)] py-3 last:border-b-0">
+              <span className="text-[13px] text-[var(--text-muted)]">{row.label}</span>
+              <span className="truncate text-sm font-medium text-[var(--text-primary)]">{row.value}</span>
+            </div>
+          ))}
+          {refreshing && <p className="pt-3 text-[11px] text-[var(--text-muted)]">Refreshing…</p>}
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-6 inline-flex w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)]"
+        >
+          Log out
+        </button>
       </div>
-      <ProfileEditModal open={editOpen} currentUser={currentUser} onClose={() => setEditOpen(false)} onSaved={() => onProfileUpdate?.()} />
+      <ProfileEditModal open={editOpen} currentUser={user} onClose={() => setEditOpen(false)} onSaved={handleSaved} />
     </div>
   );
 }
@@ -1172,6 +1241,7 @@ export function DashboardShell() {
     chats: conversations.some((c) => c.type === "dm" && (c.unreadCount || 0) > 0),
     groups: conversations.some((c) => c.type === "group" && (c.unreadCount || 0) > 0),
     spaces: conversations.some((c) => c.type === "space_channel" && (c.unreadCount || 0) > 0),
+    settings: false,
     profile: false,
   };
 
@@ -1402,6 +1472,7 @@ export function DashboardShell() {
                     onDiscover={() => setShowDiscover(true)}
                   />
                 )}
+                {mobileTab === "settings" && <MobileSettingsTab />}
                 {mobileTab === "profile" && (
                   <MobileProfileTab currentUser={currentUser} onProfileUpdate={refreshUser} />
                 )}
