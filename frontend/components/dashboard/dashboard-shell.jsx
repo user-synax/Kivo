@@ -41,7 +41,6 @@ import { Avatar } from "./avatar";
 import { ProfileEditModal } from "./profile-edit-modal";
 import { SettingsPanel } from "./settings-panel";
 import { useTheme } from "@/components/theme-provider";
-import { VerificationBanner } from "@/components/auth/verification-banner";
 
 // Restrained easing — matches the rest of the app (no bounce).
 const EASE = [0.22, 1, 0.36, 1];
@@ -1300,7 +1299,6 @@ export function DashboardShell() {
   if (!isDesktop) {
     return (
       <div className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none" style={{ overscrollBehavior: "none", touchAction: "none" }}>
-        <VerificationBanner user={currentUser} />
         <AnimatePresence initial={false}>
           {selected ? (
             <motion.div
@@ -1605,7 +1603,6 @@ export function DashboardShell() {
   // Desktop: nested icon-rail + panel sidebar + chat side by side.
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
-      <VerificationBanner user={currentUser} />
       <div className="flex min-h-0 flex-1">
       <div className="hidden h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
         <NestedSidebar

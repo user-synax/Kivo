@@ -22,7 +22,14 @@ export function errorHandler(err, req, res, next) {
 
   res.status(statusCode).json({
     success: false,
-    error: { code, message },
+    error: {
+      code,
+      message,
+      // Only populated when an error explicitly carries extra context (e.g.
+      // EMAIL_NOT_VERIFIED passes the userId so the client can route to OTP
+      // verification). Undefined for every other error.
+      ...(err.details !== undefined ? { details: err.details } : {}),
+    },
   });
 }
 

@@ -3,11 +3,15 @@
 //
 // Response shape (see middleware/errorHandler.js):
 //   { success: false, error: { code, message } }
+// `details` is optional and only surfaced for specific flows (e.g. login with an
+// unverified email passes the userId so the client can route to OTP verify).
+// Every other error keeps the plain { code, message } envelope.
 export class ApiError extends Error {
-  constructor(statusCode, code, message) {
+  constructor(statusCode, code, message, details) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
     this.isOperational = true;
   }
 }

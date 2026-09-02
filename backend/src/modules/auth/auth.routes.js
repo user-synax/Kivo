@@ -11,8 +11,14 @@ const refreshLimiter = rateLimiter({ keyPrefix: "refresh", windowSeconds: 60, ma
 const forgotPasswordLimiter = rateLimiter({ keyPrefix: "forgot-password", windowSeconds: 300, max: 5 });
 const resetPasswordLimiter = rateLimiter({ keyPrefix: "reset-password", windowSeconds: 300, max: 10 });
 const resendVerificationLimiter = rateLimiter({ keyPrefix: "resend-verification", windowSeconds: 60, max: 1 });
+const registerLimiter = rateLimiter({
+  keyPrefix: "register",
+  windowSeconds: 3600,
+  max: 5,
+  keyFrom: (req) => req.ip,
+});
 
-router.post("/register", authController.register);
+router.post("/register", registerLimiter, authController.register);
 router.post("/login", loginLimiter, authController.login);
 router.post("/refresh-token", refreshLimiter, authController.refreshToken);
 
@@ -21,7 +27,23 @@ router.post("/refresh-token", refreshLimiter, authController.refreshToken);
 router.post("/logout", authenticate, authController.logout);
 router.post("/logout-all", authenticate, authController.logoutAll);
 
-// Email verification
+// Email OTP verification (public — issued at signup, keyed to the new user).
+const otpVerifyLimiter = rateLimiter({
+  keyPrefix: "verify-otp",
+  windowSeconds: 600,
+  max: 10,
+  keyFrom: (req) => req.body?.userId || req.ip,
+});
+const resendOtpLimiter = rateLimiter({
+  keyPrefix: "resend-otp",
+  windowSeconds: 60,
+  max: 1,
+  keyFrom: (req) => req.body?.userId || req.ip,
+});
+router.post("/verify-otp", otpVerifyLimiter, authController.verifyOtp);
+router.post("/resend-otp", resendOtpLimiter, authController.resendOtp);
+
+// Email verification (legacy link flow)
 router.get("/verify-email", authController.verifyEmail);
 router.post("/resend-verification", authenticate, resendVerificationLimiter, authController.resendVerification);
 

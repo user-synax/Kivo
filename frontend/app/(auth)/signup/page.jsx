@@ -7,7 +7,6 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthInput } from "@/components/auth/AuthInput";
 import { GuestGate } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
-import { setSession } from "@/lib/auth";
 
 const EASE_SMOOTH_OUT = [0.22, 1, 0.36, 1];
 
@@ -121,9 +120,9 @@ export default function SignUpPage() {
         return;
       }
 
-      const session = data.data || data;
-      setSession(session.user, session.accessToken);
-      router.push("/app");
+      // Registration no longer issues a session — redirect to OTP verification
+      // with the new user id; /verify-otp issues the session on success.
+      router.push(`/verify-otp?uid=${data.data.userId}`);
     } catch {
       setServerError("Network error. Please try again.");
     } finally {

@@ -4,6 +4,8 @@ import {
   parseBody,
   registerSchema,
   loginSchema,
+  verifyOtpSchema,
+  resendOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "./auth.validation.js";
@@ -43,10 +45,11 @@ export const register = asyncHandler(async (req, res) => {
   const data = parseBody(registerSchema, req.body);
   const result = await authService.registerUser(data);
 
-  setRefreshCookie(res, result.refreshToken);
+  // No session is issued here — the client must verify the emailed OTP first
+  // (POST /auth/verify-otp), which is what issues the session.
   res.status(201).json({
     success: true,
-    data: { user: result.user, accessToken: result.accessToken },
+    data: { userId: result.userId, email: result.email },
   });
 });
 
@@ -92,6 +95,30 @@ export const logoutAll = asyncHandler(async (req, res) => {
   await authService.logoutAllSessions({ userId: req.user.userId });
   clearRefreshCookie(res);
   res.status(200).json({ success: true, data: null });
+});
+
+// ── Email OTP verification ─────────────────────────────────────────────────
+
+export const verifyOtp = asyncHandler(async (req, res) => {
+  const data = parseBody(verifyOtpSchema, req.body);
+  const result = await authService.verifyOtp({
+    userId: data.userId,
+    otp: data.otp,
+    deviceInfo: deviceInfoFrom(req),
+  });
+
+  // Only reached with a verified email — safe to hand out the session.
+  setRefreshCookie(res, result.refreshToken);
+  res.status(200).json({
+    success: true,
+    data: { user: result.user, accessToken: result.accessToken },
+  });
+});
+
+export const resendOtp = asyncHandler(async (req, res) => {
+  const data = parseBody(resendOtpSchema, req.body);
+  const result = await authService.resendOtp({ userId: data.userId });
+  res.status(200).json({ success: true, data: result });
 });
 
 // ── Email verification ──────────────────────────────────────────────────────

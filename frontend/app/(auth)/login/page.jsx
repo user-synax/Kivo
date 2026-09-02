@@ -95,6 +95,15 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Unverified accounts are routed to OTP verification instead of
+        // surfacing the error (backend passes the userId in error.details).
+        if (
+          data?.error?.code === "EMAIL_NOT_VERIFIED" &&
+          data?.error?.details?.userId
+        ) {
+          router.push(`/verify-otp?uid=${data.error.details.userId}`);
+          return;
+        }
         setServerError(
           data?.error?.message || "Invalid credentials. Please try again.",
         );
