@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Navbar } from "../components/navbar/navbar";
 import { GuestGate } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
+import { RadialButton } from "@/components/ui/radial-button";
 
 const EASE_SMOOTH_OUT = [0.22, 1, 0.36, 1];
 
@@ -94,12 +95,12 @@ export default function Home() {
                   transition={{ duration: 0.2, ease: EASE_SMOOTH_OUT }}
                   className="shrink-0"
                 >
-                  <Button
-                    render={<a href="/signup" />}
+                  <RadialButton
+                    onClick={() => window.location.href = "/signup"}
                     className="kivo-cta h-auto rounded-pills px-6 py-3 text-[16px] font-medium leading-none tracking-[-0.352px] transition-[transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:ring-accent-blue/30 has-[>svg]:px-6"
                   >
                     Get Started
-                  </Button>
+                  </RadialButton>
                 </motion.div>
 
                 {/* Secondary CTA - ghost outline */}
