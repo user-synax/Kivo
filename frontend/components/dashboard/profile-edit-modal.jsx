@@ -1,460 +1,569 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Check, Loader2, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { CountryPicker } from "@/components/profile/country-picker";
-import { apiPatch, apiUpload, apiDelete } from "@/lib/api";
+import { apiDelete, apiPatch, apiUpload } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import { AVATAR_STYLES } from "@/lib/avatar-styles";
 import { BANNER_OPTIONS } from "@/lib/banners";
 import { COUNTRIES } from "@/lib/countries";
 
-function Field({ label, hint, children }) {
-  return (
-    <div className="block">
-      <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-muted)]">
-        {label}
-      </span>
-      {children}
-      {hint && (
-        <span className="mt-1 block text-[11px] text-[var(--text-muted)]">
-          {hint}
-        </span>
-      )}
-    </div>
-  );
+const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
+
+function Field({ label, hint, counter, children }) {
+    return (
+        <div className="block">
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <span className="text-[12px] font-medium text-[var(--text-muted)]">
+                    {label}
+                </span>
+                {counter}
+            </div>
+            {children}
+            {hint && (
+                <span className="mt-1 block text-[11px] leading-snug text-[var(--text-muted)]">
+                    {hint}
+                </span>
+            )}
+        </div>
+    );
 }
 
-const inputCls =
-  "w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:border-[var(--accent)] focus:outline-none";
+function Section({ label, delay = 0, className = "", children }) {
+    return (
+        <section
+            className={`t-item-in ${className}`}
+            style={{ animationDelay: `${delay}ms` }}
+        >
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                {label}
+            </h3>
+            <div className="space-y-4">{children}</div>
+        </section>
+    );
+}
+
+const inputCls = `w-full rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] caret-[var(--accent)] placeholder:text-[var(--text-muted)]/70 outline-none transition-[border-color,box-shadow] duration-200 ${EASE} focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[var(--accent)]/15 hover:border-[var(--text-muted)]/40`;
+
+// Small live character counter — only appears once the user is close to the
+// limit so fields stay visually calm until it matters.
+function Counter({ value, max }) {
+    if (value.length <= max * 0.7) return null;
+    const near = value.length >= max;
+    return (
+        <span
+            className={`text-[11px] tabular-nums transition-colors duration-200 ${EASE} ${
+                near ? "text-[#ff5577]" : "text-[var(--text-muted)]"
+            }`}
+        >
+            {value.length}/{max}
+        </span>
+    );
+}
 
 export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
-  const router = useRouter();
-  const [render, setRender] = useState(open);
-  const [shown, setShown] = useState(false);
+    const router = useRouter();
+    const [render, setRender] = useState(open);
+    const [shown, setShown] = useState(false);
 
-  const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
-  const [bio, setBio] = useState("");
-  const [status, setStatus] = useState("");
-  const [avatarStyle, setAvatarStyle] = useState("default");
-  const [banner, setBanner] = useState("");
-  const [country, setCountry] = useState(null);
-  const [githubUsername, setGithubUsername] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+    const [displayName, setDisplayName] = useState("");
+    const [username, setUsername] = useState("");
+    const [bio, setBio] = useState("");
+    const [status, setStatus] = useState("");
+    const [avatarStyle, setAvatarStyle] = useState("default");
+    const [banner, setBanner] = useState("");
+    const [country, setCountry] = useState(null);
+    const [githubUsername, setGithubUsername] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
 
-  // Avatar / DP upload.
-  const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const fileRef = useRef(null);
+    // Avatar / DP upload.
+    const [uploading, setUploading] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const fileRef = useRef(null);
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      setError("Image must be under 4MB.");
-      return;
-    }
-    setError(null);
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append("avatar", file);
-      const updated = await apiUpload("/api/v1/users/me/avatar", form);
-      // Persist + propagate (drives sidebar/profile/chat avatars everywhere).
-      setSession(updated, getToken());
-      onSaved?.(updated);
-      setPreviewUrl(null);
-    } catch (err) {
-      setError(err?.message || "Could not upload photo");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
-
-  const handleRemoveAvatar = async () => {
-    setError(null);
-    setUploading(true);
-    try {
-      const updated = await apiDelete("/api/v1/users/me/avatar");
-      setSession(updated, getToken());
-      onSaved?.(updated);
-      setPreviewUrl(null);
-    } catch (err) {
-      setError(err?.message || "Could not remove photo");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Mount/unmount with a one-frame delay so the open/close transitions play.
-  useEffect(() => {
-    if (open) {
-      const me = currentUser || getSession();
-      setDisplayName(me?.displayName || "");
-      setUsername(me?.username || "");
-      setBio(me?.bio || "");
-      setStatus(me?.status || "");
-      setAvatarStyle(me?.avatarStyle || "default");
-      setBanner(me?.banner || "");
-      setCountry(
-        me?.country
-          ? COUNTRIES.find((c) => c.code === me.country) || null
-          : null,
-      );
-      setGithubUsername(me?.githubUsername || "");
-      setError(null);
-      setRender(true);
-      const id = requestAnimationFrame(() => setShown(true));
-      return () => cancelAnimationFrame(id);
-    }
-    setShown(false);
-    const t = setTimeout(() => setRender(false), 160);
-    return () => clearTimeout(t);
-  }, [open, currentUser]);
-
-  // Escape to close.
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            setError("Please choose an image file.");
+            return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+            setError("Image must be under 4MB.");
+            return;
+        }
+        setError(null);
+        setUploading(true);
+        try {
+            const form = new FormData();
+            form.append("avatar", file);
+            const updated = await apiUpload("/api/v1/users/me/avatar", form);
+            // Persist + propagate (drives sidebar/profile/chat avatars everywhere).
+            setSession(updated, getToken());
+            onSaved?.(updated);
+            setPreviewUrl(null);
+        } catch (err) {
+            setError(err?.message || "Could not upload photo");
+        } finally {
+            setUploading(false);
+            if (fileRef.current) fileRef.current.value = "";
+        }
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
-  if (!render) return null;
+    const handleRemoveAvatar = async () => {
+        setError(null);
+        setUploading(true);
+        try {
+            const updated = await apiDelete("/api/v1/users/me/avatar");
+            setSession(updated, getToken());
+            onSaved?.(updated);
+            setPreviewUrl(null);
+        } catch (err) {
+            setError(err?.message || "Could not remove photo");
+        } finally {
+            setUploading(false);
+        }
+    };
 
-  const close = () => onClose();
+    // Mount/unmount with a one-frame delay so the open/close transitions play.
+    useEffect(() => {
+        if (open) {
+            const me = currentUser || getSession();
+            setDisplayName(me?.displayName || "");
+            setUsername(me?.username || "");
+            setBio(me?.bio || "");
+            setStatus(me?.status || "");
+            setAvatarStyle(me?.avatarStyle || "default");
+            setBanner(me?.banner || "");
+            setCountry(
+                me?.country
+                    ? COUNTRIES.find((c) => c.code === me.country) || null
+                    : null,
+            );
+            setGithubUsername(me?.githubUsername || "");
+            setError(null);
+            setRender(true);
+            const id = requestAnimationFrame(() => setShown(true));
+            return () => cancelAnimationFrame(id);
+        }
+        setShown(false);
+        const t = setTimeout(() => setRender(false), 160);
+        return () => clearTimeout(t);
+    }, [open, currentUser]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await apiPatch("/api/v1/users/me", {
-        displayName: displayName.trim(),
-        username: username.trim(),
-        bio: bio.trim(),
-        status: status.trim(),
-        avatarStyle,
-        banner,
-        country: country?.code || "",
-        githubUsername: githubUsername.trim(),
-      });
-      // Persist the refreshed user object (drives the sidebar avatar + session).
-      setSession(updated, getToken());
-      onSaved?.(updated);
-      onClose();
-    } catch (err) {
-      setError(err?.message || "Could not save changes");
-    } finally {
-      setSaving(false);
-    }
-  };
+    // Escape to close.
+    useEffect(() => {
+        if (!open) return undefined;
+        const onKey = (e) => {
+            if (e.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [open, onClose]);
 
-  const openFullProfile = () => {
-    onClose();
-    router.push("/app/profile");
-  };
+    if (!render) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div
-        className={`t-modal-backdrop absolute inset-0 bg-black/60 ${
-          shown ? "is-open" : ""
-        }`}
-        onClick={close}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Edit profile"
-        className={`t-modal relative z-10 m-0 w-full max-w-md overflow-hidden rounded-t-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-md)] sm:m-3 sm:rounded-2xl ${
-          shown ? "is-open" : ""
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-          <div className="flex items-center gap-3">
-            <Avatar
-              name={displayName || currentUser?.displayName || "?"}
-              avatarStyle={avatarStyle}
-              url={previewUrl || currentUser?.avatarUrl}
-              size="sm"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                {displayName || currentUser?.displayName || "Profile"}
-              </p>
-              <p className="truncate text-[12px] text-[var(--text-muted)]">
-                Edit profile &amp; avatar
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close"
-            className="flex size-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    const close = () => onClose();
 
-        {/* Body */}
-        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-5 py-5">
-          <Field label="Display name">
-            <input
-              className={inputCls}
-              value={displayName}
-              maxLength={50}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
-            />
-          </Field>
+    const handleSave = async () => {
+        setSaving(true);
+        setError(null);
+        try {
+            const updated = await apiPatch("/api/v1/users/me", {
+                displayName: displayName.trim(),
+                username: username.trim(),
+                bio: bio.trim(),
+                status: status.trim(),
+                avatarStyle,
+                banner,
+                country: country?.code || "",
+                githubUsername: githubUsername.trim(),
+            });
+            // Persist the refreshed user object (drives the sidebar avatar + session).
+            setSession(updated, getToken());
+            onSaved?.(updated);
+            onClose();
+        } catch (err) {
+            setError(err?.message || "Could not save changes");
+        } finally {
+            setSaving(false);
+        }
+    };
 
-          <Field label="Username" hint="Letters, numbers and underscores.">
-            <input
-              className={inputCls}
-              value={username}
-              maxLength={30}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="username"
-            />
-          </Field>
+    const openFullProfile = () => {
+        onClose();
+        router.push("/u/" + (username || currentUser?.username));
+    };
 
-          <Field label="Status" hint="A short line shown under your name.">
-            <input
-              className={inputCls}
-              value={status}
-              maxLength={60}
-              onChange={(e) => setStatus(e.target.value)}
-              placeholder="e.g. Available"
-            />
-          </Field>
+    const avatarNode = (size) => (
+        <Avatar
+            name={displayName || currentUser?.displayName || "?"}
+            avatarStyle={avatarStyle}
+            url={previewUrl || currentUser?.avatarUrl}
+            size={size}
+        />
+    );
 
-          <Field label="Bio">
-            <textarea
-              className={`${inputCls} min-h-[72px] resize-none`}
-              value={bio}
-              maxLength={280}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="A little about you"
-            />
-          </Field>
-
-          <Field label="Country" hint="Shown as a flag on your profile.">
-            <CountryPicker value={country} onChange={setCountry} />
-          </Field>
-
-          <Field label="GitHub" hint="Your contribution graph will be shown on your profile.">
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-[13px] text-[var(--text-muted)]">github.com/</span>
-              <input
-                className={`${inputCls} flex-1`}
-                value={githubUsername}
-                maxLength={39}
-                onChange={(e) => setGithubUsername(e.target.value)}
-                placeholder="username"
-              />
-            </div>
-          </Field>
-
-          {/* Display picture upload */}
-          <div>
-            <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">
-              Profile photo
-            </span>
-            <div className="flex items-center gap-4">
-              <Avatar
-                name={displayName || currentUser?.displayName || "?"}
-                avatarStyle={avatarStyle}
-                url={previewUrl || currentUser?.avatarUrl}
-                size="lg"
-              />
-              <div className="flex flex-col gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] disabled:opacity-50"
-                >
-                  {uploading
-                    ? "Uploading…"
-                    : currentUser?.avatarUrl
-                      ? "Change photo"
-                      : "Upload photo"}
-                </button>
-                {currentUser?.avatarUrl ? (
-                  <button
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    disabled={uploading}
-                    className="text-[12px] text-[var(--text-muted)] transition-colors duration-200 hover:text-[var(--text-primary)] disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            <span className="mt-1.5 block text-[11px] text-[var(--text-muted)]">
-              JPG, PNG, WebP or GIF. Stored privately, up to 4MB.
-            </span>
-          </div>
-
-          {/* Avatar customization */}
-          <div>
-            <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">
-              Avatar style
-            </span>
-             <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 sm:gap-3">
-              {AVATAR_STYLES.map((preset) => {
-                const active = preset.id === avatarStyle;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setAvatarStyle(preset.id)}
-                    aria-pressed={active}
-                    title={preset.label}
-                    className={`group flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      active
-                        ? "border-[var(--accent)] bg-[var(--hover)]"
-                        : "border-[var(--border)] hover:bg-[var(--hover)]"
-                    }`}
-                  >
-                    <span className="relative">
-                      <Avatar
-                        name={displayName || currentUser?.displayName || "?"}
-                        avatarStyle={preset.id}
-                        size="sm"
-                      />
-                      {active && (
-                        <span className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] ring-2 ring-[var(--bg-surface)]">
-                          <Check className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      {preset.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Banner — animated GIF cover. Pick from the curated Giphy set. */}
-          <div>
-            <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">
-              Banner
-            </span>
-            <div className="relative h-20 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
-              {banner ? (
-                <img
-                  src={banner}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />
-              )}
-            </div>
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => setBanner("")}
-                aria-pressed={!banner}
-                className={`flex h-12 items-center justify-center rounded-lg border text-[11px] font-medium text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  !banner
-                    ? "border-[var(--accent)] bg-[var(--hover)] text-[var(--text-primary)]"
-                    : "border-[var(--border)] hover:bg-[var(--hover)]"
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+            <div
+                className={`t-modal-backdrop absolute inset-0 bg-black/60 backdrop-blur-[2px] ${
+                    shown ? "is-open" : ""
                 }`}
-              >
-                None
-              </button>
-              {BANNER_OPTIONS.map((opt) => {
-                const active = banner === opt.url;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setBanner(opt.url)}
-                    aria-pressed={active}
-                    aria-label={opt.label}
-                    title={opt.label}
-                    className={`relative h-12 overflow-hidden rounded-lg border transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      active
-                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]"
-                        : "border-[var(--border)] hover:bg-[var(--hover)]"
-                    }`}
-                  >
-                    <img
-                      src={opt.url}
-                      alt=""
-                      aria-hidden="true"
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                );
-              })}
+                onClick={close}
+                aria-hidden="true"
+            />
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Edit profile"
+                className={`t-modal relative z-10 flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[0_24px_80px_-16px_rgba(0,0,0,0.6)] sm:max-h-[86vh] sm:max-w-lg sm:rounded-2xl ${
+                    shown ? "is-open" : ""
+                }`}
+            >
+                {/* ── Cover header: live banner preview + overlapping avatar ─────── */}
+                <div className="relative shrink-0">
+                    <div className="relative h-24 w-full overflow-hidden sm:h-28">
+                        {banner ? (
+                            <img
+                                src={banner}
+                                alt=""
+                                aria-hidden="true"
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10" />
+                    </div>
+
+                    {/* Mobile drag handle */}
+                    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-2 sm:hidden">
+                        <span className="h-1 w-9 rounded-full bg-white/60" />
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={close}
+                        aria-label="Close"
+                        className={`absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-sm transition-[background-color,transform] duration-200 ${EASE} hover:bg-black/60 active:scale-90`}
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+
+                    {/* Avatar + name overlapping the cover */}
+                    <div className="relative flex items-end gap-3 px-5 pb-3">
+                        <div className="relative -mt-10 shrink-0 rounded-2xl ring-4 ring-[var(--bg-surface)] sm:-mt-12">
+                            {avatarNode("lg")}
+                            {uploading && (
+                                <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/45 text-white">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                </span>
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1 pb-0.5">
+                            <p className="truncate text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
+                                {displayName ||
+                                    currentUser?.displayName ||
+                                    "Profile"}
+                            </p>
+                            <p className="truncate text-[12px] text-[var(--text-muted)]">
+                                {username
+                                    ? `@${username}`
+                                    : "Set up your identity"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Body ────────────────────────────────────────────────────────── */}
+                <div className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 py-5">
+                    <Section label="Identity" delay={0}>
+                        <Field
+                            label="Display name"
+                            counter={<Counter value={displayName} max={50} />}
+                        >
+                            <input
+                                className={inputCls}
+                                value={displayName}
+                                maxLength={50}
+                                onChange={(e) => setDisplayName(e.target.value)}
+                                placeholder="Your name"
+                            />
+                        </Field>
+
+                        <Field
+                            label="Username"
+                            hint="Letters, numbers and underscores."
+                            counter={<Counter value={username} max={30} />}
+                        >
+                            <input
+                                className={inputCls}
+                                value={username}
+                                maxLength={30}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="username"
+                                spellCheck={false}
+                                autoComplete="off"
+                            />
+                        </Field>
+
+                        <Field
+                            label="Status"
+                            hint="A short line shown under your name."
+                            counter={<Counter value={status} max={60} />}
+                        >
+                            <input
+                                className={inputCls}
+                                value={status}
+                                maxLength={60}
+                                onChange={(e) => setStatus(e.target.value)}
+                                placeholder="e.g. Available"
+                            />
+                        </Field>
+
+                        <Field
+                            label="Bio"
+                            counter={<Counter value={bio} max={280} />}
+                        >
+                            <textarea
+                                className={`${inputCls} min-h-[84px] resize-none`}
+                                value={bio}
+                                maxLength={280}
+                                onChange={(e) => setBio(e.target.value)}
+                                placeholder="A little about you"
+                            />
+                        </Field>
+                    </Section>
+
+                    <Section label="Presence" delay={40}>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Field
+                                label="Country"
+                                hint="A flag on your profile."
+                            >
+                                <CountryPicker
+                                    value={country}
+                                    onChange={setCountry}
+                                />
+                            </Field>
+                            <Field
+                                label="GitHub"
+                                hint="Shows your contribution graph."
+                            >
+                                <div className="flex items-stretch gap-2">
+                                    <span className="flex shrink-0 items-center rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-2.5 text-[13px] text-[var(--text-muted)]">
+                                        @
+                                    </span>
+                                    <input
+                                        className={`${inputCls} flex-1 px-3`}
+                                        value={githubUsername}
+                                        maxLength={39}
+                                        onChange={(e) =>
+                                            setGithubUsername(e.target.value)
+                                        }
+                                        placeholder="username"
+                                        spellCheck={false}
+                                        autoComplete="off"
+                                    />
+                                </div>
+                            </Field>
+                        </div>
+                    </Section>
+
+                    <Section label="Profile photo" delay={80}>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <input
+                                ref={fileRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                onChange={handleAvatarChange}
+                                className="hidden"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileRef.current?.click()}
+                                disabled={uploading}
+                                className={`group relative flex h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-4 text-[13px] font-medium text-[var(--text-primary)] transition-[border-color,background-color,transform] duration-200 ${EASE} hover:border-[var(--accent)] hover:bg-[var(--hover)] active:scale-[0.98] disabled:opacity-50`}
+                            >
+                                <Upload
+                                    className={`h-3.5 w-3.5 text-[var(--text-muted)] transition-colors duration-200 ${EASE} group-hover:text-[var(--accent)]`}
+                                />
+                                {uploading
+                                    ? "Uploading…"
+                                    : currentUser?.avatarUrl
+                                      ? "Change photo"
+                                      : "Upload photo"}
+                            </button>
+                            {currentUser?.avatarUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveAvatar}
+                                    disabled={uploading}
+                                    className={`flex h-11 items-center gap-1.5 rounded-xl px-3 text-[13px] font-medium text-[var(--text-muted)] transition-[color,transform] duration-200 ${EASE} hover:text-[#ff5577] active:scale-[0.98] disabled:opacity-50`}
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Remove
+                                </button>
+                            ) : null}
+                            <span className="w-full text-[11px] leading-snug text-[var(--text-muted)]">
+                                JPG, PNG, WebP or GIF · up to 4MB
+                            </span>
+                        </div>
+
+                        {/* Avatar style presets */}
+                        <div>
+                            <span className="mb-2 block text-[12px] text-[var(--text-muted)]">
+                                Border style
+                            </span>
+                            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                                {AVATAR_STYLES.map((preset) => {
+                                    const active = preset.id === avatarStyle;
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            type="button"
+                                            onClick={() =>
+                                                setAvatarStyle(preset.id)
+                                            }
+                                            aria-pressed={active}
+                                            title={preset.label}
+                                            className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-[border-color,background-color,transform] duration-200 ${EASE} active:scale-[0.95] ${
+                                                active
+                                                    ? "border-[var(--accent)] bg-[var(--hover)]"
+                                                    : "border-[var(--border)] hover:bg-[var(--hover)]"
+                                            }`}
+                                        >
+                                            <Avatar
+                                                name={
+                                                    displayName ||
+                                                    currentUser?.displayName ||
+                                                    "?"
+                                                }
+                                                avatarStyle={preset.id}
+                                                size="sm"
+                                            />
+                                            {active && (
+                                                <span className="t-badge-pop absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] ring-2 ring-[var(--bg-surface)]">
+                                                    <Check
+                                                        className="h-2.5 w-2.5"
+                                                        strokeWidth={3}
+                                                    />
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] leading-none text-[var(--text-muted)]">
+                                                {preset.label}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </Section>
+
+                    <Section label="Banner" delay={120}>
+                        <p className="-mt-1 text-[11px] leading-snug text-[var(--text-muted)]">
+                            Animated cover shown at the top of your profile —
+                            previewed live in the header above.
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setBanner("")}
+                                aria-pressed={!banner}
+                                className={`flex h-14 items-center justify-center rounded-xl border text-[11px] font-medium transition-[border-color,background-color,transform] duration-200 ${EASE} active:scale-[0.97] ${
+                                    !banner
+                                        ? "border-[var(--accent)] bg-[var(--hover)] text-[var(--text-primary)]"
+                                        : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]"
+                                }`}
+                            >
+                                None
+                            </button>
+                            {BANNER_OPTIONS.map((opt) => {
+                                const active = banner === opt.url;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => setBanner(opt.url)}
+                                        aria-pressed={active}
+                                        aria-label={opt.label}
+                                        title={opt.label}
+                                        className={`relative h-14 overflow-hidden rounded-xl border transition-[border-color,box-shadow,transform] duration-200 ${EASE} active:scale-[0.97] ${
+                                            active
+                                                ? "border-[var(--accent)] ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-surface)]"
+                                                : "border-[var(--border)] hover:brightness-110"
+                                        }`}
+                                    >
+                                        <img
+                                            src={opt.url}
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="h-full w-full object-cover"
+                                        />
+                                        {active && (
+                                            <span className="t-badge-pop absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] ring-2 ring-[var(--bg-surface)]">
+                                                <Check
+                                                    className="h-2.5 w-2.5"
+                                                    strokeWidth={3}
+                                                />
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </Section>
+
+                    {error && (
+                        <div
+                            role="alert"
+                            className="t-badge-pop flex items-start gap-2 rounded-xl border border-[#ff5577]/25 bg-[#ff5577]/10 px-3 py-2.5 text-[12px] leading-snug text-[#ff9ab3]"
+                        >
+                            <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Footer (sticky, safe-area aware) ───────────────────────────── */}
+                <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--bg-surface)]/95 px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur">
+                    <button
+                        type="button"
+                        onClick={openFullProfile}
+                        className="rounded-lg px-1 py-1 text-[13px] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-[var(--text-primary)]"
+                    >
+                        View Public profile
+                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={close}
+                            disabled={saving}
+                            className={`flex h-10 flex-1 items-center justify-center rounded-xl border border-[var(--border)] px-4 text-[13px] font-medium text-[var(--text-primary)] transition-[background-color,transform] duration-200 ${EASE} hover:bg-[var(--hover)] active:scale-[0.98] disabled:opacity-50 sm:flex-none`}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-[13px] font-semibold text-[var(--on-accent)] shadow-[0_6px_20px_-8px_var(--accent)] transition-[filter,transform,opacity] duration-200 ${EASE} hover:brightness-110 active:scale-[0.98] disabled:opacity-60 sm:flex-none`}
+                        >
+                            {saving && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            )}
+                            {saving ? "Saving…" : "Save changes"}
+                        </button>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          {error && (
-            <p className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
-              {error}
-            </p>
-          )}
         </div>
-
-        {/* Footer */}
-        <div className="flex flex-col gap-3 border-t border-[var(--border)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <button
-            type="button"
-            onClick={openFullProfile}
-            className="text-[13px] text-[var(--text-muted)] hover:cursor-pointer transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-[var(--text-primary)]"
-          >
-            View full profile
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={close}
-              className="flex-1 rounded-lg border border-[var(--border)] px-4 hover:cursor-pointer py-2.5 text-[13px] font-medium text-[var(--text-primary)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] sm:flex-none"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 hover:cursor-pointer py-2.5 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:brightness-110 active:brightness-95 disabled:opacity-50 sm:flex-none"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default ProfileEditModal;

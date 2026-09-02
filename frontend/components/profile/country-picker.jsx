@@ -1,10 +1,11 @@
 "use client";
 
+import { Check, ChevronDown, Search, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { Search, X, Check, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { createPortal } from "react-dom";
 import { COUNTRIES } from "@/lib/countries";
+import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -29,7 +30,11 @@ function Flag({ code }) {
    value: { name: string, code: string } | null
    onChange: (country: { name: string, code: string } | null) => void
    ──────────────────────────────────────────────────────────────────────── */
-export function CountryPicker({ value, onChange, title = "Select your country" }) {
+export function CountryPicker({
+  value,
+  onChange,
+  title = "Select your country",
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -38,8 +43,7 @@ export function CountryPicker({ value, onChange, title = "Select your country" }
     const q = search.toLowerCase();
     return COUNTRIES.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.code.toLowerCase().includes(q),
+        c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q),
     );
   }, [search]);
 
@@ -79,131 +83,141 @@ export function CountryPicker({ value, onChange, title = "Select your country" }
       </button>
 
       {/* ── Dialog ─────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            {/* Backdrop — matches t-modal-backdrop pattern */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: EASE }}
-              onClick={() => {
-                setIsOpen(false);
-                setSearch("");
-              }}
-              className="fixed inset-0 z-[998] bg-black/60 backdrop-blur-[2px]"
-              aria-hidden="true"
-            />
+      {/* Portaled to <body> so it escapes the stacking context of any
+          ancestor modal (t-modal / t-item-in use will-change: transform,
+          which traps fixed-position children and paints them under later
+          siblings). createPortal wraps AnimatePresence — NOT the other way
+          around: AnimatePresence cannot track a portal element as its direct
+          child, and the dialog silently fails to render. */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {isOpen && (
+              <>
+                {/* Backdrop — matches t-modal-backdrop pattern */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2, ease: EASE }}
+                  onClick={() => {
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className="fixed inset-0 z-[1001] bg-black/60 backdrop-blur-[2px]"
+                  aria-hidden="true"
+                />
 
-            {/* Dialog container — centered, pointer-events passthrough */}
-            <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 pointer-events-none">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96, filter: "blur(4px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 0.96, filter: "blur(4px)" }}
-                transition={{ duration: 0.25, ease: EASE }}
-                className={cn(
-                  "pointer-events-auto flex h-fit max-h-[520px] w-full max-w-[400px] flex-col overflow-hidden",
-                  "rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)]",
-                  "shadow-[var(--shadow-lg)] sm:h-[520px]",
-                )}
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                  <h2 className="text-[14px] font-medium text-[var(--text-primary)]">
-                    {title}
-                  </h2>
-                  <button
-                    type="button"
-                    title="Close"
-                    onClick={() => {
-                      setIsOpen(false);
-                      setSearch("");
-                    }}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                {/* Dialog container — centered, pointer-events passthrough */}
+                <div className="fixed inset-0 z-[1002] flex items-center justify-center p-4 pointer-events-none">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96, filter: "blur(4px)" }}
+                    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, scale: 0.96, filter: "blur(4px)" }}
+                    transition={{ duration: 0.25, ease: EASE }}
+                    className={cn(
+                      "pointer-events-auto flex h-fit max-h-[520px] w-full max-w-[400px] flex-col overflow-hidden",
+                      "rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)]",
+                      "shadow-[var(--shadow-lg)] sm:h-[520px]",
+                    )}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Search */}
-                <div className="px-5 pb-3">
-                  <div className="relative flex items-center">
-                    <Search
-                      size={15}
-                      className="absolute left-3 text-[var(--text-muted)]"
-                    />
-                    <input
-                      autoFocus
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search countries..."
-                      className={cn(
-                        "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-base)] py-2.5 pr-10 pl-9",
-                        "text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
-                        "transition-colors duration-200 focus:border-[var(--accent)] focus:outline-none",
-                      )}
-                    />
-                    {search && (
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                      <h2 className="text-[14px] font-medium text-[var(--text-primary)]">
+                        {title}
+                      </h2>
                       <button
                         type="button"
-                        onClick={() => setSearch("")}
-                        className="absolute right-2.5 flex h-5 w-5 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                        title="Close"
+                        onClick={() => {
+                          setIsOpen(false);
+                          setSearch("");
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Country list */}
-                <div className="t-scroll flex-1 overflow-y-auto pb-2">
-                  {filtered.length === 0 ? (
-                    <div className="flex h-[150px] items-center justify-center text-[13px] text-[var(--text-muted)]">
-                      No countries found
                     </div>
-                  ) : (
-                    filtered.map((country) => {
-                      const selected = value?.code === country.code;
-                      return (
-                        <button
-                          key={country.code}
-                          type="button"
-                          onClick={() => handleSelect(country)}
+
+                    {/* Search */}
+                    <div className="px-5 pb-3">
+                      <div className="relative flex items-center">
+                        <Search
+                          size={15}
+                          className="absolute left-3 text-[var(--text-muted)]"
+                        />
+                        <input
+                          autoFocus
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="Search countries..."
                           className={cn(
-                            "group flex w-full items-center justify-between px-5 py-2.5 transition-colors duration-150",
-                            selected
-                              ? "bg-[var(--hover)]"
-                              : "hover:bg-[var(--hover)]/50",
+                            "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-base)] py-2.5 pr-10 pl-9",
+                            "text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
+                            "transition-colors duration-200 focus:border-[var(--accent)] focus:outline-none",
                           )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Flag code={country.code} />
-                            <span
+                        />
+                        {search && (
+                          <button
+                            type="button"
+                            onClick={() => setSearch("")}
+                            className="absolute right-2.5 flex h-5 w-5 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Country list */}
+                    <div className="t-scroll flex-1 overflow-y-auto pb-2">
+                      {filtered.length === 0 ? (
+                        <div className="flex h-[150px] items-center justify-center text-[13px] text-[var(--text-muted)]">
+                          No countries found
+                        </div>
+                      ) : (
+                        filtered.map((country) => {
+                          const selected = value?.code === country.code;
+                          return (
+                            <button
+                              key={country.code}
+                              type="button"
+                              onClick={() => handleSelect(country)}
                               className={cn(
-                                "text-[13px] transition-colors duration-150",
+                                "group flex w-full items-center justify-between px-5 py-2.5 transition-colors duration-150",
                                 selected
-                                  ? "font-medium text-[var(--text-primary)]"
-                                  : "text-[var(--text-muted)] group-hover:text-[var(--text-primary)]",
+                                  ? "bg-[var(--hover)]"
+                                  : "hover:bg-[var(--hover)]/50",
                               )}
                             >
-                              {country.name}
-                            </span>
-                          </div>
-                          {selected && (
-                            <Check className="h-4 w-4 text-[var(--text-primary)]" />
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
+                              <div className="flex items-center gap-3">
+                                <Flag code={country.code} />
+                                <span
+                                  className={cn(
+                                    "text-[13px] transition-colors duration-150",
+                                    selected
+                                      ? "font-medium text-[var(--text-primary)]"
+                                      : "text-[var(--text-muted)] group-hover:text-[var(--text-primary)]",
+                                  )}
+                                >
+                                  {country.name}
+                                </span>
+                              </div>
+                              {selected && (
+                                <Check className="h-4 w-4 text-[var(--text-primary)]" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </motion.div>
                 </div>
-              </motion.div>
-            </div>
-          </>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </>
   );
 }
