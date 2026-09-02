@@ -321,6 +321,7 @@ export function NestedSidebar({
   onNewGroup,
   onCreateSpace,
   onDiscoverSpaces,
+  unread = {},
 }) {
   const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState("chats");
@@ -335,7 +336,12 @@ export function NestedSidebar({
   }, [conversations, query]);
 
   const chatsItems = useMemo(
-    () => filteredConversations.filter((c) => c.type === "dm" || c.type === "group"),
+    () => filteredConversations.filter((c) => c.type === "dm"),
+    [filteredConversations]
+  );
+
+  const groupsItems = useMemo(
+    () => filteredConversations.filter((c) => c.type === "group"),
     [filteredConversations]
   );
 
@@ -355,7 +361,8 @@ export function NestedSidebar({
   }, [spaces, query]);
 
   const placeholderByTab = {
-    chats: "Search conversations",
+    chats: "Search chats",
+    groups: "Search groups",
     spaces: "Search spaces",
     settings: "Search settings",
   };
@@ -367,6 +374,7 @@ export function NestedSidebar({
         onTabChange={setActiveTab}
         currentUser={currentUser}
         onProfileClick={() => setProfileOpen(true)}
+        unread={unread}
       />
 
       {/* Content panel */}
@@ -394,6 +402,16 @@ export function NestedSidebar({
                   onSpace={onCreateSpace}
                   onDiscover={onDiscoverSpaces}
                 />
+              )}
+              {activeTab === "groups" && (
+                <button
+                  type="button"
+                  onClick={onNewGroup}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90"
+                >
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+                  New group
+                </button>
               )}
               {activeTab === "spaces" && (
                 <>
@@ -460,13 +478,37 @@ export function NestedSidebar({
                 className="h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5"
                 style={{ overscrollBehavior: "contain" }}
               >
-                {conversations.length === 0 ? (
-                  <EmptyState message="No conversations yet" />
+                {conversations.filter((c) => c.type === "dm").length === 0 ? (
+                  <EmptyState message="No chats yet" />
                 ) : filteredConversations.length === 0 || chatsItems.length === 0 ? (
-                  <EmptyState message={query.trim() ? `No results for “${query.trim()}”` : "No conversations yet"} />
+                  <EmptyState message={query.trim() ? `No results for “${query.trim()}”` : "No chats yet"} />
                 ) : (
                   <ChatsList
                     items={chatsItems}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    onMarkUnread={onMarkUnread}
+                  />
+                )}
+              </motion.div>
+            )}
+            {activeTab === "groups" && (
+              <motion.div
+                key="groups"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
+                className="h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5"
+                style={{ overscrollBehavior: "contain" }}
+              >
+                {conversations.filter((c) => c.type === "group").length === 0 ? (
+                  <EmptyState message="No groups yet" />
+                ) : groupsItems.length === 0 ? (
+                  <EmptyState message={query.trim() ? `No results for “${query.trim()}”` : "No groups yet"} />
+                ) : (
+                  <ChatsList
+                    items={groupsItems}
                     selectedId={selectedId}
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}

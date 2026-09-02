@@ -1608,6 +1608,7 @@ export function DashboardShell() {
           onNewGroup={handleNewGroup}
           onCreateSpace={() => setShowSpaceCreate(true)}
           onDiscoverSpaces={() => setShowDiscover(true)}
+          unread={tabUnread}
         />
       </div>
 

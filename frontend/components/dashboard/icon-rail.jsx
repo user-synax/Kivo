@@ -1,16 +1,17 @@
 "use client";
 
-import { Layers, MessageCircle, Settings } from "lucide-react";
+import { Layers, MessageCircle, Settings, Users } from "lucide-react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { cn } from "@/lib/utils";
 
 const RAIL_ITEMS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
+  { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick }) {
+export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, unread }) {
   const profileLabel = currentUser?.displayName || currentUser?.email || "Profile";
 
   return (
@@ -22,6 +23,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick }
         {RAIL_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const hasUnread = Boolean(unread?.[item.id]);
           return (
             <div key={item.id} className="group relative flex w-full justify-center">
               <button
@@ -30,13 +32,16 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick }
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => onTabChange?.(item.id)}
                 className={cn(
-                  "flex size-10 items-center justify-center rounded-xl transition-colors duration-200",
+                  "relative flex size-10 items-center justify-center rounded-xl transition-colors duration-200",
                   isActive
                     ? "text-[var(--accent)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                 )}
               >
                 <Icon className="h-5 w-5" strokeWidth={isActive ? 2.2 : 1.8} />
+                {hasUnread && (
+                  <span className="absolute right-1 top-1 size-2.5 rounded-full bg-[#ff3b30] ring-2 ring-[var(--bg-elevated)]" aria-hidden="true" />
+                )}
               </button>
               {/* hover tooltip — icons only in rail, label on hover */}
               <span
