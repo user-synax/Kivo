@@ -41,6 +41,14 @@ export const updateMeSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal("")),
+  githubUsername: z
+    .string()
+    .trim()
+    .max(39)
+    .regex(/^[a-zA-Z0-9-]*$/, "GitHub username may only contain letters, numbers, and hyphens")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
 });
 
 export const usernameParamSchema = z.object({

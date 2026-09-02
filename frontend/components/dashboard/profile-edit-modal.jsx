@@ -42,6 +42,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
   const [avatarStyle, setAvatarStyle] = useState("default");
   const [banner, setBanner] = useState("");
   const [country, setCountry] = useState(null);
+  const [githubUsername, setGithubUsername] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -109,6 +110,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
           ? COUNTRIES.find((c) => c.code === me.country) || null
           : null,
       );
+      setGithubUsername(me?.githubUsername || "");
       setError(null);
       setRender(true);
       const id = requestAnimationFrame(() => setShown(true));
@@ -145,6 +147,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
         avatarStyle,
         banner,
         country: country?.code || "",
+        githubUsername: githubUsername.trim(),
       });
       // Persist the refreshed user object (drives the sidebar avatar + session).
       setSession(updated, getToken());
@@ -251,6 +254,19 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
 
           <Field label="Country" hint="Shown as a flag on your profile.">
             <CountryPicker value={country} onChange={setCountry} />
+          </Field>
+
+          <Field label="GitHub" hint="Your contribution graph will be shown on your profile.">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[13px] text-[var(--text-muted)]">github.com/</span>
+              <input
+                className={`${inputCls} flex-1`}
+                value={githubUsername}
+                maxLength={39}
+                onChange={(e) => setGithubUsername(e.target.value)}
+                placeholder="username"
+              />
+            </div>
           </Field>
 
           {/* Display picture upload */}

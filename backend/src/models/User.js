@@ -60,6 +60,14 @@ const userSchema = new mongoose.Schema(
       default: null,
       maxlength: 2,
     },
+    // GitHub username for displaying the contribution graph on the public
+    // profile. Optional; a plain string, no OAuth required.
+    githubUsername: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 39,
+    },
     // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
     // so the previous file can be deleted on re-upload.
     avatarFileId: {

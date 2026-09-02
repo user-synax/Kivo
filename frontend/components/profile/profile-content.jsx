@@ -20,6 +20,14 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import {
+  ContributionGraph,
+  ContributionGraphCalendar,
+  ContributionGraphBlock,
+  ContributionGraphFooter,
+  ContributionGraphLegend,
+  ContributionGraphTotalCount,
+} from "@/components/ui/contribution-graph";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -1030,6 +1038,32 @@ export function ProfileContent({
             >
               This is your profile.
             </motion.p>
+          )}
+
+          {/* ── GitHub contribution graph ────────────────────────────────── */}
+          {profile.githubUsername && (
+            <motion.div variants={item} className="mt-5">
+              <div className="border-t border-[var(--hairline-soft)] pt-5">
+                <ContributionGraph
+                  username={profile.githubUsername}
+                  className="text-[var(--ink-muted)]"
+                >
+                  <ContributionGraphCalendar className="rounded-xl border border-[var(--hairline)] bg-[var(--surface-1)] p-3">
+                    {({ activity, dayIndex, weekIndex }) => (
+                      <ContributionGraphBlock
+                        activity={activity}
+                        dayIndex={dayIndex}
+                        weekIndex={weekIndex}
+                      />
+                    )}
+                  </ContributionGraphCalendar>
+                  <ContributionGraphFooter className="mt-2">
+                    <ContributionGraphTotalCount className="text-[12px] text-[var(--ink-muted)]" />
+                    <ContributionGraphLegend />
+                  </ContributionGraphFooter>
+                </ContributionGraph>
+              </div>
+            </motion.div>
           )}
         </motion.div>
       </motion.div>
