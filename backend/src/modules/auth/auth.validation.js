@@ -28,14 +28,6 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const verifyOtpSchema = z.object({
-  userId: z.string().min(1, "userId is required"),
-  otp: z.string().length(6, "Code must be 6 digits"),
-});
-
-export const resendOtpSchema = z.object({
-  userId: z.string().min(1, "userId is required"),
-});
 
 // Convenience parser that throws a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {

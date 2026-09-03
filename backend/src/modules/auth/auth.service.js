@@ -1,9 +1,7 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
 import env, { refreshTtlSeconds } from "../../config/env.js";
-import { unauthorized, conflict, notFound, badRequest, forbidden } from "../../utils/errors.js";
+import { unauthorized, conflict, notFound, badRequest } from "../../utils/errors.js";
 import User from "../../models/User.js";
 import Session from "../../models/Session.js";
 import { sendEmail } from "../../lib/email.js";
@@ -69,32 +67,7 @@ function passwordResetEmailHtml({ displayName, resetUrl }) {
 </html>`;
 }
 
-// ── Email OTP templates ─────────────────────────────────────────────────────
 
-// OTP verification email — same 480px card styling as the other templates.
-// The code is rendered as large monospace digits on a brand-purple chip.
-
-function otpEmailHtml({ displayName, otp }) {
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:system-ui,-apple-system,sans-serif;">
-  <div style="max-width:480px;margin:40px auto;background:#fff;border-radius:12px;padding:40px 32px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-    <h1 style="margin:0 0 8px;font-size:24px;color:#1a1a1a;">Your verification code</h1>
-    <p style="margin:0 0 24px;color:#666;font-size:15px;line-height:1.6;">
-      Hi${displayName ? ` ${displayName}` : ""}, use the code below to verify your email address.
-    </p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <span style="display:inline-block;background:#7a40ed;color:#fff;font-size:36px;font-weight:700;letter-spacing:8px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;padding:16px 32px;border-radius:12px;">${otp}</span>
-    </div>
-    <p style="margin:0;color:#999;font-size:13px;line-height:1.6;">
-      This code expires in 10 minutes. If you didn't create an account, you can safely ignore this email.
-    </p>
-  </div>
-</body>
-</html>`;
-}
 
 // ── Session helpers ─────────────────────────────────────────────────────────
 
@@ -161,34 +134,11 @@ function publicUser(user) {
   };
 }
 
-// ── Email OTP helpers ───────────────────────────────────────────────────────
 
-// Generate a 6-digit numeric OTP, bcrypt-hash it, and stamp it (plus expiry,
-// attempt counter reset, and send timestamp) onto the user. The caller
-// persists the changes via user.save().
-async function issueEmailOtp(user) {
-  const otp = crypto.randomInt(100000, 1000000).toString();
-  user.emailOtpHash = await bcrypt.hash(otp, 12);
-  user.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
-  user.emailOtpAttempts = 0;
-  user.emailOtpLastSentAt = new Date();
-  return otp;
-}
 
-// Fire-and-forget OTP email — a failed SMTP send must not block the request.
-function sendOtpEmail(user, otp) {
-  sendEmail({
-    to: user.email,
-    subject: "Your verification code — Kivo",
-    html: otpEmailHtml({ displayName: user.displayName || "", otp }),
-  }).catch((err) => {
-    console.error("[email] Failed to send OTP email:", err.message);
-  });
-}
+// ── Registration ───────────────────────────────────────────────────────────
 
-// ── Registration (with email OTP verification) ──────────────────────────────
-
-export async function registerUser({ email, username, password, displayName }) {
+export async function registerUser({ email, username, password, displayName, deviceInfo }) {
   const existing = await User.findOne({ email });
   if (existing) {
     throw conflict("Email already registered", "EMAIL_TAKEN");
@@ -212,14 +162,10 @@ export async function registerUser({ email, username, password, displayName }) {
     isEmailVerified: false,
   });
 
-  // Generate + email the 6-digit verification OTP (send is fire-and-forget).
-  const otp = await issueEmailOtp(user);
-  await user.save();
-  sendOtpEmail(user, otp);
-
-  // No session is issued here: the client must complete email verification
-  // (POST /auth/verify-otp) before receiving an access token.
-  return { userId: user.id, email: user.email };
+  // Issue a session immediately — no OTP barrier. Email verification is
+  // handled asynchronously via the in-app banner + link flow.
+  const { accessToken, refreshToken } = await issueSession(user.id, deviceInfo);
+  return { user: publicUser(user), accessToken, refreshToken };
 }
 
 // ── Login ───────────────────────────────────────────────────────────────────
@@ -247,14 +193,6 @@ export async function loginUser({ identifier, password, deviceInfo }) {
   const ok = await user.comparePassword(password);
   if (!ok) {
     throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
-  }
-
-  // Email must be verified before a session can be issued. `details.userId`
-  // lets the frontend route straight to the OTP verification screen.
-  if (!user.isEmailVerified) {
-    throw forbidden("Please verify your email", "EMAIL_NOT_VERIFIED", {
-      userId: user.id,
-    });
   }
 
   const { accessToken, refreshToken } = await issueSession(user.id, deviceInfo);
@@ -324,97 +262,6 @@ export async function forceLogoutUser({ userId }) {
   }
   await logoutAllSessions({ userId });
   return { revoked: true };
-}
-
-// ── Email OTP verification ─────────────────────────────────────────────────
-
-// Verify a 6-digit email OTP and, on success, issue a full session (same shape
-// as login so the frontend can reuse its session handling unchanged).
-export async function verifyOtp({ userId, otp, deviceInfo }) {
-  // Guard against malformed ids (would otherwise surface as a CastError 500).
-  if (!mongoose.isValidObjectId(userId)) {
-    throw notFound("User not found", "USER_NOT_FOUND");
-  }
-
-  const user = await User.findById(userId).select(
-    "+emailOtpHash +emailOtpExpires +emailOtpAttempts",
-  );
-  if (!user) {
-    throw notFound("User not found", "USER_NOT_FOUND");
-  }
-
-  // Already verified — idempotent success (still issues a session below).
-  if (!user.isEmailVerified) {
-    if (!user.emailOtpHash) {
-      throw badRequest("No verification code pending", "OTP_EXPIRED");
-    }
-    if (user.emailOtpExpires && user.emailOtpExpires.getTime() < Date.now()) {
-      throw badRequest("Code expired, request a new one", "OTP_EXPIRED");
-    }
-    if (user.emailOtpAttempts >= 5) {
-      // Lock out: clear the code so no further attempts are possible until a
-      // new one is requested.
-      user.emailOtpHash = null;
-      user.emailOtpExpires = null;
-      user.emailOtpAttempts = 0;
-      await user.save();
-      throw badRequest(
-        "Too many incorrect attempts, request a new code",
-        "OTP_LOCKED",
-      );
-    }
-
-    const ok = await bcrypt.compare(otp, user.emailOtpHash);
-    if (!ok) {
-      user.emailOtpAttempts += 1;
-      await user.save();
-      throw badRequest("Incorrect code", "INVALID_OTP");
-    }
-
-    user.isEmailVerified = true;
-    // Auto-verify the profile badge for users who complete email verification
-    // at signup (showBadge defaults to true, so the badge shows immediately).
-    user.verified = true;
-    user.emailOtpHash = null;
-    user.emailOtpExpires = null;
-    user.emailOtpAttempts = 0;
-    await user.save();
-  }
-
-  const { accessToken, refreshToken } = await issueSession(user.id, deviceInfo);
-  return { user: publicUser(user), accessToken, refreshToken };
-}
-
-// Re-send the 6-digit OTP. Always returns success (no user enumeration). A
-// 60s cooldown is enforced in-service via emailOtpLastSentAt so a stale or
-// replayed request can't trigger more emails than the route limiter allows.
-export async function resendOtp({ userId }) {
-  const validId = mongoose.isValidObjectId(userId);
-  const user = validId
-    ? await User.findById(userId).select(
-        "+emailOtpHash +emailOtpExpires +emailOtpLastSentAt",
-      )
-    : null;
-
-  if (!user || user.isEmailVerified) {
-    return { sent: true };
-  }
-
-  const lastSent = user.emailOtpLastSentAt
-    ? user.emailOtpLastSentAt.getTime()
-    : 0;
-  if (Date.now() - lastSent < 60 * 1000) {
-    throw badRequest(
-      "Please wait before requesting another code",
-      "RATE_LIMIT_EXCEEDED",
-    );
-  }
-
-  const otp = await issueEmailOtp(user);
-  await user.save();
-  sendOtpEmail(user, otp);
-
-  return { sent: true };
 }
 
 // ── Email verification ──────────────────────────────────────────────────────

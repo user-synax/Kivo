@@ -111,12 +111,6 @@ const userSchema = new mongoose.Schema(
     emailVerificationTokenHash: { type: String, default: null, select: false },
     emailVerificationExpires: { type: Date, default: null, select: false },
 
-    // Email OTP verification (6-digit code emailed at signup; replaces the
-    // magic-link flow for new registrations). All hidden from default queries.
-    emailOtpHash: { type: String, default: null, select: false },
-    emailOtpExpires: { type: Date, default: null, select: false },
-    emailOtpAttempts: { type: Number, default: 0, select: false },
-    emailOtpLastSentAt: { type: Date, default: null, select: false },
 
     // Password reset
     passwordResetTokenHash: { type: String, default: null, select: false },

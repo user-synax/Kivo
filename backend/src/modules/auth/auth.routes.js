@@ -27,23 +27,7 @@ router.post("/refresh-token", refreshLimiter, authController.refreshToken);
 router.post("/logout", authenticate, authController.logout);
 router.post("/logout-all", authenticate, authController.logoutAll);
 
-// Email OTP verification (public — issued at signup, keyed to the new user).
-const otpVerifyLimiter = rateLimiter({
-  keyPrefix: "verify-otp",
-  windowSeconds: 600,
-  max: 10,
-  keyFrom: (req) => req.body?.userId || req.ip,
-});
-const resendOtpLimiter = rateLimiter({
-  keyPrefix: "resend-otp",
-  windowSeconds: 60,
-  max: 1,
-  keyFrom: (req) => req.body?.userId || req.ip,
-});
-router.post("/verify-otp", otpVerifyLimiter, authController.verifyOtp);
-router.post("/resend-otp", resendOtpLimiter, authController.resendOtp);
-
-// Email verification (legacy link flow)
+// Email verification (link flow)
 router.get("/verify-email", authController.verifyEmail);
 router.post("/resend-verification", authenticate, resendVerificationLimiter, authController.resendVerification);
 
