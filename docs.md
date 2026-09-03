@@ -191,8 +191,8 @@ Messages appear immediately (optimistic UI). If send fails, use **retry** on tha
 
 Every bubble has a menu — right-click on desktop, **press and hold** on mobile:
 
-- On **other people's messages**: React · **Copy** · **View profile** · **Block** · Reply · **Thread** · **Forward** · **Pin** · Mark as unread · **Select**
-- On **your own messages**: React · **Copy** · **Forward** · **Pin** · **Thread** · Reply · Edit · Delete · **Select**
+- On **other people's messages**: React · **Copy** · **Save message** · **View profile** · **Block** · Reply · **Thread** · **Forward** · **Pin** · Mark as unread · **Select**
+- On **your own messages**: React · **Copy** · **Save message** · **Forward** · **Pin** · **Thread** · Reply · Edit · Delete · **Select**
 - A **quick-reaction strip** of common emoji sits at the top of the menu so long-press → one-tap react works on mobile.
 - **Select** switches the chat into multi-select mode — tick several bubbles, then use the floating bar to **copy**, **forward**, or **delete** (your own) them.
 - **View profile** opens the person's profile; **Block** blocks them (their messages in this chat are then hidden behind the blocked banner).
@@ -246,6 +246,15 @@ You can only forward a message you can already see: membership of the source con
 1. Context menu → **Pin** (or **Unpin**). Any member of the chat can pin.
 2. Pinned messages appear in a **banner under the chat header**, newest first (up to 10).
 3. Unpinning or deleting the message clears it from the banner; changes sync in real time to everyone in the chat.
+
+### Save a message (bookmarks)
+
+1. Context menu (right-click / long-press) on any message → **Save message** (your own, other people's, and thread replies all work). The row flips to **Unsave** once saved.
+2. Open the **Saved** panel from the bookmark icon next to Search in the sidebar — every message you saved across chats is listed, newest save first.
+3. Click any entry to **jump to that conversation** and highlight the message (same as search results).
+4. Unsave from the bubble menu again, or delete the message — deleted messages leave the Saved list automatically.
+
+Saves are personal: no one else sees them, and they follow your account across devices.
 
 ### Threads (reply in a side panel)
 
@@ -778,7 +787,6 @@ What does **not** queue: file/photo attachments (uploads need a live connection)
 
 Do not expect these in the current MVP:
 
-- Saved messages
 - **Voice / video** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
@@ -797,6 +805,7 @@ Do not expect these in the current MVP:
 | Open DM from a friend | Friends → **Message** |
 | Send / reply / react / edit / delete / copy / forward / pin messages | Chat panel + bubble menu (double-click = ❤️) |
 | Threaded replies (side panel) | Message menu → Thread, or click the "N replies" chip under a message |
+| Save messages for later | Message menu → Save message; sidebar bookmark icon opens the Saved panel |
 | Emoji in text | Composer smile button (9 categories, 270+) |
 | @mentions | Type `@` in the composer |
 | Typing, presence, read receipts | Automatic while connected |

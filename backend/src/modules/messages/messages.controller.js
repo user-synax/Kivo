@@ -6,6 +6,7 @@ import {
   updateMessageSchema,
   reactionSchema,
   pinSchema,
+  saveSchema,
   listMessagesQuerySchema,
   markUnreadSchema,
 } from "./messages.validation.js";
@@ -61,6 +62,23 @@ export const listPinned = asyncHandler(async (req, res) => {
     userId: req.user.userId,
   });
   res.status(200).json({ success: true, data: messages });
+});
+
+export const toggleSave = asyncHandler(async (req, res) => {
+  const { saved } = parseBody(saveSchema, req.body);
+  const message = await messagesService.toggleSave({
+    messageId: req.params.id,
+    userId: req.user.userId,
+    saved,
+  });
+  res.status(200).json({ success: true, data: message });
+});
+
+export const listSaved = asyncHandler(async (req, res) => {
+  const items = await messagesService.listSaved({
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: items });
 });
 
 export const pinMessage = asyncHandler(async (req, res) => {

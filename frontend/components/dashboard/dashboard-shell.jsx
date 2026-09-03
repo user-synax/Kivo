@@ -33,6 +33,7 @@ import {
 } from "@/lib/cache";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { useOfflineStatus } from "@/lib/hooks/use-offline-status";
+import { SavedMessagesModal } from "@/components/dashboard/saved-messages-modal";
 import { SearchOverlay } from "@/components/dashboard/search-overlay";
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { UserPanel } from "./user-panel";
@@ -406,6 +407,8 @@ export function DashboardShell() {
   const isOffline = useOfflineStatus(isConnected);
   // Search overlay state
   const [searchOpen, setSearchOpen] = useState(false);
+  // Saved messages modal state
+  const [savedOpen, setSavedOpen] = useState(false);
   // Message highlight state: when a search result is clicked, we store the
   // target message id and conversation id so ChatPanel can scroll + highlight it.
   const [highlightMessageId, setHighlightMessageId] = useState(null);
@@ -1516,6 +1519,7 @@ export function DashboardShell() {
                       hideGroups
                       isOffline={isOffline}
                       onSearchOpen={() => setSearchOpen(true)}
+                      onSavedOpen={() => setSavedOpen(true)}
                       onMarkUnread={(id) => handleMarkUnread(id)}
                     />
                   </div>
@@ -1540,6 +1544,7 @@ export function DashboardShell() {
                       hideDMs
                       isOffline={isOffline}
                       onSearchOpen={() => setSearchOpen(true)}
+                      onSavedOpen={() => setSavedOpen(true)}
                       onMarkUnread={(id) => handleMarkUnread(id)}
                     />
                   </div>
@@ -1602,6 +1607,12 @@ export function DashboardShell() {
         onSelectMessage={handleSearchMessage}
         onSelectUser={handleSearchUser}
         onSelectSpace={handleSearchSpace}
+      />
+
+      <SavedMessagesModal
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        onJump={handleSearchMessage}
       />
 
       <GroupSettingsOverlay
@@ -1687,6 +1698,7 @@ export function DashboardShell() {
           notificationBell={notificationBellNode}
           isOffline={isOffline}
           onSearchOpen={() => setSearchOpen(true)}
+          onSavedOpen={() => setSavedOpen(true)}
           onMarkUnread={(id) => handleMarkUnread(id)}
           onCompose={handleCompose}
           onNewGroup={handleNewGroup}
@@ -1809,6 +1821,12 @@ export function DashboardShell() {
         onSelectMessage={handleSearchMessage}
         onSelectUser={handleSearchUser}
         onSelectSpace={handleSearchSpace}
+      />
+
+      <SavedMessagesModal
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        onJump={handleSearchMessage}
       />
 
       <ProfileDrawer

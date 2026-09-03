@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bookmark,
   ChevronDown,
   Compass,
   Hash,
@@ -316,6 +317,7 @@ export function NestedSidebar({
   notificationBell = null,
   isOffline = false,
   onSearchOpen,
+  onSavedOpen,
   onMarkUnread,
   onCompose,
   onNewGroup,
@@ -383,6 +385,17 @@ export function NestedSidebar({
         <div className="flex shrink-0 flex-col gap-2 border-b border-[var(--border)] px-3 py-3">
           <div className="flex items-center gap-2">
             {notificationBell && <span className="shrink-0">{notificationBell}</span>}
+            {onSavedOpen && (
+              <button
+                type="button"
+                onClick={onSavedOpen}
+                aria-label="Saved messages"
+                title="Saved messages"
+                className="kivo-focus flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              >
+                <Bookmark className="h-5 w-5" strokeWidth={1.6} />
+              </button>
+            )}
             {onSearchOpen && (
               <button
                 type="button"

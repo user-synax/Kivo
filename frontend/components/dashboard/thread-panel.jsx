@@ -190,6 +190,27 @@ export function ThreadPanel({
     }
   };
 
+  const toggleSaveReply = async (reply) => {
+    const next = !reply.saved;
+    setReplies((prev) =>
+      prev.map((r) => (r.id === reply.id ? { ...r, saved: next } : r)),
+    );
+    try {
+      const updated = await apiPost(`/api/v1/messages/${reply.id}/save`, {
+        saved: next,
+      });
+      setReplies((prev) =>
+        prev.map((r) => (r.id === reply.id ? { ...r, ...updated } : r)),
+      );
+    } catch {
+      setReplies((prev) =>
+        prev.map((r) =>
+          r.id === reply.id ? { ...r, saved: !next } : r,
+        ),
+      );
+    }
+  };
+
   const copyMessage = async (m) => {
     const textToCopy = messageText(m);
     if (!textToCopy) return;
@@ -322,6 +343,9 @@ export function ThreadPanel({
                         mine ? () => removeMessage(reply.id) : undefined
                       }
                       onCopy={() => copyMessage(reply)}
+                      onSaveToggle={
+                        !reply.isDeleted ? () => toggleSaveReply(reply) : undefined
+                      }
                       onForward={onForward ? () => onForward(reply) : undefined}
                       onProfile={
                         !mine && membersById[reply.senderId]?.username

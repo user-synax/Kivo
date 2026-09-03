@@ -39,6 +39,10 @@ export const pinSchema = z.object({
   pinned: z.boolean(),
 });
 
+export const saveSchema = z.object({
+  saved: z.boolean(),
+});
+
 export const listMessagesQuerySchema = z.object({
   cursor: z.string().optional(),
   around: z.string().optional(),

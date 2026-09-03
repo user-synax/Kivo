@@ -302,9 +302,10 @@ export function DocsScreen() {
               <h3 className="doc-h3">Message menu</h3>
               <p>
                 Right-click a bubble on desktop, or press and hold on mobile, to
-                open the menu: quick reactions, Copy, View profile / Block
-                (others’ messages), Reply, Thread, Forward, Pin, Select, and
-                Mark as unread. Your own messages add Edit and Delete.
+                open the menu: quick reactions, Copy, Save message, View
+                profile / Block (others’ messages), Reply, Thread, Forward,
+                Pin, Select, and Mark as unread. Your own messages add Edit
+                and Delete.
               </p>
               <h3 className="doc-h3">React, edit, delete</h3>
               <ul className="mt-3 flex flex-col gap-2">
@@ -357,6 +358,14 @@ export function DocsScreen() {
                 Select (or long-press a bubble on mobile) switches the chat to
                 multi-select. Tick several bubbles, then use the floating bar to
                 copy, forward, or delete your own messages.
+              </p>
+              <h3 className="doc-h3">Save messages</h3>
+              <p>
+                Save message bookmarks any bubble (yours, others’, thread
+                replies). Open the Saved panel from the bookmark icon next to
+                Search to see everything you saved across chats, newest first —
+                clicking an entry jumps to that conversation and highlights the
+                message. Saves are personal and follow your account.
               </p>
               <h3 className="doc-h3">Mention someone</h3>
               <Steps
@@ -658,7 +667,7 @@ export function DocsScreen() {
                 kivo.usersynax.dev yet:
               </p>
               <ul className="mt-4 flex flex-col gap-2">
-                <Bullet>Saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
+                <Bullet>Voice or video calls — no call backend or UI yet
                 </Bullet>
                 <Bullet>Sharing palettes as saved theme templates</Bullet>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bookmark,
   ChevronDown,
   Compass,
   Hash,
@@ -527,6 +528,7 @@ export function Sidebar({
   hideDMs = false,
   isOffline = false,
   onSearchOpen,
+  onSavedOpen,
   onMarkUnread,
 }) {
   const isDesktop = useIsDesktop();
@@ -576,6 +578,17 @@ export function Sidebar({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {notificationBell}
+          {onSavedOpen && (
+            <button
+              type="button"
+              onClick={onSavedOpen}
+              aria-label="Saved messages"
+              title="Saved messages"
+              className="kivo-focus flex size-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[${EASE}] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            >
+              <Bookmark className="h-5 w-5" strokeWidth={1.6} />
+            </button>
+          )}
           {onSearchOpen && (
             <button
               type="button"

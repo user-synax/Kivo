@@ -774,6 +774,20 @@ export function ChatPanel({
     });
   };
 
+  // Jump-to-message session bookkeeping: once an anchor page is loaded, ending
+  // the highlight (2s flash) must NOT re-run the normal fetch — that would
+  // replace the anchored page with the newest 50 and scroll away ("the chat
+  // reloads"). We only refetch normally when the conversation or the jump
+  // target actually changes.
+  const wasAnchorSessionRef = useRef(false);
+  const anchorConvRef = useRef(null);
+  // Keep the latest clear callback in a ref so the highlight effect doesn't
+  // re-run on every parent render (it would restart the flash timer + scroll).
+  const clearHighlightRef = useRef(onHighlightCleared);
+  useEffect(() => {
+    clearHighlightRef.current = onHighlightCleared;
+  }, [onHighlightCleared]);
+
   // Load message history when the conversation changes — stale-while-revalidate.
   // Render cached messages instantly, then silently revalidate via REST.
   // If highlightMessageId is set, use the anchor-based fetch (around=) instead.
@@ -787,6 +801,18 @@ export function ChatPanel({
     }
     let active = true;
     setReplyingTo(null);
+
+    // A highlight session just ended (flash finished): keep the anchored page
+    // exactly as it is — no refetch and (see the auto-scroll effect) no yank to
+    // the bottom. If the conversation changed mid-session, drop the stale flag
+    // so the new conversation loads normally.
+    if (!highlightMessageId && wasAnchorSessionRef.current) {
+      if (anchorConvRef.current === convId) return undefined;
+      wasAnchorSessionRef.current = false;
+      anchorConvRef.current = null;
+    }
+    wasAnchorSessionRef.current = Boolean(highlightMessageId);
+    if (highlightMessageId) anchorConvRef.current = convId;
 
     const useAnchor = highlightMessageId && convId;
 
@@ -854,13 +880,21 @@ export function ChatPanel({
   }, [convId, highlightMessageId]);
 
   // Keep pinned to the bottom on new messages / typing changes.
-  // Skip auto-scroll when we have a highlight target (jump-to-message).
+  // Skip auto-scroll when we have a highlight target (jump-to-message), and
+  // once that jump session ends, consume the flag WITHOUT scrolling — the page
+  // is already anchored where the user wants to be.
   useEffect(() => {
     if (highlightMessageId) return;
+    if (wasAnchorSessionRef.current && anchorConvRef.current === convId) {
+      wasAnchorSessionRef.current = false;
+      anchorConvRef.current = null;
+      return;
+    }
+    wasAnchorSessionRef.current = false;
     void messages.length;
     void typing;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, typing, highlightMessageId]);
+  }, [messages.length, typing, highlightMessageId, convId]);
 
   // Jump-to-message highlight: when highlightMessageId is set, scroll to it
   // and apply a brief background flash once the messages are loaded.
@@ -881,14 +915,14 @@ export function ChatPanel({
         // Remove after 2s
         const timer = setTimeout(() => {
           el.style.backgroundColor = "transparent";
-          onHighlightCleared?.();
+          clearHighlightRef.current?.();
         }, 2000);
         return () => clearTimeout(timer);
       }
-      onHighlightCleared?.();
+      clearHighlightRef.current?.();
     });
     return () => cancelAnimationFrame(raf);
-  }, [highlightMessageId, messages, onHighlightCleared]);
+  }, [highlightMessageId, messages]);
 
   // Load older messages (prepend) when the user scrolls to the top.
   const loadOlder = () => {
@@ -1517,6 +1551,27 @@ export function ChatPanel({
     showNotice(ok ? "Copied to clipboard" : "Couldn't copy");
   };
 
+  const toggleSavedMessage = async (m) => {
+    const next = !m.saved;
+    // Optimistic flip, then reconcile with the server payload.
+    setMessages((prev) =>
+      prev.map((x) => (x.id === m.id ? { ...x, saved: next } : x)),
+    );
+    try {
+      const updated = await apiPost(`/api/v1/messages/${m.id}/save`, {
+        saved: next,
+      });
+      setMessages((prev) =>
+        prev.map((x) => (x.id === m.id ? { ...x, ...updated } : x)),
+      );
+      showNotice(next ? "Saved" : "Removed from saved");
+    } catch {
+      setMessages((prev) =>
+        prev.map((x) => (x.id === m.id ? { ...x, saved: !next } : x)),
+      );
+    }
+  };
+
   const handleShareMessage = async (m) => {
     const text = messageText(m);
     if (!text) return;
@@ -2076,6 +2131,11 @@ export function ChatPanel({
                           onOpenProfile={setProfileUsername}
                           onCopy={
                             hasCopy ? () => handleCopyMessage(m) : undefined
+                          }
+                          onSaveToggle={
+                            realMessage && !m.isDeleted && m.type !== "system"
+                              ? () => toggleSavedMessage(m)
+                              : undefined
                           }
                           onForward={
                             realMessage

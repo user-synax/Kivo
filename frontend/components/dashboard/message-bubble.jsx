@@ -2,6 +2,8 @@
 
 import {
   Ban,
+  Bookmark,
+  BookmarkCheck,
   Check,
   CheckCheck,
   Clock,
@@ -151,6 +153,7 @@ export function MessageBubble({
   isMobile = false,
   // Message-action menu extras (context menu + long-press).
   onCopy,
+  onSaveToggle,
   onThread,
   onForward,
   onPinToggle,
@@ -451,6 +454,16 @@ export function MessageBubble({
           <ContextMenuItem onSelect={() => onCopy?.()}>
             <Copy className="h-4 w-4" />
             Copy
+          </ContextMenuItem>
+        )}
+        {onSaveToggle && (
+          <ContextMenuItem onSelect={() => onSaveToggle?.()}>
+            {message?.saved ? (
+              <BookmarkCheck className="h-4 w-4" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
+            )}
+            {message?.saved ? "Unsave" : "Save message"}
           </ContextMenuItem>
         )}
         <ContextMenuItem onSelect={() => onReply?.(message)}>

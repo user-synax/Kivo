@@ -19,6 +19,17 @@ const readBySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Saved (bookmark): per-user saves, mirroring reactions. A message is "saved"
+// for a user when their userId is present; the savedAt drives the Saved view's
+// ordering (newest save first).
+const savedBySchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    savedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 // A single chat message. Messages are stored in their own collection (not
 // embedded in the Conversation) and referenced by conversationId so a thread can
 // grow without bloating the conversation document.
@@ -77,6 +88,9 @@ const messageSchema = new mongoose.Schema(
 
     readBy: { type: [readBySchema], default: [] },
 
+    // Per-user saves ("Saved messages"). Not a read/unread signal.
+    savedBy: { type: [savedBySchema], default: [] },
+
     // User ObjectIds resolved from @username mentions in the content.
     mentions: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -133,6 +147,8 @@ messageSchema.index({ conversationId: 1, threadId: 1, createdAt: 1 });
 messageSchema.index({ conversationId: 1, pinnedAt: -1 });
 // Secondary: "messages sent by a user" (e.g. for moderation/search later).
 messageSchema.index({ senderId: 1, createdAt: -1 });
+// Saved feed per user: "messages this user saved, newest save first".
+messageSchema.index({ "savedBy.userId": 1, "savedBy.savedAt": -1 });
 
 // Text index for full-text search on message content.
 messageSchema.index({ content: "text" }, { weights: { content: 1 } });

@@ -23,8 +23,10 @@ const reactionLimiter = rateLimiter({
   max: 60,
 });
 
+router.get("/saved", messagesController.listSaved);
 router.patch("/:id", messageEditLimiter, messagesController.editMessage);
 router.delete("/:id", messagesController.deleteMessage);
+router.post("/:id/save", messagesController.toggleSave);
 router.post("/:id/pin", messagesController.pinMessage);
 router.post("/:id/reactions", reactionLimiter, messagesController.addReaction);
 router.delete("/:id/reactions/:reactionId", reactionLimiter, messagesController.removeReaction);

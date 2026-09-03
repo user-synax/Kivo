@@ -97,6 +97,7 @@ Kivo
 | Offline Caching | **Complete** | IndexedDB (`idb-keyval`) cache for conversations, Spaces, friends, requests |
 | File & Image Attachments | **Complete** | Upload images + docs via Appwrite, lightbox, inline preview, download cards |
 | Threads | **Complete** | Any message hosts a side conversation: replies carry `threadId`, render in a dedicated panel (desktop drawer / mobile sheet), "N replies" chips under root bubbles, excluded from the main timeline & unread badge; thread replies only notify when @mentioned |
+| Saved Messages | **Complete** | Bookmark any message (menu → Save message; own, others', thread replies); per-user `savedBy` on the Message; Saved panel (sidebar bookmark icon) lists them across chats newest-first with jump-to-message; deleted messages drop out |
 | Mention Notifications | **Complete** | `@mention` feature shipped |
 | **Global Search (Ctrl+K)** | **Complete** | Unified search: messages, people, spaces; jump-to-message |
 | **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, audit logging |
@@ -273,6 +274,8 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | List pinned | `GET /api/v1/conversations/:id/pinned` | Must be participant (newest first, max 10) |
 | List threads | `GET /api/v1/conversations/:id/threads` | Must be participant (active threads: root + summary) |
 | Fetch thread replies | `GET /api/v1/conversations/:id/threads/:threadId/messages` | Must be participant (oldest first) |
+| Save / unsave message | `POST /api/v1/messages/:id/save` | Must be participant (non-system, non-deleted) |
+| Saved feed | `GET /api/v1/messages/saved` | Own saves across conversations, newest save first |
 | Mark read | `PATCH /api/v1/conversations/:id/read` | Must be participant |
 
 #### 3.4 Message Schema
@@ -285,6 +288,7 @@ Message {
   replyToMessageId: ObjectId (nullable) — inline quote-reply target
   threadId: ObjectId (nullable) — set when the message is a thread reply; root messages are null
   reactions: [{ userId, emoji, _id }]
+  savedBy: [{ userId, savedAt }] — per-user bookmarks (Saved messages)
   deliveredTo: [ObjectId]
   readBy: [{ userId, readAt }]
   forwardedFromId: ObjectId (nullable) — source message when forwarded
@@ -303,6 +307,7 @@ Message {
 - `{ conversationId: 1, threadId: 1, createdAt: 1 }` — thread panel feed (oldest first)
 - `{ senderId: 1, createdAt: -1 }` — moderation/search
 - `{ conversationId: 1, pinnedAt: -1 }` — pinned banner query
+- `{ savedBy.userId: 1, savedBy.savedAt: -1 }` — Saved feed per user
 
 #### 3.5 Cursor-Based Pagination
 
@@ -385,6 +390,13 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 **Realtime.**
 
 - Thread replies fan out through the same `message:new`/`message:edited`/`message:deleted`/`message:reaction` room events; clients with the thread open append to the panel, everyone else refreshes chip summaries via `GET /threads`.
+
+### 3.12 Saved Messages (bookmarks)
+
+- Any visible message can be saved — your own, others', and thread replies. `POST /messages/:id/save` `{ saved }` toggles the current user's entry in `Message.savedBy` (membership required; system and soft-deleted messages are rejected).
+- Conversation list payloads include a per-user `saved` flag (resolved at read time), so bubble menus render Save vs Unsave correctly without an extra fetch.
+- `GET /messages/saved` returns the user's saves across every conversation they're still in, newest save first (cap 200); deleted messages are excluded, so removing a message clears it from the list. The client joins conversation labels/avatars from its own conversation list.
+- Saves are purely personal (no notification, no broadcast) and follow the account across devices.
 
 ---
 
@@ -553,8 +565,9 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 - Auto-scroll to bottom on new messages.
 - Typing indicator display.
 - Emoji picker (9 categories, 270+ emojis).
-- Message menu (right-click / long-press): quick-react strip, copy, thread, reply, forward, pin, select mode, profile/block; edit & delete on own messages.
+- Message menu (right-click / long-press): quick-react strip, copy, save, thread, reply, forward, pin, select mode, profile/block; edit & delete on own messages.
 - Threaded replies render in a dedicated side panel with a composer (desktop right drawer / mobile full-screen sheet); "N replies" chips under root messages open it.
+- Saved messages panel (sidebar bookmark icon): every bookmarked bubble across chats, newest save first; clicking a row jumps to the conversation and highlights the message.
 - Message grouping (60-second window).
 - Delivery/read receipts (sent → delivered → read).
 - Retry button for failed messages.
@@ -997,6 +1010,8 @@ Refresh token is sent automatically via httpOnly cookie.
 |---|---|---|---|
 | PATCH | `/api/v1/messages/:id` | Yes | `{ content }` |
 | DELETE | `/api/v1/messages/:id` | Yes | — (soft-delete; clears pin) |
+| GET | `/api/v1/messages/saved` | Yes | The caller's saved messages (newest save first) |
+| POST | `/api/v1/messages/:id/save` | Yes | `{ saved }` — save/unsave (must be participant) |
 | POST | `/api/v1/messages/:id/pin` | Yes | `{ pinned }` — pin/unpin (must be participant) |
 | POST | `/api/v1/messages/:id/reactions` | Yes | `{ emoji }` |
 | DELETE | `/api/v1/messages/:id/reactions/:reactionId` | Yes | — |
@@ -1529,7 +1544,6 @@ These may be considered after the core communication experience is stable.
 ### Phase 2 — Enhanced Messaging
 
 - Per-conversation mutes & quiet hours (beyond the shipped per-category preferences).
-- Saved messages.
 - Custom emoji.
 - Advanced permissions.
 - Scheduled messages.

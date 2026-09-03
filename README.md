@@ -114,6 +114,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Forwarding** — resend any message into another conversation with a **"Forwarded from @user"** attribution pill (original author kept)
 - **Pinned messages** — any member pins/unpins; a pinned banner sits under the chat header, newest first (max 10), cleared by unpin or by deleting the message
 - **Threads** — any message can host a side conversation: replies open in a dedicated panel (desktop drawer / mobile sheet), live "N replies" chips sit under root bubbles, and thread activity never spams the main timeline, unread badge, or notification bell (unless you're @mentioned)
+- **Saved messages** — bookmark any message (menu → Save message, thread replies included); the Saved panel (bookmark icon next to search) lists them across all your chats newest-first with one-click jump-to-message
 - **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
 - **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
 - **Notification system** (in-app center + sounds + bell with unread badge)
@@ -138,7 +139,6 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Animated landing page
 
 ### 🚧 Planned / Not Started
-- Saved messages
 - Voice / video calls (not wired yet — no backend or frontend)
 - Re-sending a verification email automatically at signup (removed with the OTP step)
 
@@ -396,6 +396,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - **Forwarding** — copies the message into another conversation with a "Forwarded from @user" pill (original author kept)
 - **Pinned messages** — pin/unpin from the menu; a banner under the chat header lists them newest-first (max 10), cleared by unpin or by deleting the message
 - **Threads** — menu → Thread (or click a reply chip) opens the side panel for that message; replies there stay out of the main timeline (no unread/notification spam, mentions still ping)
+- **Saved messages** — menu → Save message bookmarks any bubble (yours, others', thread replies); the Saved panel (bookmark icon next to search in the sidebar) lists them newest-first across chats and jumps straight to the message
 - 60-second message grouping & hover actions (context menu)
 - **New messages separator** — a labelled divider sits where your unread messages begin (auto-clears as you read to the bottom)
 - Emoji picker — 9 categories (Smileys, People, Hearts, Animals, Food, Activity, Travel, Objects, Symbols), 270+ emojis
@@ -483,7 +484,7 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 |---|---|
 | **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA |
 | **Phase 1.5** | Voice & video calls |
-| **Phase 2** | Saved messages, stronger search, video/audio attachments |
+| **Phase 2** | Stronger search, video/audio attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace theme sharing |
 

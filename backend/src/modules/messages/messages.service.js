@@ -8,8 +8,17 @@ import { emitToConversation, roomName } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 
 // Public message shape returned to clients and used as the socket payload base.
-export function publicMessage(message) {
+// When a viewer id is supplied the per-user `saved` flag (Saved messages) is
+// resolved from savedBy — used by conversation-scoped list endpoints so bubble
+// menus can show the right Save/Unsave state.
+export function publicMessage(message, viewerId = null) {
   const obj = message.toObject ? message.toObject() : message;
+  const saved =
+    viewerId != null
+      ? (obj.savedBy || []).some(
+          (s) => (s.userId || s).toString() === viewerId.toString(),
+        )
+      : false;
   const base = {
     id: obj._id.toString(),
     conversationId: obj.conversationId.toString(),
@@ -42,6 +51,7 @@ export function publicMessage(message) {
     forwardedFromName: obj.forwardedFromName || null,
     pinnedAt: obj.pinnedAt ? new Date(obj.pinnedAt).toISOString() : null,
     pinnedBy: obj.pinnedBy ? obj.pinnedBy.toString() : null,
+    saved,
     isEdited: obj.isEdited,
     isDeleted: obj.isDeleted,
     createdAt: obj.createdAt,
@@ -108,7 +118,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
       .sort({ createdAt: 1 })
       .limit(limit)
       .lean();
-    const messages = docs.map((m) => publicMessage(m));
+    const messages = docs.map((m) => publicMessage(m, userId));
     return { messages, nextCursor: null };
   }
 
@@ -118,9 +128,14 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     if (!mongoose.Types.ObjectId.isValid(around)) {
       throw badRequest("Invalid around message id", "INVALID_CURSOR");
     }
-    const anchorMsg = await Message.findById(around).select("createdAt");
+    // Full document (no select): the anchor itself is included in the returned
+    // page and mapped through publicMessage, so it must carry every field.
+    const anchorMsg = await Message.findById(around);
     if (!anchorMsg) {
       throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+    }
+    if (anchorMsg.conversationId.toString() !== String(conversationId)) {
+      throw badRequest("Message is not in this conversation", "INVALID_MESSAGE");
     }
     // Fetch `limit` messages: half before the anchor, half after.
     const half = Math.ceil(limit / 2);
@@ -148,7 +163,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     // Combine: older messages (reversed to ascending) + anchor + newer messages
     const olderReversed = [...after].reverse();
     const allDocs = [...olderReversed, anchorMsg.toObject(), ...before];
-    const messages = allDocs.map((m) => publicMessage(m));
+    const messages = allDocs.map((m) => publicMessage(m, userId));
 
     return { messages, nextCursor: null, anchorId: around };
   }
@@ -170,7 +185,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     .limit(limit)
     .lean();
 
-  const messages = docs.reverse().map((m) => publicMessage(m));
+  const messages = docs.reverse().map((m) => publicMessage(m, userId));
   const nextCursor = docs.length === limit && messages.length > 0
     ? messages[0].id
     : null;
@@ -427,7 +442,76 @@ export async function listPinned({ conversationId, userId }) {
     .sort({ pinnedAt: -1 })
     .limit(10)
     .lean();
-  return docs.map((m) => publicMessage(m));
+  return docs.map((m) => publicMessage(m, userId));
+}
+
+// Save / unsave a message for the current user (bookmark). Any message you can
+// see can be saved — your own or others', main timeline or thread reply.
+export async function toggleSave({ messageId, userId, saved }) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) {
+    throw badRequest("Invalid message id", "INVALID_ID");
+  }
+  const message = await Message.findById(messageId);
+  if (!message || message.isDeleted) {
+    throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+  }
+  if (message.type === "system") {
+    throw badRequest("System messages can't be saved", "SYSTEM_MESSAGE");
+  }
+  const conversation = await assertMembership(message.conversationId.toString(), userId);
+  await assertDmNotBlocked(conversation, userId);
+
+  const uid = new mongoose.Types.ObjectId(userId);
+  if (saved) {
+    const already = message.savedBy.some((s) => s.userId.toString() === userId);
+    if (!already) message.savedBy.push({ userId: uid });
+  } else {
+    message.savedBy = message.savedBy.filter(
+      (s) => s.userId.toString() !== userId,
+    );
+  }
+  await message.save();
+
+  return publicMessage(message, userId);
+}
+
+// The current user's Saved messages across every conversation they're still in,
+// newest save first. The client joins conversation labels/avatars from its own
+// conversation list, so the payload stays flat: { message, savedAt }.
+export async function listSaved({ userId }) {
+  const conversations = await Conversation.find({ participants: userId })
+    .select("_id")
+    .lean();
+  if (!conversations.length) return [];
+  const convIds = conversations.map((c) => c._id);
+  const uid = new mongoose.Types.ObjectId(userId);
+
+  const docs = await Message.find({
+    conversationId: { $in: convIds },
+    isDeleted: false,
+    "savedBy.userId": uid,
+  })
+    .sort({ createdAt: -1 })
+    .limit(400)
+    .lean();
+
+  const items = docs
+    .map((doc) => {
+      const entry = (doc.savedBy || []).find(
+        (s) => s.userId.toString() === userId,
+      );
+      return entry
+        ? {
+            message: publicMessage(doc, userId),
+            savedAt: entry.savedAt || doc.createdAt,
+          }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
+    .slice(0, 200);
+
+  return items;
 }
 
 // Every active thread in a conversation: root message + a small summary
@@ -511,7 +595,7 @@ export async function listThreads({ conversationId, userId }) {
       if (participantNames.length >= 3) break;
     }
     return {
-      root: publicMessage(root),
+      root: publicMessage(root, userId),
       summary: {
         replyCount: count.replyCount,
         lastReplyAt: count.lastReplyAt || null,
@@ -553,8 +637,8 @@ export async function listThreadMessages({ conversationId, threadId, userId }) {
     .limit(500)
     .lean();
   return {
-    root: publicMessage(rootDoc),
-    messages: replies.map((m) => publicMessage(m)),
+    root: publicMessage(rootDoc, userId),
+    messages: replies.map((m) => publicMessage(m, userId)),
     hasMore: replies.length === 500,
   };
 }
