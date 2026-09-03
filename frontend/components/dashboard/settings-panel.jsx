@@ -7,10 +7,12 @@ import {
   EyeOff,
   Loader2,
   Palette,
+  Play,
   ShieldBan,
   Trash2,
   Undo2,
   UserCheck,
+  Volume2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
@@ -18,6 +20,12 @@ import { Switch } from "@/components/ui/switch";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
+import {
+  getSoundPrefs,
+  previewCue,
+  setSoundPrefs,
+  setSoundsEnabled,
+} from "@/lib/sound";
 import { ACCENT_PRESETS, TINT_PRESETS } from "@/lib/theme";
 import { Avatar } from "./avatar";
 import { TwoFactorSection } from "./two-factor-section";
@@ -472,6 +480,118 @@ function NotificationsSection() {
   );
 }
 
+const SOUND_CATEGORY_DEFS = [
+  {
+    key: "directMessages",
+    label: "Direct Messages",
+    hint: "New DM when you're not reading it",
+  },
+  {
+    key: "mentions",
+    label: "Mentions",
+    hint: "When you're @mentioned in a group or space",
+  },
+  {
+    key: "groupMessages",
+    label: "Group Messages",
+    hint: "Only while the tab is in the background",
+  },
+  {
+    key: "spaceMessages",
+    label: "Space Messages",
+    hint: "Only while the tab is in the background",
+  },
+  {
+    key: "friendRequests",
+    label: "Friend Requests",
+    hint: "Incoming requests and acceptances",
+  },
+];
+
+function SoundsSection() {
+  const [prefs, setPrefs] = useState(() => getSoundPrefs());
+
+  const handleToggle = (key, nextVal) => {
+    setPrefs(setSoundPrefs({ [key]: nextVal }));
+  };
+
+  return (
+    <SectionCard
+      icon={Volume2}
+      title="Sounds"
+      description="Play a short chime when a message or request arrives. These switches are the audio layer only — Notification preferences control the in-app list and browser push."
+    >
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 transition-colors">
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+              Notification sounds
+              <span className="ml-2 text-[11px] font-normal text-[var(--text-muted)]">
+                {prefs.enabled ? "ON" : "OFF"}
+              </span>
+            </p>
+            <p className="mt-0.5 text-[11px] leading-tight text-[var(--text-muted)]">
+              Master switch for every cue below
+            </p>
+          </div>
+          <Switch
+            checked={prefs.enabled}
+            ariaLabel="Notification sounds"
+            onCheckedChange={(v) =>
+              setPrefs(v ? setSoundsEnabled(true) : setSoundsEnabled(false))
+            }
+          />
+        </div>
+        <div
+          className={`space-y-2 transition-opacity ${
+            prefs.enabled ? "" : "pointer-events-none opacity-40"
+          }`}
+        >
+          {SOUND_CATEGORY_DEFS.map((d) => {
+            const checked = Boolean(prefs[d.key]);
+            return (
+              <div
+                key={d.key}
+                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                    {d.label}
+                    <span className="ml-2 text-[11px] font-normal text-[var(--text-muted)]">
+                      {checked ? "ON" : "OFF"}
+                    </span>
+                  </p>
+                  {d.hint && (
+                    <p className="mt-0.5 text-[11px] leading-tight text-[var(--text-muted)]">
+                      {d.hint}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => previewCue(d.key)}
+                    aria-label={`Play ${d.label} sound`}
+                    title="Play a preview"
+                    className="flex size-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </button>
+                  <Switch
+                    checked={checked}
+                    ariaLabel={`${d.label} sound`}
+                    onCheckedChange={(v) => handleToggle(d.key, v)}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 function BadgeSection() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -647,6 +767,7 @@ export function SettingsPanel() {
           <TwoFactorSection />
           <BlockedUsersSection />
           <NotificationsSection />
+          <SoundsSection />
         </div>
       </div>
     </div>

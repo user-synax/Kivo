@@ -24,7 +24,7 @@ import { SpaceDiscoverModal } from "@/components/spaces/space-discover-modal";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { requestPermission, subscribe, syncSubscription } from "@/lib/push";
-import { playDmSound } from "@/lib/sound";
+import { playCue } from "@/lib/sound";
 import {
   getCachedConversations,
   getCachedSpaces,
@@ -383,6 +383,8 @@ export function DashboardShell() {
   const [mobileTab, setMobileTab] = useState("chats");
   // Notifications — bell badge + center list, live via notification:new
   const [notifOpen, setNotifOpen] = useState(false);
+  const notifOpenRef = useRef(false);
+  notifOpenRef.current = notifOpen;
   const [notifications, setNotifications] = useState([]);
   const [notifNextCursor, setNotifNextCursor] = useState(null);
   const [notifHasMore, setNotifHasMore] = useState(false);
@@ -527,6 +529,13 @@ export function DashboardShell() {
     if (!socket) return;
     const onNotificationNew = (notif) => {
       if (!notif?.id) return;
+      // Friend requests/accepts have no message event — cue from here. Stay
+      // quiet while the notification center is open and the tab is visible.
+      if (notif.type === "friend_request" || notif.type === "friend_accept") {
+        const pageHidden =
+          typeof document !== "undefined" && document.visibilityState !== "visible";
+        if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
+      }
       if (notif.type === "dm_message" && notif.conversationId === selectedIdRef.current) {
         const cur = conversationsRef.current.find((c) => c.id === selectedIdRef.current);
         if (cur?.type === "dm") return;
@@ -790,17 +799,27 @@ export function DashboardShell() {
 
     const onNew = (msg) => {
       if (!msg?.conversationId) return;
-      // DM-only sound cue: play only for DMs, not groups/spaces, when tab not visible or conversation not focused
+      // Sound cue by category — only when the event deserves attention:
+      // DM: tab hidden OR that conversation isn't focused (classic behavior).
+      // Mention: tab hidden OR conversation not focused, in any conversation
+      // (mention cues override the group/space category like the server prefs).
+      // Group / Space message: only when the tab is hidden AND the conversation
+      // isn't focused — reading another chat in-app stays quiet. System messages
+      // (e.g. "you are now friends") never chime.
       try {
-        if (msg.senderId !== currentUser?.id) {
+        if (msg.senderId !== currentUser?.id && msg.type !== "system") {
           const conv = conversationsRef.current.find((c) => c.id === msg.conversationId);
-          const isDm = conv ? conv.type === "dm" : true; // brand-new DM assumed dm; groups/spaces are pre-existing
-          if (isDm) {
-            const isVisible = typeof document !== "undefined" ? document.visibilityState === "visible" : true;
-            const isFocused = msg.conversationId === selectedIdRef.current;
-            if (!isVisible || !isFocused) {
-              playDmSound();
-            }
+          const convType = conv ? conv.type : "dm"; // brand-new conv assumed dm
+          const isVisible = typeof document !== "undefined" ? document.visibilityState === "visible" : true;
+          const isFocused = msg.conversationId === selectedIdRef.current;
+          const mentioned = (msg.mentions || []).includes(currentUser?.id);
+          if (convType === "dm") {
+            if (!isVisible || !isFocused) playCue("directMessages");
+          } else if (mentioned) {
+            if (!isVisible || !isFocused) playCue("mentions");
+          } else if (!isVisible && !isFocused) {
+            if (convType === "group") playCue("groupMessages");
+            else if (convType === "space_channel") playCue("spaceMessages");
           }
         }
       } catch {}

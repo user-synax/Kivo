@@ -427,7 +427,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - Covers DMs, group & Space messages (incl. announcements), mentions, friend requests & accepts; cursor-paginated with "mark all read"
 - **Notification preferences** (Settings) — per-category toggles for Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages (off by default), and Announcements; `@mentions` always override a muted category
 - **DM-focused suppression** — if you're actively viewing a DM, notifications for it are skipped server-side
-- Notification **sounds** for incoming DMs when the chat isn't focused (mute via `kivo:sound` in localStorage)
+- **Sound cues** per notification category (Settings → Sounds): Direct Messages, Mentions, Group Messages, Space Messages, and Friend Requests each have their own toggle plus a one-tap preview — chimes are synthesized in-browser (Web Audio), so no audio files ship with the app
 - Realtime delivery via socket (`notification:new`) with per-recipient fan-out
 - **Unread dots** on the Chats/Groups/Spaces navigation icons when a category has unread activity
 

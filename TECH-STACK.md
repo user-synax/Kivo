@@ -44,7 +44,7 @@ UI and interaction · routing · responsive design · API consumption · Socket.
   - `/u/[username]` **public profiles**
   - `/docs` in-app guide, `/admin` + `/admin/dashboard`
 - `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals), `spaces/`, `notifications/`, `profile/`, `chat/` (attachments), `mentions/`, `ui/`, `motion/` (context menu), `navbar/`, `admin/`, `docs/`
-- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js`, `push.js`, `sound.js`, `last-active.js`, `use-breakpoint.js`, hooks, etc.
+- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js`, `push.js`, `sound.js` (Web Audio sound cues), `last-active.js`, `use-breakpoint.js`, hooks, etc.
 - `frontend/Design.md` — visual design system & tokens (Framer dark canvas, `#4ba9e1` blue signal).
 
 ### Networking
@@ -234,6 +234,7 @@ Public browser variables are explicitly prefixed and contain no secrets. `.env.e
 - Realtime and persistence are separate concerns — MongoDB is authoritative; Socket.IO only distributes events.
 - Redis is future acceleration/state infrastructure, not canonical storage.
 - Appwrite supplements the core backend (storage only today).
+- Notification **sound cues** are client-side only: `lib/sound.js` synthesizes short chimes with the Web Audio API (no audio assets), and per-category + master toggles persist in `localStorage["kivo:sounds"]`. Cues are triggered from live socket events (`message:new` for DM/group/Space/mention, `notification:new` for friend requests) — the server never knows about audio, and the notification center + push remain the server-gated delivery paths.
 - Build only features supported by the current PRD; keep the UI fast and polished; reuse design tokens from `frontend/Design.md`.
 - TypeScript is intentionally out of scope for this project.
 

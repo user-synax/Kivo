@@ -87,7 +87,7 @@ Kivo
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
 | Space Discovery | **Complete** | Browse & search public spaces by category |
-| Notification System | **Complete** | In-app notification center + sound + DM-focused suppression |
+| Notification System | **Complete** | In-app notification center + DM-focused suppression + per-category sound cues (Settings → Sounds) |
 | Web Push | **Complete** | VAPID push for offline users, PWA service worker |
 | PWA / Installable | **Complete** | Manifest, icons, service worker |
 | Mobile UX | **Complete** | Bottom tab bar, responsive panels, safe-area handling |
@@ -712,7 +712,7 @@ Notification {
 
 - `notification-bell.jsx` — bell icon with a live unread count badge.
 - `notification-center.jsx` — dropdown feed with list, cursor-pagination, and mark-read actions.
-- Notification **sounds** on new messages (`lib/sound.js`).
+- Notification **sounds** — per-category cues synthesized in-browser via Web Audio (`lib/sound.js`), with master + per-category toggles and preview buttons in Settings → Sounds (no audio assets).
 
 ---
 

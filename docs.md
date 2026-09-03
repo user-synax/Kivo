@@ -515,7 +515,7 @@ You are never notified of your **own** messages. **System** messages (joins/leav
 
 **Notification preferences (Settings → Notification preferences):** choose which categories you receive — Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages, and Announcements. Space Messages are **off by default**; `@mentions` override a muted category. Toggles apply to both in-app and push delivery.
 
-**Sound:** a short chime can play for new DMs while the app is open (only when the DM isn't focused or the tab is hidden). There is no UI toggle yet; set `kivo:sound` to `off` in localStorage to mute.
+**Sound cues (Settings → Sounds):** every category has its own audio toggle — Direct Messages, Mentions, Group Messages, Space Messages, and Friend Requests — under a master **Notification sounds** switch, each with a **▶ preview** button so you can hear a cue before enabling it. Cues fire only when a message/request deserves attention: DMs chime when the tab is hidden or that DM isn't focused; **@mentions** chime when the conversation isn't focused (they override the group/space categories, like the server preferences); group and Space messages only chime while the tab is in the background; friend requests/acceptances chime unless the notification center is open. Cues are synthesized in-browser with the Web Audio API (no audio assets), and preferences live in `localStorage["kivo:sounds"]` — the old `kivo:sound` flag is migrated into the master switch on first read.
 
 ### Browser / lock-screen push (offline)
 

@@ -535,6 +535,14 @@ export function DocsScreen() {
                 Space Messages (off by default), and Announcements. @mentions
                 always come through, even for a muted category.
               </p>
+              <h3 className="doc-h3">Sound cues</h3>
+              <p>
+                Settings → Sounds gives Direct Messages, Mentions, Group
+                Messages, Space Messages, and Friend Requests their own toggle
+                plus a preview button. Cues play when a DM or mention needs your
+                attention, or when the tab is in the background for group and
+                Space messages — the master switch silences everything.
+              </p>
               <h3 className="doc-h3">Browser notifications</h3>
               <p>
                 The first time you open the bell, the browser may ask for
@@ -598,7 +606,7 @@ export function DocsScreen() {
               <ul className="mt-4 flex flex-col gap-2">
                 <Bullet>Threads, pins, and saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
                 </Bullet>
-                <Bullet>Per-Space palettes &amp; theme sharing</Bullet>
+                <Bullet>Sharing palettes as saved theme templates</Bullet>
                 <Bullet>Private invite links for Spaces</Bullet>
                 <Bullet>Video/audio attachments (images & documents only)</Bullet>
                 <Bullet>
