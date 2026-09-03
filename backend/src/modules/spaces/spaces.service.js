@@ -71,6 +71,12 @@ async function toPublicSpace(space, userId) {
     category: obj.category,
     avatarUrl: obj.avatarUrl || null,
     banner: obj.banner || null,
+    // Per-Space palette — carried on every public payload (avatar/banner are
+    // public too) so members' clients can apply it without an extra fetch.
+    appearance: {
+      accent: obj.appearance?.accent || null,
+      tint: obj.appearance?.tint || null,
+    },
     owner: obj.owner.toString(),
     members,
     myRole: myMember ? myMember.role : null,
@@ -186,6 +192,10 @@ export async function listSpaces({ userId }) {
       category: s.category,
       avatarUrl: s.avatarUrl || null,
       banner: s.banner || null,
+      appearance: {
+        accent: s.appearance?.accent || null,
+        tint: s.appearance?.tint || null,
+      },
       owner: s.owner.toString(),
       members,
       myRole: myMember ? myMember.role : null,
@@ -208,7 +218,7 @@ export async function listPublicSpaces({ q, category, limit = 20 }) {
     const regex = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     filter.$or = [{ name: regex }, { description: regex }];
   }
-  const spaces = await Space.find(filter).sort({ updatedAt: -1 }).limit(Math.min(limit, 50)).select("name slug description category avatarUrl banner owner members channels createdAt").lean();
+  const spaces = await Space.find(filter).sort({ updatedAt: -1 }).limit(Math.min(limit, 50)).select("name slug description category avatarUrl banner appearance owner members channels createdAt").lean();
   return spaces.map((s) => ({
     id: s._id.toString(),
     name: s.name,
@@ -217,6 +227,10 @@ export async function listPublicSpaces({ q, category, limit = 20 }) {
     category: s.category,
     avatarUrl: s.avatarUrl || null,
     banner: s.banner || null,
+    appearance: {
+      accent: s.appearance?.accent || null,
+      tint: s.appearance?.tint || null,
+    },
     owner: s.owner.toString(),
     memberCount: (s.members || []).length,
     channelCount: (s.channels || []).length,
@@ -237,6 +251,13 @@ export async function updateSpace({ spaceId, userId, data, avatar }) {
   if (data.description !== undefined) update.description = data.description;
   if (data.category !== undefined) update.category = data.category;
   if (data.banner !== undefined) update.banner = data.banner || null;
+  if (data.appearance !== undefined) {
+    // Normalize: null clears both; a partial object nulls the missing color.
+    update.appearance = {
+      accent: data.appearance?.accent || null,
+      tint: data.appearance?.tint || null,
+    };
+  }
   if (data.slug !== undefined) {
     // allow slug change only if unique
     const s = slugFromName(data.slug);

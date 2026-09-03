@@ -23,7 +23,11 @@ function withAvatar(handler) {
     upload(req, res, async (err) => {
       if (err) return res.status(400).json({ success: false, error: { message: err.message, code: "UPLOAD_ERROR" } });
       try {
-        await handler(req, res);
+        // Pass `next` through: handlers here are asyncHandler-wrapped and rely
+        // on next() to route thrown ApiErrors to the error middleware. Omitting
+        // it made .catch(next) call undefined and crash the process on any
+        // validation/permission error.
+        await handler(req, res, next);
       } catch (e) {
         next(e);
       }

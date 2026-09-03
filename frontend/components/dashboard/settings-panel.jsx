@@ -46,7 +46,8 @@ function SectionCard({ icon: Icon, title, description, children }) {
 }
 
 // Small round color swatch used by the studio rows (presets + neutral).
-function ColorDot({ color, selected, label, onClick }) {
+// Exported so the per-Space palette editor reuses the same visual language.
+export function ColorDot({ color, selected, label, onClick }) {
   return (
     <button
       type="button"
@@ -71,7 +72,7 @@ function ColorDot({ color, selected, label, onClick }) {
 
 // Native color input styled as a circular swatch — the "anything goes" option
 // at the end of each preset row.
-function ColorInput({ value, label, onChange, badge = false }) {
+export function ColorInput({ value, label, onChange, badge = false }) {
   return (
     <label
       title={label}

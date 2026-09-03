@@ -394,8 +394,9 @@ function CustomizationSection() {
                   </span>
                   <span className="font-sans text-[13px] leading-[1.5] text-ink-muted">
                     Pick any palette as your base, then recolor its accent and
-                    canvas tone. Saved to your account, everywhere you sign
-                    in. Per-Space palettes are next.
+                    canvas tone — saved to your account everywhere you sign
+                    in. Every Space can carry its own palette too, set by its
+                    owners and seen by all its members.
                   </span>
                 </div>
               </div>

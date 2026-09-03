@@ -82,6 +82,7 @@ Kivo
 | Realtime Events | **Complete** | Socket.IO with authenticated connections |
 | Theme System | **Complete** | 10 themes (6 dark + 4 light), live switching; preset persisted in localStorage |
 | Custom Colors (Theme Studio) | **Complete** | Per-user accent + canvas-tint overlay over any preset, live preview, saved to the account (`appearance` field) and synced on login |
+| Space Palettes | **Complete** | Per-Space accent + tint (`Space.appearance`), set by owners/admins in Space settings with live preview; scoped to the channel chat view for all members |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
@@ -459,7 +460,7 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 - Advanced message styles.
 - Custom emoji/reaction packs.
 - Animated profile elements.
-- Per-conversation and per-space appearance overrides.
+- Per-conversation appearance overrides (per-Space palettes are shipped — see the Space palette row above).
 - Theme sharing.
 
 ---
@@ -1490,8 +1491,7 @@ These may be considered after the core communication experience is stable.
 - Developer platform.
 - Mini-apps.
 - Automation.
-- Marketplace themes & per-Space palettes.
-- Theme sharing.
+- Marketplace themes & theme sharing.
 
 ---
 

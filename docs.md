@@ -365,6 +365,10 @@ You cannot assign the **owner** role directly. You cannot remove the last owner.
 - Remove a member (or leave yourself).
 - Join/leave and role changes emit system messages into channels and update live.
 
+### Space palette (owners & admins)
+
+A Space can carry its own **accent + canvas tone** (the same theme-studio controls as Settings). Open **Space settings → Space palette**, pick colors — a live mini-preview shows how they'll look — and **Save palette**. The palette rides on the Space record, so **every member sees it automatically**: while viewing that Space's channels, the chat view is scoped to the Space's colors while the rest of the app (sidebar, lists) keeps each member's own theme. **Reset to default** puts members back on their personal themes. Members without edit rights can view the current state but not change it.
+
 ### Delete a Space
 
 Owner only, from Space settings. Confirm the prompt. This cannot be undone and removes the Space, its channel conversations, and their messages.

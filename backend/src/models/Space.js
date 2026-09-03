@@ -54,6 +54,14 @@ const spaceSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     members: { type: [memberSchema], default: [] },
     channels: { type: [channelSchema], default: [] },
+
+    // Per-Space palette (theme studio): an accent + canvas tint that members'
+    // clients apply while viewing this Space's channels. Hex colors, or null
+    // = keep each member's own theme. Only owner/admins can edit.
+    appearance: {
+      accent: { type: String, default: null },
+      tint: { type: String, default: null },
+    },
   },
   { timestamps: true }
 );

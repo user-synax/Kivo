@@ -30,6 +30,7 @@ import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { MentionAutocomplete } from "@/components/mentions/mention-autocomplete";
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useSocket } from "@/components/socket-provider";
+import { useTheme } from "@/components/theme-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
@@ -51,6 +52,7 @@ import {
   setOutboxStatus,
   subscribeOutbox,
 } from "@/lib/outbox";
+import { cssVarsForColors, customIsActive, derivePalette } from "@/lib/theme";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { useFileUpload } from "@/lib/use-file-upload";
 
@@ -1388,8 +1390,22 @@ export function ChatPanel({
           avatarUrl: other?.avatarUrl,
         };
 
+  // Per-Space palette: while a Space channel is open, scope the Space's colors
+  // to this panel. CSS custom properties cascade to descendants only, so the
+  // chat view takes on the Space's identity while the rest of the app (sidebar,
+  // lists) keeps the member's own theme.
+  const memberColors = useTheme().colors;
+  const spaceAppearance = space?.appearance;
+  const spaceThemeVars =
+    isChannel && spaceAppearance && customIsActive(spaceAppearance)
+      ? cssVarsForColors(derivePalette(memberColors, spaceAppearance))
+      : undefined;
+
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] max-md:isolate">
+    <div
+      className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] max-md:isolate"
+      style={spaceThemeVars}
+    >
       {/* Header — keep visible on mobile when keyboard opens (sticky + bg) */}
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0">
         {onBack && (

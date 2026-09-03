@@ -120,7 +120,7 @@ MongoDB is the canonical source of truth. Core collections:
 | `Conversation` | `type: dm / group / space_channel`, participants, admins (groups), `spaceId`+`channelId` for channel conversations, `lastMessageAt`; messages are **not** embedded |
 | `Message` | conversationId + senderId, content (4000), type `text/system`, replyToMessageId, reactions (subdocs), deliveredTo, readBy, mentions, **attachments** (embedded), isEdited, isDeleted |
 | `FriendRequest` | directed `from`/`to` + status (`pending/accepted/declined`); accepted rows are the friendship edge |
-| `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug |
+| `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug, **appearance** (`{accent,tint}` per-Space palette; owner/admin-editable via Space settings, read by every member's client to scope the channel view) |
 | `Notification` | recipient/sender, type (`dm_message`, `group_message`, `space_message`, `mention`, `friend_request`, `friend_accept`, `space_invite` reserved), delivery flags |
 | `PushSubscription` | per-user VAPID endpoint + keys (unique endpoint) |
 | `AdminActionLog` | audit trail: ban/unban/force_logout/delete_group/delete_space + IP + timestamp |

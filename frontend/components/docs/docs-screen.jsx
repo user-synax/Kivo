@@ -438,6 +438,14 @@ export function DocsScreen() {
                 There are no invite links. Leave from Space settings; you can
                 rejoin from Discover.
               </p>
+              <h3 className="doc-h3">Space palette</h3>
+              <p>
+                Owners and admins can give a Space its own accent and canvas
+                tone (Space settings → Space palette, with a live preview).
+                Everyone sees those colors while viewing the Space's channels;
+                the rest of the app keeps their own theme. Reset to default
+                returns to personal themes.
+              </p>
               <h3 className="doc-h3">Channel types</h3>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>
