@@ -26,6 +26,11 @@ router.delete("/:id", ctrl.deleteSpace);
 
 router.post("/:id/join", ctrl.joinSpace);
 
+// Invite links — owner/admin manages the space's single active invite.
+router.get("/:id/invite", ctrl.getInvite);
+router.post("/:id/invite", ctrl.createInvite);
+router.delete("/:id/invite", ctrl.revokeInvite);
+
 router.post("/:id/members", ctrl.addMember);
 router.delete("/:id/members/:userId", ctrl.removeMember);
 router.patch("/:id/members/:userId/role", ctrl.updateMemberRole);

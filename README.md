@@ -404,7 +404,8 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - Text & announcement channels, each backed by its own message thread
 - Admin+ create, rename, and delete channels (last channel protected)
 - Full moderation — add/remove members, assign roles (admin promotion is owner-only), self-leave with auto owner promotion
-- **Discovery** — browse/search public spaces by category, join with one click (no invite links)
+- **Discovery** — browse/search **public** spaces by category, join with one click
+- **Privacy & invites** — a Space can be **public** (Discover + direct join) or **private** (hidden from Discover, invite-only). Owner/admins manage a rotating invite link with a 7-day expiry in Space settings; invite links deep-link into the app and private Spaces can't be direct-joined
 
 ### 👥 Friends
 - Request by username, email, or display name; search is debounced

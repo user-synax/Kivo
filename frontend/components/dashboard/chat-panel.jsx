@@ -1365,6 +1365,10 @@ export function ChatPanel({
     return () => clearTimeout(t);
   }, [firstUnreadId, messages.length]);
 
+  // Per-Space palette needs the current theme colors; call this hook above the
+  // conditional return so the hook order never changes between renders.
+  const memberColors = useTheme().colors;
+
   if (!conversation) return <EmptyState />;
 
   const headerName = isChannel
@@ -1394,7 +1398,6 @@ export function ChatPanel({
   // to this panel. CSS custom properties cascade to descendants only, so the
   // chat view takes on the Space's identity while the rest of the app (sidebar,
   // lists) keeps the member's own theme.
-  const memberColors = useTheme().colors;
   const spaceAppearance = space?.appearance;
   const spaceThemeVars =
     isChannel && spaceAppearance && customIsActive(spaceAppearance)

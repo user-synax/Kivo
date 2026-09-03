@@ -10,6 +10,7 @@ export const createSpaceSchema = z.object({
 
 export const updateSpaceSchema = z.object({
   name: z.string().trim().min(2).max(50).optional(),
+  visibility: z.enum(["public", "private"]).optional(),
   description: z.string().trim().max(500).optional(),
   category: z.enum(SPACE_CATEGORIES).optional(),
   banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),

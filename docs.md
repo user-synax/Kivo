@@ -327,7 +327,7 @@ In the **Spaces** panel, each Space is a card you expand to reveal its channels 
 
 You join as **member** and get every channel. You can leave later from Space settings and rejoin via Discover.
 
-All Spaces currently appear in Discover (there is no private/unlisted Space flag). Invite links are **not** used; joining is Discover or an admin adding you.
+**Public vs private Spaces:** public Spaces appear in Discover and accept one-click joins. **Private** Spaces are hidden from Discover and can only be joined through an **invite link** — owner/admins create a rotating link in **Space settings → Privacy & invites** (7-day expiry; "New link" invalidates the old one, "Turn off" closes invites). Invite links deep-link into the app (`/app?join=CODE`) and auto-join when you're signed in; from Discover, the **"Have an invite code?"** field joins the same way (and is where a deep link lands if the join fails).
 
 ### Channel types
 
@@ -736,8 +736,7 @@ Do not expect these in the current MVP:
 - **Threads**, pinned messages, saved messages
 - **Voice / video** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
-- Per-Space palettes & theme sharing
-- Private / invite-linked Spaces
+- Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
 - Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
 - Video/audio attachments (images and documents only in this pass)
 

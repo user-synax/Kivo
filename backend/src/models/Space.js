@@ -62,6 +62,14 @@ const spaceSchema = new mongoose.Schema(
       accent: { type: String, default: null },
       tint: { type: String, default: null },
     },
+
+    // Discoverability & access. `public` spaces appear in Discover and accept
+    // direct joins; `private` spaces are hidden from Discover and can only be
+    // joined via a valid invite code managed by owner/admins. One active invite
+    // per space: rotate (regenerate) invalidates the previous code.
+    visibility: { type: String, enum: ["public", "private"], default: "public" },
+    inviteCode: { type: String, default: null, index: true },
+    inviteExpiresAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -98,7 +98,7 @@ Versioned REST APIs under `/api/v1`; the standalone admin API lives under `/api/
 | `/api/v1/friends` | request, accept/decline, list, remove |
 | `/api/v1/conversations` | DMs/groups CRUD, members/admins, read/unread, messages (list/send) |
 | `/api/v1/messages` | edit, delete, reactions |
-| `/api/v1/spaces` | spaces CRUD, discover, join, members/roles, channels |
+| `/api/v1/spaces` | spaces CRUD, discover (public only), join, join-by-invite-code, invite manage (GET/POST/DELETE), members/roles, channels |
 | `/api/v1/notifications` | list, unread-count, mark read, preferences |
 | `/api/v1/push` | vapid-public-key, subscribe, unsubscribe |
 | `/api/v1/attachments` | multipart upload (Multer → Appwrite) |
@@ -120,7 +120,7 @@ MongoDB is the canonical source of truth. Core collections:
 | `Conversation` | `type: dm / group / space_channel`, participants, admins (groups), `spaceId`+`channelId` for channel conversations, `lastMessageAt`; messages are **not** embedded |
 | `Message` | conversationId + senderId, content (4000), type `text/system`, replyToMessageId, reactions (subdocs), deliveredTo, readBy, mentions, **attachments** (embedded), isEdited, isDeleted |
 | `FriendRequest` | directed `from`/`to` + status (`pending/accepted/declined`); accepted rows are the friendship edge |
-| `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug, **appearance** (`{accent,tint}` per-Space palette; owner/admin-editable via Space settings, read by every member's client to scope the channel view) |
+| `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug, **appearance** (`{accent,tint}` per-Space palette; owner/admin-editable via Space settings, read by every member's client to scope the channel view), **visibility** (`public`/`private` — private hidden from Discover, joinable only by invite code), `inviteCode` + `inviteExpiresAt` (single rotating 7-day invite per Space, owner/admin-managed; codes are never included in Space payloads) |
 | `Notification` | recipient/sender, type (`dm_message`, `group_message`, `space_message`, `mention`, `friend_request`, `friend_accept`, `space_invite` reserved), delivery flags |
 | `PushSubscription` | per-user VAPID endpoint + keys (unique endpoint) |
 | `AdminActionLog` | audit trail: ban/unban/force_logout/delete_group/delete_space + IP + timestamp |

@@ -1,5 +1,5 @@
 "use client";
-import { Search, X } from "lucide-react";
+import { Link2, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 import { SPACE_CATEGORIES } from "@/lib/space-categories";
@@ -7,13 +7,18 @@ import { SpaceCard } from "./space-card";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { motion, useReducedMotion } from "motion/react";
 
-export function SpaceDiscoverModal({ open, onClose, onJoined }) {
+export function SpaceDiscoverModal({ open, onClose, onJoined, invitePrefill }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [spaces, setSpaces] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [joiningId, setJoiningId] = useState(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState(null);
+  const [inviteNotice, setInviteNotice] = useState(null);
   const isDesktop = useIsDesktop();
   const reduce = useReducedMotion();
   const EASE = [0.22, 1, 0.36, 1];
@@ -32,10 +37,24 @@ export function SpaceDiscoverModal({ open, onClose, onJoined }) {
     } finally { setLoading(false); }
   };
 
+  // When the shell hands us an invite code (e.g. a deep link that failed),
+  // open the invite field prefilled so the join can be retried in place.
   useEffect(() => {
     if (!open) return;
-    fetchSpaces(query, category);
-  }, [open]);
+    if (invitePrefill?.code) {
+      setInviteOpen(true);
+      setInviteCode(invitePrefill.code);
+      setInviteNotice(
+        invitePrefill.message ||
+          "This is an invite link — paste the code below to join the Space."
+      );
+    } else {
+      setInviteOpen(false);
+      setInviteCode("");
+      setInviteNotice(null);
+    }
+    setInviteError(null);
+  }, [open, invitePrefill]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,6 +83,29 @@ export function SpaceDiscoverModal({ open, onClose, onJoined }) {
     } finally { setJoiningId(null); }
   };
 
+  const joinByInvite = async () => {
+    const code = inviteCode.trim();
+    if (!code) return;
+    setInviteBusy(true);
+    setInviteError(null);
+    try {
+      const space = await apiPost(
+        `/api/v1/spaces/join/${encodeURIComponent(code)}`,
+        {}
+      );
+      onJoined?.(space);
+      setInviteOpen(false);
+      setInviteCode("");
+      onClose();
+    } catch (e) {
+      setInviteError(
+        e?.message || "Could not join — check the invite code and try again."
+      );
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
   const inner = (
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -88,6 +130,50 @@ export function SpaceDiscoverModal({ open, onClose, onJoined }) {
             </button>
           ))}
         </div>
+      </div>
+      <div className="flex flex-col">
+        <button
+          type="button"
+          onClick={() => {
+            setInviteOpen((v) => !v);
+            setInviteError(null);
+            setInviteNotice(null);
+          }}
+          className="inline-flex items-center gap-1.5 self-start text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+        >
+          <Link2 className="h-3.5 w-3.5" />
+          {inviteOpen ? "Hide invite field" : "Have an invite code? Join a private Space"}
+        </button>
+        {inviteOpen && (
+          <div className="mt-2 flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
+            {inviteNotice && (
+              <p className="text-[12px] text-[var(--text-muted)]">{inviteNotice}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.toLowerCase().replace(/[^a-f0-9]/g, "").slice(0, 12))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") joinByInvite();
+                }}
+                placeholder="Invite code (12 characters)"
+                aria-label="Space invite code"
+                className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={joinByInvite}
+                disabled={inviteBusy || inviteCode.trim().length < 12}
+                className="shrink-0 rounded-lg bg-[var(--accent)] px-3.5 py-2 text-[12px] font-semibold text-[var(--on-accent)] transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                {inviteBusy ? "Joining…" : "Join"}
+              </button>
+            </div>
+            {inviteError && (
+              <p className="text-[12px] text-[var(--destructive)]">{inviteError}</p>
+            )}
+          </div>
+        )}
       </div>
       {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">{error}</p>}
       {loading ? (

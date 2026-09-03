@@ -9,6 +9,7 @@ import { BANNER_OPTIONS } from "@/lib/banners";
 import { SPACE_CATEGORIES } from "@/lib/space-categories";
 import { apiPostForm } from "@/lib/api";
 import { SpacePaletteSection } from "./space-palette-section";
+import { SpacePrivacySection } from "./space-privacy-section";
 
 export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLeft }) {
   const currentUser = getSession();
@@ -148,6 +149,8 @@ export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLef
         {error && <p className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-[12px] text-[var(--text-muted)]">{error}</p>}
 
         <SpacePaletteSection space={space} onUpdated={onUpdated} canEdit={canEdit} />
+
+        <SpacePrivacySection space={space} onUpdated={onUpdated} canEdit={canEdit} />
 
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Members · {members.length}</p>

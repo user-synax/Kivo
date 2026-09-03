@@ -434,9 +434,20 @@ export function DocsScreen() {
                   "Click Join. You enter as a member and get every channel.",
                 ]}
               />
+              <h3 className="doc-h3">Private Spaces &amp; invites</h3>
               <p>
-                There are no invite links. Leave from Space settings; you can
-                rejoin from Discover.
+                A Space can be <strong>private</strong> — hidden from Discover
+                and joinable only by invite. Owner/admins manage the invite
+                link in Space settings → Privacy &amp; invites: create a link,
+                rotate it (old links stop working), or turn invites off. Each
+                link expires after 7 days.
+              </p>
+              <p>
+                Opening an invite link signs you in and joins automatically. If
+                you're already in the app, Discover has a "Have an invite
+                code?" field for pasting a code. Leave from Space settings; you
+                can rejoin from Discover (public Spaces) or a fresh invite
+                (private Spaces).
               </p>
               <h3 className="doc-h3">Space palette</h3>
               <p>
@@ -607,7 +618,7 @@ export function DocsScreen() {
                 <Bullet>Threads, pins, and saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
                 </Bullet>
                 <Bullet>Sharing palettes as saved theme templates</Bullet>
-                <Bullet>Private invite links for Spaces</Bullet>
+
                 <Bullet>Video/audio attachments (images & documents only)</Bullet>
                 <Bullet>
                   Full offline message history — only the latest 50 messages

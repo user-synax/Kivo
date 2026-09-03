@@ -87,6 +87,7 @@ Kivo
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
 | Space Discovery | **Complete** | Browse & search public spaces by category |
+| Private Spaces & Invites | **Complete** | `public`/`private` Space visibility; private Spaces are hidden from Discover and joinable only via a rotating 7-day invite link (Space settings → Privacy & invites), with code join from Discover and `/app?join=CODE` deep links |
 | Notification System | **Complete** | In-app notification center + DM-focused suppression + per-category sound cues (Settings → Sounds) |
 | Web Push | **Complete** | VAPID push for offline users, PWA service worker |
 | PWA / Installable | **Complete** | Manifest, icons, service worker |
@@ -531,7 +532,7 @@ Discord-style community containers built on top of the existing conversation mod
 
 | Concept | Description |
 |---|---|
-| **Space** | Community container: name, slug, description, category, avatar, banner, owner |
+| **Space** | Community container: name, slug, description, category, avatar, banner, owner, **visibility** (`public`/`private`), single rotating **invite code + expiry** (admin-managed) |
 | **Member** | A user with a role: `owner` → `admin` → `moderator` → `member` |
 | **Channel** | Embedded subdocument in the Space (types: `text`, `announcement`), each backed by a `Conversation` with `type: "space_channel"` |
 
@@ -543,11 +544,15 @@ Role ranks: `owner 4 > admin 3 > moderator 2 > member 1`. Access control is rank
 |---|---|---|
 | POST | `/api/v1/spaces` | Any authenticated user (auto-creates `#general`) |
 | GET | `/api/v1/spaces` | Member — own spaces |
-| GET | `/api/v1/spaces/discover?q=&category=` | Any authenticated user (public list) |
-| GET | `/api/v1/spaces/:id` | Member |
-| PATCH | `/api/v1/spaces/:id` | Admin+ |
+| GET | `/api/v1/spaces/discover?q=&category=` | Any authenticated user (lists **public** spaces only) |
+| GET | `/api/v1/spaces/:id` | Member (non-member + private → 404, no existence leak) |
+| PATCH | `/api/v1/spaces/:id` | Admin+ (incl. `visibility` toggle) |
 | DELETE | `/api/v1/spaces/:id` | Owner only (cascades conversations) |
-| POST | `/api/v1/spaces/:id/join` | Any authenticated user (public spaces) |
+| POST | `/api/v1/spaces/:id/join` | Any authenticated user (**public** spaces; private → 403) |
+| POST | `/api/v1/spaces/join/:code` | Any authenticated user with a valid, unexpired code (public or private) |
+| GET | `/api/v1/spaces/:id/invite` | Admin+ (invite status; codes never ship in space payloads) |
+| POST | `/api/v1/spaces/:id/invite` | Admin+ (create/rotate code, 7-day expiry) |
+| DELETE | `/api/v1/spaces/:id/invite` | Admin+ (turn invites off) |
 
 #### 7.3 Membership & Roles
 
@@ -579,9 +584,10 @@ Role ranks: `owner 4 > admin 3 > moderator 2 > member 1`. Access control is rank
 
 #### 7.5 Discovery
 
-- `GET /api/v1/spaces/discover` lists public spaces (regex name/description search + `category` filter, limit ≤ 50).
-- The frontend `SpaceDiscoverModal` provides search, category pills, and one-click join.
-- Invite links are **deprecated** — `createInvite` returns `INVITE_REMOVED`. Joining uses public discovery or admin-added members.
+- `GET /api/v1/spaces/discover` lists **public** spaces only (regex name/description search + `category` filter, limit ≤ 50).
+- The frontend `SpaceDiscoverModal` provides search, category pills, one-click join, and a **"Have an invite code?"** field.
+- **Private Spaces** are hidden from Discover and reject direct joins; joining requires a valid invite code via `POST /spaces/join/:code`.
+- **Invite links**: one rotating code per Space (`Space.inviteCode` + `inviteExpiresAt`, 7-day TTL), created/rotated/revoked by owner/admins through Space settings → Privacy & invites. Codes are 12 hex chars, never included in Space payloads, idempotent for existing members, and expire cleanly (`INVITE_EXPIRED`). The frontend deep-links as `/app?join=CODE`; a failed deep link reopens Discover with the code prefilled.
 
 #### 7.6 Realtime Events
 
@@ -656,7 +662,7 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 | `space_message` | New message in a space channel |
 | `friend_request` | A user sends you a friend request |
 | `friend_accept` | A user accepts your friend request |
-| `space_invite` | Reserved for future space invites |
+| `space_invite` | Reserved for a future "invite this person" notification (today's Space invites use rotating link codes) |
 | `mention` | `@mention` in a message (shipped) |
 
 #### 8.2 Delivery Model

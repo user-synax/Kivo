@@ -69,6 +69,7 @@ async function toPublicSpace(space, userId) {
     slug: obj.slug,
     description: obj.description,
     category: obj.category,
+    visibility: obj.visibility || "public",
     avatarUrl: obj.avatarUrl || null,
     banner: obj.banner || null,
     // Per-Space palette — carried on every public payload (avatar/banner are
@@ -190,6 +191,7 @@ export async function listSpaces({ userId }) {
       slug: s.slug,
       description: s.description,
       category: s.category,
+      visibility: s.visibility || "public",
       avatarUrl: s.avatarUrl || null,
       banner: s.banner || null,
       appearance: {
@@ -212,7 +214,7 @@ export async function listSpaces({ userId }) {
 }
 
 export async function listPublicSpaces({ q, category, limit = 20 }) {
-  const filter = {};
+  const filter = { visibility: "public" };
   if (category && category !== "All") filter.category = category;
   if (q && q.trim()) {
     const regex = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -225,6 +227,7 @@ export async function listPublicSpaces({ q, category, limit = 20 }) {
     slug: s.slug,
     description: s.description,
     category: s.category,
+    visibility: s.visibility || "public",
     avatarUrl: s.avatarUrl || null,
     banner: s.banner || null,
     appearance: {
@@ -240,6 +243,12 @@ export async function listPublicSpaces({ q, category, limit = 20 }) {
 
 export async function getSpace({ spaceId, userId }) {
   const { space } = await assertSpace(spaceId, userId);
+  // Private spaces are invisible to non-members — treat as not found so the
+  // id itself doesn't leak existence; members and invitees see full details.
+  const isMember = space.members.some((m) => m.userId.toString() === userId);
+  if (space.visibility === "private" && !isMember) {
+    throw notFound("Space not found", "SPACE_NOT_FOUND");
+  }
   return await toPublicSpace(space, userId);
 }
 
@@ -258,6 +267,7 @@ export async function updateSpace({ spaceId, userId, data, avatar }) {
       tint: data.appearance?.tint || null,
     };
   }
+  if (data.visibility !== undefined) update.visibility = data.visibility;
   if (data.slug !== undefined) {
     // allow slug change only if unique
     const s = slugFromName(data.slug);
@@ -384,11 +394,12 @@ export async function updateMemberRole({ spaceId, userId, targetUserId, role }) 
   return await toPublicSpace(space, userId);
 }
 
-// ── Join (public spaces) ───────────────────────────────────────────────
+// ── Join (public spaces & invites) ─────────────────────────────────────
 
-export async function joinSpace({ spaceId, userId }) {
-  const space = await Space.findById(spaceId);
-  if (!space) throw notFound("Space not found", "SPACE_NOT_FOUND");
+// Shared membership add: pushes the member, joins every channel conversation,
+// and fans out the realtime events. Used by the public direct-join endpoint
+// (public spaces only) and by invite-code joins (public AND private).
+async function addMemberAndJoin(space, userId) {
   const exists = space.members.some((m) => m.userId.toString() === userId);
   if (exists) throw badRequest("Already a member", "ALREADY_MEMBER");
   space.members.push({ userId, role: "member", joinedAt: new Date() });
@@ -409,15 +420,75 @@ export async function joinSpace({ spaceId, userId }) {
   return await toPublicSpace(space, userId);
 }
 
-// Keep for backwards compat (invite links) — now just delegates to joinSpace via code lookup
-export async function joinByInvite({ code, userId }) {
-  const space = await Space.findOne({ inviteCode: code });
-  if (!space) throw notFound("Invite not found", "INVITE_NOT_FOUND");
-  return joinSpace({ spaceId: space._id.toString(), userId });
+export async function joinSpace({ spaceId, userId }) {
+  const space = await Space.findById(spaceId);
+  if (!space) throw notFound("Space not found", "SPACE_NOT_FOUND");
+  // Private spaces are joinable only through a valid invite code — the direct
+  // join endpoint stays open for `public` spaces (Discover's one-click join).
+  if (space.visibility === "private") {
+    throw forbidden("This space is private. Ask a member for an invite link.", "PRIVATE_SPACE");
+  }
+  return addMemberAndJoin(space, userId);
 }
-export async function createInvite({ spaceId, userId, expiresInHours }) {
-  // Deprecated — invite links removed. Keep stub to avoid 404.
-  throw badRequest("Invite links have been removed. Use Discover to join public spaces.", "INVITE_REMOVED");
+
+// One active invite per space: a 12-hex code with a 7-day expiry. Rotating
+// (createInvite again) replaces the code and invalidates the previous link;
+// revokeInvite turns invites off entirely. Codes are never included in space
+// payloads — only the admin invite endpoints below return them.
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export async function joinByInvite({ code, userId }) {
+  const raw = typeof code === "string" ? code.trim().toLowerCase() : "";
+  if (!raw) throw badRequest("Invite code required", "INVALID_CODE");
+  const space = await Space.findOne({ inviteCode: raw });
+  if (!space) {
+    throw notFound("Invite not found — it may have been replaced or turned off.", "INVITE_NOT_FOUND");
+  }
+  const isMember = space.members.some((m) => m.userId.toString() === userId);
+  if (isMember) {
+    // Idempotent: reopening an invite link while already a member just returns
+    // the space instead of erroring.
+    return await toPublicSpace(space, userId);
+  }
+  if (!space.inviteExpiresAt || new Date(space.inviteExpiresAt).getTime() < Date.now()) {
+    throw badRequest("This invite link has expired.", "INVITE_EXPIRED");
+  }
+  // Bypass the direct-join privacy gate: the code itself is the authorization.
+  return addMemberAndJoin(space, userId);
+}
+
+export async function getInvite({ spaceId, userId }) {
+  const { space } = await assertSpace(spaceId, userId, { requireMember: true, requireRole: "admin" });
+  const code = space.inviteCode || null;
+  const expiresAt = space.inviteExpiresAt || null;
+  const active = Boolean(
+    code && expiresAt && new Date(expiresAt).getTime() >= Date.now()
+  );
+  return {
+    enabled: active,
+    code: active ? code : null,
+    expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+  };
+}
+
+export async function createInvite({ spaceId, userId }) {
+  const { space } = await assertSpace(spaceId, userId, { requireMember: true, requireRole: "admin" });
+  space.inviteCode = generateInviteCode();
+  space.inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  await space.save();
+  return {
+    enabled: true,
+    code: space.inviteCode,
+    expiresAt: space.inviteExpiresAt.toISOString(),
+  };
+}
+
+export async function revokeInvite({ spaceId, userId }) {
+  const { space } = await assertSpace(spaceId, userId, { requireMember: true, requireRole: "admin" });
+  space.inviteCode = null;
+  space.inviteExpiresAt = null;
+  await space.save();
+  return { enabled: false, code: null, expiresAt: null };
 }
 
 // ── Channels ──────────────────────────────────────────────────────────

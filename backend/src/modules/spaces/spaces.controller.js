@@ -102,6 +102,21 @@ export const joinByInvite = asyncHandler(async (req, res) => {
   res.json({ success: true, data: space });
 });
 
+export const getInvite = asyncHandler(async (req, res) => {
+  const invite = await svc.getInvite({ spaceId: req.params.id, userId: req.user.userId });
+  res.json({ success: true, data: invite });
+});
+
+export const createInvite = asyncHandler(async (req, res) => {
+  const invite = await svc.createInvite({ spaceId: req.params.id, userId: req.user.userId });
+  res.status(201).json({ success: true, data: invite });
+});
+
+export const revokeInvite = asyncHandler(async (req, res) => {
+  const invite = await svc.revokeInvite({ spaceId: req.params.id, userId: req.user.userId });
+  res.json({ success: true, data: invite });
+});
+
 export const createChannel = asyncHandler(async (req, res) => {
   const data = parseBody(createChannelSchema, req.body);
   const r = await svc.createChannel({ spaceId: req.params.id, userId: req.user.userId, ...data });

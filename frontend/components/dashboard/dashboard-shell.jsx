@@ -380,6 +380,7 @@ export function DashboardShell() {
   const [showSpaceSettings, setShowSpaceSettings] = useState(false);
   const [selectedSpaceId, setSelectedSpaceId] = useState(null);
   const [showDiscover, setShowDiscover] = useState(false);
+  const [pendingInvite, setPendingInvite] = useState(null);
   const [mobileTab, setMobileTab] = useState("chats");
   // Notifications — bell badge + center list, live via notification:new
   const [notifOpen, setNotifOpen] = useState(false);
@@ -455,6 +456,7 @@ export function DashboardShell() {
     if (!currentUser) return;
     syncSubscription().catch(() => {});
   }, [currentUser]);
+
 
   // Service-worker push click → navigate to conversation while app is open in another tab.
   useEffect(() => {
@@ -628,6 +630,53 @@ export function DashboardShell() {
       return next;
     });
   }, []);
+
+  // Invite deep link (/app?join=CODE). Joins the Space the code points at and
+  // drops the query param so a reload can't re-trigger the join. On failure the
+  // Discover modal opens with the code prefilled so the user can retry/paste.
+  const joinByCodeHandledRef = useRef(false);
+  useEffect(() => {
+    if (!currentUser || joinByCodeHandledRef.current) return;
+    const params =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null;
+    const code = params?.get("join")?.trim();
+    if (!code) return;
+    joinByCodeHandledRef.current = true;
+    const cleanupUrl = () => {
+      try {
+        window.history.replaceState(null, "", window.location.pathname);
+      } catch {}
+    };
+    apiPost(`/api/v1/spaces/join/${encodeURIComponent(code)}`)
+      .then((space) => {
+        cleanupUrl();
+        upsertSpace(space);
+        const uid = getSession()?.id;
+        loadSpaces().then((list) => {
+          setSpaces(list);
+          if (uid) setCachedSpaces(uid, list).catch(() => {});
+        });
+        loadConversations().then((list) => {
+          setConversations(list);
+          if (uid) setCachedConversations(uid, list).catch(() => {});
+          const conv = list.find(
+            (c) => c.type === "space_channel" && c.spaceId === space.id
+          );
+          if (conv) setSelectedId(conv.id);
+        });
+      })
+      .catch((err) => {
+        cleanupUrl();
+        setPendingInvite({
+          code,
+          message:
+            err?.message || "Couldn't join this Space with the invite link.",
+        });
+        setShowDiscover(true);
+      });
+  }, [currentUser, loadConversations, loadSpaces, upsertSpace]);
 
   // Insert or merge a conversation into the list (drives sidebar + selected).
   // Recomputes isAdmin from the admins array so realtime events — which carry the
@@ -1539,8 +1588,12 @@ export function DashboardShell() {
 
       <SpaceDiscoverModal
         open={showDiscover}
-        onClose={() => setShowDiscover(false)}
+        onClose={() => {
+          setShowDiscover(false);
+          setPendingInvite(null);
+        }}
         onJoined={handleDiscoverJoined}
+        invitePrefill={pendingInvite}
       />
 
       <SearchOverlay
@@ -1742,8 +1795,12 @@ export function DashboardShell() {
 
       <SpaceDiscoverModal
         open={showDiscover}
-        onClose={() => setShowDiscover(false)}
+        onClose={() => {
+          setShowDiscover(false);
+          setPendingInvite(null);
+        }}
         onJoined={handleDiscoverJoined}
+        invitePrefill={pendingInvite}
       />
 
       <SearchOverlay
