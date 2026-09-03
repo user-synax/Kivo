@@ -17,16 +17,18 @@ If you are already logged in, `/login` and `/signup` send you to `/app`. If you 
 **Local development** (Bun):
 
 ```bash
-# backend
-cd backend && bun install && bun run dev
+# backend (terminal 1)
+cd backend && bun install
+cp .env.example .env   # then fill in MongoDB/Appwrite/VAPID/Gmail values
+bun run dev            # http://localhost:4000
 
-# frontend (separate terminal)
+# frontend (terminal 2)
 cd frontend && bun install
-# set NEXT_PUBLIC_API_URL=http://localhost:4000 in frontend/.env.local
-bun run dev
+echo "NEXT_PUBLIC_API_URL=http://localhost:4000" > .env.local
+bun run dev            # http://localhost:3000
 ```
 
-Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for avatars, VAPID keys for web push).
+Next.js rewrites proxy `/api/*` and `/socket.io` to the backend (see `BACKEND_URL`), so REST calls stay same-origin; the Socket.IO client connects straight to `NEXT_PUBLIC_API_URL`.
 
 ---
 
@@ -37,9 +39,13 @@ Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for
 | `/` | Anyone | Landing page (Features, Customization, Security, Roadmap). Logged-in users are sent to `/app`. |
 | `/login` | Guests | Log in with email **or** username + password. |
 | `/signup` | Guests | Create an account. |
-| `/app` | Signed-in users | Main chat: sidebar, conversations, Spaces. |
+| `/forgot-password` / `/reset-password?token=…` | Anyone | Reset a forgotten password via emailed link. |
+| `/verify-email?token=…` | Anyone | Validate an email-verification link. |
+| `/app` | Signed-in users | Main chat: conversation lists, Spaces, Settings. |
 | `/app/profile` | Signed-in users | Read-only profile summary and **Log out**. |
+| `/u/:username` | Anyone | **Public profile** — shareable page for any user (badge, country, GitHub graph, actions). |
 | `/docs` | Anyone | In-app "How to use Kivo" guide. |
+| `/admin`, `/admin/dashboard` | Admins | Standalone admin panel (separate login). |
 
 ---
 
@@ -47,17 +53,16 @@ Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for
 
 **Where:** `/signup`
 
-1. Enter **display name**, **username**, **email**, and **password** (at least 8 characters).
-2. Submit. You are signed in and taken to `/app`.
-3. Check your inbox — Kivo emails you a **verify email** link (expires in 24 hours). Click it (or paste the link) to mark your email as verified.
+1. Enter **display name**, **username**, **email**, and **password** (at least 8 characters, with a confirm field).
+2. Submit. **You are signed in immediately and taken to `/app`** — there is no OTP or verification wall, so you can start chatting right away.
 
 **Rules**
 
 - Password: at least 8 characters.
 - Username: 3–30 characters; letters, numbers, and underscores only. Unique.
 - Email: unique, valid format.
-- Until your email is verified, an in-app banner at the top of the chat shows a **Resend verification** option (rate-limited, 1 per minute).
-- Login is rate-limited (10 attempts per 15 minutes).
+- Email verification is a link-based flow on the backend (`/verify-email?token=…`, resend API). Signup currently does **not** email a verification link automatically and there is no in-app resend banner — nothing blocks chat either way.
+- Registration is rate-limited (5 per hour per IP), login 10 per 15 minutes.
 
 ---
 
@@ -68,7 +73,7 @@ Backend env template: `backend/.env.example` (MongoDB, JWT secrets, Appwrite for
 1. Enter your **email or username** and password.
 2. Submit. You go to `/app`.
 
-Sessions use a short-lived access token plus an httpOnly refresh cookie. The app refreshes the access token automatically before it expires.
+Sessions use a short-lived access token plus an httpOnly refresh cookie. The app refreshes the access token automatically before it expires (single-flight, 60 s before expiry).
 
 **Forgot your password?**
 
@@ -79,8 +84,7 @@ Sessions use a short-lived access token plus an httpOnly refresh cookie. The app
 
 **Log out**
 
-1. Open the dashboard sidebar and click your **profile** (bottom of the sidebar) to edit, then open the full profile, **or** go to `/app/profile`.
-2. Click **Log out**.
+Open the **Profile** tab (mobile) or click your avatar in the rail (desktop), then the full profile **or** go to `/app/profile`, and click **Log out**.
 
 That ends the current session. There is also a server endpoint to log out of **all** devices (`POST /api/v1/auth/logout-all`); it is not exposed as a button in the UI yet.
 
@@ -88,23 +92,32 @@ That ends the current session. There is also a server endpoint to log out of **a
 
 ## 3. Dashboard layout
 
-After login you see three regions (on a wide screen):
+### Desktop & tablet (md+)
 
-1. **Left sidebar** — DMs, groups, Spaces, search, compose, theme, profile.
-2. **Center chat** — the open conversation or channel.
-3. **Right panel** (XL desktop, DMs) — the other person’s profile. For groups and Spaces, a **settings drawer** can slide in from the right.
+A **icon rail** on the far left switches between four panels — **Chats**, **Groups**, **Spaces**, and **Settings** — with your **avatar at the bottom** for the profile editor. Unread dots appear on the rail icons whenever a category has unread activity.
 
-**Mobile:** On a phone, Kivo shows a **bottom tab bar** with three sections — **Chats**, **Spaces**, and **Profile** — so navigation feels native. Open a chat to see messages; use **Back** in the chat header to return to the list. Group/Space settings open as a full-height drawer. Safe-area insets are handled on notched devices.
+Inside the active panel:
 
-**Collapse the sidebar:** use the panel icon in the sidebar header (desktop). Collapsed state is remembered.
+- **Header** — the notification **bell**, the **global search** button (Ctrl+K), and per-tab actions (the **New** menu in Chats; **New group** in Groups; **Discover** + **New** in Spaces).
+- A **scoped search field** filters the current tab (chats / groups / spaces).
+- The list shows DMs or groups as rows (with last message, time, unread badge, and online dot for DMs) or Spaces as expandable cards listing their channels.
+- The **"You are offline"** banner appears here when disconnected.
 
-**Remember last chat & instant paint:** the last selected conversation is restored after refresh. Your conversations, Spaces, friends, and friend requests are cached in the browser (IndexedDB), so the list paints instantly while fresh data loads.
+### Center chat
+
+The open conversation or channel. For DMs on very wide screens a **right panel** shows the other person's profile; group/Space settings open as a **drawer** or a persistent side column.
+
+### Mobile
+
+On a phone, Kivo shows a **bottom tab bar** with five sections — **Chats**, **Groups**, **Spaces**, **Settings**, and **Profile** — so navigation feels native. Open a chat to see messages; use **Back** (header or edge-swipe) to return to the list. Safe-area insets are handled on notched devices.
+
+**Remembered state & instant paint:** the last open conversation is restored after refresh, Space expand state is saved, and your conversations, Spaces, friends, and friend requests are cached in the browser (IndexedDB), so lists paint instantly while fresh data loads. The latest 50 messages of each chat are cached too.
 
 ---
 
 ## 4. Friends
 
-**Open:** sidebar **+** (New) menu → **Friends**, or the people / compose control that opens the friends modal.
+**Open:** the **New** menu (Chats panel) → **Friends** — or, in the app, the people control that opens the friends modal.
 
 The modal has three tabs: **Requests**, **Friends**, **Add**.
 
@@ -127,7 +140,9 @@ The other person gets an in-app (and possibly push) notification.
 
 On the **Friends** tab, click **Message**. That opens or creates a 1:1 conversation.
 
-**Note:** Unfriend exists on the API (`DELETE /api/v1/friends/:id`) but is not in the friends UI yet.
+### Remove a friend
+
+Open the person's profile (public page `/u/username` or the in-app profile drawer) and click **Unfriend**.
 
 ---
 
@@ -135,21 +150,24 @@ On the **Friends** tab, click **Message**. That opens or creates a 1:1 conversat
 
 ### Start a DM
 
-- From **Friends** → **Message**, or  
-- From **Add** search results, **Message** (if they are already a friend).
+- From **Friends** → **Message**, or from a profile page/drawer → **Message**.
 
 DMs are unique per pair: starting chat again reuses the existing conversation.
 
 ### Find a conversation
 
-- Sidebar lists **Direct** chats, newest activity first.
-- Use the **search** field in the sidebar to filter friends/conversations by name.
+- The **Chats** panel lists **Direct Messages**, newest activity first.
+- Use the **search** field at the top of the panel to filter by name.
 - Unread count shows as a badge on the row.
-- A green dot on the avatar means the other person is **online** (DMs only; groups do not show a single online dot).
+- A green dot on the avatar means the other person is **online** (DMs only; groups do not show a single online dot). Offline people show **"active X ago"** instead.
 
 ### Open a chat
 
 Click the conversation. On mobile, that replaces the list with the chat panel.
+
+### Blocking a person
+
+From the chat header / right-hand profile panel (or any profile page) choose **Block**. Blocking removes the friendship and hides the conversation; the person cannot message you. You can **Unblock** later from the same places. A blocked conversation shows a clear state instead of the composer.
 
 ---
 
@@ -169,7 +187,7 @@ Messages appear immediately (optimistic UI). If send fails, use **retry** on tha
 
 ### Reply (quote)
 
-1. Right-click (or long-press / context menu) a message → **Reply**.
+1. Context menu (right-click / long-press) on a message → **Reply**.
 2. A quote preview appears above the composer.
 3. Send as usual, or cancel the reply with the **X** on the preview.
 
@@ -177,10 +195,12 @@ The original message is shown as an inline quote on the new message. Deleted ori
 
 ### React with emoji
 
-1. Context menu on a message → **React**, **or** use the reaction chips under a message.
+1. Context menu → **React**, or use the reaction chips under a message.
 2. Pick an emoji. Clicking the same reaction again removes yours.
 
-You can also open the **emoji picker** next to the composer (smile button) to insert emoji into the text you are typing. The picker has multiple categories (smileys, people, nature, food, activity, travel, objects, symbols, flags) — 270+ emojis.
+Quick like: **double-click** (or long-press) a message to react with ❤️.
+
+You can also open the **emoji picker** next to the composer (smile button) to insert emoji into the text you are typing. The picker has 9 categories — Smileys, People, Hearts, Animals, Food, Activity, Travel, Objects, Symbols — 270+ emojis.
 
 ### Edit your message
 
@@ -193,7 +213,7 @@ You can also open the **emoji picker** next to the composer (smile button) to in
 1. Context menu → **Delete** (your own messages only).
 2. The message is **soft-deleted**: content is cleared, the row remains so replies stay in place.
 
-You cannot edit or delete other people’s messages.
+You cannot edit or delete other people's messages.
 
 ### Mentions (`@username`)
 
@@ -202,7 +222,7 @@ You cannot edit or delete other people’s messages.
 3. **Arrow keys** to move, **Enter** or **Tab** to insert, or click a person.
 4. The mention is stored as `@username` and highlighted in the bubble (with online status on the token when available).
 
-Mentioned people get a **mention** notification (title like “X mentioned you”) instead of a generic message notification.
+Mentioned people get a **mention** notification (title like "X mentioned you"). Mentions **override muted categories** — they arrive even if you muted that conversation type, as long as the Mentions preference is on.
 
 Mentions only resolve to people who are in that DM, group, or channel.
 
@@ -218,11 +238,11 @@ On your own bubbles:
 - Double check: **delivered**
 - Filled / read state: the other participant(s) **read** it
 
-The chat is marked read when you have it open. System messages (e.g. “Admin added X”) do not bump unread counts.
+The chat is marked read when you have it open. System messages (e.g. "Admin added X") do not bump unread counts.
 
 ### Mark a conversation unread
 
-Right-click (or long-press on mobile) a conversation in the sidebar → **Mark as unread**. The unread badge returns to that row, and when you reopen the chat a labelled **“New messages”** line shows where your unread messages begin. The separator clears automatically once you scroll to the latest messages (the chat is then marked read again).
+Right-click (or long-press on mobile) a conversation → **Mark as unread**. The unread badge returns to that row, and when you reopen the chat a labelled **"New messages"** line shows where your unread messages begin. The separator clears automatically once you scroll to the latest messages (the chat is then marked read again).
 
 ### Typing indicator
 
@@ -232,6 +252,10 @@ When someone else is typing in the open conversation, you see a typing line. You
 
 A message that has not confirmed yet shows as sending. On failure, retry from the bubble.
 
+### After a reconnect
+
+If your connection drops and comes back, Kivo automatically **gap-fills**: the conversation list refreshes, and the open chat fetches anything newer than the last message you saw — you don't have to scroll to catch up.
+
 ---
 
 ## 7. Group chats
@@ -240,7 +264,7 @@ Private groups for a small set of people (friends, class, squad). Not a Space.
 
 ### Create a group
 
-1. Sidebar **+** → **New group**, or the **+** next to the Groups section header.
+1. In the **Groups** panel click **New group** (or the **New** menu → **Group**).
 2. Name the group (required, max 50 characters).
 3. Optionally upload a group avatar (image, max 4MB).
 4. Select **at least two friends** (the group will have you + those people — at least three people total).
@@ -254,7 +278,7 @@ Open the group in the sidebar (under **Groups**). Messaging works like DMs (repl
 
 ### Group settings
 
-Open the group, then click **Group settings** in the chat header (gear / people icon). On XL screens the panel sits on the right; on smaller screens it is a drawer.
+Open the group, then click **Group settings** in the chat header. On wide screens the panel sits on the right; on smaller screens it is a drawer.
 
 **Admins can:**
 
@@ -271,7 +295,7 @@ Open the group, then click **Group settings** in the chat header (gear / people 
 **Rules**
 
 - The **last admin cannot be removed or demoted** (the group would have no owner).
-- Membership changes show as centered **system** chips (“Admin added X”, “Y left the group”) and update live for everyone.
+- Membership changes show as centered **system** chips ("Admin added X", "Y left the group") and update live for everyone.
 
 ---
 
@@ -281,7 +305,7 @@ Spaces are community containers (like Discord servers). Each Space has channels.
 
 ### Create a Space
 
-1. Sidebar **+** → create Space, or **+** next to **Spaces**.
+1. In the **Spaces** panel click **New** (or the **New** menu → **Space**).
 2. Set **name** (required), optional **description**, **category**, **banner** (preset GIFs), and **avatar** (image, max 4MB).
 3. Create.
 
@@ -291,19 +315,17 @@ A **`#general`** text channel is created automatically. You are the **owner**.
 
 ### Browse your Spaces
 
-In the sidebar, **Spaces** lists spaces you belong to. Click a Space name to expand/collapse its channels (that expand state is saved). Click a channel (hash = text, megaphone = announcement) to open it.
+In the **Spaces** panel, each Space is a card you expand to reveal its channels (that expand state is saved). Click a channel (hash = text, megaphone = announcement) to open it.
 
 ### Discover and join public Spaces
 
-1. Sidebar **+** → **Discover Spaces**.
+1. In the **Spaces** panel click **Discover** (or the **New** menu → **Discover Spaces**).
 2. Search by name/description and/or filter by **category**.
 3. Click **Join** on a Space.
 
 You join as **member** and get every channel. You can leave later from Space settings and rejoin via Discover.
 
-All Spaces currently appear in Discover (there is no private/unlisted Space flag in the UI).
-
-Invite links are **not** used; joining is Discover or an admin adding you.
+All Spaces currently appear in Discover (there is no private/unlisted Space flag). Invite links are **not** used; joining is Discover or an admin adding you.
 
 ### Channel types
 
@@ -314,7 +336,7 @@ Invite links are **not** used; joining is Discover or an admin adding you.
 
 ### Create, rename, delete channels
 
-In **Space settings** (open a Space channel, then settings in the header):
+In **Space settings** (open a Space channel, then the settings control in the header):
 
 - **Admin+** can add a channel: name, optional description, type (text or announcement).
 - **Admin+** can rename channels.
@@ -327,31 +349,31 @@ Rank (highest first): **owner → admin → moderator → member**.
 | Action | Who |
 |--------|-----|
 | Edit Space name, description, category, banner, avatar | Admin+ |
-| Add/remove members, change roles | Admin+ |
+| Add/remove members, change roles (member ↔ moderator) | Admin+ |
 | Promote someone to **admin** | **Owner only** |
 | Delete the Space | **Owner only** |
-| Leave the Space | Any member (owner leave auto-promotes the highest remaining member; you cannot leave the Space empty of owners in a broken way) |
+| Leave the Space | Any member (owner leave auto-promotes the highest remaining member; you cannot remove the last owner) |
 | Post in announcement channels | Admin+ |
 
 You cannot assign the **owner** role directly. You cannot remove the last owner.
 
 ### Space settings (members)
 
-- Change a member’s role (within what your rank allows).
+- Change a member's role (within what your rank allows).
 - Remove a member (or leave yourself).
 - Join/leave and role changes emit system messages into channels and update live.
 
 ### Delete a Space
 
-Owner only, from Space settings. Confirm the prompt. This cannot be undone and removes the Space and its channel conversations.
+Owner only, from Space settings. Confirm the prompt. This cannot be undone and removes the Space, its channel conversations, and their messages.
 
 ---
 
 ## 9. Profile and appearance
 
-### Edit profile (quick)
+### Edit profile
 
-Click your **avatar / name** at the bottom of the sidebar.
+On desktop click your **avatar** in the icon rail; on mobile open the **Profile** tab → **Edit profile**.
 
 You can set:
 
@@ -364,36 +386,56 @@ You can set:
 | Avatar photo | PNG, JPEG, WebP, or GIF; max **4MB** (Appwrite). Replace or remove. |
 | Avatar frame | Presets: Default, Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora |
 | Banner | Preset animated GIF covers |
+| Country | Optional; rendered as a **flag** on your profile |
+| GitHub | Optional username; renders a **contribution graph** on your public profile |
 
 Save to apply. Email is **not** editable here.
 
-### Full profile page
+### Your full profile page
 
-From the edit modal, open the full profile, or go to **`/app/profile`**.
+From the edit modal open the full profile, or go to **`/app/profile`**.
 
 Shows banner, avatar, display name, username, email, status, and role. **Log out** is here.
 
-### Other person’s profile (DMs)
+### Verification badge
 
-On a wide desktop (XL), the **right column** shows the other user: banner, avatar, name, username, online/offline, status, bio, and member-since. It is hidden on smaller screens.
+Verified accounts (a status granted by admins) can show a **verified badge** next to their name. If you're verified, **Settings → Verification badge** toggles whether it is visible on your public profile.
+
+### Public profile (`/u/username`)
+
+Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status, bio, and join date — plus a **GitHub contribution graph** when a GitHub username is set.
+
+What you can do there depends on your relationship:
+
+- Signed out: a "Join Kivo" prompt appears after a moment.
+- Friends: **Message** (opens the DM).
+- Not friends: **Add friend** (or **Accept** if they already requested you) and **Message** if they're a friend.
+- Anyone you're connected to: **Block / Unblock** and, for friends, **Unfriend**.
+
+Search results that point at a person open this same profile in a drawer inside the app.
 
 ---
 
 ## 10. Themes
 
-**Where:** bottom of the sidebar, **theme** control (palette).
+**Where:** **Settings → Appearance** (gear/avatar rail on desktop; Settings tab on mobile).
 
-Five live palettes (no page reload). Choice is stored in the browser (`localStorage`).
+**Ten** live palettes (no page reload). Choice is stored in the browser (`localStorage`, key `kivo:theme`).
 
-| Theme | Feel |
-|-------|------|
-| **Framer** (default) | Near-black canvas, white text, blue accent |
-| **Cloud** | Cool, slightly blue-tinted dark |
-| **Sand** | Warm, slightly brown-tinted dark |
-| **Ink** | Neutral near-black |
-| **Midnight** | Deep navy canvas |
+| Theme | Family | Feel |
+|-------|--------|------|
+| **Framer** (default) | Dark | Near-black canvas, white text, blue accent |
+| **Midnight** | Dark | Deep navy canvas |
+| **Graphite** | Dark | Cool slate, premium metallic depth |
+| **Espresso** | Dark | Rich warm brown, deep tonal ramp |
+| **Pine** | Dark | Deep forest green |
+| **Plum** | Dark | Moody aubergine |
+| **Porcelain** | Light | Neutral off-white canvas |
+| **Linen** | Light | Warm cream canvas |
+| **Mist** | Light | Cool blue-gray canvas |
+| **Sage** | Light | Soft green-tinted canvas |
 
-All themes share the same layout and corner radius; only colors change. If your OS asks for reduced motion, animations stay minimal.
+All themes share the same layout, corner radius, and elevation; only colors change. If your OS asks for reduced motion, animations stay minimal.
 
 ---
 
@@ -404,7 +446,7 @@ You can send files and images in any DM, group, or Space channel.
 ### Attach a file
 
 1. In the chat composer, click the **paperclip** button.
-2. Pick one or more files from your device.
+2. Pick one or more files from your device (**up to 10 files**).
 3. Each file shows a **preview chip** with name, size, and a progress bar while uploading.
 4. Type an optional caption, then **Enter** to send.
 5. The message appears with the files below your text.
@@ -430,14 +472,14 @@ Multiple files of mixed types can be sent in a single message.
 
 ---
 
-## 13. Notifications
+## 12. Notifications
 
 ### In-app bell
 
-The **bell** is on the dashboard (near the chat header / shell). The badge is the unread count.
+The **bell** sits in the panel header (Chats, Groups, and Spaces panels). The badge is the unread count.
 
 1. Click the bell to open the **notification center**.
-2. Click an item to open the related chat (DM, group, or Space channel) and mark it read.
+2. Click an item to open the related chat (DM, group, or Space channel) and mark it read. Friend-request items open the Friends modal.
 3. Scroll down to load older notifications.
 4. **Mark all read** clears the badge.
 
@@ -445,18 +487,20 @@ The **bell** is on the dashboard (near the chat header / shell). The badge is th
 
 **Types you may see**
 
-- New **DM** message  
-- New **group** message  
-- New **Space channel** message  
-- Someone **@mentioned** you  
-- **Friend request**  
+- New **DM** message
+- New **group** message
+- New **Space channel** message (incl. announcements)
+- Someone **@mentioned** you
+- **Friend request**
 - Friend request **accepted**
 
 You are never notified of your **own** messages. **System** messages (joins/leaves) do not create notifications.
 
 **Quiet when you are already in a DM:** if that DM is open and focused, the server **does not** send a notification for it. Group/Space notifications still fan out to other members.
 
-**Sound:** a short sound can play for new DMs while the app is open.
+**Notification preferences (Settings → Notification preferences):** choose which categories you receive — Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages, and Announcements. Space Messages are **off by default**; `@mentions` override a muted category. Toggles apply to both in-app and push delivery.
+
+**Sound:** a short chime can play for new DMs while the app is open (only when the DM isn't focused or the tab is hidden). There is no UI toggle yet; set `kivo:sound` to `off` in localStorage to mute.
 
 ### Browser / lock-screen push (offline)
 
@@ -464,13 +508,13 @@ The first time you **open the notification bell**, if the browser has not asked 
 
 Then, when you are **offline** or the tab is closed, you can still get native notifications for DMs, groups, Space messages, mentions, and friend events (if VAPID is configured on the server).
 
-Clicking a push notification opens the app (typically `/app` or the relevant conversation).
+Clicking a push notification opens the app and jumps to the relevant conversation.
 
 Permission is **opt-in**. There is no auto-prompt on first page load.
 
 ---
 
-## 14. Install as an app (PWA)
+## 13. Install as an app (PWA)
 
 Kivo is installable:
 
@@ -478,28 +522,29 @@ Kivo is installable:
 - **Android:** Add to Home Screen / Install app.
 - **iOS Safari:** Share → **Add to Home Screen**.
 
-It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push. Kivo caches your conversation, Space, friend, and friend-request **lists** in IndexedDB so they paint instantly on reload, but there is **no full offline message cache** yet (you still need the network to send/receive messages and see full history).
+It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push and notification clicks. Kivo caches your conversation, Space, friend, friend-request lists, and the **latest 50 messages per chat** in IndexedDB so they paint instantly on reload — but there is **no full offline history** yet (you still need the network to send/receive messages and load older pages).
 
 ---
 
-## 15. Presence and live updates
+## 14. Presence and live updates
 
 While you are connected:
 
 - Friends and DM partners can see you as **online** (green indicator).
-- When someone is offline, Kivo shows how long ago they were **last active** (e.g. “active 12 min ago”), in DMs and on their profile, instead of a bare offline state.
+- When someone is offline, Kivo shows how long ago they were **last active** (e.g. "active 12 min ago"), in DMs and on profiles, instead of a bare offline state.
 - New messages, edits, deletes, reactions, and receipts appear **without refresh**.
 - Group and Space membership, channel list, and settings updates stream in live.
 - New notifications arrive over the same realtime connection.
 
-If the connection drops, reconnect when the network returns; history still loads from the server.
+If the connection drops, Kivo reconnects automatically; on reconnect it **gap-fills** the conversation list and the open chat so nothing you missed is lost. History still loads from the server.
 
 ---
 
-## 16. Keyboard and accessibility
+## 15. Keyboard and accessibility
 
 | Action | Shortcut |
 |--------|----------|
+| Open global search | **Ctrl+K** / **Cmd+K** |
 | Send message | **Enter** |
 | New line in composer | **Shift+Enter** |
 | Confirm mention from autocomplete | **Enter** or **Tab** |
@@ -507,26 +552,27 @@ If the connection drops, reconnect when the network returns; history still loads
 | Save edited message | **Enter** |
 | Cancel edit | **Escape** |
 | Close modal / notification center | **Escape** |
+| Navigate lightbox images | **← / →** |
 
 Interactive controls use visible **focus** styles. Modals have labels for assistive tech. **Reduced motion** is respected.
 
 ---
 
-## 17. Landing page (marketing)
+## 16. Landing page (marketing)
 
 On `/` (logged out):
 
-- Hero and chat mockup  
-- Nav: Features, Customization, Security, Roadmap  
+- Hero and chat mockup
+- Nav: Features, Customization, Security, Roadmap
 - **Log in** / **Sign up**
 
 Use this to explain the product; actual chat is only after signup.
 
 ---
 
-## 18. Global search (Ctrl+K)
+## 17. Global search (Ctrl+K)
 
-**Open:** press **Ctrl+K** (or **Cmd+K** on Mac), or click the search icon in the sidebar header.
+**Open:** press **Ctrl+K** (or **Cmd+K** on Mac), or click the search icon in the panel header.
 
 A command-palette overlay opens with a single search field.
 
@@ -535,8 +581,8 @@ A command-palette overlay opens with a single search field.
 | Category | What it matches | Click behavior |
 |----------|-----------------|----------------|
 | **Messages** | Content of messages in conversations you belong to | Opens the conversation and jumps to that message |
-| **People** | Username or display name | Opens the person's profile |
-| **Spaces** | Space names you are a member of | Navigates into the space |
+| **People** | Username or display name | Opens the person's profile (in-app drawer) |
+| **Spaces** | Space names you are a member of | Opens a channel of the Space |
 
 - Search is **debounced** (300ms) and results load independently per category.
 - Minimum **2 characters** required.
@@ -544,7 +590,21 @@ A command-palette overlay opens with a single search field.
 
 ### Jump to message
 
-Clicking a message result closes the overlay, opens the conversation, and **scrolls directly to that message** with a brief blue highlight flash.
+Clicking a message result closes the overlay, opens the conversation, and **scrolls directly to that message** with a brief highlight flash. (Server-side, this uses an anchor fetch `around=<messageId>`.)
+
+The sidebar also has a per-panel **filter field** for chats/groups/spaces — that's quick name filtering, separate from global search.
+
+---
+
+## 18. Other people's profiles
+
+### In a DM (right panel)
+
+On a wide desktop (XL), the **right column** shows the other user: banner, avatar, name, username, verified badge, online/offline + last active, status, bio, and member-since. It is hidden on smaller screens.
+
+### Profile drawer / public page
+
+Open a person's profile from search results or any avatar shortcut. The same profile content powers the public page at `/u/<username>`. From it you can Message, Add friend / accept, Unfriend, or Block/Unblock.
 
 ---
 
@@ -582,7 +642,7 @@ The admin panel uses a separate JWT cookie (`admin_token`) that is never accepte
 
 - Rate-limited to **5 login attempts per 15 minutes** per IP.
 - Admin cookie is `httpOnly`, `SameSite=Lax`, `Path=/`.
-- Every moderation action (ban, unban, force-logout, delete) is logged with IP and timestamp.
+- Every moderation action (ban, unban, force-logout, delete) is logged with IP and timestamp (`AdminActionLog`).
 
 ### Environment variables
 
@@ -605,13 +665,18 @@ node -e "const b=require('bcryptjs');b.hash('your-password',12).then(h=>console.
 
 ### Message caching
 
-Messages are cached in IndexedDB (per conversation, last 50 messages). On load or conversation switch, cached messages render **instantly** while a background revalidation fetches fresh data from the server.
+Messages are cached in IndexedDB (per conversation, latest 50 messages). On load or conversation switch, cached messages render **instantly** while a background revalidation fetches fresh data from the server.
 
 Cache is updated in real-time during online use:
 - After initial REST fetch
 - On every incoming `message:new`, `message:edited`, `message:deleted`, `message:reaction` socket event
+- After a reconnect gap-fill
 
-Cache is cleared on logout.
+The whole cache (lists + messages) is cleared on logout.
+
+### Reconnect gap-fill
+
+On every successful socket reconnect the app refreshes the conversation list (unread counts, previews) and fetches messages newer than the newest known message in the open chat, merging them into the local cache — so a blip in connectivity doesn't lose anything.
 
 ### Offline indicator
 
@@ -619,19 +684,22 @@ A small **"You are offline"** banner appears in the sidebar when both signals in
 - `navigator.onLine` (browser online/offline events)
 - Socket.IO connection state
 
-The message composer's send button is disabled and grayed out while offline, with a subtle note that network is required.## What is not in the product yet
+The message composer's send button is disabled and grayed out while offline, with a subtle note that network is required.
+
+---
+
+## What is not in the product yet
 
 Do not expect these in the current MVP:
 
-- WhatsApp/Discord-style **search** inside messages, conversations, or Spaces (user search only)  
-- **Threads**, pinned messages, saved messages  
-- **Voice / video** — phase 1 backend is wired but no call UI yet  
-- **2FA** (two-factor authentication)  
-- Unfriend button in the UI  
-- Custom user-created themes  
-- Invite links for private Spaces  
-- Full offline **message** history in the PWA (chat lists are cached; messages still need the network)  
-- Video/audio attachments (images and documents only in this pass)  
+- **Threads**, pinned messages, saved messages
+- **Voice / video** — no backend wiring and no call UI
+- **2FA** (two-factor authentication; shown as "coming soon" in Settings)
+- Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
+- Custom user-created themes
+- Private / invite-linked Spaces
+- Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
+- Video/audio attachments (images and documents only in this pass)
 
 ---
 
@@ -639,30 +707,32 @@ Do not expect these in the current MVP:
 
 | Feature | How you use it |
 |---------|----------------|
-| Sign up / log in / session refresh | `/signup`, `/login`; stay on `/app` |
-| Log out | `/app/profile` |
-| Friends: add, accept, decline, list, search | Sidebar → Friends |
+| Sign up / log in / session refresh | `/signup`, `/login`; instant signup, stay on `/app` |
+| Log out | Profile tab / `/app/profile` |
+| Friends: add, accept, decline, list, search, remove | New menu → Friends; Unfriend on profiles |
 | Open DM from a friend | Friends → **Message** |
-| Send / reply / react / edit / delete messages | Chat panel + context menu |
-| Emoji in text | Composer smile button |
+| Send / reply / react / edit / delete messages | Chat panel + context menu (double-click = ❤️) |
+| Emoji in text | Composer smile button (9 categories, 270+) |
 | @mentions | Type `@` in the composer |
 | Typing, presence, read receipts | Automatic while connected |
-| Group create / members / admins | New group + group settings |
-| Spaces, channels, roles, Discover | Sidebar Spaces + Discover + Space settings |
-| Profile, avatar, frame, banner, bio, status | Sidebar profile |
-| Five Framer-style themes | Sidebar theme switcher |
-| In-app notifications | Bell |
+| Group create / members / admins | Groups panel → New group + group settings |
+| Spaces, channels, roles, Discover | Spaces panel + Discover + Space settings |
+| Profile, avatar, frame, banner, bio, status, country, GitHub | Icon-rail avatar / Profile tab |
+| Public profile & verified badge | `/u/:username` (badge toggle in Settings) |
+| Block / unblock users | DM header, profile drawer, public profile |
+| Ten themes (6 dark / 4 light) | Settings → Appearance |
+| Notification preferences | Settings → Notification preferences |
+| In-app notifications | Bell in panel header |
 | Web push | Allow notifications when opening the bell |
 | Install PWA | Browser install / Add to Home Screen |
-| Mobile bottom tab bar (Chats / Spaces / Profile) | On phone-sized screens |
-| Offline list caching (conversations, Spaces, friends) | Automatic via IndexedDB |
+| Mobile bottom tab bar (Chats/Groups/Spaces/Settings/Profile) | On phone-sized screens |
+| Offline list + message caching | Automatic via IndexedDB (last 50 per chat) |
+| Reconnect gap-fill | Automatic after socket reconnect |
 | File & image attachments (images, PDFs, docs) | Paperclip button in composer |
 | Image lightbox (fullscreen, arrows, download) | Click any image in chat |
-| Global search (Ctrl+K) | Ctrl+K or search icon in sidebar |
+| Global search (Ctrl+K) | Ctrl+K or search icon in panel header |
 | Admin panel | `/admin` — standalone dashboard |
-| Offline message caching | IndexedDB, last 50 messages per conversation |
 | Offline indicator | "You are offline" banner in sidebar |
-| Email verification | Verification link emailed on signup + Resend banner |
 | Forgot / reset password | `/forgot-password` → emailed link → `/reset-password` |
 | Last online status | "active … ago" in DMs & profiles when offline |
 | Mark as unread | Right-click conversation → Mark as unread |

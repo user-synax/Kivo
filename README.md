@@ -23,26 +23,28 @@
 
 ## ✨ Highlights
 
-- ⚡ **Real-time everything** — messages, typing, presence, and read receipts via Socket.IO (no polling).
-- 🔔 **Full notification system** — in-app notifications with a bell + center, web push for offline users, and DM-focused suppression.
+- ⚡ **Real-time everything** — messages, typing, presence, and read receipts via Socket.IO (no polling). Missed messages are **gap-filled on reconnect**.
+- 🔔 **Full notification system** — in-app notification center with a bell, per-category **notification preferences**, DM-focused suppression, and web push for offline users.
 - 📱 **Progressive Web App** — installable on any device with a service worker, manifest, and offline push delivery.
 - 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
-- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), `@mentions`, edit, and soft-delete.
-- 📎 **File & image attachments** — upload images, PDFs, documents, and text files in any chat; image lightbox with navigation, inline previews, and download.
-- 🎨 **5 live-switchable themes** with a Framer-style dark palette, persisted without a page reload.
-- 👤 **Rich profiles** — display name, custom status, bio, banner, avatar frames, and uploads hosted on Appwrite Storage.
-- 🤝 **Complete friends system** — send, accept, decline, remove, search, and jump straight into a DM.
-- 📱 **Mobile-first polish** — responsive three-panel layout with a bottom tab bar for phone navigation that works beautifully from phone to XL desktop.
-- 🗄️ **Offline caching** — conversations, Spaces, friends, and message history cached in IndexedDB for instant paint on reload.
+- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), double-click/long-press ❤️, `@mentions`, edit, and soft-delete.
+- 📎 **File & image attachments** — up to 10 images/PDFs/documents per message (30 MB each) in any chat; image lightbox with navigation, inline previews, and download.
+- 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
+- 👤 **Rich profiles** — display name, custom status, bio, banner, avatar uploads & frames, **country flag**, and **GitHub contribution graph** on a public profile page (`/u/username`).
+- ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
+- 🚫 **Blocking** — block/unblock another user from any DM or profile; blocked chats are hidden and friendships are removed.
+- 🤝 **Complete friends system** — send, accept, decline, **remove**, search, and jump straight into a DM.
+- 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Settings / Profile) and an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
+- 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
-- 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation.
+- 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation, and audit logging.
 - 📴 **Offline indicator** — "You are offline" banner when both browser and socket signals indicate disconnection.
-- 📧 **Transaction email** — signup triggers an **email verification** link, and **forgot/reset password** emails work end-to-end via Gmail SMTP.
+- 📧 **Transactional email** — forgot/reset password emails work end-to-end via Gmail SMTP; a link-based email-verification flow exists (`/verify-email`, resend API).
 - 🕒 **Last online status** — "active X min/hour ago" instead of a bare offline state.
 - 📬 **Mark as unread** — right-click any conversation and re-mark it unread; a "New messages" separator shows where unread hits start.
-- 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, never trust the client.
+- 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, rate limiting on every sensitive route, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
 
 ---
@@ -69,7 +71,7 @@ Kivo
 └── Spaces (community containers)              ✅ Done
     └── Channels (text & announcement)         ✅ Done
         └── Messages                           ✅ Done
-            └── Replies (quote reply)          ✅ Done
+            ├── Replies (quote reply)          ✅ Done
             └── Attachments (images & docs)    ✅ Done
             └── Threads (future)               🚧 Phase 2
 ```
@@ -84,10 +86,11 @@ Although Kivo is a **student project**, the messaging core is **fully functional
 - 👥 **Group conversations** (e.g. college projects, gaming squads) with admins & member management
 - 🏠 **Your own Spaces & Channels** — run a community, moderate members, and organize chat by channel
 - 🔎 **Discover public spaces** by category or search and join with one click
-- 🎨 **Personalizing your chat** with 5 live-switchable Framer-style themes
-- 📎 **Sharing files and images** — drag or click to upload, preview images in a lightbox, view documents inline
+- 🎨 **Personalizing your chat** with 10 live-switchable themes (dark & light)
+- 📎 **Sharing files and images** — drag or click to upload up to 10 files (30 MB each), preview images in a lightbox, view documents inline
 - 🟢 Real-time presence, typing indicators, read receipts, `@mentions`, and message replies
-- 📱 A **bottom tab bar** (Chats / Spaces / Profile) makes the app feel native on phones
+- 📱 A **bottom tab bar** (Chats / Groups / Spaces / Settings / Profile) makes the app feel native on phones
+- 🧑‍🤝‍🧑 Public profile pages at `/u/username` — shareable, with badges, country, and GitHub activity
 
 It's a great platform for **normal, everyday conversations** — no enterprise features needed.
 
@@ -96,23 +99,28 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 ## 🚦 Implementation Status
 
 ### ✅ Complete
-- Authentication & sessions (JWT + httpOnly refresh cookie)
-- Email verification (verification link emailed on signup, resend option, verification banner)
+- Authentication & sessions (JWT + httpOnly refresh cookie, session-backed; instant signup — no OTP)
+- Email verification (link-based flow, `/verify-email` page + resend API; signup itself is instant and doesn't block chat)
 - Password reset (forgot/reset password via emailed token, invalidates all sessions)
-- User profiles (name, username, bio, custom status, **banner**, avatar upload)
-- Friends system (request / accept / decline / list / search / remove)
+- User profiles (name, username, bio, custom status, banner, country, GitHub username, avatar upload & frames)
+- **Public profile pages** (`/u/:username`) with verified badge, country flag, and GitHub contribution graph
+- **Verification badges** (admin-granted `verified`, visibility toggled by the user in Settings)
+- **Blocking** (block/unblock from DMs or profiles; blocked relationships respected server-side)
+- Friends system (request / accept / decline / list / search / **remove**)
 - DM conversations (create, list, history, unread counts)
-- Text messaging (send, **reply**, **@mentions**, edit, soft-delete, reactions, emoji picker, receipts)
+- Text messaging (send, **reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, receipts)
 - **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
 - **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
-- **Notification system** (in-app notification center + notification sounds + bell with unread badge)
+- **Notification system** (in-app center + sounds + bell with unread badge)
+- **Notification preferences** (per-category toggles: DMs, groups, mentions, friend requests, Space messages, announcements)
 - **Web Push** (PWA service worker, VAPID subscriptions, offline push delivery)
 - **Progressive Web App** (installable, manifest, service worker)
-- Typing indicators & presence (realtime via Socket.IO)
-- Theme system (5 themes, live switching, no reload)
-- **Mobile UX overhaul** (bottom tab bar, responsive panels, safe-area handling)
-- **Offline caching** (IndexedDB cache for conversations, Spaces, friends, messages)
-- **File & image attachments** (images, PDFs, documents — upload via Appwrite, lightbox, inline preview)
+- Typing indicators & presence (realtime via Socket.IO, scoped to peers, offline grace to avoid flicker)
+- **Reconnect gap-fill** (refetches conversation list + messages newer than the newest known message after every reconnect)
+- Theme system (**10 themes**, 6 dark + 4 light, live switching, no reload)
+- **Mobile UX** (bottom tab bar with 5 tabs, responsive panels, edge-swipe back, safe-area handling)
+- **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
+- **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
 - **Admin panel** — standalone dashboard with user/group/space management, ban/unban, audit logging
 - **Offline indicator** — "You are offline" banner, disabled composer when offline
@@ -121,9 +129,10 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Animated landing page
 
 ### 🚧 Planned / Not Started
-- Threads · Mention notifications
-- Voice channels / video calls (Phase 1 backend wired, frontend not built)
-- 2FA — second-factor authentication
+- Threads · pinned/saved messages
+- Voice / video calls (not wired yet — no backend or frontend)
+- 2FA — second-factor authentication (shown in Settings as "coming soon")
+- Re-sending a verification email automatically at signup (removed with the OTP step)
 
 ---
 
@@ -140,6 +149,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 | **Motion (Framer Motion)** | Animations |
 | **Socket.IO Client** | Realtime |
 | **idb-keyval** | IndexedDB offline caching |
+| **lucide-react** / hugeicons / react-icons | Icons |
 | **Biome** | Linting & formatting |
 
 > JavaScript only — no TypeScript, by design.
@@ -149,19 +159,19 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 | Technology | Purpose |
 |---|---|
 | **Node.js + Express 5** | HTTP framework |
-| **Socket.IO 4** | Realtime WebSocket layer |
+| **Socket.IO 4** | Realtime WebSocket layer (in-memory presence, single instance) |
 | **Mongoose 9** | MongoDB ODM |
 | **MongoDB Atlas** | Primary database |
 | **Zod 4** | Request validation |
 | **JWT (jsonwebtoken)** | Authentication |
 | **bcryptjs** | Password hashing (12 rounds) |
 | **web-push** | VAPID web push notifications (offline delivery) |
-| **nodemailer** | Transactional email (verification, password reset) via Gmail SMTP |
-| **Appwrite** | File & attachment storage (avatars + message attachments) |
-| **Multer** | Multipart file upload handling |
-| **Redis** | Caching, rate limiting (planned) |
+| **nodemailer** | Transactional email (password reset, verification) via Gmail SMTP |
+| **Appwrite Storage** | File storage — avatars + message attachments (separate buckets) |
+| **Multer** | Multipart file upload handling (memory storage) |
+| **Redis** | Planned for caching/rate limiting — **not used yet** (in-memory limiter + presence today) |
 
-> **Runtime:** [Bun](https://bun.sh) — package manager & runtime for dev.
+> **Runtime:** [Bun](https://bun.sh) — package manager & runtime for dev (backend `nodemon` for watch mode).
 
 ---
 
@@ -169,29 +179,35 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 
 ```
 kivo/
-├── frontend/            # Next.js 16 app (App Router, React 19)
-│   ├── app/             # Routes: landing, login, signup, app, profile, docs, admin
-│   ├── components/      # UI, dashboard, chat, auth, navbar, spaces, notifications, docs
-│   ├── lib/             # theme, api, auth, chat, spaces, push, sound, cache, avatar helpers
-│   └── components/admin # admin-gate.jsx
+├── frontend/                 # Next.js 16 app (App Router, React 19, JS only)
+│   ├── app/                  # Routes: /, login, signup, verify-email, forgot/reset
+│   │   │                     #   password, /app (chat), /app/profile, /u/[username],
+│   │   │                     #   /docs, /admin + /admin/dashboard
+│   ├── components/           # dashboard (chat shell, panels), spaces, notifications,
+│   │   │                     #   profile, chat, ui, motion, navbar, admin, docs
+│   ├── lib/                  # api, auth, cache, chat, theme, push, sound, spaces,
+│   │   │                     #   avatar-styles, banners, countries, last-active, hooks
+│   └── Design.md             # Visual design system & tokens
 │
-├── backend/             # Express 5 + Socket.IO + Mongoose
+├── backend/                  # Express 5 + Socket.IO + Mongoose (JS only)
 │   └── src/
-│       ├── config/      # DB, env, webpush config
-│       ├── lib/         # Appwrite client, attachment upload helpers
-│       ├── middleware/  # auth, adminAuth, errorHandler, rateLimiter
-│       ├── models/      # User, Session, Conversation, Message, FriendRequest, Space, Notification, PushSubscription, AdminActionLog
-│       ├── modules/     # auth, users, conversations, messages, friends, spaces, notifications, push, admin, attachments, search
-│       ├── socket/      # Socket.IO init, presence, room helpers, events
-│       └── utils/       # helpers & errors
+│       ├── config/           # env, db, webpush config
+│       ├── lib/              # appwrite client, attachment upload, email (nodemailer)
+│       ├── middleware/       # auth, adminAuth, errorHandler, rateLimiter (in-memory)
+│       ├── models/           # User, Session, Conversation, Message, FriendRequest,
+│       │                     #   Space, Notification, PushSubscription, AdminActionLog
+│       ├── modules/          # auth, users, friends, conversations, messages, spaces,
+│       │                     #   notifications, push, attachments, search, admin
+│       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
+│       └── utils/            # errors & async handlers
 │
-├── docs.md              # Full features & how-to-use guide
-├── PRD.md               # Full product requirements & spec
-├── TECH-STACK.md        # Architecture & engineering decisions
-└── Design.md            # Visual design system
+├── README.md                 # This file
+├── docs.md                   # Full features & how-to-use guide
+├── PRD.md                    # Product requirements, API reference, schema
+└── TECH-STACK.md             # Architecture & engineering decisions
 ```
 
-Each backend module follows a clean **4-file pattern**: `*.routes.js` → `*.controller.js` → `*.service.js` → `*.validation.js`.
+Each backend module follows a clean **4-file pattern**: `*.routes.js` → `*.controller.js` → `*.service.js` → `*.validation.js` (where validation applies).
 
 ---
 
@@ -201,7 +217,8 @@ Each backend module follows a clean **4-file pattern**: `*.routes.js` → `*.con
 
 - [Bun](https://bun.sh) (>= 1.3)
 - [MongoDB](https://www.mongodb.com/atlas) (Atlas or local)
-- [Appwrite](https://appwrite.io) account (for avatar storage)
+- [Appwrite](https://appwrite.io) account (avatar + attachment storage; optional for a bare login/chat server)
+- [Gmail App Password](https://myaccount.google.com/apppasswords) for transactional email
 
 > For web push notifications, generate VAPID keys with `npx web-push generate-vapid-keys` and add them to your backend `.env`.
 
@@ -214,7 +231,7 @@ bun install
 # configure environment (MongoDB + Appwrite + auth secrets)
 cp .env.example .env
 
-bun run dev   # dev (nodemon)
+bun run dev   # dev (nodemon, http://localhost:4000)
 bun run start # production (bun)
 ```
 
@@ -224,7 +241,9 @@ bun run start # production (bun)
 cd frontend
 bun install
 
-# point the frontend at your backend (see below)
+# REST calls are proxied to the backend by Next.js rewrites (BACKEND_URL,
+# default http://localhost:4000). Socket.IO connects directly, so point
+# NEXT_PUBLIC_API_URL at the backend origin.
 echo "NEXT_PUBLIC_API_URL=http://localhost:4000" > .env.local
 
 bun run dev   # http://localhost:3000
@@ -236,20 +255,25 @@ bun run lint  # biome check
 
 | Variable | Where | Purpose |
 |---|---|---|
+| `PORT` | backend | API/Socket.IO port (default 4000 in `.env.example`) |
 | `MONGODB_URI` | backend | MongoDB connection string |
 | `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` | backend | JWT signing secrets |
+| `ACCESS_TOKEN_TTL` / `REFRESH_TOKEN_TTL` | backend | Token lifetimes (default `15m` / `7d`) |
+| `REFRESH_COOKIE_SAMESITE` | backend | `strict` (or `lax` for cross-subdomain) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | backend | Web push (VAPID) keys for offline notifications |
-| `APPWRITE_*` | backend | Appwrite endpoint, project, key, bucket (avatar + attachment storage) |
-| `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket ID for message attachments (separate from avatar bucket) |
-| `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins |
-| `NEXT_PUBLIC_API_URL` | frontend | Backend base URL (HTTP + Socket.IO) |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | backend | Gmail SMTP credentials for transactional email (verification, password reset) |
+| `APPWRITE_ENDPOINT` / `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` | backend | Appwrite credentials (storage) |
+| `APPWRITE_BUCKET_ID` | backend | Appwrite bucket for avatar uploads |
+| `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket for message attachments (separate from avatar bucket) |
+| `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins (empty = allow any in dev) |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | backend | Gmail SMTP credentials for transactional email |
 | `EMAIL_FROM` | backend | "From" header for outgoing emails |
 | `FRONTEND_URL` | backend | Frontend base URL used to build email verify/reset links |
 | `ADMIN_EMAIL` | backend | Admin panel login email |
 | `ADMIN_PASSWORD_HASH` | backend | Bcrypt hash of the admin password |
-| `ADMIN_JWT_SECRET` | backend | Secret for admin JWT signing |
-| `ADMIN_JWT_TTL` | backend | Admin token lifetime (default 30m) |
+| `ADMIN_JWT_SECRET` / `ADMIN_JWT_TTL` | backend | Admin JWT signing + lifetime (default 30m) |
+| `ADMIN_COOKIE_NAME` | backend | Admin cookie name (default `admin_token`) |
+| `BACKEND_URL` | frontend | Backend origin used by Next.js API rewrites (default `http://localhost:4000`) |
+| `NEXT_PUBLIC_API_URL` | frontend | Backend origin for the Socket.IO connection (default `http://localhost:4000`) |
 
 > See `backend/.env.example` for the full list with comments. Never commit real secrets — `*.env` is gitignored.
 
@@ -271,13 +295,14 @@ Registration / Login
   Protected routes / Socket.IO (handshake via JWT)
 ```
 
-- **GuestGate** redirects logged-in users away from `/login` & `/signup`.
+- **Registration is instant** — no OTP or verification barrier; you land in `/app`. Sessions are server-backed (`Session` documents with a TTL index).
+- **GuestGate** redirects logged-in users away from `/login`, `/signup`, and the landing page.
 - **AuthGate** redirects unauthenticated users from `/app/*` to `/login`.
-- Rate limits: login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`.
+- **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, admin login `5/15min`.
 
 ### Email verification & password reset
 
-- On **signup**, Kivo emails a **verify-email** link (24h expiry). Until the email is verified, an in-app banner nudges the user to verify (with a **resend** option, rate-limited to 1/min). The verify link works without logging in at `/verify-email?token=…`.
+- A **link-based email verification flow** exists: `GET /api/v1/auth/verify-email?token=…` (24h expiry, token stored hashed) and `POST /api/v1/auth/resend-verification` (authenticated, 1/min). The frontend `/verify-email?token=…` page validates tokens. Note: after the OTP step was removed, signup no longer emails a verification link automatically and there is no in-app resend banner — the endpoints remain for the flow.
 - **Forgot password** (`/forgot-password`) emails the user a reset link (1h expiry). **Reset password** (`/reset-password?token=…`) sets a new password and invalidates **all** existing sessions in one go.
 - All transactional email is sent over **Gmail SMTP** via `nodemailer` (see env vars below). Email sending is fire-and-forget, so signup/login never blocks on the mail server.
 
@@ -294,29 +319,35 @@ Registration / Login
 | `message:read` | Server → Room | Marked as read |
 | `message:unread` | Server → Room | Conversation marked unread (badge + separator) |
 | `message:delivery-updated` | Server → Room | Delivery state changed |
-| `typing:start` / `typing:stop` | Client → Room | Typing indicator |
-| `presence:online` / `offline` | Server → All | Presence broadcast |
+| `typing:start` / `typing:stop` | Client → Room | Typing indicator (re-broadcast to others) |
+| `presence:online` / `offline` | Server → Peers | Presence broadcast, scoped to people who share a conversation/space with the user |
 | `presence:snapshot` | Server → Client | Online peers on connect |
+| `conversation:focus` / `conversation:blur` | Client → Server | Tracks the DM the user is viewing (notification suppression) |
+| `message:delivered` | Client → Server | Delivery ack for a received message |
 | `conversation:member-added` / `member-removed` | Server → Room | Group membership changes |
 | `conversation:updated` / `admin-changed` / `removed` | Server → Room | Group updates |
 | `space:updated` / `space:member-*` / `space:channel-*` | Server → Space | Space, members & channels |
 | `space:deleted` / `space:joined` / `space:removed` | Server → All | Space lifecycle |
-| `notification:new` | Server → User | New in-app notification (fanned out to online recipients) |
-| `message:new` (with attachments) | Server → Room | Message carrying file/image attachments |
+| `notification:new` | Server → User | New in-app notification (fanned out per recipient) |
 
-> All socket events are **authenticated** via JWT handshake, and **authorized** — the server verifies conversation membership before accepting sensitive events.
+> Every connection is **authenticated** via JWT handshake (banned users are rejected at reconnect), and the server verifies conversation/space membership before accepting sensitive events. All socket rooms are joined automatically on connect. After a reconnect the client **gap-fills**: it refetches the conversation list and fetches messages newer than the newest known message in the open chat, so nothing is missed while offline.
 
 ---
 
-## 🎨 Theme System — "Framer" Dark Palette
+## 🎨 Theme System
 
-| Theme | Style |
-|---|---|
-| **Framer** (default) | Dark Framer-style canvas · near-black surfaces · blue accent |
-| **Cloud** | Cool, slightly blue-tinted canvas |
-| **Sand** | Warm, faint brown-tinted canvas |
-| **Ink** | Neutral near-black canvas |
-| **Midnight** | Deep navy canvas |
+| Theme | Family | Feel |
+|---|---|---|
+| **Framer** (default) | Dark | Framer-style canvas · near-black surfaces · blue accent |
+| **Midnight** | Dark | Deep navy canvas |
+| **Graphite** | Dark | Cool slate, premium metallic depth |
+| **Espresso** | Dark | Rich warm brown, deep tonal ramp |
+| **Pine** | Dark | Deep forest green cast |
+| **Plum** | Dark | Moody aubergine |
+| **Porcelain** | Light | Neutral off-white canvas |
+| **Linen** | Light | Warm cream canvas |
+| **Mist** | Light | Cool blue-gray canvas |
+| **Sage** | Light | Soft green-tinted canvas |
 
 **Core tokens (default "Framer")**
 
@@ -330,73 +361,79 @@ Registration / Login
 | Border (`--border`) | `#262626` (hairline) |
 | Online indicator | `#22c55e` |
 
-**Typography:** Goga (display/heading) · Inter (body) · JetBrains Mono (mono/labels)
+**Typography:** Outfit (display/headings — exposed as the `font-goga` / `font-display` tokens) · Inter (body) · system monospace for `font-mono`.
 
-Themes share one geometry — corner radius, elevation, and layout languages are global design tokens in `globals.css`, so switching a theme only re-skims colors. Palettes apply via CSS custom properties, persist in `localStorage` under `kivo:theme`, and switch **live** with zero reload — all while respecting `prefers-reduced-motion`. The single source of truth for palette colors is `frontend/lib/theme.js`; the visual system is documented in `frontend/Design.md`.
+Themes share one geometry — corner radius, elevation, and layout languages are global design tokens in `globals.css`, so switching a theme only re-skims colors. Palettes apply via CSS custom properties, persist in `localStorage` under `kivo:theme`, and switch **live** with zero reload — all while respecting `prefers-reduced-motion`. The single source of truth for palette colors is `frontend/lib/theme.js`; the visual system is documented in `frontend/Design.md`. The theme picker lives in **Settings → Appearance**.
 
 ---
 
 ## 🧱 Key Features
 
 ### 📎 File & Image Attachments
-- Upload images (jpg, png, gif, webp) and documents (pdf, doc, xlsx, ppt, txt) — max 30MB each
-- Multiple attachments per message, mixed types allowed
+- Upload images (jpg, png, gif, webp) and documents (pdf, doc/docx, xls/xlsx, ppt/pptx, txt) — **max 30 MB each, up to 10 files per message**
+- Multiple attachments per message, mixed types allowed, caption optional
 - Per-file upload progress indicator in the composer
 - **Image lightbox** — click any image to open a fullscreen centered modal with arrow-key navigation, download, and filename label
 - PDF, document, and text files render as download cards with file icon, name, and size
-- Drag-and-click paperclip button to attach files
-- Server-side MIME validation and Appwrite storage
+- Server-side MIME validation (allow-listed) and Appwrite storage in a dedicated attachments bucket
 
 ### 💬 Messaging
-- Cursor-based pagination with infinite scroll (newest-first)
+- Cursor-based pagination with infinite scroll (newest-first), plus `around=<messageId>` anchor fetch for jump-to-message
 - Optimistic UI with sent → delivered → read states + retry on failure
 - **Quote replies** with inline preview of the original message
-- **`@mentions`** with autocomplete (conversation participants only) + mention notifications
-- Reactions, edit, and soft-delete
-- 60-second message grouping & hover actions (bubble menu)
+- **`@mentions`** with autocomplete (conversation participants only) + mention notifications that override muted categories
+- **Double-click / long-press a message to ❤️ it**, reactions, edit, and soft-delete
+- 60-second message grouping & hover actions (context menu)
 - **New messages separator** — a labelled divider sits where your unread messages begin (auto-clears as you read to the bottom)
-- Emoji picker — 9 categories, 270+ emojis
-- Delivery & read receipts
+- Emoji picker — 9 categories (Smileys, People, Hearts, Animals, Food, Activity, Travel, Objects, Symbols), 270+ emojis
+- Delivery & read receipts; typing indicators
+- **Reconnect gap-fill** — after the socket reconnects, missed messages are fetched and merged into the cache
 
 ### 👥 Groups
-- Create private groups (2+ members) with a name & optional avatar
+- Create private groups (you + at least 2 friends) with a name & optional avatar (4 MB)
 - Add/remove members and promote/demote admins (real-time)
 - Admin-only management with system notices ("Admin added X", "Y left the group")
 - Prevent orphaned groups — the last admin can't be removed/demoted
 
 ### 🏠 Spaces & Channels
-- Create a space with name, avatar, banner, description & category (a `#general` channel is auto-created)
+- Create a space with name, avatar, banner, description & category (a `#general` channel is auto-created with a backing conversation)
 - Role hierarchy: **owner → admin → moderator → member** with rank-based permissions
 - Text & announcement channels, each backed by its own message thread
 - Admin+ create, rename, and delete channels (last channel protected)
-- Full moderation — add/remove members, assign roles, self-leave with auto owner promotion
-- **Discovery** — browse/search public spaces by category, join with one click
+- Full moderation — add/remove members, assign roles (admin promotion is owner-only), self-leave with auto owner promotion
+- **Discovery** — browse/search public spaces by category, join with one click (no invite links)
 
 ### 👥 Friends
-- Request by username or email
+- Request by username, email, or display name; search is debounced
 - Accept/decline, auto-mutual on reverse requests
 - Conflict-safe unique constraints (no duplicate/self-friending)
-- Search with debounced API calls + "Message" shortcut
+- **Remove a friend** from their profile (public page or in-app drawer)
+- "Message" shortcut opens/creates the DM
 
 ### 👤 Profiles
 - Display name, unique username, bio (280), custom status (60)
-- 9 preset avatar styles + real avatar upload (Appwrite, 4MB max)
-- Profile **banner** image
-- User detail panel (desktop XL+) with member-since info
+- **9 avatar frame presets** (Default, Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora) + real avatar upload (Appwrite, 4 MB max)
+- Profile **banner** — curated animated GIF covers
+- **Country** (flag shown on profile) and optional **GitHub username** (renders a contribution graph)
+- **Public profile page** at `/u/<username>` — shareable with anyone; visitors get a "Join Kivo" nudge
+- **Verified badge** for verified accounts (visibility toggled in Settings)
+- Block/unblock and Add friend / Message / Unfriend actions on every profile
 
 ### 🔔 Notifications
 - In-app notification center — a bell with an unread count badge and a dropdown list
-- Covers messages (DM / group / space), friend requests & accepts; cursor-paginated with "mark all read"
+- Covers DMs, group & Space messages (incl. announcements), mentions, friend requests & accepts; cursor-paginated with "mark all read"
+- **Notification preferences** (Settings) — per-category toggles for Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages (off by default), and Announcements; `@mentions` always override a muted category
 - **DM-focused suppression** — if you're actively viewing a DM, notifications for it are skipped server-side
-- Notification **sounds** on new messages
+- Notification **sounds** for incoming DMs when the chat isn't focused (mute via `kivo:sound` in localStorage)
 - Realtime delivery via socket (`notification:new`) with per-recipient fan-out
+- **Unread dots** on the Chats/Groups/Spaces navigation icons when a category has unread activity
 
 ### 📱 PWA & Web Push
 - **Installable PWA** — `manifest.json` with icons, standalone display, and a service worker (`sw.js`)
-- **Web push** powered by VAPID (`web-push`) — offline users receive DMs, group messages, and friend events as native notifications
+- **Web push** powered by VAPID (`web-push`) — offline users receive DMs, group messages, mentions, and friend events as native notifications
 - Permission is opt-in via explicit user action (`requestPermission`); `syncSubscription` only auto-subscribes when permission is already granted
 - Push subscriptions are stored per user; expired/unsubscribed endpoints (404/410) are cleaned up automatically
-- Notification click actions in the service worker deep-link into the app
+- Notification click actions in the service worker deep-link into the open conversation
 
 ---
 
@@ -404,13 +441,13 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 
 ```
 Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express backend  ──►  MongoDB
-   │                                                │
-   └─────────── Socket.IO (realtime) ◄──────────────┘
+   │                                                 │
+   └─────────── Socket.IO (realtime) ◄───────────────┘
 ```
 
 **Message flow:** Client → POST → Authenticate → Zod validate → Authorize membership → MongoDB write → Socket.IO emit → recipients.
 
-> MongoDB is authoritative; **Socket.IO only distributes realtime events**. Redis is acceleration, not canonical storage. Appwrite supplements the core (storage/push).
+> MongoDB is authoritative; **Socket.IO only distributes realtime events**. Redis is planned acceleration, not canonical storage — the current limiter and presence store are in-memory (single instance). Appwrite supplements the core (file storage); web-push delivers offline notifications.
 
 ---
 
@@ -419,10 +456,10 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 - JWT access tokens + **session-backed** httpOnly refresh cookies
 - Server-side **Zod validation** on every body, query, and param
 - Resource-based authorization (membership / ownership checks)
-- Rate limiting with `X-RateLimit-*` + `Retry-After` headers
+- Rate limiting with `X-RateLimit-*` + `Retry-After` headers on auth, messaging, search, and upload routes
 - Helmet security headers, secure CORS, body-size limits
-- Upload validation (types & 4MB max), old files deleted on replace
-- No stack traces / secrets leaked in production
+- Upload validation (allow-listed MIME types & sizes), old files deleted on replace
+- Banned users are rejected at login and disconnected from sockets; no stack traces / secrets leaked in production
 
 ---
 
@@ -430,8 +467,8 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications, PWA, customization, mobile UX, offline caching, file & image attachments |
-| **Phase 1.5** | DM & group voice calls (LiveKit), voice channel frontend, 2FA |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, global search |
+| **Phase 1.5** | Voice & video calls, 2FA, threads |
 | **Phase 2** | Threads, pinned/saved messages, stronger search, video/audio attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |
@@ -443,7 +480,7 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 - 🆔 [`docs.md`](./docs.md) — full features & how-to-use guide
 - 📄 [`PRD.md`](./PRD.md) — full product requirements, API reference, schema
 - 🏗️ [`TECH-STACK.md`](./TECH-STACK.md) — architecture & engineering decisions
-- 🎨 [`Design.md`](./Design.md) — visual design system & tokens
+- 🎨 [`frontend/Design.md`](./frontend/Design.md) — visual design system & tokens
 
 ---
 

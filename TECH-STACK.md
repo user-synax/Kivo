@@ -1,621 +1,264 @@
-Kivo Technical Stack & Architecture
+# Kivo — Technical Stack & Architecture
 
-Repository Strategy
+## Repository Strategy
 
-Kivo uses one Git repository containing separate frontend and backend applications.
+Kivo uses one Git repository containing two separate applications:
 
+```
 kivo/
-├── frontend/
-├── backend/
-├── design.md
-├── prd.md
-├── stack.md
-└── ...
+├── frontend/        # Next.js 16 app (App Router, React 19, JavaScript)
+├── backend/         # Express 5 + Socket.IO + Mongoose (JavaScript)
+├── README.md        # Overview & setup
+├── docs.md          # Features & how-to-use guide
+├── PRD.md           # Product requirements & API reference
+└── TECH-STACK.md    # This document
+```
 
-This is intentionally a simple monorepo layout. Do not introduce microservices initially.
+This is intentionally a simple monorepo layout. Do not introduce microservices.
 
-Frontend
+---
 
-Core
+## Frontend
 
-Next.js
+### Core
 
-JavaScript only
+- **Next.js 16** (App Router), **React 19**
+- **JavaScript only** — no TypeScript
+- Tailwind CSS v4 (PostCSS), shadcn/ui + Base UI primitives, `motion` (Framer Motion), Socket.IO client, `idb-keyval` (IndexedDB cache), lucide-react/hugeicons/react-icons, date-fns
+- Linting & formatting: **Biome** (`bun run lint`)
 
-App Router
+### Responsibilities
 
-React
+UI and interaction · routing · responsive design · API consumption · Socket.IO client · optimistic UI · theme/customization system · PWA readiness · accessibility · client-side state only where needed.
 
-Tailwind CSS
+**Rules**
 
-shadcn/ui
+- JavaScript only.
+- Avoid unnecessary UI/component libraries when shadcn/ui or native implementation is sufficient.
 
-Motion.dev
+### Frontend layout (current)
 
-Frontend Responsibilities
+- `frontend/app/` — route groups:
+  - `/` landing, `(auth)/` → `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/verify-email`
+  - `/app` chat dashboard (DashboardShell), `/app/profile`
+  - `/u/[username]` **public profiles**
+  - `/docs` in-app guide, `/admin` + `/admin/dashboard`
+- `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals), `spaces/`, `notifications/`, `profile/`, `chat/` (attachments), `mentions/`, `ui/`, `motion/` (context menu), `navbar/`, `admin/`, `docs/`
+- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js`, `push.js`, `sound.js`, `last-active.js`, `use-breakpoint.js`, hooks, etc.
+- `frontend/Design.md` — visual design system & tokens (Framer dark canvas, `#4ba9e1` blue signal).
 
-UI and interaction
+### Networking
 
-Routing
+- REST calls use **relative** `/api/...` paths; `next.config.mjs` **rewrites** `/api/v1/*`, `/api/admin/*`, and `/socket.io/*` to the backend (`BACKEND_URL`, default `http://localhost:4000`). Same-origin URLs let the httpOnly `sameSite=strict` refresh cookie flow without CORS.
+- The **Socket.IO client connects directly** to `NEXT_PUBLIC_API_URL` (default `http://localhost:4000`) because Next rewrites do not proxy WebSocket upgrades.
 
-Server rendering where useful
+---
 
-Responsive design
+## Backend
 
-API consumption
+### Core
 
-Socket.IO client
+- **Node.js + Express 5**, **Socket.IO 4**, **Mongoose 9**, **MongoDB**, **Zod 4**
+- JavaScript only. Runtime & package manager: **Bun** (`bun run dev` runs nodemon; `bun run start` runs `src/server.js`).
+- `backend/server.js` at the repo root is a legacy stub — the real entrypoint is `backend/src/server.js` (the Express app is built in `src/app.js`, shared by the HTTP server + Socket.IO).
 
-Optimistic UI
+### Responsibilities
 
-Theme/customization system
+Authentication/session logic · authorization · business rules · REST API · realtime event authorization · database operations · rate limiting · file upload orchestration · notification orchestration · error handling · security controls.
 
-PWA readiness
+### Server architecture
 
-Accessibility
+Domain/module-based organization:
 
-Client-side state only where needed
+```
+backend/src/
+├── app.js               # Express app: helmet, CORS, cookies, /health, route mounts, 404 + error handler
+├── server.js            # HTTP server bootstrap: DB connect → Socket.IO init → listen
+├── config/              # env (dotenv), db (Mongoose), webpush (VAPID client)
+├── lib/                 # appwrite (storage client), attachments (uploads), email (nodemailer SMTP)
+├── middleware/          # auth (JWT bearer), adminAuth (admin cookie), rateLimiter, errorHandler
+├── models/              # User, Session, Conversation, Message, FriendRequest, Space,
+│                        #   Notification, PushSubscription, AdminActionLog
+├── modules/             # auth, users, friends, conversations, messages, spaces,
+│                        #   notifications, push, attachments, search, admin
+├── socket/              # index.js (init, JWT handshake, presence, rooms), io.js (emit helpers)
+└── utils/               # errors, asyncHandler
+```
 
-Do NOT introduce TypeScript.
+Each domain module follows a clean **4-file pattern**: `*.routes.js` → `*.controller.js` → `*.service.js` → `*.validation.js` (validation omitted where a module has no inputs to validate).
 
-Avoid unnecessary UI/component libraries when shadcn/ui or native implementation is sufficient.
+### API style
 
-Backend
+Versioned REST APIs under `/api/v1`; the standalone admin API lives under `/api/admin`.
 
-Core
+| Mount | Module |
+|---|---|
+| `/api/v1/auth` | register, login, refresh-token, logout, logout-all, verify-email, resend-verification, forgot/reset-password |
+| `/api/v1/users` | me, profile update/avatar, public profile by username, search, blocked list, block/unblock |
+| `/api/v1/friends` | request, accept/decline, list, remove |
+| `/api/v1/conversations` | DMs/groups CRUD, members/admins, read/unread, messages (list/send) |
+| `/api/v1/messages` | edit, delete, reactions |
+| `/api/v1/spaces` | spaces CRUD, discover, join, members/roles, channels |
+| `/api/v1/notifications` | list, unread-count, mark read, preferences |
+| `/api/v1/push` | vapid-public-key, subscribe, unsubscribe |
+| `/api/v1/attachments` | multipart upload (Multer → Appwrite) |
+| `/api/v1/search` | unified global search |
+| `/api/admin` | admin login, stats, users (ban/unban/detail), groups & spaces (delete) |
 
-Node.js
+`GET /health` returns `{ success: true, data: { status: "ok" } }` for uptime checks.
 
-Express
+---
 
-JavaScript
+## Data Model (MongoDB / Mongoose)
 
-Socket.IO
+MongoDB is the canonical source of truth. Core collections:
 
-Mongoose
+| Model | Notes |
+|---|---|
+| `User` | email, username, displayName, bio (280), status (60), avatar (URL + Appwrite file id), avatarStyle, banner, **country**, **githubUsername**, **verified / showBadge**, blockedUsers, ban fields, lastActiveAt, email-verification & password-reset token hashes, **notificationPreferences** |
+| `Session` | Backs each refresh token; `expiresAt` TTL index → deleting/expiring a session revokes it |
+| `Conversation` | `type: dm / group / space_channel`, participants, admins (groups), `spaceId`+`channelId` for channel conversations, `lastMessageAt`; messages are **not** embedded |
+| `Message` | conversationId + senderId, content (4000), type `text/system`, replyToMessageId, reactions (subdocs), deliveredTo, readBy, mentions, **attachments** (embedded), isEdited, isDeleted |
+| `FriendRequest` | directed `from`/`to` + status (`pending/accepted/declined`); accepted rows are the friendship edge |
+| `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug |
+| `Notification` | recipient/sender, type (`dm_message`, `group_message`, `space_message`, `mention`, `friend_request`, `friend_accept`, `space_invite` reserved), delivery flags |
+| `PushSubscription` | per-user VAPID endpoint + keys (unique endpoint) |
+| `AdminActionLog` | audit trail: ban/unban/force_logout/delete_group/delete_space + IP + timestamp |
 
-MongoDB
+Design notes:
 
-Redis
+- **Messages live in their own collection** (never an unbounded array inside a conversation). Key indexes: `conversationId + createdAt`, `senderId + createdAt`, plus a text index on `content` for search.
+- Conversations/space channels each map 1:1 to a `Conversation` so every channel has its own message thread.
+- Duplicate-DM prevention is enforced in the service layer (a unique index on an array does not behave as a pairwise constraint in MongoDB).
 
-Zod
+---
 
-Backend Responsibilities
+## Realtime (Socket.IO)
 
-Authentication/session logic
+- Socket.IO is the primary realtime layer. All connections authenticate via **JWT handshake**; banned users are rejected at reconnect.
+- On connect, sockets **auto-join** every conversation room (`conversation:<id>`) and space room (`space:<id>`) the user belongs to.
+- Server emits into rooms after DB writes: `message:*`, `conversation:*`, `space:*`, per-user `notification:new`.
+- Clients emit `typing:start/stop` (re-broadcast), `conversation:focus/blur` (DM notification suppression), and `message:delivered` (receipt ack).
+- **Presence is in-memory and scoped**: `presence:online/offline` are only fanned out to users who share a conversation or space, with a ~12 s offline grace period to avoid flicker. `presence:snapshot` corrects late joiners.
+- **Reconnect gap-fill:** after a reconnect the client refetches the conversation list and any messages newer than the newest known message (REST `after=`), then merges them into the cache.
+- This is a **single-instance** design today. Horizontal scaling would require a shared adapter (e.g. a Redis pub/sub adapter) — do not add Redis before that is actually needed.
 
-Authorization
+---
 
-Business rules
+## Caching, Rate Limiting, Storage, Push
 
-REST API
+### Redis — planned, not used yet
 
-Realtime event authorization
+Redis is **not** currently a dependency. Rate limiting is an **in-memory fixed-window limiter** (`middleware/rateLimiter.js`) and presence is an in-memory map. If/when Redis arrives its role is acceleration only:
 
-Database operations
+- rate limiting across instances, short-lived caching, unread counters, presence/typing for scaled Socket.IO
+- **never** canonical storage for messages
 
-Rate limiting
+### Rate limiting (current)
 
-File upload orchestration
+Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, admin login `5/15min`.
 
-Notification orchestration
+### Appwrite Storage
 
-Error handling
+Appwrite is **supporting infrastructure, not the core database**. It stores:
 
-Security controls
+- **Avatars** — user/group photos (4 MB cap, allow-listed image MIME types, Appwrite preview URLs, old file deleted on replace)
+- **Message attachments** — a separate bucket (`APPWRITE_ATTACHMENTS_BUCKET_ID`), images jpg/png/gif/webp + documents pdf/doc(x)/xls(x)/ppt(x)/txt, 30 MB × 10 files, MIME allow-list enforced server-side
 
-API Style
+Appwrite is optional at boot — the server runs without credentials and the upload endpoints return a clear `APPWRITE_NOT_CONFIGURED`/`BUCKET_NOT_CONFIGURED` error until they are set.
 
-Use versioned REST APIs:
+### Web Push
 
-/api/v1
+Offline notification delivery uses **`web-push` (VAPID)**, not Appwrite Messaging. Per-user subscriptions are stored in Mongo; dead endpoints (404/410) are cleaned up on send. The service worker deep-links notification clicks back into the conversation.
 
-Prefer resource-oriented routes, for example:
+### Transactional email
 
-GET /api/v1/conversations
-POST /api/v1/conversations
+**nodemailer** over **Gmail SMTP** (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) for the password-reset flow and the email-verification resend flow. Sending is fire-and-forget so signup/login never blocks.
 
-GET /api/v1/conversations/:id/messages
-POST /api/v1/conversations/:id/messages
+---
 
-PATCH /api/v1/messages/:id
-DELETE /api/v1/messages/:id
+## Validation, Auth & Authorization
 
-POST /api/v1/messages/:id/reactions
-DELETE /api/v1/messages/:id/reactions/:reactionId
-
-POST /api/v1/spaces
-GET /api/v1/spaces/:id
-
-POST /api/v1/spaces/:id/channels
-GET /api/v1/channels/:id/messages
-
-Do not create ad-hoc endpoint names such as /sendMessage or /getMessages.
-
-Server Architecture
-
-Prefer domain/module-based organization:
-
-backend/
-└── src/
-├── config/
-├── middleware/
-├── modules/
-│ ├── auth/
-│ ├── users/
-│ ├── conversations/
-│ ├── messages/
-│ ├── spaces/
-│ ├── channels/
-│ └── notifications/
-├── socket/
-├── services/
-├── utils/
-├── app.js
-└── server.js
-
-Avoid giant global controllers, routes, models, and utils folders containing unrelated business logic.
-
-Each domain should own its routes/controllers/services/model/schema as the codebase grows.
-
-Database
-
-Primary database
-
-MongoDB Atlas
-
-ODM
-
-Mongoose
-
-MongoDB is the canonical source of truth.
-
-Core data will include concepts such as:
-
-User
-Session
-Conversation
-ConversationMember
-Message
-MessageReaction
-Space
-SpaceMember
-Channel
-Notification
-UserSettings
-Attachment
-Report
-
-Do not embed unbounded message arrays inside conversations.
-
-Messages must be independently stored and paginated.
-
-Important indexes will include combinations around:
-
-conversationId + createdAt
-
-senderId + createdAt
-
-membership lookups
-
-usernames/search fields where appropriate
-
-Indexes should be introduced based on access patterns.
-
-Redis
-
-Redis is used from day one.
-
-Redis responsibilities:
-
-short-lived caching
-
-rate limiting
-
-temporary state
-
-unread counters where appropriate
-
-locks where required
-
-presence/typing support where appropriate
-
-future Socket.IO horizontal scaling
-
-Redis is NOT the source of truth for messages.
-
-Design helpers/services around explicit cache expiry and invalidation.
-
-Realtime
-
-Primary transport
-
-Socket.IO
-
-Socket.IO is the primary realtime layer for Kivo's messaging experience.
-
-Use it for:
-
-new messages
-
-message updates/deletions
-
-reactions
-
-typing indicators
-
-delivery/read state
-
-presence
-
-realtime notifications
-
-conversation updates
-
-Connections must authenticate.
-
-Server must verify:
-
-user identity
-
-conversation membership
-
-space/channel membership
-
-relevant permissions
-
-before accepting sensitive socket events.
-
-Appwrite
-
-Appwrite is a supporting infrastructure service, not the core application database.
-
-Appwrite Storage
-
-Use for:
-
-avatars
-
-images
-
-documents
-
-message attachments
-
-future media
-
-Appwrite Messaging
-
-Use for:
-
-push notifications
-
-Appwrite Presence
-
-May be used for:
-
-temporary presence
-
-online/away
-
-typing-like ephemeral state
-
-However, Socket.IO remains the primary realtime transport for Kivo.
-
-Do not store core chat history in Appwrite Database merely because Appwrite provides a database.
-
-Validation
-
-Use Zod for:
-
-body validation
-
-query validation
-
-route parameter validation
-
-important internal input boundaries where useful
-
-The client cannot be trusted.
-
-Validation must happen server-side.
-
-Authentication
-
-Authentication/session architecture should be centralized in the backend.
-
-Protected API request flow:
-
-Request
-↓
-Authentication
-↓
-User identification
-↓
-Validation
-↓
-Authorization
-↓
-Business logic
-↓
-Database
-
-Sensitive credentials and secrets must never be exposed to the browser.
-
-Authorization
-
-Authorization is resource-based.
-
-Examples:
-
-Is this user a member of the conversation?
-
-Can this user edit this message?
-
-Can this user delete this message?
-
-Does this user have permission to manage the Space?
-
-Can this member create channels?
-
-Never trust role/permission values sent by the frontend.
-
-Error Handling
-
-Use centralized Express error handling.
-
-Prefer consistent API responses such as:
-
+- **Zod** validates every body, query, and route param server-side. The client is never trusted.
+- **Auth**: short-lived JWT access tokens (15 min) in `Authorization: Bearer`, plus an httpOnly refresh cookie backed by a `Session` document (TTL). Refresh is single-flight and does **not** rotate the cookie (rotation races can strand clients); sessions are revoked by deleting the document (logout, logout-all, password reset, admin ban).
+- **Authorization is resource-based**: membership checks for conversations/spaces/channels, sender checks for edit/delete, rank checks (`owner → admin → moderator → member`) for space moderation, owner-only rules for admin promotion, Space deletion, and last-owner protection.
+- Centralized Express error handling with a consistent envelope:
+```json
 {
-"success": false,
-"error": {
-"code": "SOME_ERROR",
-"message": "Human readable message"
+  "success": false,
+  "error": { "code": "SOME_ERROR", "message": "Human readable message" }
 }
-}
+```
+Production errors never expose stack traces, secrets, connection details, or internal paths.
 
-Production errors must not expose:
+---
 
-stack traces
+## Security Middleware
 
-secrets
+Secure CORS (`CORS_ALLOWED_ORIGINS`) · Helmet headers · JSON body limits · cookie security (`httpOnly`, `sameSite`, scoped path) · rate limiting · input validation · upload validation · auth + admin-auth middleware · centralized error handler · `trust proxy` for correct IPs behind a load balancer.
 
-database connection details
+---
 
-internal file paths
+## Performance
 
-Security Middleware
+Cursor-based pagination · `around=<messageId>` anchor fetch for jump-to-message · `after=<messageId>` catch-up fetch for reconnects · Mongo indexes on access patterns + text index for search · optimistic UI · IndexedDB caching (lists + last 50 messages) with stale-while-revalidate · debounced search & autocomplete · Socket.IO instead of polling · reduced-motion support. Do not optimize blindly — measure first when possible.
 
-Prepare for:
+---
 
-secure CORS
+## Environment Variables
 
-Helmet/security headers
+Keep secrets server-side. Backend (`backend/.env.example`): `MONGODB_URI`, `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, `ACCESS_TOKEN_TTL` (15m), `REFRESH_TOKEN_TTL` (7d), `REFRESH_COOKIE_SAMESITE`, `CORS_ALLOWED_ORIGINS`, `APPWRITE_*` (+ `APPWRITE_ATTACHMENTS_BUCKET_ID`), `VAPID_PUBLIC_KEY/PRIVATE_KEY/SUBJECT`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `EMAIL_FROM`, `FRONTEND_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, `ADMIN_JWT_SECRET`, `ADMIN_JWT_TTL`, `ADMIN_COOKIE_NAME`.
 
-request body limits
+Frontend: `NEXT_PUBLIC_API_URL` (Socket.IO origin) and `BACKEND_URL` (Next rewrite target) — both default to `http://localhost:4000`.
 
-rate limiting
+Public browser variables are explicitly prefixed and contain no secrets. `.env.example` files are maintained; `*.env` is gitignored.
 
-cookie security
+---
 
-input validation
+## Deployment
 
-upload validation
+- **Frontend**: static/Next hosting (Vercel-class) with rewrites to the backend.
+- **Backend**: a single always-available Node/Bun-compatible host that supports **long-lived WebSocket connections** for Socket.IO. Single instance for now (in-memory presence); scale out with a shared adapter when real users require it.
+- **Database**: MongoDB Atlas.
+- **Storage**: Appwrite Storage (avatars + attachments).
+- **Push**: VAPID keys via env vars.
 
-authentication middleware
+---
 
-authorization middleware
+## Engineering Decisions (current & standing)
 
-centralized error handling
+- JavaScript only across frontend and backend.
+- Simple architecture over premature abstraction; domain-driven modules.
+- No microservices. No direct frontend-to-database access.
+- Realtime and persistence are separate concerns — MongoDB is authoritative; Socket.IO only distributes events.
+- Redis is future acceleration/state infrastructure, not canonical storage.
+- Appwrite supplements the core backend (storage only today).
+- Build only features supported by the current PRD; keep the UI fast and polished; reuse design tokens from `frontend/Design.md`.
+- TypeScript is intentionally out of scope for this project.
 
-Performance
+## Future Scaling Direction
 
-Use:
+Initial topology:
 
-cursor-based pagination
-
-MongoDB indexes
-
-Redis caching where justified
-
-optimistic UI
-
-lazy loading
-
-efficient image sizing/loading
-
-message-list virtualization when necessary
-
-Socket.IO instead of polling for realtime chat
-
-minimal client-side state
-
-avoid unnecessary database reads
-
-Do not optimize blindly. Measure first when possible.
-
-Frontend ↔ Backend
-
-Core business flow:
-
-Browser
-↓ HTTPS
-Next.js frontend
-↓ REST API
-Express backend
-↓
-MongoDB
-
-Realtime:
-
-Browser
-↕ Socket.IO
-Socket.IO server
-
-Typical message flow:
-
-Client
-↓
-POST /messages
-↓
-Authenticate
-↓
-Zod validation
-↓
-Authorize membership
-↓
-MongoDB write
-↓
-Socket.IO emit
-↓
-Recipients
-
-This means MongoDB is authoritative; Socket.IO distributes realtime events.
-
-Server Runtime
-
-Bun is the intended package manager and runtime for local development and backend execution where compatibility is confirmed.
-
-Use Bun consistently:
-
-bun install
-bun add
-bun add -d
-bun run dev
-bun run start
-bunx ...
-
-Do not mix npm/pnpm/yarn unless a specific package/tool requires it.
-
-Before adopting runtime-sensitive dependencies, verify Bun compatibility.
-
-Deployment
-
-Frontend
-
-Vercel
-
-Backend
-
-Start with a low-cost/simple always-available Node-compatible host such as Render/Railway based on current pricing and runtime support.
-
-The backend deployment must support long-lived WebSocket connections for Socket.IO.
-
-Do not rely on artificial keep-alive tricks to prevent a free-tier instance from sleeping.
-
-Upgrade to an always-on service when real users depend on realtime availability.
-
-Database
-
-MongoDB Atlas
-
-Storage
-
-Appwrite Storage
-
-Push
-
-Appwrite Messaging
-
-Environment Variables
-
-Keep secrets server-side.
-
-Example categories:
-
-MONGODB_URI
-REDIS_URL
-
-APPWRITE_ENDPOINT
-APPWRITE_PROJECT_ID
-APPWRITE_API_KEY
-APPWRITE_BUCKET_ID
-
-AUTH/SESSION secrets
-CORS/FRONTEND origin
-
-Public browser variables must be explicitly prefixed and contain no secrets.
-
-Maintain .env.example.
-
-Development Principles
-
-JavaScript only across frontend and backend.
-
-Prefer simple architecture over premature abstraction.
-
-Domain-driven modules.
-
-No microservices initially.
-
-No direct frontend-to-database access.
-
-No trust in client authorization claims.
-
-No unbounded database arrays for messages.
-
-Realtime and persistence are separate concerns.
-
-Redis is acceleration/state infrastructure, not canonical storage.
-
-Appwrite supplements the core backend.
-
-Build only features supported by the current PRD.
-
-Keep the UI fast and polished.
-
-Reuse design tokens from design.md.
-
-Future Scaling Direction
-
-Initial:
-
-Next.js
-↓
-Express + Socket.IO
-↓
-MongoDB
-
-- Redis
-- Appwrite
+```
+Next.js ──► Express + Socket.IO (single instance) ──► MongoDB
+                  │
+                  ├── in-memory rate limiter & presence
+                  ├── Appwrite (file storage)
+                  └── VAPID web push
+```
 
 Later, if scale requires:
 
+```
 Load Balancer
 ├── API/Socket Server 1
 ├── API/Socket Server 2
 └── API/Socket Server 3
-↓
-Redis
-↓
-MongoDB
+        ▼
+     Redis (adapter, rate limits, counters)
+        ▼
+     MongoDB
+```
 
 Only split services when actual scale or organizational complexity justifies it.
-
-Engineering Goal
-
-The stack is intentionally chosen to teach and support real full-stack engineering:
-
-API design
-
-authorization
-
-database modeling
-
-realtime systems
-
-caching
-
-queues later
-
-file storage
-
-push notifications
-
-performance
-
-security
-
-scalable deployment
-
-polished modern frontend engineering

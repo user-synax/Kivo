@@ -177,14 +177,15 @@ export function DocsScreen() {
               <Steps
                 items={[
                   "Enter a display name, username, email, and password (at least 8 characters).",
-                  "Submit. You land in chat at /app — then check your inbox.",
-                  "Open the emailed verify link to confirm your email (expires in 24 hours).",
+                  "Submit. You are signed in instantly and land in chat at /app — no OTP or waiting.",
                 ]}
               />
               <p>
                 Username must be unique: 3–30 characters, letters, numbers, and
-                underscores. Email must be unique too. Until your email is
-                verified, a banner offers a Resend option.
+                underscores. Email must be unique too. Nothing blocks chatting
+                — email verification is a link-based flow on the backend
+                (/verify-email plus a resend API), but signup does not email a
+                verification link automatically right now.
               </p>
               <p>
                 To log in later, use{" "}
@@ -211,8 +212,10 @@ export function DocsScreen() {
               <p>After you sign in you see:</p>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>
-                  <strong className="text-ink">Left</strong> — DMs, groups,
-                  Spaces, search, new chat, theme, and your profile.
+                  <strong className="text-ink">Left</strong> — an icon rail
+                  switches between Chats, Groups, Spaces, and Settings. Each
+                  panel has search, the notification bell, and per-tab actions
+                  (New chat, New group, Discover).
                 </Bullet>
                 <Bullet>
                   <strong className="text-ink">Center</strong> — the open
@@ -225,12 +228,14 @@ export function DocsScreen() {
                 </Bullet>
               </ul>
               <p>
-                On a phone you see the conversation list with a bottom tab bar
-                — Chats, Spaces, and Profile — so it feels like a native app.
-                Open a chat, then use Back in the header to return. The
-                sidebar can be collapsed on desktop; Kivo remembers that, and
-                the last chat you had open. Your lists load instantly from a
-                local browser cache while fresh data arrives.
+                On a phone the same panels live in a bottom tab bar — Chats,
+                Groups, Spaces, Settings, and Profile — so it feels like a
+                native app. Open a chat, then use Back in the header (or an
+                edge swipe) to return. Click your avatar in the rail (or open
+                the Profile tab) to edit your profile. Kivo remembers the last
+                chat you had open, and your lists plus the latest messages
+                paint instantly from a local browser cache while fresh data
+                arrives.
               </p>
             </Section>
 
@@ -258,7 +263,8 @@ export function DocsScreen() {
               <h3 className="doc-h3">Start a private chat</h3>
               <p>
                 On the Friends tab, click Message. That opens an existing DM or
-                creates one.
+                creates one. To remove a friend, open their profile and choose
+                Unfriend — or Block them entirely from any DM or profile.
               </p>
             </Section>
 
@@ -294,7 +300,8 @@ export function DocsScreen() {
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>
                   React: message menu → React, or tap a reaction chip under the
-                  bubble. Same emoji again removes yours.
+                  bubble. Same emoji again removes yours. Quick like:
+                  double-click (or long-press) a message to ❤️ it.
                 </Bullet>
                 <Bullet>
                   Emoji in text: smile button next to the composer (270+
@@ -322,7 +329,9 @@ export function DocsScreen() {
                 Scroll up for older messages. Your bubbles show sent →
                 delivered → read. When someone else is typing, you see it in
                 the open chat. Opening a chat marks it read. System lines like
-                “Admin added X” do not add to unread.
+                “Admin added X” do not add to unread. If your connection drops
+                and returns, Kivo gap-fills the open chat so nothing you
+                missed is lost.
               </p>
               <h3 className="doc-h3">Mark as unread</h3>
               <p>
@@ -449,15 +458,24 @@ export function DocsScreen() {
 
             <Section id="profile" title="Profile & themes">
               <p>
-                Click your name at the bottom of the sidebar to edit profile.
+                Click your avatar in the icon rail (or the Profile tab on
+                mobile) to edit your profile.
               </p>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>Display name, unique username, bio (280), status (60)</Bullet>
                 <Bullet>
                   Photo (PNG, JPEG, WebP, or GIF, max 4MB) and a color frame
-                  (Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora)
+                  (Default, Lime, Blue, Rose, Amber, Violet, Ocean, Sunset,
+                  Aurora)
                 </Bullet>
-                <Bullet>Optional animated banner</Bullet>
+                <Bullet>
+                  Optional animated banner, country flag, and GitHub username
+                  (renders a contribution graph)
+                </Bullet>
+                <Bullet>
+                  A public page at /u/username you can share with anyone;
+                  verified accounts can show a badge (toggle in Settings)
+                </Bullet>
               </ul>
               <p>
                 Email cannot be changed here. Full profile at /app/profile
@@ -465,15 +483,17 @@ export function DocsScreen() {
               </p>
               <h3 className="doc-h3">Themes</h3>
               <p>
-                Use the theme control at the bottom of the sidebar. Switch
-                live — no reload. Choice is saved in this browser.
+                Open Settings → Appearance and pick a palette. Switching is
+                live — no reload. Your choice is saved in this browser. Ten
+                themes: six dark and four light.
               </p>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>Framer — default near-black, blue accent</Bullet>
-                <Bullet>Cloud — cooler, slightly blue</Bullet>
-                <Bullet>Sand — warmer</Bullet>
-                <Bullet>Ink — neutral near-black</Bullet>
-                <Bullet>Midnight — deep navy</Bullet>
+                <Bullet>Midnight — deep navy · Graphite — cool slate</Bullet>
+                <Bullet>Espresso — warm brown · Pine — forest green</Bullet>
+                <Bullet>Plum — moody aubergine</Bullet>
+                <Bullet>Porcelain — neutral off-white · Linen — warm cream</Bullet>
+                <Bullet>Mist — cool blue-gray · Sage — soft green</Bullet>
               </ul>
             </Section>
 
@@ -488,6 +508,12 @@ export function DocsScreen() {
               <p>
                 You are not notified of your own messages. If a DM is already
                 open in front of you, Kivo skips a notification for that DM.
+              </p>
+              <p>
+                Fine-tune what you get in Settings → Notification preferences:
+                Direct Messages, Group Messages, Mentions, Friend Requests,
+                Space Messages (off by default), and Announcements. @mentions
+                always come through, even for a muted category.
               </p>
               <h3 className="doc-h3">Browser notifications</h3>
               <p>
@@ -522,6 +548,7 @@ export function DocsScreen() {
                   </thead>
                   <tbody className="text-ink-muted">
                     {[
+                      ["Open global search", "Ctrl+K / Cmd+K"],
                       ["Send message", "Enter"],
                       ["New line", "Shift + Enter"],
                       ["Insert mention", "Enter or Tab"],
@@ -549,19 +576,18 @@ export function DocsScreen() {
                 kivo.usersynax.dev yet:
               </p>
               <ul className="mt-4 flex flex-col gap-2">
-                <Bullet>Search inside messages or conversations</Bullet>
+                <Bullet>Threads, pins, and saved messages</Bullet>
                 <Bullet>
-                  Voice or video calls — the backend is wired but there is no
-                  call UI yet
+                  Voice or video calls — no call backend or UI yet
                 </Bullet>
                 <Bullet>2FA (two-factor authentication)</Bullet>
-                <Bullet>Threads, pins, and saved messages</Bullet>
-                <Bullet>Unfriend in the Friends window</Bullet>
+                <Bullet>Custom user-created themes</Bullet>
                 <Bullet>Private invite links for Spaces</Bullet>
                 <Bullet>Video/audio attachments (images & documents only)</Bullet>
                 <Bullet>
-                  Using the installed app fully offline — chat lists are
-                  cached, but messages still need the network
+                  Using the installed app fully offline — chat lists and the
+                  latest messages are cached, but full history still needs the
+                  network
                 </Bullet>
               </ul>
             </Section>

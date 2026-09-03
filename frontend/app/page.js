@@ -435,8 +435,8 @@ function CustomizationSection() {
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { name: "Framer", swatch: "bg-ink" },
-                  { name: "Cloud", swatch: "bg-accent-blue" },
-                  { name: "Sand", swatch: "bg-surface-2" },
+                  { name: "Midnight", swatch: "bg-accent-blue" },
+                  { name: "Porcelain", swatch: "bg-surface-2" },
                 ].map((t) => (
                   <div
                     key={t.name}
@@ -609,14 +609,15 @@ function RoadmapSection() {
     "Groups — private multi-member chats",
     "Spaces & Channels — text / announcement, role-based",
     "Notifications — in-app bell + VAPID web push",
-    "Phase 1 voice — LiveKit backend wired",
+    "Attachments — images & documents",
+    "Public profiles, blocking & global search",
   ];
   const next = [
-    "DM & group voice calls",
-    "Voice channel frontend",
-    "Attachments — images & files",
+    "DM & group voice / video calls",
     "Message threads",
     "2FA — second-factor authentication",
+    "Pinned & saved messages",
+    "Custom user themes",
   ];
 
   return (

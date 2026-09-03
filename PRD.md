@@ -69,9 +69,9 @@ Kivo
 | Area | Status | Notes |
 |---|---|---|
 | Authentication & Sessions | **Complete** | JWT access + httpOnly refresh cookie, session-backed |
-| Email Verification | **Complete** | Verify link emailed on signup (24h), resend + verification banner |
+| Email Verification | **Backend wired** | Link flow (`/verify-email`, resend API); no auto-email at signup since the OTP step was removed |
 | Password Reset | **Complete** | Forgot/reset via emailed token (1h), invalidates all sessions |
-| User Profiles | **Complete** | Display name, username, bio, custom status, avatar upload, banner |
+| User Profiles | **Complete** | Display name, username, bio, status, avatar + frames, banner, country, GitHub username |
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
 | DM Conversations | **Complete** | Create, list, message history, unread counts |
 | Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts |
@@ -80,7 +80,7 @@ Kivo
 | Typing Indicators | **Complete** | Realtime via Socket.IO |
 | Presence | **Complete** | Online/offline, snapshot on connect |
 | Realtime Events | **Complete** | Socket.IO with authenticated connections |
-| Theme System | **Complete** | 5 Framer-style themes with live switching, persisted in localStorage |
+| Theme System | **Complete** | 10 themes (6 dark + 4 light) with live switching, persisted in localStorage |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
@@ -98,7 +98,12 @@ Kivo
 | **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, disabled composer |
 | **Last Online Status** | **Complete** | "active … ago" labels for offline users (DMs + profiles) |
 | **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
-| Voice / 2FA | **Partially wired** | LiveKit backend stubbed for voice; frontend not built; 2FA planned |
+| **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
+| **Blocking** | **Complete** | Block/unblock from DMs & profiles; server-enforced, friendships removed |
+| **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
+| **Reconnect Gap-Fill** | **Complete** | Conversation list + messages newer than newest-known refetched after socket reconnect |
+| **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
+| Voice / 2FA | **Not started** | No voice/call backend or UI; 2FA planned ("coming soon" in Settings) |
 
 ---
 
@@ -117,7 +122,8 @@ Kivo
 
 - Passwords hashed with bcrypt (12 rounds).
 - On success: user document created, session document created, access token returned, refresh token set as httpOnly cookie.
-- An **email verification** link is emailed (fire-and-forget, 24h expiry). The user is signed in immediately but is nudged to verify via an in-app banner until they do.
+- Signup is **instant** — a session is issued immediately and the user lands in the app. **No OTP or verification wall** (the OTP sign-up step was removed).
+- A link-based email-verification flow remains on the API (`POST /api/v1/auth/resend-verification` + `/verify-email?token=…`, 24h expiry, token stored hashed). An email is not automatically sent at signup currently.
 - Duplicate email/username returns `CONFLICT` error.
 
 #### 1.1.1 Email Verification
@@ -126,7 +132,7 @@ Kivo
 |---|---|
 | Verify link | `GET /api/v1/auth/verify-email?token=…` — marks `isEmailVerified = true` (24h expiry) |
 | Resend | `POST /api/v1/auth/resend-verification` (authenticated, limit 1/min). No-op if already verified. |
-| Banner | `verification-banner.jsx` shown until verified, with a **Resend** action |
+| Banner | None currently — the resend endpoint is API-only after the OTP step was removed |
 | Token storage | SHA-256 hash stored on the user (`emailVerificationTokenHash`), never the raw token |
 
 #### 1.2 Login
@@ -180,7 +186,11 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | username | String | Yes | Unique, validated |
 | bio | String | Yes | Max 280 characters |
 | status | String | Yes | Max 60 characters (custom status line) |
-| avatarStyle | String | Yes | One of 8 preset styles (6 solid colors + 2 gradient rings) |
+| banner | String | Yes | Curated animated GIF cover |
+| country | String | Yes | ISO-3166 alpha-2 → flag shown on profiles |
+| githubUsername | String | Yes | GitHub contribution graph on the public profile |
+| verified / showBadge | Boolean | No / Yes | Admin grants `verified`; the user toggles `showBadge` visibility in Settings |
+| avatarStyle | String | Yes | One of 9 presets: Default + 6 solid colors + 2 gradient rings |
 | avatarUrl | String | Via upload | Hosted on Appwrite Storage |
 | email | String | No | Read-only |
 | role | String | No | `user` or `admin` |
@@ -384,7 +394,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 
 #### 5.1 Theme Architecture
 
-- 5 built-in themes stored in `lib/theme.js`.
+- 10 built-in themes stored in `lib/theme.js` (single source of truth).
 - Theme applied via CSS custom properties at the `:root` level.
 - Persisted in `localStorage` under `kivo:theme` (`THEME_STORAGE_KEY`).
 - Live switching — no page reload required.
@@ -392,13 +402,18 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 
 #### 5.2 Available Themes
 
-| Theme | Style | Canvas |
+| Theme | Family | Canvas |
 |---|---|---|
-| **Framer** (default) | Dark Framer-style, blue accent | `#090909` |
-| **Cloud** | Cool, slightly blue-tinted | `#0b0d12` |
-| **Sand** | Warm, faint brown-tinted | `#100d0a` |
-| **Ink** | Neutral near-black | `#0c0c0e` |
-| **Midnight** | Deep navy | `#0a0e16` |
+| **Framer** (default) | Dark — Framer-style, blue accent | `#090909` |
+| **Midnight** | Dark — deep navy | `#0a0e16` |
+| **Graphite** | Dark — cool slate | `#0d0f12` |
+| **Espresso** | Dark — rich warm brown | `#130e0a` |
+| **Pine** | Dark — deep forest green | `#0a160f` |
+| **Plum** | Dark — moody aubergine | `#100a14` |
+| **Porcelain** | Light — neutral off-white | `#faf9f7` |
+| **Linen** | Light — warm cream | `#f8f4ec` |
+| **Mist** | Light — cool blue-gray | `#f5f7fa` |
+| **Sage** | Light — soft green | `#f5f7f1` |
 
 #### 5.3 Color Palette ("Framer" Dark)
 
@@ -420,9 +435,9 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 
 | Role | Font |
 |---|---|
-| Display / Headings | Goga |
+| Display / Headings | Outfit (loaded via `next/font`; styled through `font-goga` / `font-display`) |
 | Body | Inter |
-| Mono / Labels | JetBrains Mono |
+| Mono / Labels | System monospace stack (`font-mono`; JetBrains Mono intent) |
 
 #### 5.5 Motion System
 
@@ -658,6 +673,8 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 | GET | `/api/v1/notifications/unread-count` | Yes | Unread notification count (badge) |
 | GET | `/api/v1/notifications` | Yes | Cursor-paginated list; `?cursor=&limit=&unreadOnly=` (limit 1–100, default 20) |
 | PATCH | `/api/v1/notifications/read` | Yes | `{ ids: [...] }` and/or `{ all: true }` mark read |
+| GET | `/api/v1/notifications/preferences` | Yes | Read per-category notification preferences |
+| PATCH | `/api/v1/notifications/preferences` | Yes | Update one or more preference toggles |
 
 #### 8.4 Notification Schema
 
@@ -1336,7 +1353,7 @@ components/
 
 ### Future
 
-- Build block/report foundations.
+- Report/submission moderation queue (user blocking is shipped).
 - Prevent unauthorized message editing/deletion.
 - Prevent users from accessing conversations/spaces they do not belong to.
 
@@ -1365,7 +1382,7 @@ components/
 | Frontend | Vercel | Static/SSR Next.js deployment |
 | Backend | Render/Railway | Must support long-lived WebSocket connections |
 | Database | MongoDB Atlas | Managed MongoDB |
-| Storage | Appwrite Storage | Avatars, future attachments |
+| Storage | Appwrite Storage | Avatars + message attachments (separate buckets) |
 | Push | Web Push (VAPID) | Shipped — offline web push delivery |
 | Push (future) | Appwrite Messaging | Planned for FCM/APNs native push |
 
@@ -1373,20 +1390,21 @@ components/
 
 **Server-side (never exposed to browser):**
 - `MONGODB_URI`
-- `REDIS_URL`
-- `ACCESS_TOKEN_SECRET`
-- `REFRESH_TOKEN_SECRET`
+- `PORT`
+- `ACCESS_TOKEN_SECRET` / `REFRESH_TOKEN_SECRET` (+ optional `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`, `REFRESH_COOKIE_SAMESITE`)
 - `APPWRITE_ENDPOINT`
 - `APPWRITE_PROJECT_ID`
 - `APPWRITE_API_KEY`
-- `APPWRITE_BUCKET_ID`
+- `APPWRITE_BUCKET_ID` (avatars)
+- `APPWRITE_ATTACHMENTS_BUCKET_ID` (message attachments)
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT`
-- `GMAIL_USER` / `GMAIL_APP_PASSWORD` (transactional email — verification, password reset)
+- `GMAIL_USER` / `GMAIL_APP_PASSWORD` (transactional email — password reset, verification resend)
 - `EMAIL_FROM` (From header for outgoing mail)
 - `FRONTEND_URL` (base URL for email verify/reset links)
-- `CORS_ORIGIN`
+- `CORS_ALLOWED_ORIGINS`
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` / `ADMIN_JWT_SECRET` / `ADMIN_JWT_TTL` / `ADMIN_COOKIE_NAME`
 - `NODE_ENV`
 
 **Client-side (explicitly prefixed):**
@@ -1399,7 +1417,7 @@ Maintain `.env.example` in both frontend and backend.
 ## Out of Scope for MVP
 
 - Slack-style work-management features
-- Full voice channels / video calls / screen sharing (Phase 1.5 backend wiring in progress)
+- Full voice channels / video calls / screen sharing (not started — no backend or UI)
 - End-to-end encryption
 - Bots / webhooks / integrations
 - Marketplace
@@ -1426,20 +1444,21 @@ These may be considered after the core communication experience is stable.
 - `@mention` feature with autocomplete + mention notifications.
 - Mobile UX (bottom tab bar, responsive panels) + IndexedDB offline caching.
 - File & image attachments (images, PDFs, docs) with lightbox & inline previews.
-- **Email verification** (signup email link, resend, banner) and **password reset** (forgot/reset via email).
-- **Last online status** and **Mark as unread / New messages separator**.
+- **Email verification** (instant signup — no OTP; `/verify-email` link + resend API) and **password reset** (forgot/reset via email).
+- **Last online status**, **Mark as unread / New messages separator**, and **reconnect gap-fill**.
+- **Global search (Ctrl+K)**, **admin panel**, **public profiles** (`/u/:username`, badges, GitHub graphs), **blocking**, **notification preferences**, and **rate limiting**.
 
 ### Phase 1.5 — Voice Foundations
 
-- Voice backend wiring (LiveKit) — Phase 1 backend stub wired.
-- DM & group voice calls.
+- DM & group voice calls (no backend or frontend yet).
 - Voice channel frontend.
 - 2FA — second-factor authentication.
+- Automatic verification email at signup / in-app resend banner.
 
 ### Phase 2 — Enhanced Messaging
 
 - Threads.
-- Notification preferences per user.
+- Per-conversation mutes & quiet hours (beyond the shipped per-category preferences).
 - Pinned messages.
 - Saved messages.
 - Custom emoji.
@@ -1472,7 +1491,7 @@ The MVP is successful when:
 1. Users can reliably communicate in realtime (DMs, typing, presence, read receipts).
 2. Conversation loading is fast with cursor-based pagination.
 3. Mobile and desktop UX both feel polished.
-4. Customization is visibly deeper than ordinary chat apps (5 themes, live switching).
+4. Customization is visibly deeper than ordinary chat apps (10 themes — 6 dark + 4 light, live switching).
 5. Permissions and security are enforced server-side.
 6. The architecture can support future voice/video/community features without rewriting.
 
