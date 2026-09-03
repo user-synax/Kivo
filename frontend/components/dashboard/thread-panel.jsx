@@ -279,8 +279,11 @@ export function ThreadPanel({
             </p>
             {root?.attachments?.length > 0 && (
               <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                📎 {root.attachments.length}{" "}
-                {root.attachments.length === 1 ? "attachment" : "attachments"}
+                {root.attachments.length === 1 &&
+                root.attachments[0].kind === "audio"
+                  ? "🎙️ Voice message"
+                  : `📎 ${root.attachments.length}{" "}
+                ${root.attachments.length === 1 ? "attachment" : "attachments"}`}
               </p>
             )}
           </div>

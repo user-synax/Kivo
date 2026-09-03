@@ -14,12 +14,28 @@ const DOC_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "text/plain",
 ]);
+// Voice messages: recorded in-browser via MediaRecorder. No transcoding happens
+// server-side — the file is stored as-is in the same attachments bucket, so the
+// extra load is one small upload + one field on the message.
+const AUDIO_TYPES = new Set([
+  "audio/webm",
+  "audio/ogg",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/aac",
+  "audio/wav",
+]);
 
-export const ALLOWED_MIMES = new Set([...IMAGE_TYPES, ...DOC_TYPES]);
+export const ALLOWED_MIMES = new Set([
+  ...IMAGE_TYPES,
+  ...DOC_TYPES,
+  ...AUDIO_TYPES,
+]);
 export const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
 
 export function fileKind(mimeType) {
   if (IMAGE_TYPES.has(mimeType)) return "image";
+  if (AUDIO_TYPES.has(mimeType)) return "audio";
   return "document";
 }
 
@@ -61,7 +77,8 @@ export async function uploadAttachment(buffer, fileName, mimeType, size) {
     // Use Appwrite's built-in image preview with resize
     url = `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/preview?project=${encodeURIComponent(projectId)}&width=800&height=800`;
   } else {
-    // Documents get a direct view URL
+    // Documents and audio get a direct view URL (playback streams straight
+    // from Appwrite — the API server never proxies media bytes)
     url = `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/view?project=${encodeURIComponent(projectId)}`;
   }
 

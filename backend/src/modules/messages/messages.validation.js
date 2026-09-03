@@ -6,7 +6,7 @@ const attachmentSchema = z.object({
   fileName: z.string().min(1).max(255),
   mimeType: z.string().min(1),
   size: z.number().int().positive(),
-  kind: z.enum(["image", "document"]),
+  kind: z.enum(["image", "document", "audio"]),
   url: z.string().url(),
 });
 
@@ -15,6 +15,7 @@ export const createMessageSchema = z.object({
   replyToMessageId: z.string().optional(),
   threadId: z.string().optional(),
   attachments: z.array(attachmentSchema).max(10).optional(),
+  audioDuration: z.number().min(0).max(3600).optional(),
   forwardedFromId: z.string().optional(),
 }).refine(
   (data) =>

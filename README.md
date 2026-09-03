@@ -129,6 +129,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Mobile UX** (bottom tab bar with 5 tabs, responsive panels, edge-swipe back, safe-area handling)
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
+- **Voice messages** (hold-to-record in the composer, slide up to cancel, inline play/pause player with progress + duration — recorded in-browser via MediaRecorder, stored as-is, no transcoding)
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
 - **Admin panel** — standalone dashboard with user/group/space management, ban/unban, audit logging
 - **Offline indicator** — "You are offline" banner + composer keeps working for text
@@ -482,9 +483,9 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, voice messages, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA |
 | **Phase 1.5** | Voice & video calls |
-| **Phase 2** | Stronger search, video/audio attachments |
+| **Phase 2** | Stronger search, video attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace theme sharing |
 

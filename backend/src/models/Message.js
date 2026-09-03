@@ -97,7 +97,9 @@ const messageSchema = new mongoose.Schema(
       default: [],
     },
 
-    // File attachments — images and documents uploaded via the attachments endpoint.
+    // File attachments — images, documents, and voice messages uploaded via
+    // the attachments endpoint. Audio is stored as-is (no transcoding); the
+    // browser plays it back straight from the view URL.
     attachments: {
       type: [
         {
@@ -106,12 +108,21 @@ const messageSchema = new mongoose.Schema(
           fileName: { type: String, required: true },
           mimeType: { type: String, required: true },
           size: { type: Number, required: true },
-          kind: { type: String, enum: ["image", "document"], required: true },
+          kind: {
+            type: String,
+            enum: ["image", "document", "audio"],
+            required: true,
+          },
           url: { type: String, required: true },
         },
       ],
       default: [],
     },
+
+    // Voice-message duration in seconds (0-3600). Set by the client at record
+    // time so bubbles can render a duration without preloading the audio.
+    // Plain messages keep this null.
+    audioDuration: { type: Number, min: 0, max: 3600, default: null },
     isEdited: { type: Boolean, default: false },
     // Soft delete: keep the row (so replies/ordering remain stable) but blank it.
     isDeleted: { type: Boolean, default: false },

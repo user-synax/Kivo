@@ -342,7 +342,10 @@ export function MessageBubble({
                   isUserOnline={isUserOnline}
                   onOpenProfile={onOpenProfile}
                 />
-                <AttachmentBubble attachments={message.attachments} />
+                <AttachmentBubble
+                  attachments={message.attachments}
+                  audioDuration={message.audioDuration}
+                />
               </>
             )}
           </BubbleContent>

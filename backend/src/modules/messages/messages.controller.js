@@ -26,7 +26,7 @@ export const listMessages = asyncHandler(async (req, res) => {
 });
 
 export const createMessage = asyncHandler(async (req, res) => {
-  const { content, replyToMessageId, threadId, attachments, forwardedFromId } = parseBody(createMessageSchema, req.body);
+  const { content, replyToMessageId, threadId, attachments, audioDuration, forwardedFromId } = parseBody(createMessageSchema, req.body);
   const message = await messagesService.createMessage({
     conversationId: req.params.id,
     userId: req.user.userId,
@@ -34,6 +34,7 @@ export const createMessage = asyncHandler(async (req, res) => {
     replyToMessageId,
     threadId,
     attachments,
+    audioDuration,
     forwardedFromId,
   });
   res.status(201).json({ success: true, data: message });

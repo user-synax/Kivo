@@ -13,12 +13,17 @@ const DOC_TYPES = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "text/plain",
 ];
-const ALLOWED_MIMES = new Set([...IMAGE_TYPES, ...DOC_TYPES]);
+// Voice messages (MediaRecorder output). The recorded File is normalized to its
+// bare MIME (no ;codecs= suffix) so the server allow-list matches.
+const AUDIO_TYPES = ["audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "audio/wav"];
+const ALLOWED_MIMES = new Set([...IMAGE_TYPES, ...DOC_TYPES, ...AUDIO_TYPES]);
 const MAX_SIZE = 30 * 1024 * 1024; // 30MB
 const MAX_FILES = 10;
 
 function kindFromMime(mime) {
-  return IMAGE_TYPES.includes(mime) ? "image" : "document";
+  if (IMAGE_TYPES.includes(mime)) return "image";
+  if (AUDIO_TYPES.includes(mime)) return "audio";
+  return "document";
 }
 
 function formatSize(bytes) {
@@ -155,7 +160,24 @@ export function useFileUpload() {
   return { files, addFiles, removeFile, clearAll, uploadAll, uploading, progress };
 }
 
-function uploadSingleFile(formData, fileId, setFiles, setProgress) {
+/**
+ * Upload one already-built File (e.g. a just-recorded voice blob) and resolve
+ * with the server's attachment metadata. Uses the same XHR path as the queue
+ * so auth and error handling stay in one place.
+ */
+export async function uploadSingleFileObject(file, conversationId) {
+  const formData = new FormData();
+  formData.append("conversationId", conversationId);
+  formData.append("files", file);
+  return uploadSingleFile(
+    formData,
+    `f_${Date.now()}`,
+    () => {},
+    () => {},
+  );
+}
+
+export function uploadSingleFile(formData, fileId, setFiles, setProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 

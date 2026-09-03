@@ -34,7 +34,9 @@ export function messageText(message) {
   const files = message.attachments || [];
   if (files.length === 1) {
     const f = files[0];
-    return f.kind === "image" ? `📷 ${f.fileName || "Image"}` : `📎 ${f.fileName || "File"}`;
+    if (f.kind === "image") return `📷 ${f.fileName || "Image"}`;
+    if (f.kind === "audio") return "🎙️ Voice message";
+    return `📎 ${f.fileName || "File"}`;
   }
   if (files.length > 1) return `📎 ${files.length} attachments`;
   return "";

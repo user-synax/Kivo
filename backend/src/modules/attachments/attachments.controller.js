@@ -37,7 +37,7 @@ export const uploadFiles = asyncHandler(async (req, res) => {
     // Validate MIME type
     if (!ALLOWED_MIMES.has(file.mimetype)) {
       throw badRequest(
-        `File type "${file.mimetype}" is not allowed. Allowed: images (jpg, png, gif, webp) and documents (pdf, doc, docx, xlsx, xls, ppt, pptx, txt)`,
+        `File type "${file.mimetype}" is not allowed. Allowed: images (jpg, png, gif, webp), documents (pdf, doc, docx, xlsx, xls, ppt, pptx, txt), and audio (webm, ogg, mp3, m4a, aac, wav)`,
         "INVALID_FILE_TYPE",
       );
     }

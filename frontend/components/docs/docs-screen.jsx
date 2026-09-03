@@ -396,24 +396,38 @@ export function DocsScreen() {
               </p>
             </Section>
 
-            <Section id="attachments" title="File & image attachments">
+            <Section id="attachments" title="File, image & voice attachments">
               <p>
-                You can share files and images in any DM, group, or Space
-                channel.
+                You can share files, images, and voice messages in any DM,
+                group, or Space channel.
               </p>
               <h3 className="doc-h3">Attach a file</h3>
               <Steps
                 items={[
                   "Click the paperclip button in the chat composer.",
-                  "Pick one or more files from your device (images or documents).",
+                  "Pick one or more files from your device (images, documents, or audio).",
                   "Each file shows a preview chip with name, size, and upload progress.",
                   "Type an optional caption, then Enter to send.",
                 ]}
               />
               <p>
                 Allowed types: JPG, PNG, GIF, WebP, PDF, DOC/DOCX, XLS/XLSX,
-                PPT/PPTX, and TXT — max 30 MB each. Multiple files of mixed
-                types can be sent in one message.
+                PPT/PPTX, TXT, and audio (WebM, OGG, MP3, M4A, AAC, WAV) —
+                max 30 MB each. Multiple files of mixed types can be sent in
+                one message.
+              </p>
+              <h3 className="doc-h3">Record a voice message</h3>
+              <Steps
+                items={[
+                  "Press and hold the mic button in the composer — a red bar shows a live timer.",
+                  "Release to send immediately; slide your finger/pointer up (or tap X) to cancel.",
+                  "Voice bubbles play inline: tap play/pause, click the bar to seek, and the duration shows before the audio loads.",
+                ]}
+              />
+              <p>
+                Voice messages need a connection to upload. They can be
+                forwarded (audio + duration carry over), saved, and deleted
+                like any message.
               </p>
               <h3 className="doc-h3">View images</h3>
               <ul className="mt-3 flex flex-col gap-2">
@@ -671,7 +685,7 @@ export function DocsScreen() {
                 </Bullet>
                 <Bullet>Sharing palettes as saved theme templates</Bullet>
 
-                <Bullet>Video/audio attachments (images & documents only)</Bullet>
+                <Bullet>Video attachments (voice messages are built; video is not)</Bullet>
                 <Bullet>
                   Full offline message history — only the latest 50 messages
                   per chat are cached (text you send while offline is queued

@@ -47,6 +47,7 @@ export function publicMessage(message, viewerId = null) {
       kind: a.kind,
       url: a.url,
     })),
+    audioDuration: obj.audioDuration || null,
     forwardedFromId: obj.forwardedFromId ? obj.forwardedFromId.toString() : null,
     forwardedFromName: obj.forwardedFromName || null,
     pinnedAt: obj.pinnedAt ? new Date(obj.pinnedAt).toISOString() : null,
@@ -225,6 +226,7 @@ export async function createMessage({
   replyToMessageId,
   threadId,
   attachments,
+  audioDuration,
   forwardedFromId,
 }) {
   const conversation = await assertMembership(conversationId, userId);
@@ -289,13 +291,14 @@ export async function createMessage({
   let mentions = [];
   let finalContent = content || "";
   let finalAttachments = attachments || [];
+  let finalAudioDuration = audioDuration ?? null;
   let forwardedName = null;
   if (forwardedFromId) {
     if (!mongoose.Types.ObjectId.isValid(forwardedFromId)) {
       throw badRequest("Invalid forwardedFromId", "INVALID_FORWARD");
     }
     const source = await Message.findById(forwardedFromId).select(
-      "conversationId senderId content attachments isDeleted",
+      "conversationId senderId content attachments audioDuration isDeleted",
     );
     if (!source || source.isDeleted) {
       throw notFound("Original message not found", "MESSAGE_NOT_FOUND");
@@ -320,6 +323,9 @@ export async function createMessage({
       kind: a.kind,
       url: a.url,
     }));
+    // Forwarded voice messages keep their duration (a client-supplied value is
+    // replaced, so a forward can't smuggle arbitrary duration data).
+    finalAudioDuration = source.audioDuration ?? null;
   } else {
     mentions = await resolveMentions(finalContent, conversation.participants);
   }
@@ -332,6 +338,7 @@ export async function createMessage({
     threadId: inThread ? threadId : null,
     mentions,
     attachments: finalAttachments,
+    audioDuration: finalAudioDuration,
     forwardedFromId: forwardedFromId || null,
     forwardedFromName: forwardedName,
   });

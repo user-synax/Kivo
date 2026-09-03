@@ -508,9 +508,9 @@ All themes share the same layout, corner radius, and elevation; only colors chan
 
 ---
 
-## 11. File & image attachments
+## 11. File, image & voice attachments
 
-You can send files and images in any DM, group, or Space channel.
+You can send files, images, and voice messages in any DM, group, or Space channel.
 
 ### Attach a file
 
@@ -523,8 +523,26 @@ You can send files and images in any DM, group, or Space channel.
 **Allowed types:**
 - **Images:** JPG, PNG, GIF, WebP — max 30 MB each
 - **Documents:** PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, TXT — max 30 MB each
+- **Audio:** WebM, OGG, MP3, M4A, AAC, WAV — max 30 MB each
 
 Multiple files of mixed types can be sent in a single message.
+
+### Record a voice message
+
+1. **Press and hold** the **mic** button (next to the paperclip) in the composer.
+2. While holding, a red recording bar shows a **live timer** and "Release to send · slide up to cancel".
+3. **Release** to send immediately — the message uploads and appears as a voice bubble.
+4. To discard instead, **slide your finger/pointer up** (the hint turns red, "Release to cancel") and release, or tap the **X** button.
+5. The first time you record, your browser asks for **microphone permission** — allow it.
+
+Voice messages need a connection (they upload like any attachment); while offline the mic shows a notice and text messages keep queuing as usual.
+
+### Play a voice message
+
+- Voice bubbles show a **play/pause button**, a **progress bar**, and the **duration** (recorded at send time, so it's visible before the audio loads).
+- Tap play to hear it; tapping another voice message stops the first (one player at a time).
+- Click or drag on the progress bar to **seek**; arrow keys skip ±5 seconds when focused.
+- Voice messages can be **forwarded** (the audio + duration carry over with the "Forwarded from" pill), **saved**, and **deleted** like any message.
 
 ### View images
 
@@ -787,11 +805,11 @@ What does **not** queue: file/photo attachments (uploads need a live connection)
 
 Do not expect these in the current MVP:
 
-- **Voice / video** — no backend wiring and no call UI
+- **Voice / video calls** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
 - Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
-- Video/audio attachments (images and documents only in this pass)
+- Video attachments (voice messages are built; video is not)
 
 ---
 
@@ -823,6 +841,7 @@ Do not expect these in the current MVP:
 | Offline list + message caching | Automatic via IndexedDB (last 50 per chat) |
 | Reconnect gap-fill | Automatic after socket reconnect |
 | File & image attachments (images, PDFs, docs) | Paperclip button in composer |
+| Voice messages (hold-to-record) | Mic button in composer → hold → release to send |
 | Image lightbox (fullscreen, arrows, download) | Click any image in chat |
 | Global search (Ctrl+K) | Ctrl+K or search icon in panel header |
 | Admin panel | `/admin` — standalone dashboard |

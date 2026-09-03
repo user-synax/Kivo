@@ -45,7 +45,7 @@ Kivo
 └── Spaces (community-level containers)
     └── Channels (text conversations inside Spaces)
         └── Messages
-            └── Attachments (images & documents) ✅
+            └── Attachments (images, docs & voice) ✅
             └── Threads (side-panel replies) ✅
 ```
 
@@ -57,7 +57,7 @@ Kivo
 | **Channel** | Text / announcement conversation inside a Space | ✅ Complete |
 | **Notification** | In-app + web push events (message, friend, space) | ✅ Complete |
 | **Push Subscription** | Per-user VAPID subscription for offline delivery | ✅ Complete |
-| **Attachment** | Image/document file attached to a message | ✅ Complete |
+| **Attachment** | Image/document/voice file attached to a message | ✅ Complete |
 | **Thread** | Message-level side discussion in a dedicated panel | ✅ Complete |
 
 ---
@@ -96,6 +96,7 @@ Kivo
 | Mobile UX | **Complete** | Bottom tab bar, responsive panels, safe-area handling |
 | Offline Caching | **Complete** | IndexedDB (`idb-keyval`) cache for conversations, Spaces, friends, requests |
 | File & Image Attachments | **Complete** | Upload images + docs via Appwrite, lightbox, inline preview, download cards |
+| Voice Messages | **Complete** | Hold-to-record mic in the composer (MediaRecorder), slide-up-to-cancel, inline play/pause player with progress + duration (`Message.audioDuration`), stored as-is in Appwrite (no transcoding); audio + duration preserved on forward |
 | Threads | **Complete** | Any message hosts a side conversation: replies carry `threadId`, render in a dedicated panel (desktop drawer / mobile sheet), "N replies" chips under root bubbles, excluded from the main timeline & unread badge; thread replies only notify when @mentioned |
 | Saved Messages | **Complete** | Bookmark any message (menu → Save message; own, others', thread replies); per-user `savedBy` on the Message; Saved panel (sidebar bookmark icon) lists them across chats newest-first with jump-to-message; deleted messages drop out |
 | Mention Notifications | **Complete** | `@mention` feature shipped |
@@ -824,20 +825,23 @@ PushSubscription {
 
 ---
 
-### 10. File & Image Attachments
+### 10. File, Image & Voice Attachments
 
 | Type | Status | Notes |
 |---|---|---|
 | Avatar uploads | **Complete** | Via Appwrite Storage, 4MB max |
 | Image attachments | **Complete** | jpg, png, gif, webp — max 30MB each |
 | Document attachments | **Complete** | pdf, doc, docx, xlsx, xls, ppt, pptx, txt — max 30MB each |
+| Voice messages | **Complete** | webm, ogg, mp3, m4a, aac, wav — max 30MB each; hold-to-record, playback player, duration |
 
 - Multiple attachments per message, mixed types allowed.
 - Content (text) becomes optional when attachments are present.
 - Server-side MIME validation and 30MB cap per file, enforced via Multer + Appwrite upload.
 - Separate `attachments` bucket in Appwrite (public read, server-only write).
+- **Voice messages add no backend load**: no transcoding or media pipeline — the recorded file is uploaded once via the existing endpoint, stored as-is, and played back by the browser straight from its Appwrite view URL. The only new state is a `Message.audioDuration` field (seconds, set at record time so bubbles render before the audio loads).
+- **Setup note:** the Appwrite `attachments` bucket's allowed-file-extensions list must include the audio extensions (`webm`, `ogg`, `mp3`, `m4a`, `aac`, `wav`) or uploads are rejected — update it in the Appwrite console (Storage → bucket → Settings).
 - **Image lightbox** — fullscreen centered modal with arrow-key navigation, download, filename label.
-- PDF, document, and text files render as download cards.
+- PDF, document, and text files render as download cards; **voice files render as an inline player** (play/pause, seekable progress bar, duration). One shared `<audio>` element means only one voice message plays at a time.
 - Per-file upload progress indicator in the composer.
 
 #### Attachment Schema (on Message)
@@ -849,9 +853,11 @@ attachments: [{
   fileName:  String (original filename)
   mimeType:  String (MIME type)
   size:      Number (bytes)
-  kind:      String (enum: ["image", "document"])
+  kind:      String (enum: ["image", "document", "audio"])
   url:       String (Appwrite view/preview URL)
 }]
+
+audioDuration: Number  // seconds, 0-3600; voice messages only, null otherwise
 ```
 
 #### Attachment Endpoints
@@ -860,11 +866,11 @@ attachments: [{
 |---|---|---|---|
 | POST | `/api/v1/attachments/upload` | Yes | Multipart: `{ conversationId, files[] }` (max 10 files, 30MB each) |
 
-Response: `{ attachments: [{ fileId, bucketId, fileName, mimeType, size, kind, url }] }`
+Response: `{ attachments: [{ fileId, bucketId, fileName, mimeType, size, kind, url }] }` — `kind` is `"audio"` for voice messages.
 
 #### Message Create (updated)
 
-`POST /api/v1/conversations/:id/messages` body: `{ content?, attachments?, replyToMessageId? }` — at least one of `content` or `attachments` is required.
+`POST /api/v1/conversations/:id/messages` body: `{ content?, attachments?, audioDuration?, replyToMessageId? }` — at least one of `content` or `attachments` is required. `audioDuration` (0-3600) is stored on voice messages; forwards copy the source's `audioDuration` and ignore any client-supplied value.
 
 ---
 
@@ -981,7 +987,7 @@ Refresh token is sent automatically via httpOnly cookie.
 | GET | `/api/v1/conversations/:id/pinned` | Yes | Pinned messages, newest first (max 10) |
 | GET | `/api/v1/conversations/:id/threads` | Yes | Active threads (root + summary) |
 | GET | `/api/v1/conversations/:id/threads/:threadId/messages` | Yes | Thread panel feed (root + replies, oldest first) |
-| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId?, threadId?, forwardedFromId? }` (content/attachments, `threadId`, or `forwardedFromId` required; forward copies can't add a caption, thread replies can't quote/forward) |
+| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, audioDuration?, replyToMessageId?, threadId?, forwardedFromId? }` (content/attachments, `threadId`, or `forwardedFromId` required; forward copies can't add a caption, thread replies can't quote/forward) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
 | POST | `/api/v1/conversations/:id/unread` | Yes | `{ messageId? }` — mark unread from a message (or latest others') forward |
 
@@ -1531,6 +1537,7 @@ These may be considered after the core communication experience is stable.
 - `@mention` feature with autocomplete + mention notifications.
 - Mobile UX (bottom tab bar, responsive panels) + IndexedDB offline caching.
 - File & image attachments (images, PDFs, docs) with lightbox & inline previews.
+- **Voice messages** (hold-to-record mic, inline playback, duration) — attachments extended with an `audio` kind, no transcoding.
 - **Email verification** (instant signup — no OTP; `/verify-email` link + resend API) and **password reset** (forgot/reset via email).
 - **Last online status**, **Mark as unread / New messages separator**, and **reconnect gap-fill**.
 - **Global search (Ctrl+K)**, **admin panel**, **public profiles** (`/u/:username`, badges, GitHub graphs), **blocking**, **notification preferences**, and **rate limiting**.
