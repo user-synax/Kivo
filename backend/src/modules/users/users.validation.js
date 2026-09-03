@@ -4,6 +4,7 @@ import { z } from "zod";
 // colors/gradients; we only store the id and validate it server-side.
 export const AVATAR_STYLE_IDS = [
   "default",
+  "accent",
   "lime",
   "blue",
   "rose",

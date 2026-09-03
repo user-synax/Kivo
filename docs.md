@@ -390,7 +390,7 @@ You can set:
 | Bio | Max 280 characters |
 | Custom status | Max 60 characters |
 | Avatar photo | PNG, JPEG, WebP, or GIF; max **4MB** (Appwrite). Replace or remove. |
-| Avatar frame | Presets: Default, Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora |
+| Avatar frame | Presets: Default, **My accent** (follows your theme color), Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora |
 | Banner | Preset animated GIF covers |
 | Country | Optional; rendered as a **flag** on your profile |
 | GitHub | Optional username; renders a **contribution graph** on your public profile |

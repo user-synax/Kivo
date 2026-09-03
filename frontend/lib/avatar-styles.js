@@ -4,6 +4,15 @@
 // product spec, so they read as a calm ring rather than a moving light.
 export const AVATAR_STYLES = [
   { id: "default", label: "Default", kind: "solid", color: null },
+  // "accent" is special: the ring maps to the theme's live accent token, so it
+  // follows the user's theme-studio color (and inside a Space with its own
+  // palette, that Space's accent) instead of a hardcoded hex.
+  {
+    id: "accent",
+    label: "My accent",
+    kind: "solid",
+    color: "var(--accent)",
+  },
   { id: "lime", label: "Lime", kind: "solid", color: "#7fee64" },
   { id: "blue", label: "Blue", kind: "solid", color: "#6c8cff" },
   { id: "rose", label: "Rose", kind: "solid", color: "#fb7185" },

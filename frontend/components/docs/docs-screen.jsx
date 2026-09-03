@@ -475,8 +475,8 @@ export function DocsScreen() {
                 <Bullet>Display name, unique username, bio (280), status (60)</Bullet>
                 <Bullet>
                   Photo (PNG, JPEG, WebP, or GIF, max 4MB) and a color frame
-                  (Default, Lime, Blue, Rose, Amber, Violet, Ocean, Sunset,
-                  Aurora)
+                  (Default, My accent — follows your theme color — Lime, Blue,
+                  Rose, Amber, Violet, Ocean, Sunset, Aurora)
                 </Bullet>
                 <Bullet>
                   Optional animated banner, country flag, and GitHub username

@@ -193,7 +193,7 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | country | String | Yes | ISO-3166 alpha-2 → flag shown on profiles |
 | githubUsername | String | Yes | GitHub contribution graph on the public profile |
 | verified / showBadge | Boolean | No / Yes | Admin grants `verified`; the user toggles `showBadge` visibility in Settings |
-| avatarStyle | String | Yes | One of 9 presets: Default + 6 solid colors + 2 gradient rings |
+| avatarStyle | String | Yes | One of 10 presets: Default + My accent (follows the theme token) + 6 solid colors + 2 gradient rings |
 | avatarUrl | String | Via upload | Hosted on Appwrite Storage |
 | email | String | No | Read-only |
 | role | String | No | `user` or `admin` |

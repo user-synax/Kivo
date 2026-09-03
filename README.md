@@ -415,7 +415,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 
 ### 👤 Profiles
 - Display name, unique username, bio (280), custom status (60)
-- **9 avatar frame presets** (Default, Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora) + real avatar upload (Appwrite, 4 MB max)
+- **10 avatar frame presets** (Default, **My accent** — follows your theme color — Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora) + real avatar upload (Appwrite, 4 MB max)
 - Profile **banner** — curated animated GIF covers
 - **Country** (flag shown on profile) and optional **GitHub username** (renders a contribution graph)
 - **Public profile page** at `/u/<username>` — shareable with anyone; visitors get a "Join Kivo" nudge
