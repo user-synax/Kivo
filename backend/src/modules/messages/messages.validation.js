@@ -14,9 +14,16 @@ export const createMessageSchema = z.object({
   content: z.string().trim().max(4000, "Message too long").optional(),
   replyToMessageId: z.string().optional(),
   attachments: z.array(attachmentSchema).max(10).optional(),
+  forwardedFromId: z.string().optional(),
 }).refine(
-  (data) => (data.content && data.content.length > 0) || (data.attachments && data.attachments.length > 0),
-  { message: "Message must have content or at least one attachment", path: ["content"] },
+  (data) =>
+    (data.content && data.content.length > 0) ||
+    (data.attachments && data.attachments.length > 0) ||
+    Boolean(data.forwardedFromId),
+  {
+    message: "Message must have content, an attachment, or a forwarded message",
+    path: ["content"],
+  },
 );
 
 export const updateMessageSchema = z.object({
@@ -25,6 +32,10 @@ export const updateMessageSchema = z.object({
 
 export const reactionSchema = z.object({
   emoji: z.string().min(1).max(8, "Emoji too long"),
+});
+
+export const pinSchema = z.object({
+  pinned: z.boolean(),
 });
 
 export const listMessagesQuerySchema = z.object({

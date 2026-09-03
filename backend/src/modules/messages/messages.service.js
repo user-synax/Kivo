@@ -37,6 +37,10 @@ export function publicMessage(message) {
       kind: a.kind,
       url: a.url,
     })),
+    forwardedFromId: obj.forwardedFromId ? obj.forwardedFromId.toString() : null,
+    forwardedFromName: obj.forwardedFromName || null,
+    pinnedAt: obj.pinnedAt ? new Date(obj.pinnedAt).toISOString() : null,
+    pinnedBy: obj.pinnedBy ? obj.pinnedBy.toString() : null,
     isEdited: obj.isEdited,
     isDeleted: obj.isDeleted,
     createdAt: obj.createdAt,
@@ -195,7 +199,14 @@ async function resolveMentions(content, participantIds) {
   return resolvedIds;
 }
 
-export async function createMessage({ conversationId, userId, content, replyToMessageId, attachments }) {
+export async function createMessage({
+  conversationId,
+  userId,
+  content,
+  replyToMessageId,
+  attachments,
+  forwardedFromId,
+}) {
   const conversation = await assertMembership(conversationId, userId);
   await assertDmNotBlocked(conversation, userId);
 
@@ -223,15 +234,57 @@ export async function createMessage({ conversationId, userId, content, replyToMe
     }
   }
 
-  const mentionIds = await resolveMentions(content, conversation.participants);
+  // Forwarding: copy the original message's content + attachments into the
+  // target conversation and stamp the attribution pill. The forwarder must be a
+  // participant of the SOURCE conversation; forwarded text never re-resolves
+  // @mentions (so forwarding doesn't ping people in the target conversation).
+  let mentions = [];
+  let finalContent = content || "";
+  let finalAttachments = attachments || [];
+  let forwardedName = null;
+  if (forwardedFromId) {
+    if (!mongoose.Types.ObjectId.isValid(forwardedFromId)) {
+      throw badRequest("Invalid forwardedFromId", "INVALID_FORWARD");
+    }
+    const source = await Message.findById(forwardedFromId).select(
+      "conversationId senderId content attachments isDeleted",
+    );
+    if (!source || source.isDeleted) {
+      throw notFound("Original message not found", "MESSAGE_NOT_FOUND");
+    }
+    const sourceConv = await Conversation.findById(source.conversationId).select("participants");
+    const sourceParticipants = (sourceConv?.participants || []).map((p) => p.toString());
+    if (!sourceParticipants.includes(userId)) {
+      throw forbidden("You can only forward messages from conversations you are in", "NOT_PARTICIPANT");
+    }
+    if (finalContent || finalAttachments.length) {
+      throw badRequest("Forwarded messages cannot carry extra content", "INVALID_FORWARD");
+    }
+    const author = await User.findById(source.senderId).select("displayName username").lean();
+    forwardedName = author?.displayName || author?.username || "Someone";
+    finalContent = source.content || "";
+    finalAttachments = (source.attachments || []).map((a) => ({
+      fileId: a.fileId,
+      bucketId: a.bucketId,
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      size: a.size,
+      kind: a.kind,
+      url: a.url,
+    }));
+  } else {
+    mentions = await resolveMentions(finalContent, conversation.participants);
+  }
 
   const message = await Message.create({
     conversationId,
     senderId: userId,
-    content: content || "",
+    content: finalContent,
     replyToMessageId: replyToMessageId || null,
-    mentions: mentionIds,
-    attachments: attachments || [],
+    mentions,
+    attachments: finalAttachments,
+    forwardedFromId: forwardedFromId || null,
+    forwardedFromName: forwardedName,
   });
 
   // Bump the conversation's activity timestamp for inbox ordering.
@@ -287,11 +340,56 @@ export async function deleteMessage({ messageId, userId }) {
   message.isDeleted = true;
   message.content = "";
   message.reactions = [];
+  // A deleted message stops being pinned (and the banner refetches on the
+  // message:deleted event).
+  message.pinnedAt = null;
+  message.pinnedBy = null;
   await message.save();
 
   const payload = publicMessage(message);
   emitToConversation(message.conversationId.toString(), "message:deleted", payload);
   return payload;
+}
+
+// Pin/unpin a message (any member). Emits `message:pin-updated` so open chats
+// can refresh their pinned banner and the message's own pin state.
+export async function pinMessage({ messageId, userId, pinned }) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) {
+    throw badRequest("Invalid message id", "INVALID_ID");
+  }
+  const message = await Message.findById(messageId);
+  if (!message || message.isDeleted) {
+    throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+  }
+  await assertMembership(message.conversationId.toString(), userId);
+
+  message.pinnedAt = pinned ? new Date() : null;
+  message.pinnedBy = pinned ? userId : null;
+  await message.save();
+
+  const payload = publicMessage(message);
+  emitToConversation(message.conversationId.toString(), "message:pin-updated", {
+    conversationId: message.conversationId.toString(),
+    message: payload,
+  });
+  return payload;
+}
+
+// Pinned messages for the conversation banner, newest pin first (max 10).
+export async function listPinned({ conversationId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw badRequest("Invalid conversation id", "INVALID_ID");
+  }
+  await assertMembership(conversationId, userId);
+  const docs = await Message.find({
+    conversationId,
+    pinnedAt: { $ne: null },
+    isDeleted: false,
+  })
+    .sort({ pinnedAt: -1 })
+    .limit(10)
+    .lean();
+  return docs.map((m) => publicMessage(m));
 }
 
 // Toggle a reaction: if the user already reacted with the same emoji, remove it;

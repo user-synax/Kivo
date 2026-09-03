@@ -5,6 +5,7 @@ import {
   createMessageSchema,
   updateMessageSchema,
   reactionSchema,
+  pinSchema,
   listMessagesQuerySchema,
   markUnreadSchema,
 } from "./messages.validation.js";
@@ -24,15 +25,34 @@ export const listMessages = asyncHandler(async (req, res) => {
 });
 
 export const createMessage = asyncHandler(async (req, res) => {
-  const { content, replyToMessageId, attachments } = parseBody(createMessageSchema, req.body);
+  const { content, replyToMessageId, attachments, forwardedFromId } = parseBody(createMessageSchema, req.body);
   const message = await messagesService.createMessage({
     conversationId: req.params.id,
     userId: req.user.userId,
     content,
     replyToMessageId,
     attachments,
+    forwardedFromId,
   });
   res.status(201).json({ success: true, data: message });
+});
+
+export const listPinned = asyncHandler(async (req, res) => {
+  const messages = await messagesService.listPinned({
+    conversationId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: messages });
+});
+
+export const pinMessage = asyncHandler(async (req, res) => {
+  const { pinned } = parseBody(pinSchema, req.body);
+  const message = await messagesService.pinMessage({
+    messageId: req.params.id,
+    userId: req.user.userId,
+    pinned,
+  });
+  res.status(200).json({ success: true, data: message });
 });
 
 export const editMessage = asyncHandler(async (req, res) => {

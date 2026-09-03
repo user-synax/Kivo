@@ -1,14 +1,22 @@
 "use client";
 
 import {
+  Ban,
   Check,
   CheckCheck,
   Clock,
+  Copy,
   FaceGrinning,
+  Forward,
   Mail,
   Pencil,
+  Pin,
+  PinOff,
   Reply,
+  Share,
+  ShieldBan,
   Trash,
+  UserRound,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -140,7 +148,25 @@ export function MessageBubble({
   isUserOnline,
   onOpenProfile,
   isMobile = false,
+  // Message-action menu extras (context menu + long-press).
+  onCopy,
+  onForward,
+  onPinToggle,
+  onShare,
+  onSelectMode,
+  onProfile,
+  onBlock,
+  blockedByMe = false,
+  blockBusy = false,
+  blockName = "",
+  // Select mode (multi-action): gestures are inert, bubbles get a selection
+  // ring, and tapping the bubble toggles selection.
+  selectMode = false,
+  selected = false,
+  onSelectToggle,
 }) {
+  const pinned = Boolean(message?.pinnedAt);
+  const canShare = isMobile && typeof navigator !== "undefined" && !!navigator.share;
   const deleted = message.isDeleted;
   const editRef = useRef(null);
   const [pressing, setPressing] = useState(false);
@@ -167,7 +193,7 @@ export function MessageBubble({
   }, []);
 
   const triggerLike = useCallback(() => {
-    if (deleted || isEditing) return;
+    if (deleted || isEditing || selectMode) return;
     const now = Date.now();
     // throttle: ignore if liked < 500ms ago (spam / accidental triple tap)
     if (now - likeCooldownRef.current < 500) return;
@@ -181,7 +207,7 @@ export function MessageBubble({
     animTimerRef.current = setTimeout(() => setLikeAnimKey(0), 850);
 
     onReact?.("❤️");
-  }, [deleted, isEditing, onReact]);
+  }, [deleted, isEditing, selectMode, onReact]);
 
   const handleDoubleClick = useCallback(
     (e) => {
@@ -205,7 +231,7 @@ export function MessageBubble({
 
   const handleTouchEnd = useCallback(
     (e) => {
-      if (deleted || isEditing) return;
+      if (deleted || isEditing || selectMode) return;
       // ignore swipes / scrolls — only taps should trigger like
       const endT = e.changedTouches?.[0];
       if (likeStartRef.current && endT) {
@@ -235,7 +261,7 @@ export function MessageBubble({
         }, 350);
       }
     },
-    [deleted, isEditing, triggerLike],
+    [deleted, isEditing, selectMode, triggerLike],
   );
 
   // Sent messages use the primary (accent) bubble, received use the secondary.
@@ -243,14 +269,16 @@ export function MessageBubble({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger disabled={deleted || isEditing}>
+      <ContextMenuTrigger disabled={deleted || isEditing || selectMode}>
         <Bubble
           variant={bubbleVariant}
           align={mine ? "end" : "start"}
           className={cn(
             "group/bubble relative transition-transform will-change-transform select-text touch-manipulation",
-            pressing && "scale-[0.98]",
+            pressing && !selectMode && "scale-[0.98]",
             isReplying && "border-l-2 border-[var(--accent)]",
+            selected && "ring-2 ring-[var(--accent)]",
+            selectMode && "cursor-pointer",
             className,
           )}
           style={{ transitionTimingFunction: EASE_OUT_CSS }}
@@ -294,6 +322,14 @@ export function MessageBubble({
               </span>
             ) : (
               <>
+                {message.forwardedFromName && (
+                  <span className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)]">
+                    <Forward className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">
+                      Forwarded from {message.forwardedFromName}
+                    </span>
+                  </span>
+                )}
                 <MessageContent
                   content={message.content}
                   mentions={message.mentions}
@@ -345,6 +381,32 @@ export function MessageBubble({
             )}
           </AnimatePresence>
 
+          {/* Select-mode overlay + indicator. The overlay button swallows all
+              taps so selection mode never leaks into reply/attachment actions;
+              the ring + badge visualize the state. */}
+          {selectMode && onSelectToggle && (
+            <button
+              type="button"
+              aria-label={selected ? "Deselect message" : "Select message"}
+              onClick={onSelectToggle}
+              className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] focus-visible:outline-none"
+            />
+          )}
+          {selectMode && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute -top-1.5 z-[2] flex size-5 items-center justify-center rounded-full border shadow-sm transition-colors",
+                selected
+                  ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)]"
+                  : "border-[var(--border)] bg-[var(--bg-elevated)] text-transparent",
+                mine ? "-left-1.5" : "-right-1.5",
+              )}
+            >
+              <Check className="h-3 w-3" strokeWidth={3} />
+            </span>
+          )}
+
           {/* Reaction picker */}
           {reactionOpen && (
             <div
@@ -369,29 +431,102 @@ export function MessageBubble({
       </ContextMenuTrigger>
 
       <ContextMenuContent ariaLabel="Message actions">
-        <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
-          <FaceGrinning className="h-4 w-4" />
-          React
-        </ContextMenuItem>
+        {/* One-tap quick reactions — no extra tap to open the picker */}
+        <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
+          {REACTION_EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              aria-label={`React ${e}`}
+              onClick={() => onReact?.(e)}
+              className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+        {onCopy && (
+          <ContextMenuItem onSelect={() => onCopy?.()}>
+            <Copy className="h-4 w-4" />
+            Copy
+          </ContextMenuItem>
+        )}
         <ContextMenuItem onSelect={() => onReply?.(message)}>
           <Reply className="h-4 w-4" />
           Reply
         </ContextMenuItem>
-        {!mine && !deleted && (
-          <ContextMenuItem onSelect={() => onMarkUnread?.()}>
-            <Mail className="h-4 w-4" />
-            Mark as unread
+        <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
+          <FaceGrinning className="h-4 w-4" />
+          More reactions
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        {onForward && (
+          <ContextMenuItem onSelect={() => onForward?.(message)}>
+            <Forward className="h-4 w-4" />
+            Forward
           </ContextMenuItem>
         )}
-        {mine && (
-          <ContextMenuItem onSelect={() => onEdit?.()}>
-            <Pencil className="h-4 w-4" />
-            Edit
+        {onPinToggle && (
+          <ContextMenuItem onSelect={() => onPinToggle?.()}>
+            {pinned ? (
+              <PinOff className="h-4 w-4" />
+            ) : (
+              <Pin className="h-4 w-4" />
+            )}
+            {pinned ? "Unpin" : "Pin"}
           </ContextMenuItem>
+        )}
+        {onSelectMode && (
+          <ContextMenuItem onSelect={() => onSelectMode?.()}>
+            <CheckCheck className="h-4 w-4" />
+            Select messages
+          </ContextMenuItem>
+        )}
+        {canShare && onShare && (
+          <ContextMenuItem onSelect={() => onShare?.(message)}>
+            <Share className="h-4 w-4" />
+            Share…
+          </ContextMenuItem>
+        )}
+        {!mine && (onProfile || onMarkUnread || onBlock) && (
+          <>
+            <ContextMenuSeparator />
+            {onProfile && (
+              <ContextMenuItem onSelect={() => onProfile?.()}>
+                <UserRound className="h-4 w-4" />
+                Profile
+              </ContextMenuItem>
+            )}
+            {onMarkUnread && (
+              <ContextMenuItem onSelect={() => onMarkUnread?.()}>
+                <Mail className="h-4 w-4" />
+                Mark as unread
+              </ContextMenuItem>
+            )}
+            {onBlock && (
+              <ContextMenuItem
+                disabled={blockBusy}
+                tone={blockedByMe ? "default" : "destructive"}
+                onSelect={() => onBlock?.()}
+              >
+                {blockedByMe ? (
+                  <ShieldBan className="h-4 w-4" />
+                ) : (
+                  <Ban className="h-4 w-4" />
+                )}
+                {blockedByMe ? "Unblock" : "Block"}
+                {blockName ? ` ${blockName}` : ""}
+              </ContextMenuItem>
+            )}
+          </>
         )}
         {mine && (
           <>
             <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => onEdit?.()}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </ContextMenuItem>
             <ContextMenuItem tone="destructive" onSelect={() => onDelete?.()}>
               <Trash className="h-4 w-4" />
               Delete

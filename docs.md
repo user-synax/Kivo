@@ -187,6 +187,16 @@ Max length: **4000** characters. Empty messages are rejected.
 
 Messages appear immediately (optimistic UI). If send fails, use **retry** on that bubble.
 
+### Message menu (right-click / long-press)
+
+Every bubble has a menu — right-click on desktop, **press and hold** on mobile:
+
+- On **other people's messages**: React · **Copy** · **View profile** · **Block** · Reply · **Forward** · **Pin** · Mark as unread · **Select**
+- On **your own messages**: React · **Copy** · **Forward** · **Pin** · Reply · Edit · Delete · **Select**
+- A **quick-reaction strip** of common emoji sits at the top of the menu so long-press → one-tap react works on mobile.
+- **Select** switches the chat into multi-select mode — tick several bubbles, then use the floating bar to **copy**, **forward**, or **delete** (your own) them.
+- **View profile** opens the person's profile; **Block** blocks them (their messages in this chat are then hidden behind the blocked banner).
+
 ### Reply (quote)
 
 1. Context menu (right-click / long-press) on a message → **Reply**.
@@ -216,6 +226,26 @@ You can also open the **emoji picker** next to the composer (smile button) to in
 2. The message is **soft-deleted**: content is cleared, the row remains so replies stay in place.
 
 You cannot edit or delete other people's messages.
+
+### Copy a message
+
+1. Context menu → **Copy**.
+2. Text messages copy their content; attachment bubbles copy the file name and link.
+3. On phones, **Share…** (when the browser supports it) opens the native share sheet with the message text.
+
+### Forward a message
+
+1. Context menu → **Forward**.
+2. Pick a destination from the conversation picker — DMs, groups, and Space channels you belong to.
+3. A copy is sent there with a **"Forwarded from @user"** pill naming the original author. The copy never notifies the original chat, and you can't add a caption.
+
+You can only forward a message you can already see: membership of the source conversation is checked server-side.
+
+### Pin a message
+
+1. Context menu → **Pin** (or **Unpin**). Any member of the chat can pin.
+2. Pinned messages appear in a **banner under the chat header**, newest first (up to 10).
+3. Unpinning or deleting the message clears it from the banner; changes sync in real time to everyone in the chat.
 
 ### Mentions (`@username`)
 
@@ -276,7 +306,7 @@ You become the first **admin**.
 
 ### Chat in a group
 
-Open the group in the sidebar (under **Groups**). Messaging works like DMs (reply, react, edit, delete, mentions).
+Open the group in the sidebar (under **Groups**). Messaging works like DMs (reply, react, edit, delete, forward, pin, mentions).
 
 ### Group settings
 
@@ -733,7 +763,7 @@ What does **not** queue: file/photo attachments (uploads need a live connection)
 
 Do not expect these in the current MVP:
 
-- **Threads**, pinned messages, saved messages
+- **Threads**, saved messages
 - **Voice / video** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
@@ -750,7 +780,7 @@ Do not expect these in the current MVP:
 | Log out | Profile tab / `/app/profile` |
 | Friends: add, accept, decline, list, search, remove | New menu → Friends; Unfriend on profiles |
 | Open DM from a friend | Friends → **Message** |
-| Send / reply / react / edit / delete messages | Chat panel + context menu (double-click = ❤️) |
+| Send / reply / react / edit / delete / copy / forward / pin messages | Chat panel + bubble menu (double-click = ❤️) |
 | Emoji in text | Composer smile button (9 categories, 270+) |
 | @mentions | Type `@` in the composer |
 | Typing, presence, read receipts | Automatic while connected |

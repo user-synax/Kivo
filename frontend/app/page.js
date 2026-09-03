@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Navbar } from "../components/navbar/navbar";
+import { SiteFooter } from "../components/site-footer";
 import { GuestGate } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { RadialButton } from "@/components/ui/radial-button";
@@ -138,28 +139,7 @@ export default function Home() {
         <SecuritySection />
         <RoadmapSection />
 
-        <footer className="border-t border-hairline/60 px-4 py-10 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-2">
-              <img
-                src="/icons/icon-192.png"
-                alt="Kivo"
-                width="20"
-                height="20"
-                className="size-5 rounded-[5px] object-cover"
-              />
-              <span className="font-goga text-[15px] font-medium tracking-tight text-ink">
-                Kivo
-              </span>
-              <span className="font-sans text-[13px] text-ink-muted">
-                — Chat your way.
-              </span>
-            </div>
-            <p className="font-sans text-[13px] text-ink-muted">
-              Built for realtime. Designed to be yours.
-            </p>
-          </div>
-        </footer>
+        <SiteFooter />
       </main>
     </GuestGate>
   );

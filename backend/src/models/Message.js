@@ -89,12 +89,34 @@ const messageSchema = new mongoose.Schema(
     isEdited: { type: Boolean, default: false },
     // Soft delete: keep the row (so replies/ordering remain stable) but blank it.
     isDeleted: { type: Boolean, default: false },
+
+    // Forwarding. `forwardedFromId` references the original message and
+    // `forwardedFromName` is the original author's display name, denormalized
+    // at forward time so the attribution pill renders without cross-conversation
+    // joins. Forwarded copies never re-resolve @mentions.
+    forwardedFromId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+    forwardedFromName: { type: String, default: null },
+
+    // Pinning. Any member can pin/unpin a message; pinned messages surface in a
+    // banner at the top of the conversation. Deleting a message clears its pin.
+    pinnedAt: { type: Date, default: null },
+    pinnedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
 // Most common query: "messages for this conversation, newest last".
 messageSchema.index({ conversationId: 1, createdAt: -1 });
+// Pinned messages per conversation (banner feed), newest pin first.
+messageSchema.index({ conversationId: 1, pinnedAt: -1 });
 // Secondary: "messages sent by a user" (e.g. for moderation/search later).
 messageSchema.index({ senderId: 1, createdAt: -1 });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar/navbar";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 
 export const LIVE_URL = "https://kivo.usersynax.dev";
@@ -298,6 +299,13 @@ export function DocsScreen() {
                 Right-click (or use the message menu) → Reply. A quote preview
                 sits above the composer. Send, or cancel with the X.
               </p>
+              <h3 className="doc-h3">Message menu</h3>
+              <p>
+                Right-click a bubble on desktop, or press and hold on mobile, to
+                open the menu: quick reactions, Copy, View profile / Block
+                (others’ messages), Reply, Forward, Pin, Select, and Mark as
+                unread. Your own messages add Edit and Delete.
+              </p>
               <h3 className="doc-h3">React, edit, delete</h3>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>
@@ -315,6 +323,30 @@ export function DocsScreen() {
                   row so replies stay in place. Edited messages show “edited”.
                 </Bullet>
               </ul>
+              <h3 className="doc-h3">Copy & share</h3>
+              <p>
+                Copy puts the message text on your clipboard (attachments copy
+                the file name and link). Where the browser supports it,
+                Share… opens the native share sheet with the text.
+              </p>
+              <h3 className="doc-h3">Forward</h3>
+              <p>
+                Forward opens a conversation picker. The copy keeps the original
+                content and shows a “Forwarded from @user” pill naming the
+                original author.
+              </p>
+              <h3 className="doc-h3">Pin</h3>
+              <p>
+                Any member can Pin a message. Pinned messages appear in a
+                banner under the chat header, newest first. Unpin the message,
+                or delete it, to clear it from the banner.
+              </p>
+              <h3 className="doc-h3">Select mode</h3>
+              <p>
+                Select (or long-press a bubble on mobile) switches the chat to
+                multi-select. Tick several bubbles, then use the floating bar to
+                copy, forward, or delete your own messages.
+              </p>
               <h3 className="doc-h3">Mention someone</h3>
               <Steps
                 items={[
@@ -615,7 +647,7 @@ export function DocsScreen() {
                 kivo.usersynax.dev yet:
               </p>
               <ul className="mt-4 flex flex-col gap-2">
-                <Bullet>Threads, pins, and saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
+                <Bullet>Threads and saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
                 </Bullet>
                 <Bullet>Sharing palettes as saved theme templates</Bullet>
 
@@ -661,6 +693,7 @@ export function DocsScreen() {
           </div>
         </main>
       </div>
+      <SiteFooter />
     </div>
   );
 }

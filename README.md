@@ -30,6 +30,7 @@
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
 - ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), double-click/long-press ❤️, `@mentions`, edit, and soft-delete.
+- 📋 **Rich message actions** — right-click / long-press any bubble: quick reactions, **copy**, **view profile / block**, **forward with attribution**, **pin to chat**, select mode, and native **Share…** on mobile.
 - 📎 **File & image attachments** — up to 10 images/PDFs/documents per message (30 MB each) in any chat; image lightbox with navigation, inline previews, and download.
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status, bio, banner, avatar uploads & frames, **country flag**, and **GitHub contribution graph** on a public profile page (`/u/username`).
@@ -88,7 +89,7 @@ Although Kivo is a **student project**, the messaging core is **fully functional
 - 🔎 **Discover public spaces** by category or search and join with one click
 - 🎨 **Personalizing your chat** with 10 live-switchable themes (dark & light)
 - 📎 **Sharing files and images** — drag or click to upload up to 10 files (30 MB each), preview images in a lightbox, view documents inline
-- 🟢 Real-time presence, typing indicators, read receipts, `@mentions`, and message replies
+- 🟢 Real-time presence, typing indicators, read receipts, `@mentions`, and message replies, **forwarding & pinning**
 - 📱 A **bottom tab bar** (Chats / Groups / Spaces / Settings / Profile) makes the app feel native on phones
 - 🧑‍🤝‍🧑 Public profile pages at `/u/username` — shareable, with badges, country, and GitHub activity
 
@@ -109,6 +110,9 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Friends system (request / accept / decline / list / search / **remove**)
 - DM conversations (create, list, history, unread counts)
 - Text messaging (send, **reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, receipts)
+- **Message actions** — right-click / long-press any bubble: quick-reaction strip, **copy**, **view profile**, **block**, reply, edit/delete (own), **forward**, **pin**, **select mode** (multi-copy/forward/delete), and native **Share…** on mobile
+- **Forwarding** — resend any message into another conversation with a **"Forwarded from @user"** attribution pill (original author kept)
+- **Pinned messages** — any member pins/unpins; a pinned banner sits under the chat header, newest first (max 10), cleared by unpin or by deleting the message
 - **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
 - **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
 - **Notification system** (in-app center + sounds + bell with unread badge)
@@ -133,7 +137,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Animated landing page
 
 ### 🚧 Planned / Not Started
-- Threads · pinned/saved messages
+- Threads · saved messages
 - Voice / video calls (not wired yet — no backend or frontend)
 - Re-sending a verification email automatically at signup (removed with the OTP step)
 
@@ -318,6 +322,7 @@ Registration / Login
 | `message:new` | Server → Room | New message |
 | `message:edited` | Server → Room | Content updated |
 | `message:deleted` | Server → Room | Message soft-deleted |
+| `message:pin-updated` | Server → Room | Message pinned/unpinned (banner + bubble state refresh) |
 | `message:reaction` | Server → Room | Reaction added/removed |
 | `message:read` | Server → Room | Marked as read |
 | `message:unread` | Server → Room | Conversation marked unread (badge + separator) |
@@ -386,6 +391,9 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - **Quote replies** with inline preview of the original message
 - **`@mentions`** with autocomplete (conversation participants only) + mention notifications that override muted categories
 - **Double-click / long-press a message to ❤️ it**, reactions, edit, and soft-delete
+- **Rich bubble menu** (right-click / long-press) — quick emoji strip, **copy**, **view profile**, **block**, reply, edit/delete (own), **forward**, **pin**, **select mode**, and native **Share…** on mobile
+- **Forwarding** — copies the message into another conversation with a "Forwarded from @user" pill (original author kept)
+- **Pinned messages** — pin/unpin from the menu; a banner under the chat header lists them newest-first (max 10), cleared by unpin or by deleting the message
 - 60-second message grouping & hover actions (context menu)
 - **New messages separator** — a labelled divider sits where your unread messages begin (auto-clears as you read to the bottom)
 - Emoji picker — 9 categories (Smileys, People, Hearts, Animals, Food, Activity, Travel, Objects, Symbols), 270+ emojis
@@ -471,9 +479,9 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, global search, 2FA |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, message forwarding & pinning, global search, 2FA |
 | **Phase 1.5** | Voice & video calls, threads |
-| **Phase 2** | Threads, pinned/saved messages, stronger search, video/audio attachments |
+| **Phase 2** | Threads, saved messages, stronger search, video/audio attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace theme sharing |
 

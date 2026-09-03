@@ -2,14 +2,19 @@
 
 import {
   Ban,
+  CheckCheck,
   ChevronLeft,
+  Copy,
+  Forward,
   Lock,
   MoreVertical,
   Paperclip,
+  Pin,
   Reply,
   Send,
   ShieldBan,
   Smile,
+  Trash,
   User,
   UserMinus,
   Users,
@@ -33,6 +38,7 @@ import { useSocket } from "@/components/socket-provider";
 import { useTheme } from "@/components/theme-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import { copyText, messageText } from "@/lib/clipboard";
 import {
   getCachedMessages,
   mergeCachedMessage,
@@ -308,6 +314,54 @@ export function ChatPanel({
   const [hasMore, setHasMore] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [text, setText] = useState("");
+
+  // Message actions: pinned banner, forward picker, copy/share feedback, and
+  // multi-select mode.
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+  const [pinBusyId, setPinBusyId] = useState(null);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardQueue, setForwardQueue] = useState([]);
+  const [forwardConvs, setForwardConvs] = useState([]);
+  const [forwardBusy, setForwardBusy] = useState(false);
+  const [forwardError, setForwardError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const noticeTimerRef = useRef(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
+  const showNotice = (text) => {
+    setNotice(text);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => setNotice(null), 2000);
+  };
+
+  // Reset per-conversation action state and load the pinned banner when the
+  // open conversation changes.
+  useEffect(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setForwardOpen(false);
+    setPinnedMessages([]);
+    setNotice(null);
+    if (!convId) return undefined;
+    apiGet(`/api/v1/conversations/${convId}/pinned`)
+      .then((data) => setPinnedMessages(Array.isArray(data) ? data : []))
+      .catch(() => setPinnedMessages([]));
+    return undefined;
+  }, [convId]);
+
+  // Leave select mode with Escape.
+  useEffect(() => {
+    if (!selectMode) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setSelectMode(false);
+        setSelectedIds(new Set());
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectMode]);
 
   // Keep queued/sending/failed outbox entries for the open conversation in the
   // message list (survives reloads) and mirror their status flips live.
@@ -1022,6 +1076,36 @@ export function ChatPanel({
     };
   }, [socket, convId, userId, otherId, isGroup]);
 
+  // Live pin updates: keep the pinned banner and the message list in sync for
+  // every member (pin/unpin here or in another device/tab).
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onPinUpdated = (payload) => {
+      if (!payload || payload.conversationId !== convId || !payload.message) {
+        return;
+      }
+      const msg = payload.message;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)),
+      );
+      setPinnedMessages((prev) => {
+        const rest = prev.filter((p) => p.id !== msg.id);
+        if (msg.pinnedAt) return [msg, ...rest].slice(0, 10);
+        return rest;
+      });
+    };
+    const onDeleted = (payload) => {
+      if (!payload || payload.conversationId !== convId) return;
+      setPinnedMessages((prev) => prev.filter((p) => p.id !== payload.id));
+    };
+    socket.on("message:pin-updated", onPinUpdated);
+    socket.on("message:deleted", onDeleted);
+    return () => {
+      socket.off("message:pin-updated", onPinUpdated);
+      socket.off("message:deleted", onDeleted);
+    };
+  }, [socket, convId]);
+
   // Stop emitting "typing" when leaving the conversation.
   useEffect(() => {
     return () => {
@@ -1353,6 +1437,184 @@ export function ChatPanel({
     }
   };
 
+  // ── Message actions: copy / share / profile / block / pin / forward ────────
+
+  const handleCopyMessage = async (m) => {
+    const text = messageText(m);
+    if (!text) return;
+    const ok = await copyText(text);
+    showNotice(ok ? "Copied to clipboard" : "Couldn't copy");
+  };
+
+  const handleShareMessage = async (m) => {
+    const text = messageText(m);
+    if (!text) return;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (err) {
+        // AbortError = user cancelled; other failures fall back to copy.
+        if (err?.name === "AbortError") return;
+      }
+    }
+    const ok = await copyText(text);
+    showNotice(ok ? "Copied to clipboard" : "Couldn't copy");
+  };
+
+  const openProfileForSender = (m) => {
+    const sender = membersById[m.senderId];
+    if (!sender?.username) return;
+    setProfileUsername(sender.username);
+  };
+
+  const handlePinToggle = async (m) => {
+    if (!m.id || pinBusyId) return;
+    setPinBusyId(m.id);
+    try {
+      const updated = await apiPost(`/api/v1/messages/${m.id}/pin`, {
+        pinned: !m.pinnedAt,
+      });
+      setMessages((prev) =>
+        prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)),
+      );
+      setPinnedMessages((prev) => {
+        const rest = prev.filter((p) => p.id !== updated.id);
+        if (updated.pinnedAt) return [updated, ...rest].slice(0, 10);
+        return rest;
+      });
+      showNotice(updated.pinnedAt ? "Message pinned" : "Message unpinned");
+    } catch (err) {
+      showNotice(err?.message || "Could not pin message");
+    } finally {
+      setPinBusyId(null);
+    }
+  };
+
+  const scrollToMessageId = async (id) => {
+    const el = document.getElementById(`msg-${id}`);
+    if (el) {
+      el.scrollIntoView({ block: "center" });
+      return;
+    }
+    // Older than the loaded window — fetch a page centered on the anchor.
+    try {
+      const data = await apiGet(
+        `/api/v1/conversations/${convId}/messages?around=${encodeURIComponent(id)}&limit=50`,
+      );
+      const page = data?.messages || [];
+      if (page.some((m) => m.id === id)) {
+        setMessages(page);
+        requestAnimationFrame(() => {
+          document
+            .getElementById(`msg-${id}`)
+            ?.scrollIntoView({ block: "center" });
+        });
+      }
+    } catch {}
+  };
+
+  // ── Selection mode (multi-action) ─────────────────────────────────────────
+
+  const enterSelectMode = (m) => {
+    setSelectedIds(new Set([m.id]));
+    setSelectMode(true);
+  };
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+  const selectedMessages = messages.filter((m) => m.id && selectedIds.has(m.id));
+  const selectionAllOwn =
+    selectedMessages.length > 0 &&
+    selectedMessages.every((m) => m.senderId === userId);
+
+  const handleCopySelected = async () => {
+    const text = selectedMessages.map(messageText).filter(Boolean).join("\n\n");
+    if (!text) return;
+    const ok = await copyText(text);
+    showNotice(ok ? "Copied messages" : "Couldn't copy");
+  };
+
+  const openForwardPicker = async (msgs) => {
+    setForwardQueue(msgs);
+    setForwardError(null);
+    setForwardConvs([]);
+    setForwardOpen(true);
+    try {
+      const list = await apiGet("/api/v1/conversations");
+      setForwardConvs(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setForwardError(err?.message || "Could not load conversations");
+    }
+  };
+  const handleForwardSelected = () => {
+    if (selectedMessages.length) openForwardPicker(selectedMessages);
+  };
+  const closeForwardPicker = () => {
+    setForwardOpen(false);
+    setForwardQueue([]);
+    setForwardError(null);
+    exitSelectMode();
+  };
+
+  const confirmForwardTarget = async (targetConvId) => {
+    if (!forwardQueue.length || forwardBusy) return;
+    setForwardBusy(true);
+    setForwardError(null);
+    let ok = 0;
+    let firstErr = null;
+    for (const m of forwardQueue) {
+      if (!m.id) continue;
+      try {
+        await apiPost(`/api/v1/conversations/${targetConvId}/messages`, {
+          forwardedFromId: m.id,
+        });
+        ok += 1;
+      } catch (err) {
+        firstErr = firstErr || err?.message || "Could not forward";
+      }
+    }
+    setForwardBusy(false);
+    if (ok === 0) {
+      setForwardError(firstErr || "Could not forward");
+      return;
+    }
+    setForwardOpen(false);
+    setForwardQueue([]);
+    exitSelectMode();
+    showNotice(ok === 1 ? "Message forwarded" : `${ok} messages forwarded`);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectionAllOwn || !selectedMessages.length) return;
+    if (!window.confirm(`Delete ${selectedMessages.length} message(s)?`)) return;
+    const ids = selectedMessages.map((m) => m.id);
+    setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
+    exitSelectMode();
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        await apiDelete(`/api/v1/messages/${id}`);
+      } catch {
+        failed += 1;
+      }
+    }
+    showNotice(
+      failed
+        ? `Deleted ${ids.length - failed} message(s)`
+        : `Deleted ${ids.length} message(s)`,
+    );
+  };
+
   // Auto-mark read when user scrolls near bottom and unread separator is visible
   useEffect(() => {
     if (!firstUnreadId || !scrollRef.current) return;
@@ -1403,6 +1665,21 @@ export function ChatPanel({
     isChannel && spaceAppearance && customIsActive(spaceAppearance)
       ? cssVarsForColors(derivePalette(memberColors, spaceAppearance))
       : undefined;
+
+  const pinPreview = (pm) => {
+    if (pm.content) {
+      const flat = pm.content.replace(/\s+/g, " ").trim();
+      return flat.length > 48 ? `${flat.slice(0, 48)}…` : flat;
+    }
+    const files = pm.attachments || [];
+    if (files.length === 1) {
+      return files[0].kind === "image" ? "📷 photo" : `📎 ${files[0].fileName}`;
+    }
+    if (files.length > 1) return `📎 ${files.length} attachments`;
+    return "Message";
+  };
+  const actionBtnCls =
+    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40";
 
   return (
     <div
@@ -1542,6 +1819,31 @@ export function ChatPanel({
         )}
       </div>
 
+      {/* Pinned messages banner — newest pins first, jump-to-message on tap */}
+      {pinnedMessages.length > 0 && !selectMode && (
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-1.5 scrollbar-none">
+          <Pin className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+          {pinnedMessages.slice(0, 3).map((pm) => (
+            <button
+              key={pm.id}
+              type="button"
+              onClick={() => scrollToMessageId(pm.id)}
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-base)] px-2.5 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+            >
+              <span className="font-medium text-[var(--text-primary)]">
+                {senderName(pm.senderId)}
+              </span>
+              <span className="max-w-40 truncate">{pinPreview(pm)}</span>
+            </button>
+          ))}
+          {pinnedMessages.length > 3 && (
+            <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+              +{pinnedMessages.length - 3} more
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Messages */}
       <div
         ref={scrollRef}
@@ -1616,6 +1918,10 @@ export function ChatPanel({
             const showSender = (isGroup || isChannel) && !grouped && !mine;
             const sAvatar = senderAvatar(m.senderId);
             const senderLabel = senderName(m.senderId);
+            const hasCopy =
+              !m.isDeleted && Boolean(m.content || m.attachments?.length);
+            const realMessage = Boolean(m.id && !m.tempId);
+            const senderUsername = membersById[m.senderId]?.username || null;
             return (
               <React.Fragment key={m.id}>
                 {isFirstUnread && <NewMessagesSeparator />}
@@ -1665,7 +1971,7 @@ export function ChatPanel({
                     ) : null}
                     <div className="flex min-w-0 flex-1 flex-col max-w-full">
                       <SwipeToReply
-                        enabled={isMobile}
+                        enabled={isMobile && !selectMode}
                         onReply={() => handleReply(m)}
                         className="w-full min-w-0"
                       >
@@ -1697,6 +2003,45 @@ export function ChatPanel({
                           participants={conversation?.participants || []}
                           isUserOnline={isUserOnline}
                           onOpenProfile={setProfileUsername}
+                          onCopy={
+                            hasCopy ? () => handleCopyMessage(m) : undefined
+                          }
+                          onForward={
+                            realMessage
+                              ? () => openForwardPicker([m])
+                              : undefined
+                          }
+                          onPinToggle={
+                            realMessage ? () => handlePinToggle(m) : undefined
+                          }
+                          onSelectMode={
+                            realMessage ? () => enterSelectMode(m) : undefined
+                          }
+                          onShare={
+                            !m.isDeleted ? () => handleShareMessage(m) : undefined
+                          }
+                          onProfile={
+                            !mine && senderUsername
+                              ? () => openProfileForSender(m)
+                              : undefined
+                          }
+                          onBlock={
+                            isDm && otherId && !mine
+                              ? isBlockedByMe
+                                ? () => handleUnblock()
+                                : () => handleBlock()
+                              : undefined
+                          }
+                          blockedByMe={isBlockedByMe}
+                          blockBusy={blockBusy}
+                          blockName={isDm && otherId ? otherName : ""}
+                          selectMode={selectMode}
+                          selected={selectedIds.has(m.id)}
+                          onSelectToggle={
+                            selectMode && realMessage && !m.isDeleted
+                              ? () => toggleSelected(m.id)
+                              : undefined
+                          }
                           className="!max-w-full"
                           contentClassName="max-w-full"
                           isMobile={isMobile}
@@ -1722,9 +2067,60 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Composer */}
+      {/* Composer / selection toolbar */}
       <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
-        <div className="mx-auto max-w-3xl">
+        {selectMode && (
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+            <span className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-primary)]">
+              <CheckCheck className="h-4 w-4 text-[var(--accent)]" />
+              {selectedMessages.length} selected
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleCopySelected}
+                disabled={!selectedMessages.length}
+                className={actionBtnCls}
+              >
+                <Copy className="h-4 w-4" /> Copy
+              </button>
+              <button
+                type="button"
+                onClick={handleForwardSelected}
+                disabled={!selectedMessages.length}
+                className={actionBtnCls}
+              >
+                <Forward className="h-4 w-4" /> Forward
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={!selectionAllOwn}
+                title={
+                  selectionAllOwn
+                    ? "Delete selected messages"
+                    : "Only your own messages can be deleted"
+                }
+                className={`${actionBtnCls} ${
+                  selectionAllOwn ? "text-[var(--destructive)]" : ""
+                }`}
+              >
+                <Trash className="h-4 w-4" /> Delete
+              </button>
+              <button
+                type="button"
+                onClick={exitSelectMode}
+                className={`${actionBtnCls} text-[var(--text-primary)]`}
+              >
+                <X className="h-4 w-4" /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        <div
+          className="mx-auto max-w-3xl"
+          style={selectMode ? { display: "none" } : undefined}
+        >
           {replyingTo && !isBlockedByMe && !isBlockedByOther && canPost && (
             <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
               <div className="flex items-start gap-2 min-w-0">
@@ -1995,6 +2391,101 @@ export function ChatPanel({
           if (onConversationUpdate && conv) onConversationUpdate(conv);
         }}
       />
+
+      {/* Forward picker — choose a conversation for the queued message(s) */}
+      {forwardOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+          <button
+            type="button"
+            aria-label="Close forward picker"
+            onClick={closeForwardPicker}
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Forward messages"
+            className="relative z-10 flex max-h-[80dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] sm:rounded-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3.5">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                  Forward to
+                </h2>
+                <p className="truncate text-[12px] text-[var(--text-muted)]">
+                  {forwardQueue.length === 1
+                    ? "1 message"
+                    : `${forwardQueue.length} messages`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeForwardPicker}
+                aria-label="Close"
+                className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {forwardError && (
+                <p className="border-b border-[var(--border)] px-5 py-2.5 text-[12px] text-[var(--destructive)]">
+                  {forwardError}
+                </p>
+              )}
+              {!forwardError && forwardConvs.length === 0 ? (
+                <p className="py-10 text-center text-[12px] text-[var(--text-muted)]">
+                  Loading conversations…
+                </p>
+              ) : forwardError ? null : (
+                <ul className="flex flex-col gap-0.5 p-2">
+                  {forwardConvs.map((c) => {
+                    const label =
+                      c.type === "dm"
+                        ? participantName(otherParticipant(c, userId))
+                        : c.name || c.type;
+                    return (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          disabled={forwardBusy}
+                          onClick={() => confirmForwardTarget(c.id)}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[var(--hover)] disabled:opacity-50"
+                        >
+                          <Avatar name={label} url={c.avatarUrl} size="sm" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">
+                              {label}
+                            </span>
+                            <span className="block text-[11px] text-[var(--text-muted)]">
+                              {c.type === "dm"
+                                ? "Direct message"
+                                : c.type === "group"
+                                  ? `${c.participants?.length || 0} members`
+                                  : "Space channel"}
+                            </span>
+                          </span>
+                          <Forward className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transient action feedback (copied / forwarded / deleted) */}
+      {notice && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-[12px] font-medium text-[var(--text-primary)] shadow-lg"
+        >
+          {notice}
+        </div>
+      )}
     </div>
   );
 }

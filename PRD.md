@@ -74,9 +74,11 @@ Kivo
 | User Profiles | **Complete** | Display name, username, bio, status, avatar + frames, banner, country, GitHub username |
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
 | DM Conversations | **Complete** | Create, list, message history, unread counts |
-| Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts |
+| Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts, copy, select mode |
 | **@Mentions** | **Complete** | Autocomplete + mention notifications |
 | Message Replies | **Complete** | Reply-to with inline quote preview |
+| Message Forwarding | **Complete** | Forward any visible message to another chat with a "Forwarded from @user" pill (original author kept, no caption) |
+| Pinned Messages | **Complete** | Any member pins/unpins; banner under the chat header (newest first, max 10); unpin or message delete clears it |
 | Typing Indicators | **Complete** | Realtime via Socket.IO |
 | Presence | **Complete** | Online/offline, snapshot on connect |
 | Realtime Events | **Complete** | Socket.IO with authenticated connections |
@@ -267,6 +269,8 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | Delete message | `DELETE /api/v1/messages/:id` | Sender only (soft-delete) |
 | Add reaction | `POST /api/v1/messages/:id/reactions` | Must be participant |
 | Remove reaction | `DELETE /api/v1/messages/:id/reactions/:reactionId` | Own reaction only |
+| Pin / unpin message | `POST /api/v1/messages/:id/pin` | Must be participant |
+| List pinned | `GET /api/v1/conversations/:id/pinned` | Must be participant (newest first, max 10) |
 | Mark read | `PATCH /api/v1/conversations/:id/read` | Must be participant |
 
 #### 3.4 Message Schema
@@ -280,6 +284,10 @@ Message {
   reactions: [{ userId, emoji, _id }]
   deliveredTo: [ObjectId]
   readBy: [{ userId, readAt }]
+  forwardedFromId: ObjectId (nullable) — source message when forwarded
+  forwardedFromName: String (nullable) — original author's display name
+  pinnedAt: Date (nullable) — set when pinned
+  pinnedBy: ObjectId (nullable) — who pinned it
   isEdited: Boolean
   isDeleted: Boolean
   createdAt: Date
@@ -290,6 +298,7 @@ Message {
 **Indexes:**
 - `{ conversationId: 1, createdAt: -1 }` — primary message query
 - `{ senderId: 1, createdAt: -1 }` — moderation/search
+- `{ conversationId: 1, pinnedAt: -1 }` — pinned banner query
 
 #### 3.5 Cursor-Based Pagination
 
@@ -340,6 +349,21 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 - The client renders an inline quote preview of the original message above the reply.
 - Soft-deleted source messages keep their row so replies/ordering remain stable.
 
+### 3.10 Forwarding & Pinned Messages
+
+**Forwarding.**
+
+- `POST /conversations/:id/messages` with `{ forwardedFromId }` (no other fields) copies the source message's content into the target conversation.
+- The forwarder must be a participant of **both** the source and the target conversation; otherwise 403.
+- The copy carries `forwardedFromId` + the source author's display name as `forwardedFromName`; the client renders a "Forwarded from @user" pill.
+- Mention overrides are not resolved for forwarded copies (no spurious mention notifications).
+
+**Pinned messages.**
+
+- Any participant can pin/unpin via `POST /messages/:id/pin` `{ pinned }`; the pin is a timestamp, not a separate collection.
+- `GET /conversations/:id/pinned` returns pinned messages, newest first, max 10.
+- Pinning emits `message:pin-updated`; soft-deleting a pinned message clears its pin.
+
 ---
 
 ### 4. Realtime System (Socket.IO)
@@ -369,6 +393,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | `message:new` | Server → Room | New message in a conversation |
 | `message:edited` | Server → Room | Message content updated |
 | `message:deleted` | Server → Room | Message soft-deleted |
+| `message:pin-updated` | Server → Room | Message pinned or unpinned |
 | `message:reaction` | Server → Room | Reaction added or removed |
 | `message:read` | Server → Room | Messages marked as read |
 | `message:unread` | Server → Room | Conversation marked unread (badge + "New messages" separator) |
@@ -505,7 +530,7 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 - Auto-scroll to bottom on new messages.
 - Typing indicator display.
 - Emoji picker (9 categories, 270+ emojis).
-- Message actions on hover: react, edit, delete.
+- Message menu (right-click / long-press): quick-react strip, copy, reply, forward, pin, select mode, profile/block; edit & delete on own messages.
 - Message grouping (60-second window).
 - Delivery/read receipts (sent → delivered → read).
 - Retry button for failed messages.
@@ -916,7 +941,8 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | DELETE | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | GET | `/api/v1/conversations/:id/messages` | Yes | `?cursor=&limit=&around=` |
-| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId? }` (at least content or attachments required) |
+| GET | `/api/v1/conversations/:id/pinned` | Yes | Pinned messages, newest first (max 10) |
+| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId?, forwardedFromId? }` (content/attachments or `forwardedFromId` required; forward copies can't add a caption) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
 | POST | `/api/v1/conversations/:id/unread` | Yes | `{ messageId? }` — mark unread from a message (or latest others') forward |
 
@@ -944,7 +970,8 @@ Refresh token is sent automatically via httpOnly cookie.
 | Method | Path | Auth | Body |
 |---|---|---|---|
 | PATCH | `/api/v1/messages/:id` | Yes | `{ content }` |
-| DELETE | `/api/v1/messages/:id` | Yes | — |
+| DELETE | `/api/v1/messages/:id` | Yes | — (soft-delete; clears pin) |
+| POST | `/api/v1/messages/:id/pin` | Yes | `{ pinned }` — pin/unpin (must be participant) |
 | POST | `/api/v1/messages/:id/reactions` | Yes | `{ emoji }` |
 | DELETE | `/api/v1/messages/:id/reactions/:reactionId` | Yes | — |
 
@@ -1477,7 +1504,6 @@ These may be considered after the core communication experience is stable.
 
 - Threads.
 - Per-conversation mutes & quiet hours (beyond the shipped per-category preferences).
-- Pinned messages.
 - Saved messages.
 - Custom emoji.
 - Advanced permissions.

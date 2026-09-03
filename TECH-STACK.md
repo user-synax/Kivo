@@ -96,8 +96,8 @@ Versioned REST APIs under `/api/v1`; the standalone admin API lives under `/api/
 | `/api/v1/auth` | register, login, refresh-token, logout, logout-all, verify-email, resend-verification, forgot/reset-password |
 | `/api/v1/users` | me, profile update/avatar, public profile by username, search, blocked list, block/unblock |
 | `/api/v1/friends` | request, accept/decline, list, remove |
-| `/api/v1/conversations` | DMs/groups CRUD, members/admins, read/unread, messages (list/send) |
-| `/api/v1/messages` | edit, delete, reactions |
+| `/api/v1/conversations` | DMs/groups CRUD, members/admins, read/unread, messages (list/send), pinned list |
+| `/api/v1/messages` | edit, delete, pin/unpin, reactions |
 | `/api/v1/spaces` | spaces CRUD, discover (public only), join, join-by-invite-code, invite manage (GET/POST/DELETE), members/roles, channels |
 | `/api/v1/notifications` | list, unread-count, mark read, preferences |
 | `/api/v1/push` | vapid-public-key, subscribe, unsubscribe |
@@ -118,7 +118,7 @@ MongoDB is the canonical source of truth. Core collections:
 | `User` | email, username, displayName, bio (280), status (60), avatar (URL + Appwrite file id), avatarStyle, banner, **country**, **githubUsername**, **verified / showBadge**, blockedUsers, ban fields, lastActiveAt, email-verification & password-reset token hashes, **notificationPreferences**, **appearance** (`{accent, tint}` hex pair for the theme studio — returned only on self/session shapes, never in other users' profiles/search) |
 | `Session` | Backs each refresh token; `expiresAt` TTL index → deleting/expiring a session revokes it |
 | `Conversation` | `type: dm / group / space_channel`, participants, admins (groups), `spaceId`+`channelId` for channel conversations, `lastMessageAt`; messages are **not** embedded |
-| `Message` | conversationId + senderId, content (4000), type `text/system`, replyToMessageId, reactions (subdocs), deliveredTo, readBy, mentions, **attachments** (embedded), isEdited, isDeleted |
+| `Message` | conversationId + senderId, content (4000), type `text/system`, replyToMessageId, reactions (subdocs), deliveredTo, readBy, mentions, **attachments** (embedded), **forwardedFromId + forwardedFromName** (forward attribution), **pinnedAt + pinnedBy** (pin is a timestamp, not a collection), isEdited, isDeleted |
 | `FriendRequest` | directed `from`/`to` + status (`pending/accepted/declined`); accepted rows are the friendship edge |
 | `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug, **appearance** (`{accent,tint}` per-Space palette; owner/admin-editable via Space settings, read by every member's client to scope the channel view), **visibility** (`public`/`private` — private hidden from Discover, joinable only by invite code), `inviteCode` + `inviteExpiresAt` (single rotating 7-day invite per Space, owner/admin-managed; codes are never included in Space payloads) |
 | `Notification` | recipient/sender, type (`dm_message`, `group_message`, `space_message`, `mention`, `friend_request`, `friend_accept`, `space_invite` reserved), delivery flags |
@@ -127,7 +127,7 @@ MongoDB is the canonical source of truth. Core collections:
 
 Design notes:
 
-- **Messages live in their own collection** (never an unbounded array inside a conversation). Key indexes: `conversationId + createdAt`, `senderId + createdAt`, plus a text index on `content` for search.
+- **Messages live in their own collection** (never an unbounded array inside a conversation). Key indexes: `conversationId + createdAt`, `senderId + createdAt`, `conversationId + pinnedAt` (pinned banner), plus a text index on `content` for search.
 - Conversations/space channels each map 1:1 to a `Conversation` so every channel has its own message thread.
 - Duplicate-DM prevention is enforced in the service layer (a unique index on an array does not behave as a pairwise constraint in MongoDB).
 
@@ -137,7 +137,7 @@ Design notes:
 
 - Socket.IO is the primary realtime layer. All connections authenticate via **JWT handshake**; banned users are rejected at reconnect.
 - On connect, sockets **auto-join** every conversation room (`conversation:<id>`) and space room (`space:<id>`) the user belongs to.
-- Server emits into rooms after DB writes: `message:*`, `conversation:*`, `space:*`, per-user `notification:new`.
+- Server emits into rooms after DB writes: `message:*` (new/edited/deleted/reaction/**pin-updated**), `conversation:*`, `space:*`, per-user `notification:new`.
 - Clients emit `typing:start/stop` (re-broadcast), `conversation:focus/blur` (DM notification suppression), and `message:delivered` (receipt ack).
 - **Presence is in-memory and scoped**: `presence:online/offline` are only fanned out to users who share a conversation or space, with a ~12 s offline grace period to avoid flicker. `presence:snapshot` corrects late joiners.
 - **Reconnect gap-fill:** after a reconnect the client refetches the conversation list and any messages newer than the newest known message (REST `after=`), then merges them into the cache.
@@ -235,6 +235,8 @@ Public browser variables are explicitly prefixed and contain no secrets. `.env.e
 - Redis is future acceleration/state infrastructure, not canonical storage.
 - Appwrite supplements the core backend (storage only today).
 - Notification **sound cues** are client-side only: `lib/sound.js` synthesizes short chimes with the Web Audio API (no audio assets), and per-category + master toggles persist in `localStorage["kivo:sounds"]`. Cues are triggered from live socket events (`message:new` for DM/group/Space/mention, `notification:new` for friend requests) — the server never knows about audio, and the notification center + push remain the server-gated delivery paths.
+- **Forwarding keeps server-side attribution**: `createMessage` accepts a bare `{ forwardedFromId }` (membership of the source conversation checked server-side, no mention resolution) and stamps the copy with the original author's display name; the client renders the "Forwarded from" pill from the payload, never from guesswork.
+- **Pins are message fields, not a collection**: `pinnedAt`/`pinnedBy` on the message itself — toggling is a single update, listing is an indexed query (max 10, newest first), and soft-delete clears the pin for free.
 - Build only features supported by the current PRD; keep the UI fast and polished; reuse design tokens from `frontend/Design.md`.
 - TypeScript is intentionally out of scope for this project.
 
