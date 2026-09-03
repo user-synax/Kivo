@@ -14,6 +14,15 @@ const EASE_SMOOTH_OUT = [0.22, 1, 0.36, 1];
 function validate(fields) {
   const errors = {};
 
+  if (fields.step === "verify") {
+    if (!fields.code.trim()) {
+      errors.code = "Authentication code is required.";
+    } else if (fields.code.trim().length < 4) {
+      errors.code = "That code looks too short.";
+    }
+    return errors;
+  }
+
   if (!fields.identifier.trim()) {
     errors.identifier = "Email or username is required.";
   }
@@ -27,10 +36,15 @@ function validate(fields) {
 export default function LoginPage() {
   const router = useRouter();
   const reduce = useReducedMotion();
+  // Two-step flow: credentials first; if the account has 2FA enabled the server
+  // returns a short-lived ticket and we ask for a TOTP/backup code.
+  const [step, setStep] = useState("credentials"); // "credentials" | "verify"
+  const [ticket, setTicket] = useState("");
   const [formData, setFormData] = useState({
     identifier: "",
     password: "",
   });
+  const [code, setCode] = useState("");
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -50,9 +64,21 @@ export default function LoginPage() {
         },
       };
 
+  function resetToCredentials() {
+    setStep("credentials");
+    setTicket("");
+    setCode("");
+    setErrors({});
+    setServerError("");
+  }
+
   function handleChange(e) {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "code") {
+      setCode(value);
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
     if (errors[name]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -65,7 +91,11 @@ export default function LoginPage() {
 
   function handleBlur(e) {
     const { name, value } = e.target;
-    const fieldErrors = validate({ ...formData, [name]: value });
+    const fields =
+      name === "code"
+        ? { step, code: value }
+        : { step, ...formData, [name]: value };
+    const fieldErrors = validate(fields);
     if (fieldErrors[name]) {
       setErrors((prev) => ({ ...prev, [name]: fieldErrors[name] }));
     }
@@ -73,7 +103,11 @@ export default function LoginPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const fieldErrors = validate(formData);
+    const fieldErrors = validate({
+      step,
+      ...formData,
+      code,
+    });
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       return;
@@ -83,21 +117,58 @@ export default function LoginPage() {
     setServerError("");
 
     try {
-      const res = await fetch("/api/v1/auth/login", {
+      if (step === "credentials") {
+        const res = await fetch("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            identifier: formData.identifier.trim(),
+            password: formData.password,
+          }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          setServerError(
+            data?.error?.message || "Invalid credentials. Please try again.",
+          );
+          return;
+        }
+
+        const body = data.data || data;
+        if (body?.twoFactorRequired) {
+          // Password was correct — prompt for the second factor.
+          setTicket(body.ticket);
+          setStep("verify");
+          setErrors({});
+          return;
+        }
+
+        setSession(body.user, body.accessToken);
+        router.push("/app");
+        return;
+      }
+
+      // Step 2 — verify the TOTP / backup code.
+      const res = await fetch("/api/v1/auth/login/2fa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          identifier: formData.identifier.trim(),
-          password: formData.password,
-        }),
+        body: JSON.stringify({ ticket, code: code.trim() }),
       });
-
       const data = await res.json();
 
       if (!res.ok) {
-        setServerError(
-          data?.error?.message || "Invalid credentials. Please try again.",
-        );
+        const errCode = data?.error?.code;
+        if (errCode === "TWO_FACTOR_TICKET_EXPIRED") {
+          setServerError(
+            "That verification session expired — please log in again.",
+          );
+          resetToCredentials();
+        } else {
+          setServerError(
+            data?.error?.message || "Invalid code. Please try again.",
+          );
+        }
         return;
       }
 
@@ -124,13 +195,15 @@ export default function LoginPage() {
         >
           <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
             <span className="font-sans text-[12px] font-medium uppercase tracking-[0.05em] text-pewter">
-              Welcome
+              {step === "verify" ? "Two-factor authentication" : "Welcome"}
             </span>
             <h1 className="font-goga text-[28px] font-medium leading-tight tracking-tight text-ink-black">
-              Log in to Kivo
+              {step === "verify" ? "Confirm it's you" : "Log in to Kivo"}
             </h1>
             <p className="font-sans text-[14px] leading-relaxed text-pewter">
-              Pick up where your conversations left off.
+              {step === "verify"
+                ? "Enter the 6-digit code from your authenticator app, or one of your backup codes."
+                : "Pick up where your conversations left off."}
             </p>
           </motion.div>
 
@@ -143,41 +216,66 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <motion.div variants={itemVariants}>
-            <AuthInput
-              id="identifier"
-              label="Email or Username"
-              value={formData.identifier}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={errors.identifier}
-              autoComplete="username"
-              required
-            />
-          </motion.div>
+          {step === "credentials" ? (
+            <>
+              <motion.div variants={itemVariants}>
+                <AuthInput
+                  id="identifier"
+                  label="Email or Username"
+                  value={formData.identifier}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  error={errors.identifier}
+                  autoComplete="username"
+                  required
+                />
+              </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <AuthInput
-              id="password"
-              label="Password"
-              value={formData.password}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={errors.password}
-              autoComplete="current-password"
-              required
-              isPassword
-            />
-          </motion.div>
+              <motion.div variants={itemVariants}>
+                <AuthInput
+                  id="password"
+                  label="Password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  error={errors.password}
+                  autoComplete="current-password"
+                  required
+                  isPassword
+                />
+              </motion.div>
 
-          <motion.div variants={itemVariants} className="flex justify-end">
-            <a
-              href="/forgot-password"
-              className="font-sans text-[13px] font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
-            >
-              Forgot password?
-            </a>
-          </motion.div>
+              <motion.div variants={itemVariants} className="flex justify-end">
+                <a
+                  href="/forgot-password"
+                  className="font-sans text-[13px] font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
+                >
+                  Forgot password?
+                </a>
+              </motion.div>
+            </>
+          ) : (
+            <motion.div variants={itemVariants}>
+              <AuthInput
+                id="code"
+                label="Authentication code"
+                value={code}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                error={errors.code}
+                autoComplete="one-time-code"
+                placeholder="123456 or ABCDE-FGHIJ"
+                required
+              />
+              <button
+                type="button"
+                onClick={resetToCredentials}
+                className="mt-3 font-sans text-[13px] font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
+              >
+                ← Back to log in
+              </button>
+            </motion.div>
+          )}
 
           <motion.div variants={itemVariants}>
             <Button
@@ -209,26 +307,30 @@ export default function LoginPage() {
                       className="opacity-75"
                     />
                   </svg>
-                  Logging in…
+                  {step === "verify" ? "Verifying…" : "Logging in…"}
                 </span>
+              ) : step === "verify" ? (
+                "Verify Code"
               ) : (
                 "Log In"
               )}
             </Button>
           </motion.div>
 
-          <motion.p
-            variants={itemVariants}
-            className="text-center font-sans text-[14px] text-pewter"
-          >
-            Don&apos;t have an account?{" "}
-            <a
-              href="/signup"
-              className="font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
+          {step === "credentials" && (
+            <motion.p
+              variants={itemVariants}
+              className="text-center font-sans text-[14px] text-pewter"
             >
-              Sign up
-            </a>
-          </motion.p>
+              Don&apos;t have an account?{" "}
+              <a
+                href="/signup"
+                className="font-medium text-electric-blue transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink-black"
+              >
+                Sign up
+              </a>
+            </motion.p>
+          )}
         </motion.form>
       </AuthCard>
     </GuestGate>

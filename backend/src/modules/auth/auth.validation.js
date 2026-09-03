@@ -28,6 +28,32 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// 2FA code: a 6-digit TOTP code or a "ABCDE-FGHIJ"-style backup code. Kept
+// loose (normalized in the service) so both forms pass through cleanly.
+const twoFactorCode = () =>
+  z
+    .string()
+    .trim()
+    .min(4, "Code is required")
+    .max(32, "Code too long");
+
+export const twoFactorCodeSchema = z.object({
+  code: twoFactorCode(),
+});
+
+export const twoFactorDisableSchema = z.object({
+  code: twoFactorCode(),
+  // Re-authentication: disabling 2FA needs the account password too, so a
+  // stolen session cookie alone cannot silently downgrade security.
+  password: z.string().min(1, "Password is required"),
+});
+
+export const loginTwoFactorSchema = z.object({
+  // Short-lived JWT minted when the password check passed.
+  ticket: z.string().min(1, "Verification session is required"),
+  code: twoFactorCode(),
+});
+
 
 // Convenience parser that throws a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {

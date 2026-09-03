@@ -6,6 +6,9 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  twoFactorCodeSchema,
+  twoFactorDisableSchema,
+  loginTwoFactorSchema,
 } from "./auth.validation.js";
 import * as authService from "./auth.service.js";
 
@@ -62,6 +65,17 @@ export const login = asyncHandler(async (req, res) => {
     deviceInfo: deviceInfoFrom(req),
   });
 
+  // 2FA gate: the password was correct but the account requires a second
+  // factor. No session is issued yet — the client must complete /login/2fa
+  // with the returned one-time ticket.
+  if (result.twoFactorRequired) {
+    res.status(200).json({
+      success: true,
+      data: { twoFactorRequired: true, ticket: result.ticket },
+    });
+    return;
+  }
+
   setRefreshCookie(res, result.refreshToken);
   res.status(200).json({
     success: true,
@@ -99,6 +113,54 @@ export const logoutAll = asyncHandler(async (req, res) => {
 });
 
 
+
+// ── Two-factor authentication (TOTP) ────────────────────────────────────────
+
+export const getTwoFactorStatus = asyncHandler(async (req, res) => {
+  const data = await authService.twoFactorStatus({ userId: req.user.userId });
+  res.status(200).json({ success: true, data });
+});
+
+export const setupTwoFactor = asyncHandler(async (req, res) => {
+  const data = await authService.setupTwoFactor({
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data });
+});
+
+export const enableTwoFactor = asyncHandler(async (req, res) => {
+  const data = parseBody(twoFactorCodeSchema, req.body);
+  const result = await authService.enableTwoFactor({
+    userId: req.user.userId,
+    code: data.code,
+  });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const disableTwoFactor = asyncHandler(async (req, res) => {
+  const data = parseBody(twoFactorDisableSchema, req.body);
+  const result = await authService.disableTwoFactor({
+    userId: req.user.userId,
+    code: data.code,
+    password: data.password,
+  });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const loginWithTwoFactor = asyncHandler(async (req, res) => {
+  const data = parseBody(loginTwoFactorSchema, req.body);
+  const result = await authService.loginWithTwoFactor({
+    ticket: data.ticket,
+    code: data.code,
+    deviceInfo: deviceInfoFrom(req),
+  });
+
+  setRefreshCookie(res, result.refreshToken);
+  res.status(200).json({
+    success: true,
+    data: { user: result.user, accessToken: result.accessToken },
+  });
+});
 
 // ── Email verification ──────────────────────────────────────────────────────
 

@@ -1,10 +1,24 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import QRCode from "qrcode";
 import env, { refreshTtlSeconds } from "../../config/env.js";
 import { unauthorized, conflict, notFound, badRequest } from "../../utils/errors.js";
 import User from "../../models/User.js";
 import Session from "../../models/Session.js";
 import { sendEmail } from "../../lib/email.js";
+import {
+  buildProvisioningUri,
+  canonicalizeCode,
+  generateBackupCodes,
+  generateSecret,
+  verifyTotp,
+} from "../../lib/totp.js";
+
+// ── Two-factor authentication (TOTP) constants ────────────────────────────────
+const TWO_FACTOR_ISSUER = "Kivo"; // shown in authenticator apps
+const TWO_FACTOR_TICKET_TTL = "5m"; // login challenge ticket lifetime
+const TWO_FACTOR_BACKUP_CODE_COUNT = 8;
 
 // ── Token helpers ───────────────────────────────────────────────────────────
 
@@ -195,8 +209,198 @@ export async function loginUser({ identifier, password, deviceInfo }) {
     throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
   }
 
+  // 2FA gate: password verified, but the account requires a second factor
+  // before any session is issued. Return a short-lived one-time ticket that
+  // the client exchanges (with a TOTP/backup code) on POST /api/v1/auth/login/2fa.
+  if (user.twoFactorEnabled) {
+    const ticket = jwt.sign({ type: "twofa", userId: user.id }, env.accessTokenSecret, {
+      expiresIn: TWO_FACTOR_TICKET_TTL,
+    });
+    return { twoFactorRequired: true, ticket };
+  }
+
   const { accessToken, refreshToken } = await issueSession(user.id, deviceInfo);
   return { user: publicUser(user), accessToken, refreshToken };
+}
+
+// ── Two-factor authentication (TOTP) ─────────────────────────────────────────
+
+// Whether 2FA is on for this account (Settings uses this to render state).
+export async function twoFactorStatus({ userId }) {
+  const user = await User.findById(userId).select("twoFactorEnabled").lean();
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  return { enabled: Boolean(user.twoFactorEnabled) };
+}
+
+// Stage 1 of enrollment: mint a fresh secret + provisioning URI (+ QR code) and
+// persist the pending secret. Nothing is enabled until `enableTwoFactor`
+// confirms the user can actually generate codes from it.
+export async function setupTwoFactor({ userId }) {
+  const user = await User.findById(userId).select("email username twoFactorEnabled").lean();
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  if (user.twoFactorEnabled) {
+    throw badRequest(
+      "Two-factor authentication is already enabled. Disable it first to re-enroll.",
+      "TWO_FACTOR_ENABLED"
+    );
+  }
+
+  const secret = generateSecret();
+  const accountName = user.email || user.username || userId;
+  const uri = buildProvisioningUri({ issuer: TWO_FACTOR_ISSUER, accountName, secret });
+
+  // Persist the pending secret so /2fa/enable can verify a code against it.
+  await User.updateOne({ _id: userId }, { $set: { twoFactorSecret: secret } });
+
+  // Render the QR server-side (qrcode) and ship a ready-to-display PNG.
+  const qrDataUrl = await QRCode.toDataURL(uri, {
+    width: 240,
+    margin: 1,
+    errorCorrectionLevel: "M",
+  });
+
+  return { enabled: false, accountName, secret, uri, qrDataUrl };
+}
+
+// Stage 2 of enrollment: confirm the user scanned/typed the secret by asking
+// for a current TOTP code. On success, enable 2FA and generate backup codes
+// (shown exactly once — only bcrypt hashes are stored).
+export async function enableTwoFactor({ userId, code }) {
+  const user = await User.findById(userId).select("+twoFactorSecret twoFactorEnabled");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  if (user.twoFactorEnabled) {
+    throw badRequest(
+      "Two-factor authentication is already enabled. Disable it first to re-enroll.",
+      "TWO_FACTOR_ENABLED"
+    );
+  }
+  if (!user.twoFactorSecret) {
+    throw badRequest(
+      "Start the setup first — there is no pending secret to verify against.",
+      "TWO_FACTOR_SETUP_REQUIRED"
+    );
+  }
+
+  if (!verifyTotp(user.twoFactorSecret, code)) {
+    throw badRequest(
+      "Invalid code. Check the time on your device and try again.",
+      "INVALID_TWO_FACTOR_CODE"
+    );
+  }
+
+  const backupCodes = generateBackupCodes(TWO_FACTOR_BACKUP_CODE_COUNT);
+  const hashedCodes = await Promise.all(
+    backupCodes.map((c) => bcrypt.hash(canonicalizeCode(c), 12))
+  );
+
+  user.twoFactorEnabled = true;
+  user.twoFactorBackupCodes = hashedCodes;
+  await user.save();
+
+  return { enabled: true, backupCodes };
+}
+
+// Turn 2FA off. Requires the account password (so a stolen session alone can't
+// downgrade security) plus a valid TOTP code OR a backup code.
+export async function disableTwoFactor({ userId, code, password }) {
+  const user = await User.findById(userId).select(
+    "+passwordHash +twoFactorSecret +twoFactorBackupCodes twoFactorEnabled"
+  );
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  if (!user.twoFactorEnabled) {
+    throw badRequest("Two-factor authentication is not enabled.", "TWO_FACTOR_NOT_ENABLED");
+  }
+
+  const passwordOk = await user.comparePassword(password);
+  if (!passwordOk) {
+    throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
+  }
+
+  const codeValid = await isCodeValidForUser(user, code);
+  if (!codeValid) {
+    throw badRequest(
+      "Invalid code. Enter a code from your authenticator app or a backup code.",
+      "INVALID_TWO_FACTOR_CODE"
+    );
+  }
+
+  user.twoFactorEnabled = false;
+  user.twoFactorSecret = null;
+  user.twoFactorBackupCodes = [];
+  await user.save();
+  return { enabled: false };
+}
+
+// Second step of login: verify the one-time ticket (minted after the password
+// check) plus a TOTP or backup code, then issue a real session.
+export async function loginWithTwoFactor({ ticket, code, deviceInfo }) {
+  let payload;
+  try {
+    payload = jwt.verify(ticket, env.accessTokenSecret);
+  } catch {
+    throw unauthorized(
+      "This verification session has expired. Please log in again.",
+      "TWO_FACTOR_TICKET_EXPIRED"
+    );
+  }
+  if (payload?.type !== "twofa" || !payload?.userId) {
+    throw unauthorized("Invalid verification session.", "INVALID_TWO_FACTOR_TICKET");
+  }
+
+  const user = await User.findById(payload.userId).select(
+    "+twoFactorSecret +twoFactorBackupCodes twoFactorEnabled"
+  );
+  if (!user || !user.twoFactorEnabled) {
+    throw unauthorized(
+      "Two-factor authentication is not enabled for this account.",
+      "TWO_FACTOR_NOT_ENABLED"
+    );
+  }
+
+  const codeValid = await isCodeValidForUser(user, code, { consumeBackup: true });
+  if (!codeValid) {
+    throw unauthorized(
+      "Invalid code. Check your authenticator app or use a backup code.",
+      "INVALID_TWO_FACTOR_CODE"
+    );
+  }
+
+  const { accessToken, refreshToken } = await issueSession(user.id, deviceInfo);
+  return { user: publicUser(user), accessToken, refreshToken };
+}
+
+// Shared code check used by enable/disable/login: a TOTP code, or one of the
+// bcrypt-hashed single-use backup codes. When `consumeBackup` is true a backup
+// code is removed after a successful match and persisted.
+async function isCodeValidForUser(user, code, { consumeBackup = false } = {}) {
+  if (!user || !code) return false;
+
+  if (user.twoFactorSecret && verifyTotp(user.twoFactorSecret, code)) {
+    return true;
+  }
+
+  const hashes = user.twoFactorBackupCodes || [];
+  if (!hashes.length) return false;
+
+  const canonical = canonicalizeCode(code);
+  let matchedIndex = -1;
+  for (let i = 0; i < hashes.length; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- sequential bcrypt compares
+    const ok = await bcrypt.compare(canonical, hashes[i]);
+    if (ok) {
+      matchedIndex = i;
+      break;
+    }
+  }
+  if (matchedIndex === -1) return false;
+
+  if (consumeBackup) {
+    hashes.splice(matchedIndex, 1);
+    user.twoFactorBackupCodes = hashes;
+    // Best-effort persist — login still succeeds even if this write races.
+    await user.save().catch(() => {});
+  }
+  return true;
 }
 
 // ── Refresh ─────────────────────────────────────────────────────────────────

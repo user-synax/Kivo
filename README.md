@@ -126,12 +126,12 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Offline indicator** — "You are offline" banner, disabled composer when offline
 - **Last online status** — "active … ago" labels for offline users in DMs & profiles
 - **Mark as unread** — context menu on conversations + "New messages" separator in chat
+- **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
 - Animated landing page
 
 ### 🚧 Planned / Not Started
 - Threads · pinned/saved messages
 - Voice / video calls (not wired yet — no backend or frontend)
-- 2FA — second-factor authentication (shown in Settings as "coming soon")
 - Re-sending a verification email automatically at signup (removed with the OTP step)
 
 ---
@@ -467,8 +467,8 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, global search |
-| **Phase 1.5** | Voice & video calls, 2FA, threads |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, public profiles & badges, blocking, global search, 2FA |
+| **Phase 1.5** | Voice & video calls, threads |
 | **Phase 2** | Threads, pinned/saved messages, stronger search, video/audio attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |

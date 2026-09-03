@@ -156,7 +156,7 @@ Redis is **not** currently a dependency. Rate limiting is an **in-memory fixed-w
 
 ### Rate limiting (current)
 
-Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, admin login `5/15min`.
+Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, login-2FA code step `10/5min/IP`, 2FA setup `5/5min`, 2FA code verification `5/60s`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, admin login `5/15min`.
 
 ### Appwrite Storage
 
@@ -181,6 +181,7 @@ Offline notification delivery uses **`web-push` (VAPID)**, not Appwrite Messagin
 
 - **Zod** validates every body, query, and route param server-side. The client is never trusted.
 - **Auth**: short-lived JWT access tokens (15 min) in `Authorization: Bearer`, plus an httpOnly refresh cookie backed by a `Session` document (TTL). Refresh is single-flight and does **not** rotate the cookie (rotation races can strand clients); sessions are revoked by deleting the document (logout, logout-all, password reset, admin ban).
+- **2FA is optional per account**: TOTP per RFC 6238 implemented in-repo (`src/lib/totp.js`, SHA-1/30 s, constant-time compare) — no third-party TOTP runtime. `qrcode` renders the setup secret as a QR. The TOTP secret is stored server-side (verification requires it; it is only persisted as a pending secret until a setup code confirms it) and backup codes are bcrypt-hashed and single-use. Login mints a short-lived one-time JWT ticket (`5m`) that the second step exchanges for a real session only after a valid code; disable additionally requires the account password.
 - **Authorization is resource-based**: membership checks for conversations/spaces/channels, sender checks for edit/delete, rank checks (`owner → admin → moderator → member`) for space moderation, owner-only rules for admin promotion, Space deletion, and last-owner protection.
 - Centralized Express error handling with a consistent envelope:
 ```json

@@ -103,7 +103,8 @@ Kivo
 | **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
 | **Reconnect Gap-Fill** | **Complete** | Conversation list + messages newer than newest-known refetched after socket reconnect |
 | **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
-| Voice / 2FA | **Not started** | No voice/call backend or UI; 2FA planned ("coming soon" in Settings) |
+| **Two-Factor Auth (2FA)** | **Complete** | TOTP via authenticator app (QR setup in Settings), one-time backup codes, two-step login challenge |
+| Voice / Video Calls | **Not started** | No voice/call backend or UI |
 
 ---
 
@@ -1452,7 +1453,6 @@ These may be considered after the core communication experience is stable.
 
 - DM & group voice calls (no backend or frontend yet).
 - Voice channel frontend.
-- 2FA — second-factor authentication.
 - Automatic verification email at signup / in-app resend banner.
 
 ### Phase 2 — Enhanced Messaging

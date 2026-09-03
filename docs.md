@@ -71,7 +71,7 @@ Next.js rewrites proxy `/api/*` and `/socket.io` to the backend (see `BACKEND_UR
 **Log in** (`/login`)
 
 1. Enter your **email or username** and password.
-2. Submit. You go to `/app`.
+2. Submit. If two-factor authentication is enabled on the account, you'll be asked for an authenticator or backup code next (see §21) — then you go to `/app`.
 
 Sessions use a short-lived access token plus an httpOnly refresh cookie. The app refreshes the access token automatically before it expires (single-flight, 60 s before expiry).
 
@@ -688,13 +688,32 @@ The message composer's send button is disabled and grayed out while offline, wit
 
 ---
 
+## 21. Two-factor authentication (2FA)
+
+### Enabling 2FA
+
+- Open **Settings → Security** (bottom of the left sidebar on desktop, the Settings tab on mobile).
+- Click **Enable two-factor authentication** — the app generates a secret and shows a QR code plus a manual entry code.
+- Scan the QR with any authenticator app (Google Authenticator, Authy, 1Password, …) or enter the secret manually, then type the 6-digit code to confirm. Nothing is enabled until this step verifies.
+- Once enabled, Kivo shows **one-time backup codes** — save them somewhere safe. Each code can be used once to sign in if you lose access to your authenticator.
+
+### Signing in with 2FA
+
+- Login is a two-step flow: enter email + password first; if 2FA is enabled the app then asks for a code before any session is created.
+- Enter the 6-digit code from your authenticator app, or one of your backup codes (dashes and spaces are ignored, case doesn't matter). A used backup code is consumed and can't be reused.
+
+### Turning 2FA off
+
+- In **Settings → Security → Turn off two-factor authentication**, confirm with your current authenticator code (or a backup code). Backup codes are invalidated on disable.
+
+---
+
 ## What is not in the product yet
 
 Do not expect these in the current MVP:
 
 - **Threads**, pinned messages, saved messages
 - **Voice / video** — no backend wiring and no call UI
-- **2FA** (two-factor authentication; shown as "coming soon" in Settings)
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
 - Custom user-created themes
 - Private / invite-linked Spaces

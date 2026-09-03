@@ -116,6 +116,18 @@ const userSchema = new mongoose.Schema(
     passwordResetTokenHash: { type: String, default: null, select: false },
     passwordResetExpires: { type: Date, default: null, select: false },
 
+    // Two-factor authentication (TOTP, RFC 6238). The secret must stay
+    // recoverable to compute codes, so it cannot be hashed — it is Base32 and
+    // hidden from every default query (select: false). Backup codes are
+    // stored as bcrypt hashes (one-time use).
+    twoFactorEnabled: { type: Boolean, default: false, index: true },
+    twoFactorSecret: { type: String, default: null, select: false },
+    twoFactorBackupCodes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
+
     // Admin ban fields — the user document is preserved (not deleted) so the
     // email stays locked and re-registration is impossible.
     isBanned: { type: Boolean, default: false, index: true },
