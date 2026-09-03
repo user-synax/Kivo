@@ -3059,31 +3059,6 @@ export function ChatPanel({
                                             >
                                                 <Paperclip className="h-5 w-5" />
                                             </button>
-                                            <button
-                                                ref={micBtnRef}
-                                                type="button"
-                                                aria-label="Hold to record a voice message"
-                                                disabled={
-                                                    !canPost ||
-                                                    Boolean(recording) ||
-                                                    uploadBusy
-                                                }
-                                                onPointerDown={startRecording}
-                                                onPointerMove={
-                                                    moveDuringRecording
-                                                }
-                                                onPointerUp={finishRecording}
-                                                onPointerCancel={
-                                                    cancelRecording
-                                                }
-                                                onContextMenu={(e) =>
-                                                    e.preventDefault()
-                                                }
-                                                className="flex size-9 shrink-0 select-none items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
-                                                style={{ touchAction: "none" }}
-                                            >
-                                                <Mic className="h-5 w-5" />
-                                            </button>
 
                                             <textarea
                                                 ref={textareaRef}
