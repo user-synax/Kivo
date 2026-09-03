@@ -46,7 +46,7 @@ Kivo
     └── Channels (text conversations inside Spaces)
         └── Messages
             └── Attachments (images & documents) ✅
-            └── Threads (future)
+            └── Threads (side-panel replies) ✅
 ```
 
 | Concept | Description | Scope |
@@ -58,7 +58,7 @@ Kivo
 | **Notification** | In-app + web push events (message, friend, space) | ✅ Complete |
 | **Push Subscription** | Per-user VAPID subscription for offline delivery | ✅ Complete |
 | **Attachment** | Image/document file attached to a message | ✅ Complete |
-| **Thread** | Message-level discussion inside a channel | Phase 2 |
+| **Thread** | Message-level side discussion in a dedicated panel | ✅ Complete |
 
 ---
 
@@ -96,7 +96,7 @@ Kivo
 | Mobile UX | **Complete** | Bottom tab bar, responsive panels, safe-area handling |
 | Offline Caching | **Complete** | IndexedDB (`idb-keyval`) cache for conversations, Spaces, friends, requests |
 | File & Image Attachments | **Complete** | Upload images + docs via Appwrite, lightbox, inline preview, download cards |
-| Threads | **Not started** | Phase 2 |
+| Threads | **Complete** | Any message hosts a side conversation: replies carry `threadId`, render in a dedicated panel (desktop drawer / mobile sheet), "N replies" chips under root bubbles, excluded from the main timeline & unread badge; thread replies only notify when @mentioned |
 | Mention Notifications | **Complete** | `@mention` feature shipped |
 | **Global Search (Ctrl+K)** | **Complete** | Unified search: messages, people, spaces; jump-to-message |
 | **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, audit logging |
@@ -271,6 +271,8 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | Remove reaction | `DELETE /api/v1/messages/:id/reactions/:reactionId` | Own reaction only |
 | Pin / unpin message | `POST /api/v1/messages/:id/pin` | Must be participant |
 | List pinned | `GET /api/v1/conversations/:id/pinned` | Must be participant (newest first, max 10) |
+| List threads | `GET /api/v1/conversations/:id/threads` | Must be participant (active threads: root + summary) |
+| Fetch thread replies | `GET /api/v1/conversations/:id/threads/:threadId/messages` | Must be participant (oldest first) |
 | Mark read | `PATCH /api/v1/conversations/:id/read` | Must be participant |
 
 #### 3.4 Message Schema
@@ -280,7 +282,8 @@ Message {
   conversationId: ObjectId (indexed)
   senderId: ObjectId (indexed)
   content: String (max 4000 chars, blanked on soft-delete)
-  replyToMessageId: ObjectId (nullable, future thread support)
+  replyToMessageId: ObjectId (nullable) — inline quote-reply target
+  threadId: ObjectId (nullable) — set when the message is a thread reply; root messages are null
   reactions: [{ userId, emoji, _id }]
   deliveredTo: [ObjectId]
   readBy: [{ userId, readAt }]
@@ -296,7 +299,8 @@ Message {
 ```
 
 **Indexes:**
-- `{ conversationId: 1, createdAt: -1 }` — primary message query
+- `{ conversationId: 1, createdAt: -1 }` — primary message query (main timeline filters `threadId: null`)
+- `{ conversationId: 1, threadId: 1, createdAt: 1 }` — thread panel feed (oldest first)
 - `{ senderId: 1, createdAt: -1 }` — moderation/search
 - `{ conversationId: 1, pinnedAt: -1 }` — pinned banner query
 
@@ -364,6 +368,24 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 - `GET /conversations/:id/pinned` returns pinned messages, newest first, max 10.
 - Pinning emits `message:pin-updated`; soft-deleting a pinned message clears its pin.
 
+### 3.11 Threads (side-panel conversations)
+
+**Model.**
+
+- Any message can be a thread root. A thread reply is a normal `Message` with `threadId` = the root's id (roots have `threadId: null`); replies are **excluded from the main timeline** (`listMessages`, cursor/`after`/`around` pages, search, pinned list, and unread counting all filter `threadId: null`).
+- Threads are **quiet by default**: replies never create category notifications (no `dm_message`/`group_message`/`space_message` pings) and never bump the conversation unread badge. **@mentions inside a thread still notify** (`mention` type, per the mentions preference).
+
+**API.**
+
+- `POST /conversations/:id/messages` with `{ threadId }` (content required; quoting/forwarding is not allowed inside threads) — the root must be a live non-system message in the same conversation and not itself a thread reply, else 400. Any member may reply in a thread, **including non-admins under announcement posts**.
+- `GET /conversations/:id/threads` — active threads (root + `{replyCount, lastReplyAt, participants}`), used for the "N replies" chips.
+- `GET /conversations/:id/threads/:threadId/messages` — root + replies, oldest first (cap 500), for the thread panel.
+- Thread replies can't be pinned, and inline quote-replies can't target a thread reply (both 400). Reactions, copy, forward, edit (own), and delete (own) all work on thread replies.
+
+**Realtime.**
+
+- Thread replies fan out through the same `message:new`/`message:edited`/`message:deleted`/`message:reaction` room events; clients with the thread open append to the panel, everyone else refreshes chip summaries via `GET /threads`.
+
 ---
 
 ### 4. Realtime System (Socket.IO)
@@ -394,6 +416,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | `message:edited` | Server → Room | Message content updated |
 | `message:deleted` | Server → Room | Message soft-deleted |
 | `message:pin-updated` | Server → Room | Message pinned or unpinned |
+| `message:new` (thread replies) | Server → Room | Same event as main messages; payload includes `threadId` so clients route to the thread panel / chip refresh |
 | `message:reaction` | Server → Room | Reaction added or removed |
 | `message:read` | Server → Room | Messages marked as read |
 | `message:unread` | Server → Room | Conversation marked unread (badge + "New messages" separator) |
@@ -530,7 +553,8 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 - Auto-scroll to bottom on new messages.
 - Typing indicator display.
 - Emoji picker (9 categories, 270+ emojis).
-- Message menu (right-click / long-press): quick-react strip, copy, reply, forward, pin, select mode, profile/block; edit & delete on own messages.
+- Message menu (right-click / long-press): quick-react strip, copy, thread, reply, forward, pin, select mode, profile/block; edit & delete on own messages.
+- Threaded replies render in a dedicated side panel with a composer (desktop right drawer / mobile full-screen sheet); "N replies" chips under root messages open it.
 - Message grouping (60-second window).
 - Delivery/read receipts (sent → delivered → read).
 - Retry button for failed messages.
@@ -942,7 +966,9 @@ Refresh token is sent automatically via httpOnly cookie.
 | DELETE | `/api/v1/conversations/:id/admins/:userId` | Group admin | — |
 | GET | `/api/v1/conversations/:id/messages` | Yes | `?cursor=&limit=&around=` |
 | GET | `/api/v1/conversations/:id/pinned` | Yes | Pinned messages, newest first (max 10) |
-| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId?, forwardedFromId? }` (content/attachments or `forwardedFromId` required; forward copies can't add a caption) |
+| GET | `/api/v1/conversations/:id/threads` | Yes | Active threads (root + summary) |
+| GET | `/api/v1/conversations/:id/threads/:threadId/messages` | Yes | Thread panel feed (root + replies, oldest first) |
+| POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, replyToMessageId?, threadId?, forwardedFromId? }` (content/attachments, `threadId`, or `forwardedFromId` required; forward copies can't add a caption, thread replies can't quote/forward) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
 | POST | `/api/v1/conversations/:id/unread` | Yes | `{ messageId? }` — mark unread from a message (or latest others') forward |
 
@@ -1502,7 +1528,6 @@ These may be considered after the core communication experience is stable.
 
 ### Phase 2 — Enhanced Messaging
 
-- Threads.
 - Per-conversation mutes & quiet hours (beyond the shipped per-category preferences).
 - Saved messages.
 - Custom emoji.

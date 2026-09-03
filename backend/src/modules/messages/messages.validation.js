@@ -13,6 +13,7 @@ const attachmentSchema = z.object({
 export const createMessageSchema = z.object({
   content: z.string().trim().max(4000, "Message too long").optional(),
   replyToMessageId: z.string().optional(),
+  threadId: z.string().optional(),
   attachments: z.array(attachmentSchema).max(10).optional(),
   forwardedFromId: z.string().optional(),
 }).refine(

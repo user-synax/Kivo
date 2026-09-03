@@ -7,6 +7,7 @@ import {
   Copy,
   Forward,
   Lock,
+  MessageSquareText,
   MoreVertical,
   Paperclip,
   Pin,
@@ -32,6 +33,7 @@ import { UploadPreview } from "@/components/chat/attachments";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
+import { ThreadPanel } from "@/components/dashboard/thread-panel";
 import { MentionAutocomplete } from "@/components/mentions/mention-autocomplete";
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useSocket } from "@/components/socket-provider";
@@ -232,6 +234,20 @@ function NewMessagesSeparator() {
   );
 }
 
+// Compact "n min/h/d ago" for thread chips under root messages.
+function timeAgoShort(ts) {
+  if (!ts) return "";
+  const diff = Date.now() - new Date(ts).getTime();
+  if (diff < 45_000) return "now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  return "";
+}
+
 // Read-receipt state for the current user's own messages. Group chats don't show
 // per-recipient receipts, so this is effectively DM-only.
 function receiptState(message, userId, otherId) {
@@ -329,6 +345,31 @@ export function ChatPanel({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
+  // Threads: the currently open thread's root message + per-root summaries so
+  // chips under root bubbles show live reply counts/participants.
+  const [threadRoot, setThreadRoot] = useState(null);
+  const [threadSummaries, setThreadSummaries] = useState({});
+
+  const refreshThreadSummaries = async () => {
+    if (!convId) return;
+    try {
+      const data = await apiGet(`/api/v1/conversations/${convId}/threads`);
+      const map = {};
+      for (const t of Array.isArray(data) ? data : []) {
+        if (t?.root?.id && t.summary) map[t.root.id] = t.summary;
+      }
+      setThreadSummaries(map);
+    } catch {
+      /* keep previous summaries on transient failure */
+    }
+  };
+
+  const openThread = (rootMsg) => setThreadRoot(rootMsg);
+  const closeThread = () => {
+    setThreadRoot(null);
+    refreshThreadSummaries();
+  };
+
   const showNotice = (text) => {
     setNotice(text);
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
@@ -337,16 +378,20 @@ export function ChatPanel({
 
   // Reset per-conversation action state and load the pinned banner when the
   // open conversation changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: helper reads convId from closure; convId is the only real trigger.
   useEffect(() => {
     setSelectMode(false);
     setSelectedIds(new Set());
     setForwardOpen(false);
     setPinnedMessages([]);
+    setThreadRoot(null);
+    setThreadSummaries({});
     setNotice(null);
     if (!convId) return undefined;
     apiGet(`/api/v1/conversations/${convId}/pinned`)
       .then((data) => setPinnedMessages(Array.isArray(data) ? data : []))
       .catch(() => setPinnedMessages([]));
+    refreshThreadSummaries();
     return undefined;
   }, [convId]);
 
@@ -362,6 +407,20 @@ export function ChatPanel({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [selectMode]);
+
+  // Close the thread panel with Escape (mirrors select-mode).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: helper is stable per conversation; threadRoot toggling is the trigger.
+  useEffect(() => {
+    if (!threadRoot) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setThreadRoot(null);
+        refreshThreadSummaries();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [threadRoot]);
 
   // Keep queued/sending/failed outbox entries for the open conversation in the
   // message list (survives reloads) and mirror their status flips live.
@@ -943,6 +1002,12 @@ export function ChatPanel({
 
     const onNew = (msg) => {
       if (msg.conversationId !== convId) return;
+      // Thread replies never enter the main timeline — refresh the chips under
+      // root bubbles instead (the open thread panel subscribes separately).
+      if (msg.threadId) {
+        refreshThreadSummaries();
+        return;
+      }
       reconcile(msg);
       // Persist the new message into IDB cache
       if (msg?.id) mergeCachedMessage(convId, msg).catch(() => {});
@@ -1041,8 +1106,14 @@ export function ChatPanel({
       }
     };
 
-    // Wrap reconcile so it also persists the updated message to IDB cache
+    // Wrap reconcile so it also persists the updated message to IDB cache.
+    // Thread replies never touch the main timeline or its cache — they just
+    // refresh the chips under root bubbles (the open panel subscribes itself).
     const reconcileAndCache = (msg) => {
+      if (msg?.threadId) {
+        refreshThreadSummaries();
+        return;
+      }
       reconcile(msg);
       if (convId && msg?.id) {
         mergeCachedMessage(convId, msg).catch(() => {});
@@ -1683,7 +1754,7 @@ export function ChatPanel({
 
   return (
     <div
-      className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] max-md:isolate"
+      className="relative flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] max-md:isolate"
       style={spaceThemeVars}
     >
       {/* Header — keep visible on mobile when keyboard opens (sticky + bg) */}
@@ -2020,6 +2091,11 @@ export function ChatPanel({
                           onShare={
                             !m.isDeleted ? () => handleShareMessage(m) : undefined
                           }
+                          onThread={
+                            realMessage && !m.isDeleted && m.type !== "system"
+                              ? () => openThread(m)
+                              : undefined
+                          }
                           onProfile={
                             !mine && senderUsername
                               ? () => openProfileForSender(m)
@@ -2049,6 +2125,37 @@ export function ChatPanel({
                       </SwipeToReply>
                     </div>
                   </div>
+                  {/* Thread chip lives OUTSIDE the bubble's width-locked row so a
+                      wide chip can never stretch/re-center the bubble. Aligned
+                      to the bubble's edge: under the sender on the left for
+                      others' messages, flush right under your own. */}
+                  {!m.isDeleted && threadSummaries[m.id]?.replyCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openThread(m)}
+                      className={`kivo-focus mt-1 flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--hover)] ${
+                        mine ? "self-end" : "self-start ml-8 sm:ml-9"
+                      }`}
+                    >
+                      <MessageSquareText className="h-3 w-3 shrink-0" aria-hidden />
+                      <span>
+                        {threadSummaries[m.id].replyCount}{" "}
+                        {threadSummaries[m.id].replyCount === 1
+                          ? "reply"
+                          : "replies"}
+                      </span>
+                      {threadSummaries[m.id].participants?.length > 0 && (
+                        <span className="text-[var(--text-muted)]">
+                          · {threadSummaries[m.id].participants.join(", ")}
+                        </span>
+                      )}
+                      {timeAgoShort(threadSummaries[m.id].lastReplyAt) && (
+                        <span className="text-[var(--text-muted)]">
+                          · {timeAgoShort(threadSummaries[m.id].lastReplyAt)}
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </div>
               </React.Fragment>
             );
@@ -2485,6 +2592,19 @@ export function ChatPanel({
         >
           {notice}
         </div>
+      )}
+
+      {/* Thread side panel — desktop drawer / mobile sheet over this chat */}
+      {threadRoot && (
+        <ThreadPanel
+          conversation={conversation}
+          root={threadRoot}
+          onClose={closeThread}
+          onActivity={refreshThreadSummaries}
+          onForward={(m) => openForwardPicker([m])}
+          onOpenProfile={(username) => setProfileUsername(username)}
+          isMobile={isMobile}
+        />
       )}
     </div>
   );

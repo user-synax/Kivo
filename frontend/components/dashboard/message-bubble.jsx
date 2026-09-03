@@ -9,6 +9,7 @@ import {
   FaceGrinning,
   Forward,
   Mail,
+  MessageSquare,
   Pencil,
   Pin,
   PinOff,
@@ -150,6 +151,7 @@ export function MessageBubble({
   isMobile = false,
   // Message-action menu extras (context menu + long-press).
   onCopy,
+  onThread,
   onForward,
   onPinToggle,
   onShare,
@@ -455,6 +457,12 @@ export function MessageBubble({
           <Reply className="h-4 w-4" />
           Reply
         </ContextMenuItem>
+        {onThread && (
+          <ContextMenuItem onSelect={() => onThread?.(message)}>
+            <MessageSquare className="h-4 w-4" />
+            Thread
+          </ContextMenuItem>
+        )}
         <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
           <FaceGrinning className="h-4 w-4" />
           More reactions

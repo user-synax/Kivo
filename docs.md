@@ -191,8 +191,8 @@ Messages appear immediately (optimistic UI). If send fails, use **retry** on tha
 
 Every bubble has a menu — right-click on desktop, **press and hold** on mobile:
 
-- On **other people's messages**: React · **Copy** · **View profile** · **Block** · Reply · **Forward** · **Pin** · Mark as unread · **Select**
-- On **your own messages**: React · **Copy** · **Forward** · **Pin** · Reply · Edit · Delete · **Select**
+- On **other people's messages**: React · **Copy** · **View profile** · **Block** · Reply · **Thread** · **Forward** · **Pin** · Mark as unread · **Select**
+- On **your own messages**: React · **Copy** · **Forward** · **Pin** · **Thread** · Reply · Edit · Delete · **Select**
 - A **quick-reaction strip** of common emoji sits at the top of the menu so long-press → one-tap react works on mobile.
 - **Select** switches the chat into multi-select mode — tick several bubbles, then use the floating bar to **copy**, **forward**, or **delete** (your own) them.
 - **View profile** opens the person's profile; **Block** blocks them (their messages in this chat are then hidden behind the blocked banner).
@@ -246,6 +246,21 @@ You can only forward a message you can already see: membership of the source con
 1. Context menu → **Pin** (or **Unpin**). Any member of the chat can pin.
 2. Pinned messages appear in a **banner under the chat header**, newest first (up to 10).
 3. Unpinning or deleting the message clears it from the banner; changes sync in real time to everyone in the chat.
+
+### Threads (reply in a side panel)
+
+A **thread** is a discussion attached to one message. Replies live in their own panel instead of the main timeline — useful for going deeper on one topic without flooding the chat.
+
+1. Context menu (right-click / long-press) on a message → **Thread**. Your own and others' messages can be threaded, including announcements.
+2. Once a thread has replies, a **"N replies" chip** appears under that message — click it to open the thread.
+3. Reply at the bottom of the thread panel. Everyone in the chat can join, react, copy, forward, and (for their own) delete thread replies.
+4. On wide screens the thread opens as a **right-hand panel**; on mobile it takes over the screen. **Escape** or the **X** closes it.
+
+How threads behave:
+
+- **Quiet by design** — thread replies do **not** appear in the main timeline, do **not** bump the chat's unread badge, and do **not** ring the notification bell. If you're **@mentioned inside a thread**, that still notifies you (bell + push, per your preferences).
+- Deleting a thread reply removes it from the thread; if the last reply is deleted the chip disappears (the message stays threadable).
+- Quote-replies (menu → Reply) still render inline in the chat — that's separate from threads.
 
 ### Mentions (`@username`)
 
@@ -306,7 +321,7 @@ You become the first **admin**.
 
 ### Chat in a group
 
-Open the group in the sidebar (under **Groups**). Messaging works like DMs (reply, react, edit, delete, forward, pin, mentions).
+Open the group in the sidebar (under **Groups**). Messaging works like DMs (reply, react, edit, delete, forward, pin, threads, mentions).
 
 ### Group settings
 
@@ -763,7 +778,7 @@ What does **not** queue: file/photo attachments (uploads need a live connection)
 
 Do not expect these in the current MVP:
 
-- **Threads**, saved messages
+- Saved messages
 - **Voice / video** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
@@ -781,6 +796,7 @@ Do not expect these in the current MVP:
 | Friends: add, accept, decline, list, search, remove | New menu → Friends; Unfriend on profiles |
 | Open DM from a friend | Friends → **Message** |
 | Send / reply / react / edit / delete / copy / forward / pin messages | Chat panel + bubble menu (double-click = ❤️) |
+| Threaded replies (side panel) | Message menu → Thread, or click the "N replies" chip under a message |
 | Emoji in text | Composer smile button (9 categories, 270+) |
 | @mentions | Type `@` in the composer |
 | Typing, presence, read receipts | Automatic while connected |

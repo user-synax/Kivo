@@ -47,8 +47,20 @@ const messageSchema = new mongoose.Schema(
     // non-interactive chip and never bump unread counts.
     type: { type: String, enum: ["text", "system"], default: "text" },
 
-    // Optional reference to the message this one replies to (threaded replies).
+    // Optional reference to the message this one replies to with an inline
+    // quote (rendered flat in the main timeline). Distinct from threads.
     replyToMessageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+
+    // Threading. When set, this message is a reply inside the thread anchored
+    // at the referenced root message and is EXCLUDED from the main timeline
+    // (thread conversations render in the thread side panel instead). Root
+    // messages have threadId === null. Thread replies don't bump unread counts
+    // and only ever produce mention notifications, never category ones.
+    threadId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
       default: null,
@@ -115,6 +127,8 @@ const messageSchema = new mongoose.Schema(
 
 // Most common query: "messages for this conversation, newest last".
 messageSchema.index({ conversationId: 1, createdAt: -1 });
+// Thread replies per root (thread panel feed), oldest first.
+messageSchema.index({ conversationId: 1, threadId: 1, createdAt: 1 });
 // Pinned messages per conversation (banner feed), newest pin first.
 messageSchema.index({ conversationId: 1, pinnedAt: -1 });
 // Secondary: "messages sent by a user" (e.g. for moderation/search later).

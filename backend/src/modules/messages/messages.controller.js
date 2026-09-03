@@ -25,16 +25,34 @@ export const listMessages = asyncHandler(async (req, res) => {
 });
 
 export const createMessage = asyncHandler(async (req, res) => {
-  const { content, replyToMessageId, attachments, forwardedFromId } = parseBody(createMessageSchema, req.body);
+  const { content, replyToMessageId, threadId, attachments, forwardedFromId } = parseBody(createMessageSchema, req.body);
   const message = await messagesService.createMessage({
     conversationId: req.params.id,
     userId: req.user.userId,
     content,
     replyToMessageId,
+    threadId,
     attachments,
     forwardedFromId,
   });
   res.status(201).json({ success: true, data: message });
+});
+
+export const listThreads = asyncHandler(async (req, res) => {
+  const threads = await messagesService.listThreads({
+    conversationId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: threads });
+});
+
+export const listThreadMessages = asyncHandler(async (req, res) => {
+  const result = await messagesService.listThreadMessages({
+    conversationId: req.params.id,
+    threadId: req.params.threadId,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: result });
 });
 
 export const listPinned = asyncHandler(async (req, res) => {

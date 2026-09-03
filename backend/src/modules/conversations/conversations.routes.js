@@ -24,6 +24,8 @@ router.get("/", conversationsController.listConversations);
 
 // Conversation-scoped message endpoints live under the conversation id.
 router.get("/:id/messages", messagesController.listMessages);
+router.get("/:id/threads", messagesController.listThreads);
+router.get("/:id/threads/:threadId/messages", messagesController.listThreadMessages);
 router.get("/:id/pinned", messagesController.listPinned);
 router.post("/:id/messages", messageSendLimiter, messagesController.createMessage);
 router.patch("/:id/read", messagesController.markRead);

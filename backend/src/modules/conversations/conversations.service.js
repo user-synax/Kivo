@@ -191,6 +191,7 @@ export async function listConversations({ userId }) {
       conversationId: c._id,
       senderId: { $ne: uid },
       type: { $ne: "system" },
+      threadId: null, // thread replies never bump the main unread badge
       isDeleted: false,
       readBy: { $not: { $elemMatch: { userId: uid } } },
     });

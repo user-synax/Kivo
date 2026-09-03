@@ -17,6 +17,7 @@ export function publicMessage(message) {
     type: obj.type || "text",
     content: obj.isDeleted ? "" : obj.content,
     replyToMessageId: obj.replyToMessageId ? obj.replyToMessageId.toString() : null,
+    threadId: obj.threadId ? obj.threadId.toString() : null,
     reactions: (obj.reactions || []).map((r) => ({
       id: r._id.toString(),
       userId: r.userId.toString(),
@@ -101,6 +102,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     }
     const docs = await Message.find({
       conversationId,
+      threadId: null,
       createdAt: { $gt: anchorMsg.createdAt },
     })
       .sort({ createdAt: 1 })
@@ -126,6 +128,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
       // Messages created AFTER (newer than) the anchor, for context below it
       Message.find({
         conversationId,
+        threadId: null,
         createdAt: { $gt: anchorMsg.createdAt },
       })
         .sort({ createdAt: 1 })
@@ -134,6 +137,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
       // Messages created BEFORE (older than) the anchor, for context above it
       Message.find({
         conversationId,
+        threadId: null,
         createdAt: { $lt: anchorMsg.createdAt },
       })
         .sort({ createdAt: -1 })
@@ -149,7 +153,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     return { messages, nextCursor: null, anchorId: around };
   }
 
-  const filter = { conversationId };
+  const filter = { conversationId, threadId: null };
   if (cursor) {
     if (!mongoose.Types.ObjectId.isValid(cursor)) {
       throw badRequest("Invalid cursor", "INVALID_CURSOR");
@@ -204,14 +208,17 @@ export async function createMessage({
   userId,
   content,
   replyToMessageId,
+  threadId,
   attachments,
   forwardedFromId,
 }) {
   const conversation = await assertMembership(conversationId, userId);
   await assertDmNotBlocked(conversation, userId);
 
-  // Announcement channels: only owner/admin can send
-  if (conversation.type === "space_channel" && conversation.spaceId && conversation.channelId) {
+  // Announcement channels: only owner/admin can post in the channel itself,
+  // but ANY member can reply inside a thread under an announcement.
+  const inThread = Boolean(threadId);
+  if (conversation.type === "space_channel" && conversation.spaceId && conversation.channelId && !inThread) {
     const space = await Space.findById(conversation.spaceId).select("members channels");
     if (space) {
       const ch = space.channels.id(conversation.channelId);
@@ -228,9 +235,35 @@ export async function createMessage({
     if (!mongoose.Types.ObjectId.isValid(replyToMessageId)) {
       throw badRequest("Invalid replyToMessageId", "INVALID_REPLY");
     }
-    const replyTo = await Message.findById(replyToMessageId).select("conversationId");
+    const replyTo = await Message.findById(replyToMessageId).select("conversationId threadId");
     if (!replyTo || replyTo.conversationId.toString() !== conversationId) {
       throw badRequest("Reply target is not in this conversation", "INVALID_REPLY");
+    }
+    if (replyTo.threadId) {
+      throw badRequest("Can't quote a thread reply in the main timeline", "THREAD_REPLY");
+    }
+  }
+
+  // Thread reply: threadId must point at a live root message in THIS
+  // conversation — the root is a normal (non-thread, non-system) message.
+  if (inThread) {
+    if (replyToMessageId || forwardedFromId) {
+      throw badRequest("Thread replies can't also quote or forward", "INVALID_THREAD_REPLY");
+    }
+    if (!mongoose.Types.ObjectId.isValid(threadId)) {
+      throw badRequest("Invalid threadId", "INVALID_THREAD");
+    }
+    const root = await Message.findById(threadId).select(
+      "conversationId threadId type isDeleted",
+    );
+    if (
+      !root ||
+      root.conversationId.toString() !== conversationId ||
+      root.threadId ||
+      root.type !== "text" ||
+      root.isDeleted
+    ) {
+      throw badRequest("Thread root not found in this conversation", "INVALID_THREAD");
     }
   }
 
@@ -281,6 +314,7 @@ export async function createMessage({
     senderId: userId,
     content: finalContent,
     replyToMessageId: replyToMessageId || null,
+    threadId: inThread ? threadId : null,
     mentions,
     attachments: finalAttachments,
     forwardedFromId: forwardedFromId || null,
@@ -295,7 +329,7 @@ export async function createMessage({
 
   // In-app notifications: fan out per recipient (Phase 1 only, no push).
   try {
-    await notificationsService.createForMessage({ message, conversation });
+    await notificationsService.createForMessage({ message, conversation, inThread });
   } catch (err) {
     console.error("[notifications] createForMessage failed:", err?.message || err);
   }
@@ -361,6 +395,9 @@ export async function pinMessage({ messageId, userId, pinned }) {
   if (!message || message.isDeleted) {
     throw notFound("Message not found", "MESSAGE_NOT_FOUND");
   }
+  if (message.threadId) {
+    throw badRequest("Thread replies can't be pinned", "THREAD_REPLY");
+  }
   await assertMembership(message.conversationId.toString(), userId);
 
   message.pinnedAt = pinned ? new Date() : null;
@@ -383,6 +420,7 @@ export async function listPinned({ conversationId, userId }) {
   await assertMembership(conversationId, userId);
   const docs = await Message.find({
     conversationId,
+    threadId: null,
     pinnedAt: { $ne: null },
     isDeleted: false,
   })
@@ -390,6 +428,135 @@ export async function listPinned({ conversationId, userId }) {
     .limit(10)
     .lean();
   return docs.map((m) => publicMessage(m));
+}
+
+// Every active thread in a conversation: root message + a small summary
+// (reply count, last reply time, participants) so the main timeline can render
+// "n replies" chips under roots. Roots with no replies yet have no thread row.
+export async function listThreads({ conversationId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw badRequest("Invalid conversation id", "INVALID_ID");
+  }
+  await assertMembership(conversationId, userId);
+  const cid = new mongoose.Types.ObjectId(conversationId);
+
+  const threadIds = await Message.distinct("threadId", {
+    conversationId: cid,
+    threadId: { $ne: null },
+  });
+  if (!threadIds.length) return [];
+
+  const roots = await Message.find({ _id: { $in: threadIds }, isDeleted: false })
+    .sort({ createdAt: -1 })
+    .lean();
+  const rootIds = roots.map((r) => r._id);
+  if (!rootIds.length) return [];
+
+  const [counts, senders] = await Promise.all([
+    Message.aggregate([
+      {
+        $match: {
+          conversationId: cid,
+          threadId: { $in: rootIds },
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: "$threadId",
+          replyCount: { $sum: 1 },
+          lastReplyAt: { $max: "$createdAt" },
+        },
+      },
+    ]),
+    // Most recent senders per thread (for participant chips), oldest-to-newest
+    // so the push order mirrors activity.
+    Message.aggregate([
+      {
+        $match: {
+          conversationId: cid,
+          threadId: { $in: rootIds },
+          isDeleted: false,
+        },
+      },
+      { $sort: { createdAt: 1 } },
+      { $group: { _id: "$threadId", senderIds: { $push: "$senderId" } } },
+    ]),
+  ]);
+
+  // Resolve participant display names in one round trip.
+  const allSenderIds = [
+    ...new Set(senders.flatMap((s) => (s.senderIds || []).map((id) => id.toString()))),
+  ];
+  const users = allSenderIds.length
+    ? await User.find({ _id: { $in: allSenderIds } })
+        .select("displayName username")
+        .lean()
+    : [];
+  const nameById = new Map(users.map((u) => [u._id.toString(), u.displayName || u.username]));
+
+  const countById = new Map(counts.map((c) => [c._id.toString(), c]));
+  const sendersById = new Map(senders.map((s) => [s._id.toString(), s.senderIds]));
+
+  return roots.map((root) => {
+    const count = countById.get(root._id.toString()) || { replyCount: 0, lastReplyAt: null };
+    const seen = new Set();
+    const participantNames = [];
+    for (const sid of sendersById.get(root._id.toString()) || []) {
+      const key = sid.toString();
+      if (!seen.has(key)) {
+        seen.add(key);
+        participantNames.push(nameById.get(key) || "Someone");
+      }
+      if (participantNames.length >= 3) break;
+    }
+    return {
+      root: publicMessage(root),
+      summary: {
+        replyCount: count.replyCount,
+        lastReplyAt: count.lastReplyAt || null,
+        participants: participantNames,
+      },
+    };
+  })
+    // A thread whose replies were all deleted is empty again — no chip to show.
+    .filter((t) => t.summary.replyCount > 0);
+}
+
+// Full thread conversation for the side panel: the root message plus all of its
+// replies, oldest first. The root itself is returned so the panel header can
+// render without an extra fetch.
+export async function listThreadMessages({ conversationId, threadId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw badRequest("Invalid conversation id", "INVALID_ID");
+  }
+  if (!mongoose.Types.ObjectId.isValid(threadId)) {
+    throw badRequest("Invalid thread id", "INVALID_THREAD");
+  }
+  await assertMembership(conversationId, userId);
+
+  const root = await Message.findById(threadId).select(
+    "conversationId threadId type isDeleted",
+  );
+  if (
+    !root ||
+    root.conversationId.toString() !== conversationId ||
+    root.threadId ||
+    root.type !== "text"
+  ) {
+    throw badRequest("Thread root not found in this conversation", "INVALID_THREAD");
+  }
+
+  const rootDoc = await Message.findById(threadId).lean();
+  const replies = await Message.find({ conversationId, threadId })
+    .sort({ createdAt: 1 })
+    .limit(500)
+    .lean();
+  return {
+    root: publicMessage(rootDoc),
+    messages: replies.map((m) => publicMessage(m)),
+    hasMore: replies.length === 500,
+  };
 }
 
 // Toggle a reaction: if the user already reacted with the same emoji, remove it;
@@ -500,6 +667,7 @@ export async function markUnread({ conversationId, userId, messageId }) {
     // No anchor: use the newest message from others as the unread point
     anchor = await Message.findOne({
       conversationId: cid,
+      threadId: null,
       senderId: { $ne: uid },
       type: { $ne: "system" },
       isDeleted: false,

@@ -142,7 +142,7 @@ async function sendWebPushToUser(recipientId, pushPayload, doc) {
  * Preference gate: resolves category and suppresses entirely if category OFF,
  * unless recipient is @mentioned (mentions override muted category, respects mentions pref).
  */
-export async function createForMessage({ message, conversation }) {
+export async function createForMessage({ message, conversation, inThread = false }) {
   // Skip system messages
   if (message.type === "system") return [];
 
@@ -193,6 +193,10 @@ export async function createForMessage({ message, conversation }) {
     if (!mongoose.Types.ObjectId.isValid(recipientId)) continue;
 
     const isMentioned = mentions.includes(recipientId);
+    // Thread replies never create category-level notifications — they don't
+    // bump unread, so a category ping would point at an empty main timeline.
+    // Mentions inside a thread still notify (that's the only thread ping).
+    if (inThread && !isMentioned) continue;
     const recipientNotifType = isMentioned ? "mention" : notifType;
 
     // --- Preference gate (single shared point, before dispatch) ---

@@ -303,8 +303,8 @@ export function DocsScreen() {
               <p>
                 Right-click a bubble on desktop, or press and hold on mobile, to
                 open the menu: quick reactions, Copy, View profile / Block
-                (others’ messages), Reply, Forward, Pin, Select, and Mark as
-                unread. Your own messages add Edit and Delete.
+                (others’ messages), Reply, Thread, Forward, Pin, Select, and
+                Mark as unread. Your own messages add Edit and Delete.
               </p>
               <h3 className="doc-h3">React, edit, delete</h3>
               <ul className="mt-3 flex flex-col gap-2">
@@ -340,6 +340,17 @@ export function DocsScreen() {
                 Any member can Pin a message. Pinned messages appear in a
                 banner under the chat header, newest first. Unpin the message,
                 or delete it, to clear it from the banner.
+              </p>
+              <h3 className="doc-h3">Threads</h3>
+              <p>
+                A thread is a discussion attached to one message. Choose
+                Thread from the message menu (anyone can start one, even under
+                an announcement), or click the “N replies” chip under a message
+                to reopen it. Replies appear in a side panel — right-hand
+                drawer on desktop, full screen on mobile — and stay out of the
+                main timeline: they don’t add to the chat’s unread badge and
+                don’t ring the bell, unless someone @mentions you inside the
+                thread.
               </p>
               <h3 className="doc-h3">Select mode</h3>
               <p>
@@ -647,7 +658,7 @@ export function DocsScreen() {
                 kivo.usersynax.dev yet:
               </p>
               <ul className="mt-4 flex flex-col gap-2">
-                <Bullet>Threads and saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
+                <Bullet>Saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
                 </Bullet>
                 <Bullet>Sharing palettes as saved theme templates</Bullet>
 

@@ -58,6 +58,7 @@ async function searchMessages(userId, query, limit) {
     content: regex,
     isDeleted: false,
     type: "text",
+    threadId: null, // thread replies aren't in the main timeline to jump to
   })
     .sort({ createdAt: -1 })
     .limit(limit)
