@@ -34,7 +34,7 @@
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status, bio, banner, avatar uploads & frames, **country flag**, and **GitHub contribution graph** on a public profile page (`/u/username`).
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
-- 🚫 **Blocking** — block/unblock another user from any DM or profile; blocked chats are hidden and friendships are removed.
+- 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
 - 🤝 **Complete friends system** — send, accept, decline, **remove**, search, and jump straight into a DM.
 - 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Settings / Profile) and an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
 - 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
@@ -105,7 +105,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - User profiles (name, username, bio, custom status, banner, country, GitHub username, avatar upload & frames)
 - **Public profile pages** (`/u/:username`) with verified badge, country flag, and GitHub contribution graph
 - **Verification badges** (admin-granted `verified`, visibility toggled by the user in Settings)
-- **Blocking** (block/unblock from DMs or profiles; blocked relationships respected server-side)
+- **Blocking** (block from DMs/profiles; **Blocked users manager in Settings** — list + one-tap unblock; relationships respected server-side)
 - Friends system (request / accept / decline / list / search / **remove**)
 - DM conversations (create, list, history, unread counts)
 - Text messaging (send, **reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, receipts)

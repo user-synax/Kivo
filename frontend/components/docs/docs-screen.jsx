@@ -265,6 +265,8 @@ export function DocsScreen() {
                 On the Friends tab, click Message. That opens an existing DM or
                 creates one. To remove a friend, open their profile and choose
                 Unfriend — or Block them entirely from any DM or profile.
+                Everyone you've blocked is listed under Settings → Blocked
+                users, where you can unblock them in one tap.
               </p>
             </Section>
 

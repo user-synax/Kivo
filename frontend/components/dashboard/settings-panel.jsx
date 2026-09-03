@@ -7,16 +7,19 @@ import {
   EyeOff,
   Loader2,
   Palette,
+  ShieldBan,
   Trash2,
   Undo2,
+  UserCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { Switch } from "@/components/ui/switch";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
-import { apiGet, apiPatch } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import { ACCENT_PRESETS, TINT_PRESETS } from "@/lib/theme";
+import { Avatar } from "./avatar";
 import { TwoFactorSection } from "./two-factor-section";
 
 function SectionCard({ icon: Icon, title, description, children }) {
@@ -523,6 +526,116 @@ function BadgeSection() {
   );
 }
 
+// Blocked-users management: who you've blocked, with one-tap unblock. Lives in
+// Settings because that's the one place in /app you can reach regardless of
+// whether the blocked person still has a conversation open with you.
+function BlockedUsersSection() {
+  const [blocked, setBlocked] = useState(null); // null = loading
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    apiGet("/api/v1/users/blocked")
+      .then((data) => {
+        if (active) setBlocked(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (active) {
+          setBlocked([]);
+          setError(err?.message || "Could not load blocked users");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleUnblock = async (user) => {
+    if (!user?.id || busyId) return;
+    setBusyId(user.id);
+    setError(null);
+    try {
+      await apiPost(`/api/v1/users/${user.id}/unblock`, {});
+      // The server also emits conversation:updated to any open DM, so a
+      // chat panel with this person re-enables itself on its own.
+      setBlocked((prev) => prev.filter((u) => u.id !== user.id));
+    } catch (err) {
+      setError(err?.message || "Could not unblock user");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <SectionCard
+      icon={ShieldBan}
+      title="Blocked users"
+      description="Blocked people can't DM you, see your presence, or message you in shared spaces. Unblock to reconnect."
+    >
+      {blocked === null ? (
+        <div className="space-y-2">
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="flex h-14 animate-pulse items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3"
+            />
+          ))}
+        </div>
+      ) : blocked.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center">
+          <p className="text-[12px] text-[var(--text-muted)]">
+            Nobody is blocked right now. When you block someone they'll appear
+            here so you can manage it later.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {blocked.map((u) => (
+            <div
+              key={u.id}
+              className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5"
+            >
+              <Avatar
+                name={u.displayName || u.username || "?"}
+                avatarStyle={u.avatarStyle}
+                url={u.avatarUrl}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
+                  {u.displayName || u.username}
+                </p>
+                {u.username && (
+                  <p className="truncate text-[11px] text-[var(--text-muted)]">
+                    @{u.username}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUnblock(u)}
+                disabled={busyId === u.id}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+              >
+                {busyId === u.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <UserCheck className="h-3.5 w-3.5" />
+                )}
+                Unblock
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && (
+        <p className="mt-2 text-[12px] text-[var(--destructive)]">{error}</p>
+      )}
+    </SectionCard>
+  );
+}
+
 export function SettingsPanel() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -531,6 +644,7 @@ export function SettingsPanel() {
           <BadgeSection />
           <ThemeSection />
           <TwoFactorSection />
+          <BlockedUsersSection />
           <NotificationsSection />
         </div>
       </div>

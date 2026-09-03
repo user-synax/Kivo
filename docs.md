@@ -167,7 +167,9 @@ Click the conversation. On mobile, that replaces the list with the chat panel.
 
 ### Blocking a person
 
-From the chat header / right-hand profile panel (or any profile page) choose **Block**. Blocking removes the friendship and hides the conversation; the person cannot message you. You can **Unblock** later from the same places. A blocked conversation shows a clear state instead of the composer.
+From the chat header / right-hand profile panel (or any profile page) choose **Block**. Blocking removes the friendship and hides the conversation; the person cannot message you. A blocked conversation shows a clear state instead of the composer.
+
+**Manage who you've blocked:** open **Settings → Blocked users**. Every person you've blocked is listed with their name and avatar; **Unblock** removes them (and re-enables any open DM with them immediately). Unblocking is also possible from the same chat/profile places as blocking.
 
 ---
 
@@ -753,7 +755,7 @@ Do not expect these in the current MVP:
 | Spaces, channels, roles, Discover | Spaces panel + Discover + Space settings |
 | Profile, avatar, frame, banner, bio, status, country, GitHub | Icon-rail avatar / Profile tab |
 | Public profile & verified badge | `/u/:username` (badge toggle in Settings) |
-| Block / unblock users | DM header, profile drawer, public profile |
+| Block users + manage the list | DM header, profile drawer, public profile, Settings → Blocked users |
 | Ten themes + custom accent/canvas (theme studio) | Settings → Appearance → Save to my account |
 | Notification preferences | Settings → Notification preferences |
 | In-app notifications | Bell in panel header |

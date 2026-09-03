@@ -100,7 +100,7 @@ Kivo
 | **Last Online Status** | **Complete** | "active … ago" labels for offline users (DMs + profiles) |
 | **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
 | **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
-| **Blocking** | **Complete** | Block/unblock from DMs & profiles; server-enforced, friendships removed |
+| **Blocking** | **Complete** | Block from DMs & profiles; **Blocked users manager** (Settings list + one-tap unblock); server-enforced, friendships removed |
 | **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
 | **Reconnect Gap-Fill** | **Complete** | Conversation list + messages newer than newest-known refetched after socket reconnect |
 | **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
