@@ -531,7 +531,7 @@ Kivo is installable:
 - **Android:** Add to Home Screen / Install app.
 - **iOS Safari:** Share → **Add to Home Screen**.
 
-It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push and notification clicks. Kivo caches your conversation, Space, friend, friend-request lists, and the **latest 50 messages per chat** in IndexedDB so they paint instantly on reload — but there is **no full offline history** yet (you still need the network to send/receive messages and load older pages).
+It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push and notification clicks. Kivo caches your conversation, Space, friend, friend-request lists, and the **latest 50 messages per chat** in IndexedDB so they paint instantly on reload — and **text you send while offline is queued** and delivered when you're back (see §20). Full offline history of *older* pages is still not available — those need the network.
 
 ---
 
@@ -693,7 +693,13 @@ A small **"You are offline"** banner appears in the sidebar when both signals in
 - `navigator.onLine` (browser online/offline events)
 - Socket.IO connection state
 
-The message composer's send button is disabled and grayed out while offline, with a subtle note that network is required.
+### Queued sends (outbox)
+
+While offline the composer stays usable for **text messages**: hitting send stores the message in a per-account **outbox** (IndexedDB) and shows it as a bubble with a clock note — *"queued · will send when online"*. The bubble survives a page reload, because the queue is durable.
+
+When a connection comes back the app **flushes the outbox automatically** (on socket reconnect, the browser `online` event, or a slow retry timer), oldest message first, in the order you wrote them. Each success swaps the queued bubble for the real message; failures stay visible with a **failed · retry** affordance.
+
+What does **not** queue: file/photo attachments (uploads need a live connection) — the app shows a notice instead of sending. There is still **no full offline message history** (older pages need the network), but everything you write while offline is never lost.
 
 ---
 

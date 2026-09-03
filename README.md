@@ -40,7 +40,7 @@
 - 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
 - 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation, and audit logging.
-- 📴 **Offline indicator** — "You are offline" banner when both browser and socket signals indicate disconnection.
+- 📴 **Offline indicator & send queue** — "You are offline" banner when both signals drop, and a durable outbox that queues your text messages offline, survives reloads, and delivers them automatically when you're back.
 - 📧 **Transactional email** — forgot/reset password emails work end-to-end via Gmail SMTP; a link-based email-verification flow exists (`/verify-email`, resend API).
 - 🕒 **Last online status** — "active X min/hour ago" instead of a bare offline state.
 - 📬 **Mark as unread** — right-click any conversation and re-mark it unread; a "New messages" separator shows where unread hits start.
@@ -124,7 +124,8 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
 - **Admin panel** — standalone dashboard with user/group/space management, ban/unban, audit logging
-- **Offline indicator** — "You are offline" banner, disabled composer when offline
+- **Offline indicator** — "You are offline" banner + composer keeps working for text
+- **Offline send queue** — text sent while offline goes to a durable per-account outbox (survives reloads) and flushes automatically on reconnect/online; attachments still need a connection
 - **Last online status** — "active … ago" labels for offline users in DMs & profiles
 - **Mark as unread** — context menu on conversations + "New messages" separator in chat
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge

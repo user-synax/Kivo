@@ -96,7 +96,7 @@ Kivo
 | Mention Notifications | **Complete** | `@mention` feature shipped |
 | **Global Search (Ctrl+K)** | **Complete** | Unified search: messages, people, spaces; jump-to-message |
 | **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, audit logging |
-| **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, disabled composer |
+| **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, durable send queue (outbox) that flushes queued text on reconnect |
 | **Last Online Status** | **Complete** | "active … ago" labels for offline users (DMs + profiles) |
 | **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
 | **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
@@ -812,10 +812,18 @@ Response: `{ attachments: [{ fileId, bucketId, fileName, mimeType, size, kind, u
 
 - Derives `isOffline` from two signals: `navigator.onLine` (browser events) + Socket.IO connection state.
 - User is offline only when **both** signals indicate disconnection (avoids flicker during brief reconnects).
-- Shows a persistent "You are offline" banner in the sidebar.
-- Message composer send button is disabled and grayed out with a subtle note.
+- Shows a persistent "You are offline" banner in the sidebar; the composer stays usable and notes that text will queue.
 
-#### 11.3 Anchor-Based Message Fetch
+#### 11.3 Offline Send Queue (Outbox)
+
+- Composer remains enabled offline for **text messages**; attachments are rejected with an inline notice (uploads need a connection).
+- Sending offline (or a failed online send) enqueues `{ tempId, conversationId, content, replyToMessageId, createdAt }` into a durable per-user outbox — `outbox:<userId>` in the same IndexedDB store (lib/outbox.js, persistence in lib/cache.js).
+- The optimistic bubble carries `status: queued` and survives reloads (chat-panel rehydrates pending entries for the open conversation from the store).
+- **Flusher** (`components/outbox/outbox-flusher.jsx`, mounted in the /app layout): pushes pending entries oldest-first via the existing REST create endpoint whenever a connection returns — socket reconnect (`reconnectNonce`), browser `online`, hydration after reload, and a 20 s retry timer while anything is pending.
+- On success the entry is marked `sent` with the real server message for one render tick (chat-panel swaps the optimistic bubble and caches the message), then removed. Socket echoes / reconnect gap-fill remain the fallback reconcile paths (their matchers accept `queued` status).
+- Failed entries stay marked `failed` with a per-bubble **retry**; duplicate-send risk is limited to an ambiguous timeout-then-retry (same semantics as the pre-queue manual retry).
+
+#### 11.4 Anchor-Based Message Fetch
 
 - Extended `GET /api/v1/conversations/:id/messages` with `around=<messageId>` query param.
 - Returns a centered page of messages (half older, half newer) around the target.

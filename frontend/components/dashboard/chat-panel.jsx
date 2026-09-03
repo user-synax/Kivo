@@ -1,31 +1,58 @@
 "use client";
 
-import { Ban, Lock, MoreVertical, Reply, Send, ShieldBan, ChevronLeft, Smile, UserMinus, Users, User, X, Paperclip } from "lucide-react";
+import {
+  Ban,
+  ChevronLeft,
+  Lock,
+  MoreVertical,
+  Paperclip,
+  Reply,
+  Send,
+  ShieldBan,
+  Smile,
+  User,
+  UserMinus,
+  Users,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { UploadPreview } from "@/components/chat/attachments";
 import { Avatar } from "@/components/dashboard/avatar";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { MentionAutocomplete } from "@/components/mentions/mention-autocomplete";
+import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useSocket } from "@/components/socket-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import {
+  getCachedMessages,
+  mergeCachedMessage,
+  setCachedMessages,
+} from "@/lib/cache";
 import {
   otherParticipant,
   participantAvatarName,
   participantName,
 } from "@/lib/chat";
+import { useLiveLastActive } from "@/lib/last-active";
 import {
-  getCachedMessages,
-  setCachedMessages,
-  mergeCachedMessage,
-} from "@/lib/cache";
-
-import { ProfileDrawer } from "@/components/profile/profile-drawer";
+  enqueueOutbox,
+  getOutboxSnapshot,
+  getPendingOutbox,
+  removeOutbox,
+  setOutboxStatus,
+  subscribeOutbox,
+} from "@/lib/outbox";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { useFileUpload } from "@/lib/use-file-upload";
-import { UploadPreview, AttachmentBubble } from "@/components/chat/attachments";
-import { useLiveLastActive } from "@/lib/last-active";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -183,7 +210,11 @@ function SystemNotice({ content }) {
 
 function NewMessagesSeparator() {
   return (
-    <div className="my-4 flex items-center gap-3" role="separator" aria-label="New messages">
+    <div
+      className="my-4 flex items-center gap-3"
+      role="separator"
+      aria-label="New messages"
+    >
       <div className="h-px flex-1 bg-[var(--border)]" />
       <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--accent)]">
         New messages
@@ -205,7 +236,16 @@ function receiptState(message, userId, otherId) {
   return "sent";
 }
 
-export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, onConversationUpdate, isOffline, highlightMessageId, onHighlightCleared }) {
+export function ChatPanel({
+  conversation,
+  space,
+  onBack,
+  onOpenGroupSettings,
+  onConversationUpdate,
+  isOffline,
+  highlightMessageId,
+  onHighlightCleared,
+}) {
   const { socket, reconnectNonce } = useSocket();
   const currentUser = getSession();
   const userId = currentUser?.id;
@@ -213,11 +253,17 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   const convId = conversation?.id || null;
   const isGroup = conversation?.type === "group";
   const isChannel = conversation?.type === "space_channel";
-  const channelMeta = isChannel && space ? space.channels?.find((c) => c.id === conversation.channelId) : null;
+  const channelMeta =
+    isChannel && space
+      ? space.channels?.find((c) => c.id === conversation.channelId)
+      : null;
   const isAnnouncement = channelMeta?.type === "announcement";
-  const canPost = !isAnnouncement || (space && ["owner", "admin"].includes(space.myRole));
+  const canPost =
+    !isAnnouncement || (space && ["owner", "admin"].includes(space.myRole));
   const other =
-    conversation && !isGroup && !isChannel ? otherParticipant(conversation, userId) : null;
+    conversation && !isGroup && !isChannel
+      ? otherParticipant(conversation, userId)
+      : null;
   const otherId = other?.id || null;
   const otherName = participantName(other);
   const online = Array.isArray(conversation?.online)
@@ -246,11 +292,109 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
   const [messages, setMessages] = useState([]);
   const messagesRef = useRef(messages);
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  // Durable outbox (offline sends). Re-renders this panel when the queue for
+  // any conversation changes so queued bubbles appear/disappear live.
+  const outboxSnapshot = useSyncExternalStore(
+    subscribeOutbox,
+    getOutboxSnapshot,
+  );
+  const [sendError, setSendError] = useState(null);
   const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [text, setText] = useState("");
+
+  // Keep queued/sending/failed outbox entries for the open conversation in the
+  // message list (survives reloads) and mirror their status flips live.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: optimisticFromOutbox and userId are stable per session; including them would re-run the merge on every render.
+  useEffect(() => {
+    const pending = outboxSnapshot.filter(
+      (e) =>
+        e.conversationId === convId &&
+        (e.status === "queued" ||
+          e.status === "sending" ||
+          e.status === "failed"),
+    );
+    if (!pending.length) return;
+    setMessages((prev) => {
+      const next = [...prev];
+      let changed = false;
+      for (const e of pending) {
+        const i = next.findIndex((m) => m.tempId === e.tempId);
+        if (i < 0) {
+          next.push(optimisticFromOutbox(e));
+          changed = true;
+        } else if (next[i].status !== e.status) {
+          next[i] = { ...next[i], status: e.status };
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
+      next.sort((a, b) => {
+        const d =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        return (
+          d || String(a.tempId || a.id).localeCompare(String(b.tempId || b.id))
+        );
+      });
+      return next;
+    });
+  }, [outboxSnapshot, convId]);
+
+  // A flushed send came back from the server: swap the optimistic bubble for
+  // the real message (and cache it), then drop the entry from the outbox.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: helpers are stable; outboxSnapshot + convId are the real triggers.
+  useEffect(() => {
+    const done = outboxSnapshot.filter(
+      (e) =>
+        e.conversationId === convId &&
+        e.status === "sent" &&
+        e.serverMessage &&
+        e.serverMessage.id,
+    );
+    if (!done.length) return;
+    setMessages((prev) => {
+      const next = [...prev];
+      for (const e of done) {
+        const i = next.findIndex((m) => m.tempId === e.tempId);
+        const real = { ...e.serverMessage, status: "sent" };
+        if (i >= 0) {
+          next[i] = real;
+        } else if (!next.some((m) => m.id === real.id)) {
+          next.push(real);
+        }
+      }
+      return next;
+    });
+    for (const e of done) {
+      if (e.serverMessage?.id) {
+        mergeCachedMessage(convId, e.serverMessage).catch(() => {});
+      }
+      removeOutbox(e.tempId).catch(() => {});
+    }
+  }, [outboxSnapshot, convId]);
+
+  // Build a bubble-shaped optimistic message for a queued/failed/sending
+  // outbox entry — mirrors the optimistic object send() creates online.
+  const optimisticFromOutbox = (e) => ({
+    id: e.tempId,
+    tempId: e.tempId,
+    conversationId: e.conversationId,
+    senderId: userId,
+    content: e.content,
+    replyToMessageId: e.replyToMessageId || null,
+    attachments: [],
+    reactions: [],
+    deliveredTo: [],
+    readBy: [],
+    isEdited: false,
+    isDeleted: false,
+    createdAt: e.createdAt,
+    status: e.status,
+  });
   const [typing, setTyping] = useState(false);
   const [typerName, setTyperName] = useState(null);
   const [otherOnline, setOtherOnline] = useState(online);
@@ -279,7 +423,14 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   const textareaRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const fileInputRef = useRef(null);
-  const { files: pendingFiles, addFiles, removeFile, clearAll, uploadAll, uploading: uploadBusy } = useFileUpload();
+  const {
+    files: pendingFiles,
+    addFiles,
+    removeFile,
+    clearAll,
+    uploadAll,
+    uploading: uploadBusy,
+  } = useFileUpload();
 
   const isDesktop = useIsDesktop();
   const isMobile = !isDesktop;
@@ -288,7 +439,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   useEffect(() => {
     if (!showMore) return;
     function onDoc(e) {
-      if (moreRef.current && !moreRef.current.contains(e.target)) setShowMore(false);
+      if (moreRef.current && !moreRef.current.contains(e.target))
+        setShowMore(false);
     }
     function onKey(e) {
       if (e.key === "Escape") setShowMore(false);
@@ -308,7 +460,11 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       await apiPost(`/api/v1/users/${otherId}/block`, {});
       setShowMore(false);
       if (onConversationUpdate && conversation) {
-        onConversationUpdate({ ...conversation, isBlockedByMe: true, isBlockedByOther: false });
+        onConversationUpdate({
+          ...conversation,
+          isBlockedByMe: true,
+          isBlockedByOther: false,
+        });
       }
     } catch (err) {
       window.alert(err?.message || "Could not block user");
@@ -323,7 +479,11 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       await apiPost(`/api/v1/users/${otherId}/unblock`, {});
       setShowMore(false);
       if (onConversationUpdate && conversation) {
-        onConversationUpdate({ ...conversation, isBlockedByMe: false, isBlockedByOther: false });
+        onConversationUpdate({
+          ...conversation,
+          isBlockedByMe: false,
+          isBlockedByOther: false,
+        });
       }
     } catch (err) {
       window.alert(err?.message || "Could not unblock user");
@@ -357,7 +517,10 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       if (!isGroup && !isChannel && otherId && online) {
         nextSet.add(otherId.toString());
       }
-      if (Array.isArray(conversation.online) && Array.isArray(conversation.otherParticipantIds)) {
+      if (
+        Array.isArray(conversation.online) &&
+        Array.isArray(conversation.otherParticipantIds)
+      ) {
         conversation.otherParticipantIds.forEach((id, idx) => {
           if (conversation.online[idx]) nextSet.add(id.toString());
         });
@@ -381,7 +544,10 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       if (p?.userId) {
         setOnlineUsers((prev) => new Set(prev).add(p.userId.toString()));
         if (p.lastActiveAt) {
-          setLastActiveByUser((prev) => ({ ...prev, [p.userId.toString()]: p.lastActiveAt }));
+          setLastActiveByUser((prev) => ({
+            ...prev,
+            [p.userId.toString()]: p.lastActiveAt,
+          }));
         }
       }
     };
@@ -393,9 +559,15 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           return next;
         });
         if (p.lastActiveAt) {
-          setLastActiveByUser((prev) => ({ ...prev, [p.userId.toString()]: p.lastActiveAt }));
+          setLastActiveByUser((prev) => ({
+            ...prev,
+            [p.userId.toString()]: p.lastActiveAt,
+          }));
         } else {
-          setLastActiveByUser((prev) => ({ ...prev, [p.userId.toString()]: new Date().toISOString() }));
+          setLastActiveByUser((prev) => ({
+            ...prev,
+            [p.userId.toString()]: new Date().toISOString(),
+          }));
         }
       }
     };
@@ -421,7 +593,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         !m.isDeleted &&
         m.type !== "system" &&
         m.senderId !== userId &&
-        !m.readBy?.some((r) => (r.userId || r)?.toString() === userId.toString())
+        !m.readBy?.some(
+          (r) => (r.userId || r)?.toString() === userId.toString(),
+        ),
     );
     return found ? found.id : null;
   }, [messages, userId]);
@@ -439,7 +613,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   };
 
   const checkMentionTrigger = (val, cursorPosition) => {
-    const pos = cursorPosition ?? textareaRef.current?.selectionStart ?? val.length;
+    const pos =
+      cursorPosition ?? textareaRef.current?.selectionStart ?? val.length;
     const textBeforeCaret = val.slice(0, pos);
     const lastAt = textBeforeCaret.lastIndexOf("@");
 
@@ -503,7 +678,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     if (useAnchor) {
       // Anchor-based fetch: jump to the specific message
       setLoadingHistory(true);
-      apiGet(`/api/v1/conversations/${convId}/messages?limit=50&around=${highlightMessageId}`)
+      apiGet(
+        `/api/v1/conversations/${convId}/messages?limit=50&around=${highlightMessageId}`,
+      )
         .then((data) => {
           if (!active) return;
           const msgs = data?.messages || [];
@@ -623,15 +800,19 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     if (!convId) return;
     const msgs = messagesRef.current || [];
     // Find newest real message id (skip optimistic tempIds)
-    const lastReal = [...msgs].reverse().find((m) => m?.id && !String(m.id).startsWith("t_"));
+    const lastReal = [...msgs]
+      .reverse()
+      .find((m) => m?.id && !String(m.id).startsWith("t_"));
     const afterId = lastReal?.id;
     if (!afterId) return;
-    apiGet(`/api/v1/conversations/${convId}/messages?after=${afterId}&limit=100`)
+    apiGet(
+      `/api/v1/conversations/${convId}/messages?after=${afterId}&limit=100`,
+    )
       .then((data) => {
         const incoming = data?.messages || [];
         if (!incoming.length) return;
         setMessages((prev) => {
-          let next = [...prev];
+          const next = [...prev];
           for (const msg of incoming) {
             const byId = next.findIndex((m) => m.id === msg.id);
             if (byId >= 0) {
@@ -644,7 +825,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                   m.tempId &&
                   m.senderId === userId &&
                   m.content === msg.content &&
-                  (m.status === "sending" || m.status === "failed"),
+                  (m.status === "sending" ||
+                    m.status === "failed" ||
+                    m.status === "queued"),
               );
               if (t >= 0) {
                 next[t] = { ...msg, status: "sent" };
@@ -654,7 +837,10 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             next.push({ ...msg, status: "sent" });
           }
           // Keep chronological order; incoming is already ascending, but sort defensively
-          next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+          next.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          );
           return next;
         });
         // Persist gap-filled messages to IDB cache via same pipeline as live events
@@ -685,7 +871,9 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
               m.tempId &&
               m.senderId === userId &&
               m.content === msg.content &&
-              (m.status === "sending" || m.status === "failed"),
+              (m.status === "sending" ||
+                m.status === "failed" ||
+                m.status === "queued"),
           );
           if (t >= 0) {
             const copy = [...prev];
@@ -735,7 +923,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         }),
       );
     };
-     const onDelivery = (payload) => {
+    const onDelivery = (payload) => {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === payload.messageId
@@ -755,10 +943,16 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         const anchor = prev.find((m) => m.id === anchorId);
         const anchorTime = anchor ? new Date(anchor.createdAt).getTime() : 0;
         return prev.map((m) => {
-          if (m.senderId === userId || m.isDeleted || m.type === "system") return m;
+          if (m.senderId === userId || m.isDeleted || m.type === "system")
+            return m;
           const t = new Date(m.createdAt).getTime();
           if (t >= anchorTime) {
-            return { ...m, readBy: (m.readBy || []).filter((r) => (r.userId || r).toString() !== userId.toString()) };
+            return {
+              ...m,
+              readBy: (m.readBy || []).filter(
+                (r) => (r.userId || r).toString() !== userId.toString(),
+              ),
+            };
           }
           return m;
         });
@@ -776,7 +970,11 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     const onOnline = (p) => {
       if (p?.userId === otherId) {
         setOtherOnline(true);
-        if (p.lastActiveAt) setLastActiveByUser((prev) => ({ ...prev, [otherId]: p.lastActiveAt }));
+        if (p.lastActiveAt)
+          setLastActiveByUser((prev) => ({
+            ...prev,
+            [otherId]: p.lastActiveAt,
+          }));
       }
     };
     const onOffline = (p) => {
@@ -875,15 +1073,76 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
     setReplyingTo(null);
   };
 
+  const insertOptimistic = (optimistic) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.tempId === optimistic.tempId)) return prev;
+      const next = [...prev, optimistic];
+      next.sort((a, b) => {
+        const d =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        return (
+          d || String(a.tempId || a.id).localeCompare(String(b.tempId || b.id))
+        );
+      });
+      return next;
+    });
+  };
+
   const send = async () => {
     const content = text.trim();
     const hasFiles = pendingFiles.some((f) => f.status === "pending");
     if ((!content && !hasFiles) || !convId) return;
+    setSendError(null);
     const tempId = `t_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const replyToId = replyingTo?.id ?? null;
+
+    // Attachments need a live upload path — never queue files.
+    if (isOffline && hasFiles) {
+      setSendError(
+        "Attachments need a connection. Text messages will be queued while you're offline.",
+      );
+      return;
+    }
+
     setReplyingTo(null);
 
-    // Upload files first if any are pending
+    // Offline text send → durable outbox + optimistic "queued" bubble. The
+    // OutboxFlusher pushes it once a connection comes back.
+    if (isOffline && content && !hasFiles) {
+      const now = new Date().toISOString();
+      enqueueOutbox({
+        tempId,
+        conversationId: convId,
+        content,
+        replyToMessageId: replyToId,
+        createdAt: now,
+        status: "queued",
+      }).catch(() => {});
+      insertOptimistic({
+        id: tempId,
+        tempId,
+        conversationId: convId,
+        senderId: userId,
+        content,
+        replyToMessageId: replyToId,
+        attachments: [],
+        reactions: [],
+        deliveredTo: [],
+        readBy: [],
+        isEdited: false,
+        isDeleted: false,
+        createdAt: now,
+        status: "queued",
+      });
+      setText("");
+      clearAll();
+      setMentionOpen(false);
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (socket) socket.emit("typing:stop", { conversationId: convId });
+      return;
+    }
+
+    // Online path: upload files first if any are pending
     let attachments = [];
     if (hasFiles) {
       try {
@@ -912,52 +1171,74 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       createdAt: new Date().toISOString(),
       status: "sending",
     };
-    setMessages((prev) => [...prev, optimistic]);
+    insertOptimistic(optimistic);
     setText("");
     clearAll();
     setMentionOpen(false);
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (socket) socket.emit("typing:stop", { conversationId: convId });
     try {
-      const msg = await apiPost(
-        `/api/v1/conversations/${convId}/messages`,
-        {
-          content: content || undefined,
-          ...(replyToId && { replyToMessageId: replyToId }),
-          ...(attachments.length > 0 && { attachments }),
-        },
-      );
+      const msg = await apiPost(`/api/v1/conversations/${convId}/messages`, {
+        content: content || undefined,
+        ...(replyToId && { replyToMessageId: replyToId }),
+        ...(attachments.length > 0 && { attachments }),
+      });
       setMessages((prev) =>
         prev.map((m) => (m.tempId === tempId ? { ...msg, status: "sent" } : m)),
       );
+      removeOutbox(tempId).catch(() => {});
     } catch {
       setMessages((prev) =>
         prev.map((m) => (m.tempId === tempId ? { ...m, status: "failed" } : m)),
       );
+      // Persist the failure so it survives a reload and can be retried.
+      enqueueOutbox({
+        tempId,
+        conversationId: convId,
+        content,
+        replyToMessageId: replyToId,
+        createdAt: optimistic.createdAt,
+        status: "failed",
+      }).catch(() => {});
     }
   };
 
-  const retry = (tempId) => {
+  const retry = async (tempId) => {
     const m = messages.find((x) => x.tempId === tempId);
-    if (!m) return;
+    if (!m || !convId) return;
+    setSendError(null);
     setMessages((prev) =>
       prev.map((x) => (x.tempId === tempId ? { ...x, status: "sending" } : x)),
     );
-    apiPost(`/api/v1/conversations/${convId}/messages`, { content: m.content })
-      .then((msg) =>
-        setMessages((prev) =>
-          prev.map((x) =>
-            x.tempId === tempId ? { ...msg, status: "sent" } : x,
-          ),
-        ),
-      )
-      .catch(() =>
-        setMessages((prev) =>
-          prev.map((x) =>
-            x.tempId === tempId ? { ...x, status: "failed" } : x,
-          ),
-        ),
+    setOutboxStatus(tempId, "sending").catch(() => {});
+    try {
+      const msg = await apiPost(`/api/v1/conversations/${convId}/messages`, {
+        content: m.content,
+        ...(m.replyToMessageId && { replyToMessageId: m.replyToMessageId }),
+      });
+      setMessages((prev) =>
+        prev.map((x) => (x.tempId === tempId ? { ...msg, status: "sent" } : x)),
       );
+      if (msg?.id) mergeCachedMessage(convId, msg).catch(() => {});
+      removeOutbox(tempId).catch(() => {});
+    } catch {
+      setMessages((prev) =>
+        prev.map((x) => (x.tempId === tempId ? { ...x, status: "failed" } : x)),
+      );
+      setOutboxStatus(tempId, "failed").catch(() => {});
+      // Persist even failures that predate the queue (e.g. an old in-memory
+      // failed bubble) so a reload can still offer the retry.
+      if (!getPendingOutbox().some((x) => x.tempId === tempId)) {
+        enqueueOutbox({
+          tempId,
+          conversationId: convId,
+          content: m.content,
+          replyToMessageId: m.replyToMessageId || null,
+          createdAt: m.createdAt || new Date().toISOString(),
+          status: "failed",
+        }).catch(() => {});
+      }
+    }
   };
 
   const toggleReaction = async (id, emoji) => {
@@ -1017,9 +1298,15 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       setMessages((prev) =>
         prev.map((m) =>
           m.senderId !== userId && !m.isDeleted && m.type !== "system"
-            ? { ...m, readBy: [...(m.readBy || []), { userId, readAt: new Date().toISOString() }] }
-            : m
-        )
+            ? {
+                ...m,
+                readBy: [
+                  ...(m.readBy || []),
+                  { userId, readAt: new Date().toISOString() },
+                ],
+              }
+            : m,
+        ),
       );
       if (onConversationUpdate && conversation) {
         onConversationUpdate({ ...conversation, unreadCount: 0 });
@@ -1030,22 +1317,31 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
   const handleMarkUnread = async (messageId) => {
     if (!convId || !messageId) return;
     try {
-      const data = await apiPost(`/api/v1/conversations/${convId}/unread`, { messageId });
+      const data = await apiPost(`/api/v1/conversations/${convId}/unread`, {
+        messageId,
+      });
       // optimistic: make this message and all newer messages from others unread
       const anchor = messages.find((m) => m.id === messageId);
       const anchorTime = anchor ? new Date(anchor.createdAt).getTime() : 0;
       setMessages((prev) =>
         prev.map((m) => {
-          if (m.senderId === userId || m.isDeleted || m.type === "system") return m;
+          if (m.senderId === userId || m.isDeleted || m.type === "system")
+            return m;
           const t = new Date(m.createdAt).getTime();
           if (t >= anchorTime) {
-            return { ...m, readBy: (m.readBy || []).filter((r) => (r.userId || r).toString() !== userId.toString()) };
+            return {
+              ...m,
+              readBy: (m.readBy || []).filter(
+                (r) => (r.userId || r).toString() !== userId.toString(),
+              ),
+            };
           }
           return m;
-        })
+        }),
       );
       if (onConversationUpdate && conversation) {
-        const unreadCount = data?.unreadCount ?? data?.data?.unreadCount ?? null;
+        const unreadCount =
+          data?.unreadCount ?? data?.data?.unreadCount ?? null;
         if (typeof unreadCount === "number") {
           onConversationUpdate({ ...conversation, unreadCount });
         }
@@ -1069,7 +1365,11 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
 
   if (!conversation) return <EmptyState />;
 
-  const headerName = isChannel ? `#${conversation.name || "general"}` : isGroup ? conversation.name || "Group" : otherName;
+  const headerName = isChannel
+    ? `#${conversation.name || "general"}`
+    : isGroup
+      ? conversation.name || "Group"
+      : otherName;
   const headerAvatar = isChannel
     ? {
         name: `#${conversation.name || "general"}`,
@@ -1099,7 +1399,7 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
             aria-label="Back to conversations"
             className="flex items-center gap-1 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] px-3 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors duration-200 hover:bg-[#232323]"
           >
-            <ChevronLeft  />
+            <ChevronLeft />
           </button>
         )}
         <Avatar
@@ -1115,9 +1415,17 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           </p>
           <p className="truncate text-[12px] text-[var(--text-muted)]">
             {isGroup || isChannel ? (
-              <span>{conversation.participants?.length || 0} members{isChannel ? " • Space channel" : ""}</span>
+              <span>
+                {conversation.participants?.length || 0} members
+                {isChannel ? " • Space channel" : ""}
+              </span>
             ) : (
-              <StatusText online={otherOnline} lastActiveAt={lastActiveByUser[otherId] || other?.lastActiveAt || null} />
+              <StatusText
+                online={otherOnline}
+                lastActiveAt={
+                  lastActiveByUser[otherId] || other?.lastActiveAt || null
+                }
+              />
             )}
           </p>
         </div>
@@ -1148,13 +1456,25 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
               {showMore && (
                 <motion.div
                   role="menu"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98, filter: "blur(4px)" }}
+                  initial={
+                    reduce
+                      ? { opacity: 0 }
+                      : { opacity: 0, y: 6, scale: 0.98, filter: "blur(4px)" }
+                  }
                   animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.98, filter: "blur(4px)" }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  exit={
+                    reduce
+                      ? { opacity: 0 }
+                      : { opacity: 0, y: 4, scale: 0.98, filter: "blur(4px)" }
+                  }
+                  transition={
+                    reduce
+                      ? { duration: 0 }
+                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                  }
                   className="absolute right-0 top-full z-30 mt-2 min-w-48 origin-top-right overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1.5 shadow-xl"
                 >
-                    <button
+                  <button
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -1204,19 +1524,21 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
       </div>
 
       {/* Messages */}
-        <div
-          ref={scrollRef}
-          onScroll={(e) => {
-            if (e.currentTarget.scrollTop <= 8) loadOlder();
-            // if near bottom and unread exists, mark as read (removes separator)
-            if (firstUnreadId) {
-              const el = e.currentTarget;
-              const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-              if (nearBottom) markConversationRead();
-            }
-          }}
-          className="t-scroll flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12" style={{ overscrollBehavior: "contain" }}
-        >
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          if (e.currentTarget.scrollTop <= 8) loadOlder();
+          // if near bottom and unread exists, mark as read (removes separator)
+          if (firstUnreadId) {
+            const el = e.currentTarget;
+            const nearBottom =
+              el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            if (nearBottom) markConversationRead();
+          }
+        }}
+        className="t-scroll flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12"
+        style={{ overscrollBehavior: "contain" }}
+      >
         {loadingHistory && (
           <p className="py-2 text-center text-[12px] text-[var(--text-muted)]">
             Loading…
@@ -1237,7 +1559,12 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                 </React.Fragment>
               );
             }
-            const receipt = receiptState(m, userId, otherId);
+            const receipt =
+              m.status === "queued" ||
+              m.status === "sending" ||
+              m.status === "failed"
+                ? null
+                : receiptState(m, userId, otherId);
             const replySource = m.replyToMessageId
               ? messages.find((x) => x.id === m.replyToMessageId)
               : null;
@@ -1279,17 +1606,36 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                     i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
                   }`}
                 >
-                {showSender && (
-                  <span className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}>
-                    {senderLabel}
-                  </span>
-                )}
-                <div className={`flex w-fit max-w-[78%] gap-2 ${mine ? "flex-row-reverse self-end" : "flex-row self-start"} items-end min-w-0 sm:max-w-[62%]`}>
-                  {(isGroup || isChannel) && !mine ? (
-                    grouped ? (
-                      <span className="hidden sm:block w-7 shrink-0" aria-hidden="true" />
-                    ) : (
-                      <span className="hidden sm:flex shrink-0 mb-1">
+                  {showSender && (
+                    <span
+                      className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}
+                    >
+                      {senderLabel}
+                    </span>
+                  )}
+                  <div
+                    className={`flex w-fit max-w-[78%] gap-2 ${mine ? "flex-row-reverse self-end" : "flex-row self-start"} items-end min-w-0 sm:max-w-[62%]`}
+                  >
+                    {(isGroup || isChannel) && !mine ? (
+                      grouped ? (
+                        <span
+                          className="hidden sm:block w-7 shrink-0"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <span className="hidden sm:flex shrink-0 mb-1">
+                          <Avatar
+                            name={senderLabel}
+                            avatarStyle={sAvatar.avatarStyle}
+                            url={sAvatar.avatarUrl}
+                            size="sm"
+                          />
+                        </span>
+                      )
+                    ) : null}
+                    {/* Mobile avatar — show only on first of group to keep clean */}
+                    {(isGroup || isChannel) && !mine && !grouped ? (
+                      <span className="flex sm:hidden shrink-0 mb-1">
                         <Avatar
                           name={senderLabel}
                           avatarStyle={sAvatar.avatarStyle}
@@ -1297,57 +1643,49 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
                           size="sm"
                         />
                       </span>
-                    )
-                  ) : null}
-                  {/* Mobile avatar — show only on first of group to keep clean */}
-                  {(isGroup || isChannel) && !mine && !grouped ? (
-                    <span className="flex sm:hidden shrink-0 mb-1">
-                      <Avatar
-                        name={senderLabel}
-                        avatarStyle={sAvatar.avatarStyle}
-                        url={sAvatar.avatarUrl}
-                        size="sm"
-                      />
-                    </span>
-                  ) : null}
-                  <div className="flex min-w-0 flex-1 flex-col max-w-full">
-                    <SwipeToReply enabled={isMobile} onReply={() => handleReply(m)} className="w-full min-w-0">
-                      <MessageBubble
-                        message={m}
-                        mine={mine}
-                        showMeta={groupLast}
-                        reactionOpen={reactionFor === m.id}
-                        isEditing={editingId === m.id}
-                        editText={editText}
-                        onEditTextChange={setEditText}
-                        onSaveEdit={() => saveEdit(m.id)}
-                        onCancelEdit={() => setEditingId(null)}
-                        onToggleReactionPicker={() =>
-                          setReactionFor(reactionFor === m.id ? null : m.id)
-                        }
-                        onReact={(emoji) => toggleReaction(m.id, emoji)}
-                        onEdit={() => {
-                          setEditingId(m.id);
-                          setEditText(m.content);
-                        }}
-                        onDelete={() => removeMessage(m.id)}
-                        onRetry={() => retry(m.tempId)}
-                        onReply={handleReply}
-                        onMarkUnread={() => handleMarkUnread(m.id)}
-                        isReplying={replyingTo?.id === m.id}
-                        replyTo={replyTo}
-                        receipt={receipt}
-                        participants={conversation?.participants || []}
-                        isUserOnline={isUserOnline}
-                        onOpenProfile={setProfileUsername}
-                        className="!max-w-full"
-                        contentClassName="max-w-full"
-                        isMobile={isMobile}
-                      />
-                    </SwipeToReply>
+                    ) : null}
+                    <div className="flex min-w-0 flex-1 flex-col max-w-full">
+                      <SwipeToReply
+                        enabled={isMobile}
+                        onReply={() => handleReply(m)}
+                        className="w-full min-w-0"
+                      >
+                        <MessageBubble
+                          message={m}
+                          mine={mine}
+                          showMeta={groupLast}
+                          reactionOpen={reactionFor === m.id}
+                          isEditing={editingId === m.id}
+                          editText={editText}
+                          onEditTextChange={setEditText}
+                          onSaveEdit={() => saveEdit(m.id)}
+                          onCancelEdit={() => setEditingId(null)}
+                          onToggleReactionPicker={() =>
+                            setReactionFor(reactionFor === m.id ? null : m.id)
+                          }
+                          onReact={(emoji) => toggleReaction(m.id, emoji)}
+                          onEdit={() => {
+                            setEditingId(m.id);
+                            setEditText(m.content);
+                          }}
+                          onDelete={() => removeMessage(m.id)}
+                          onRetry={() => retry(m.tempId)}
+                          onReply={handleReply}
+                          onMarkUnread={() => handleMarkUnread(m.id)}
+                          isReplying={replyingTo?.id === m.id}
+                          replyTo={replyTo}
+                          receipt={receipt}
+                          participants={conversation?.participants || []}
+                          isUserOnline={isUserOnline}
+                          onOpenProfile={setProfileUsername}
+                          className="!max-w-full"
+                          contentClassName="max-w-full"
+                          isMobile={isMobile}
+                        />
+                      </SwipeToReply>
+                    </div>
                   </div>
                 </div>
-              </div>
               </React.Fragment>
             );
           })}
@@ -1365,219 +1703,268 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
         </div>
       </div>
 
-        {/* Composer */}
-        <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
-          <div className="mx-auto max-w-3xl">
-            {replyingTo && !isBlockedByMe && !isBlockedByOther && canPost && (
-              <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
-                <div className="flex items-start gap-2 min-w-0">
-                  <span className="shrink-0 text-[var(--accent)]">
-                    <Reply className="h-4 w-4" />
+      {/* Composer */}
+      <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
+        <div className="mx-auto max-w-3xl">
+          {replyingTo && !isBlockedByMe && !isBlockedByOther && canPost && (
+            <div className="mb-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+              <div className="flex items-start gap-2 min-w-0">
+                <span className="shrink-0 text-[var(--accent)]">
+                  <Reply className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <span className="block text-[12px] font-medium text-[var(--text-primary)]">
+                    {senderName(replyingTo.senderId)}
                   </span>
-                  <div className="min-w-0 flex-1 overflow-hidden">
-                    <span className="block text-[12px] font-medium text-[var(--text-primary)]">
-                      {senderName(replyingTo.senderId)}
-                    </span>
-                     <span className="block w-full break-words text-[12px] text-[var(--text-muted)] [overflow-wrap:anywhere]">
-                       {replyingTo.content}
-                     </span>
-                  </div>
+                  <span className="block w-full break-words text-[12px] text-[var(--text-muted)] [overflow-wrap:anywhere]">
+                    {replyingTo.content}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelReply}
+                  className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  aria-label="Cancel reply"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          <AnimatePresence mode="wait">
+            {isBlockedByOther ? (
+              <motion.div
+                key="blocked-other"
+                initial={
+                  reduce
+                    ? { opacity: 0 }
+                    : { opacity: 0, y: 8, filter: "blur(4px)" }
+                }
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={
+                  reduce
+                    ? { opacity: 0 }
+                    : { opacity: 0, y: -6, filter: "blur(4px)" }
+                }
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
+                }
+                className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--destructive)]/30 bg-[var(--destructive)]/10 px-4 py-3 text-sm text-[var(--destructive)]"
+              >
+                <Ban className="h-4 w-4 shrink-0" />
+                <span>{otherName} blocked you</span>
+              </motion.div>
+            ) : isBlockedByMe ? (
+              <motion.div
+                key="blocked-me"
+                initial={
+                  reduce
+                    ? { opacity: 0 }
+                    : { opacity: 0, y: 8, filter: "blur(4px)" }
+                }
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={
+                  reduce
+                    ? { opacity: 0 }
+                    : { opacity: 0, y: -6, filter: "blur(4px)" }
+                }
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
+                }
+                className="flex items-center justify-between gap-3 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
+              >
+                <span className="flex items-center gap-2">
+                  <Ban className="h-4 w-4 shrink-0" />
+                  <span>You blocked {otherName}</span>
+                </span>
+                <motion.button
+                  type="button"
+                  disabled={blockBusy}
+                  onClick={handleUnblock}
+                  whileTap={reduce ? undefined : { scale: 0.96 }}
+                  whileHover={reduce ? undefined : { scale: 1.02 }}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:opacity-40"
+                >
+                  Unblock
+                </motion.button>
+              </motion.div>
+            ) : !canPost ? (
+              <motion.div
+                key="announcement"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                }
+                className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
+              >
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Only admins can post in this announcement channel</span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="composer"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                }
+                className="relative z-20 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.length) addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <UploadPreview files={pendingFiles} onRemove={removeFile} />
+                <div className="flex items-end gap-2">
+                  {mentionOpen && (
+                    <MentionAutocomplete
+                      participants={getFilteredParticipants(mentionQuery)}
+                      query={mentionQuery}
+                      selectedIndex={mentionIndex}
+                      onSelect={handleSelectMention}
+                    />
+                  )}
                   <button
                     type="button"
-                    onClick={cancelReply}
-                    className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                    aria-label="Cancel reply"
+                    aria-label="Attach file"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                   >
-                    <X className="h-4 w-4" />
+                    <Paperclip className="h-5 w-5" />
                   </button>
-                </div>
-              </div>
-            )}
-            <AnimatePresence mode="wait">
-              {isBlockedByOther ? (
-                <motion.div
-                  key="blocked-other"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6, filter: "blur(4px)" }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--destructive)]/30 bg-[var(--destructive)]/10 px-4 py-3 text-sm text-[var(--destructive)]"
-                >
-                  <Ban className="h-4 w-4 shrink-0" />
-                  <span>{otherName} blocked you</span>
-                </motion.div>
-              ) : isBlockedByMe ? (
-                <motion.div
-                  key="blocked-me"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6, filter: "blur(4px)" }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex items-center justify-between gap-3 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
-                >
-                  <span className="flex items-center gap-2">
-                    <Ban className="h-4 w-4 shrink-0" />
-                    <span>You blocked {otherName}</span>
-                  </span>
+                  <button
+                    ref={emojiBtnRef}
+                    type="button"
+                    aria-label="Add emoji"
+                    aria-expanded={showEmoji}
+                    onClick={() => setShowEmoji((v) => !v)}
+                    className="relative flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                  >
+                    <Smile className="h-5 w-5" />
+                    {showEmoji && (
+                      <EmojiPicker
+                        onSelect={(emoji) => insertEmoji(emoji)}
+                        onClose={() => setShowEmoji(false)}
+                        ignoreRef={emojiBtnRef}
+                      />
+                    )}
+                  </button>
+                  <textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setText(val);
+                      setSendError(null);
+                      emitTyping();
+                      checkMentionTrigger(val, e.target.selectionStart);
+                    }}
+                    onClick={(e) => {
+                      checkMentionTrigger(text, e.target.selectionStart);
+                    }}
+                    onKeyUp={(e) => {
+                      if (
+                        ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                          e.key,
+                        )
+                      ) {
+                        checkMentionTrigger(text, e.target.selectionStart);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (mentionOpen) {
+                        const filtered = getFilteredParticipants(mentionQuery);
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setMentionIndex((prev) =>
+                            filtered.length ? (prev + 1) % filtered.length : 0,
+                          );
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setMentionIndex((prev) =>
+                            filtered.length
+                              ? (prev - 1 + filtered.length) % filtered.length
+                              : 0,
+                          );
+                          return;
+                        }
+                        if (
+                          (e.key === "Enter" || e.key === "Tab") &&
+                          !e.shiftKey
+                        ) {
+                          e.preventDefault();
+                          if (filtered[mentionIndex]) {
+                            handleSelectMention(filtered[mentionIndex]);
+                          } else {
+                            setMentionOpen(false);
+                          }
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setMentionOpen(false);
+                          return;
+                        }
+                      }
+
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        send();
+                      }
+                    }}
+                    placeholder="Type a message…"
+                    aria-label="Message"
+                    rows={1}
+                    className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+                  />
+                  {isOffline && (
+                    <span className="absolute -top-6 right-0 whitespace-nowrap text-[11px] text-[var(--text-muted)]">
+                      You're offline — text messages will be queued
+                    </span>
+                  )}
                   <motion.button
                     type="button"
-                    disabled={blockBusy}
-                    onClick={handleUnblock}
+                    onClick={send}
+                    disabled={
+                      !text.trim() &&
+                      !pendingFiles.some((f) => f.status === "pending")
+                    }
                     whileTap={reduce ? undefined : { scale: 0.96 }}
-                    whileHover={reduce ? undefined : { scale: 1.02 }}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:opacity-40"
+                    className="rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
                   >
-                    Unblock
+                    <Send className="h-5 w-5" />
                   </motion.button>
-                </motion.div>
-              ) : !canPost ? (
-                <motion.div
-                  key="announcement"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex items-center justify-center gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
-                >
-                  <Lock className="h-4 w-4 shrink-0" />
-                  <span>Only admins can post in this announcement channel</span>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="composer"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="relative z-20 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]"
-                >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files?.length) addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <UploadPreview files={pendingFiles} onRemove={removeFile} />
-          <div className="flex items-end gap-2">
-          {mentionOpen && (
-            <MentionAutocomplete
-              participants={getFilteredParticipants(mentionQuery)}
-              query={mentionQuery}
-              selectedIndex={mentionIndex}
-              onSelect={handleSelectMention}
-            />
-          )}
-          <button
-            type="button"
-            aria-label="Attach file"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-          >
-            <Paperclip className="h-5 w-5" />
-          </button>
-          <button
-            ref={emojiBtnRef}
-            type="button"
-            aria-label="Add emoji"
-            aria-expanded={showEmoji}
-            onClick={() => setShowEmoji((v) => !v)}
-            className="relative flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-          >
-            <Smile className="h-5 w-5" />
-            {showEmoji && (
-              <EmojiPicker
-                onSelect={(emoji) => insertEmoji(emoji)}
-                onClose={() => setShowEmoji(false)}
-                ignoreRef={emojiBtnRef}
-              />
+                </div>
+                {sendError && (
+                  <p className="mt-1.5 px-1 text-[11px] leading-snug text-[var(--destructive)]">
+                    {sendError}
+                  </p>
+                )}
+              </motion.div>
             )}
-          </button>
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => {
-              const val = e.target.value;
-              setText(val);
-              emitTyping();
-              checkMentionTrigger(val, e.target.selectionStart);
-            }}
-            onClick={(e) => {
-              checkMentionTrigger(text, e.target.selectionStart);
-            }}
-            onKeyUp={(e) => {
-              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-                checkMentionTrigger(text, e.target.selectionStart);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (mentionOpen) {
-                const filtered = getFilteredParticipants(mentionQuery);
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setMentionIndex((prev) => (filtered.length ? (prev + 1) % filtered.length : 0));
-                  return;
-                }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setMentionIndex((prev) => (filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0));
-                  return;
-                }
-                if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
-                  e.preventDefault();
-                  if (filtered[mentionIndex]) {
-                    handleSelectMention(filtered[mentionIndex]);
-                  } else {
-                    setMentionOpen(false);
-                  }
-                  return;
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setMentionOpen(false);
-                  return;
-                }
-              }
-
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Type a message…"
-            aria-label="Message"
-            rows={1}
-            className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
-          />
-            {isOffline && (
-              <span className="absolute -top-6 right-0 text-[11px] text-[var(--text-muted)]">
-                You are offline
-              </span>
-            )}
-            <motion.button
-              type="button"
-              onClick={send}
-              disabled={isOffline || (!text.trim() && !pendingFiles.some((f) => f.status === "pending"))}
-              title={isOffline ? "Send requires network connection" : undefined}
-              whileTap={reduce ? undefined : { scale: 0.96 }}
-              className={`rounded-nav px-4 py-2 text-[13px] font-medium transition-[filter,opacity,transform] duration-200 active:scale-[0.97] ${
-                isOffline
-                  ? "cursor-not-allowed bg-[var(--text-muted)]/30 text-[var(--text-muted)] opacity-60"
-                  : "bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 disabled:opacity-40"
-              }`}
-            >
-              <Send className="h-5 w-5" />
-            </motion.button>
-          </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-           </div>
-          </div>
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* Mention profile drawer — local state, does not change route */}
       <ProfileDrawer
@@ -1589,9 +1976,8 @@ export function ChatPanel({ conversation, space, onBack, onOpenGroupSettings, on
           if (onConversationUpdate && conv) onConversationUpdate(conv);
         }}
       />
-
-      </div>
-   );
+    </div>
+  );
 }
 
 export default ChatPanel;

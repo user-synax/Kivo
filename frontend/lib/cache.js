@@ -34,6 +34,37 @@ function kFriendRequests(userId) {
 function kMessages(conversationId) {
   return `messages:${conversationId}`;
 }
+function kOutbox(userId) {
+  return `outbox:${userId}`;
+}
+
+// ── Outbox (pending offline sends) ───────────────────────────────────────
+// Durable list of messages the user composed but that the server has not
+// confirmed yet (queued while offline, failed, or mid-flight). Persisted per
+// user so sends survive a reload; entries are removed once the server echoes
+// the real message. The queue logic lives in lib/outbox.js — this file only
+// owns the IndexedDB plumbing.
+
+export async function getOutboxEntries(userId) {
+  if (!userId) return null;
+  try {
+    const store = getStore();
+    const data = await get(kOutbox(userId), store);
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveOutboxEntries(userId, entries) {
+  if (!userId) return;
+  try {
+    const store = getStore();
+    await set(kOutbox(userId), Array.isArray(entries) ? entries : [], store);
+  } catch {
+    // IDB failures must never throw or block UI
+  }
+}
 
 export async function getCachedConversations(userId) {
   if (!userId) return null;
@@ -189,6 +220,7 @@ export async function clearUserCache(userId) {
       del(kSpaces(userId), store).catch(() => {}),
       del(kFriends(userId), store).catch(() => {}),
       del(kFriendRequests(userId), store).catch(() => {}),
+      del(kOutbox(userId), store).catch(() => {}),
     ]);
     // Also purge all per-conversation message caches for this user.
     // Keys are strings like "messages:<conversationId>" — enumerate and
@@ -199,9 +231,7 @@ export async function clearUserCache(userId) {
         (k) => typeof k === "string" && k.startsWith("messages:"),
       );
       if (msgKeys.length) {
-        await Promise.all(
-          msgKeys.map((k) => del(k, store).catch(() => {})),
-        );
+        await Promise.all(msgKeys.map((k) => del(k, store).catch(() => {})));
       }
     } catch {
       // non-fatal

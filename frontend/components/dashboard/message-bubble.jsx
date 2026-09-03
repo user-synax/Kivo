@@ -1,9 +1,17 @@
 "use client";
 
-import { Check, CheckCheck, FaceGrinning, Mail, Pencil, Reply, Trash } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import {
+  Check,
+  CheckCheck,
+  Clock,
+  FaceGrinning,
+  Mail,
+  Pencil,
+  Reply,
+  Trash,
+} from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -11,6 +19,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/motion/context-menu";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { formatTime } from "@/lib/chat";
 import { EASE_OUT_CSS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
@@ -26,10 +35,16 @@ import { cn } from "@/lib/utils";
 // Behavior (edit, delete, reactions, receipts, retry) is unchanged from before —
 // all state lives in the parent (chat-panel) and is passed in as props.
 
-import { MentionToken } from "@/components/mentions/mention-token";
 import { AttachmentBubble } from "@/components/chat/attachments";
+import { MentionToken } from "@/components/mentions/mention-token";
 
-function MessageContent({ content, mentions = [], participants = [], isUserOnline, onOpenProfile }) {
+function MessageContent({
+  content,
+  mentions = [],
+  participants = [],
+  isUserOnline,
+  onOpenProfile,
+}) {
   if (!content) return null;
 
   const resolvedUsernames = {};
@@ -44,7 +59,11 @@ function MessageContent({ content, mentions = [], participants = [], isUserOnlin
   }
 
   if (Object.keys(resolvedUsernames).length === 0) {
-    return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</span>;
+    return (
+      <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+        {content}
+      </span>
+    );
   }
 
   const parts = [];
@@ -72,7 +91,7 @@ function MessageContent({ content, mentions = [], participants = [], isUserOnlin
           user={user}
           isOnline={online}
           onOpenProfile={onOpenProfile}
-        />
+        />,
       );
     } else {
       parts.push(rawMatch);
@@ -85,7 +104,11 @@ function MessageContent({ content, mentions = [], participants = [], isUserOnlin
     parts.push(content.slice(lastIndex));
   }
 
-  return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{parts}</span>;
+  return (
+    <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+      {parts}
+    </span>
+  );
 }
 
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -172,7 +195,7 @@ export function MessageBubble({
       e.preventDefault();
       triggerLike();
     },
-    [triggerLike]
+    [triggerLike],
   );
 
   const handleLikeTouchStart = useCallback((e) => {
@@ -212,7 +235,7 @@ export function MessageBubble({
         }, 350);
       }
     },
-    [deleted, isEditing, triggerLike]
+    [deleted, isEditing, triggerLike],
   );
 
   // Sent messages use the primary (accent) bubble, received use the secondary.
@@ -228,7 +251,7 @@ export function MessageBubble({
             "group/bubble relative transition-transform will-change-transform select-text touch-manipulation",
             pressing && "scale-[0.98]",
             isReplying && "border-l-2 border-[var(--accent)]",
-            className
+            className,
           )}
           style={{ transitionTimingFunction: EASE_OUT_CSS }}
           onPointerDown={() => setPressing(true)}
@@ -266,7 +289,9 @@ export function MessageBubble({
                 ref={editRef}
               />
             ) : deleted ? (
-              <span className="opacity-20 bg-transparent bg-red-800">This message was deleted</span>
+              <span className="opacity-20 bg-transparent bg-red-800">
+                This message was deleted
+              </span>
             ) : (
               <>
                 <MessageContent
@@ -285,7 +310,9 @@ export function MessageBubble({
             {likeAnimKey > 0 && (
               <motion.div
                 key={likeAnimKey}
-                initial={reduceMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }}
+                initial={
+                  reduceMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }
+                }
                 animate={
                   reduceMotion
                     ? { opacity: 1 }
@@ -308,7 +335,8 @@ export function MessageBubble({
                 <span
                   className={cn(
                     "select-none text-5xl drop-shadow-[0_4px_12px_rgba(244,0,81,0.35)]",
-                    !reduceMotion && "animate-[t-like-heart-pop_550ms_cubic-bezier(0.34,1.56,0.64,1)]"
+                    !reduceMotion &&
+                      "animate-[t-like-heart-pop_550ms_cubic-bezier(0.34,1.56,0.64,1)]",
                   )}
                 >
                   ❤️
@@ -322,7 +350,7 @@ export function MessageBubble({
             <div
               className={cn(
                 "absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
-                mine ? "right-0" : "left-0"
+                mine ? "right-0" : "left-0",
               )}
             >
               {REACTION_EMOJIS.map((e) => (
@@ -378,14 +406,14 @@ export function MessageBubble({
         <div
           className={cn(
             "mt-1 flex max-w-[78%] flex-wrap gap-1",
-            mine ? "justify-end" : "justify-start"
+            mine ? "justify-end" : "justify-start",
           )}
         >
           {Object.entries(
             message.reactions.reduce((acc, r) => {
               acc[r.emoji] = (acc[r.emoji] || 0) + 1;
               return acc;
-            }, {})
+            }, {}),
           ).map(([emoji, count]) => (
             <button
               key={emoji}
@@ -404,14 +432,33 @@ export function MessageBubble({
         <div className="mt-1 flex items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]">
           <span>{formatTime(message.createdAt)}</span>
           {message.isEdited && <span>· edited</span>}
+          {message.status === "queued" && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" aria-hidden />
+              queued · will send when online
+            </span>
+          )}
           {message.status === "failed" && (
-            <button type="button" onClick={onRetry} className="text-[var(--accent)] hover:underline">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-[var(--accent)] hover:underline"
+            >
               failed · retry
             </button>
           )}
-          {receipt === "sent" && <Check className="h-3 w-3" aria-label="Sent" />}
-          {receipt === "delivered" && <CheckCheck className="h-3 w-3" aria-label="Delivered" />}
-          {receipt === "read" && <CheckCheck className="h-3 w-3 text-[var(--accent)]" aria-label="Read" />}
+          {receipt === "sent" && (
+            <Check className="h-3 w-3" aria-label="Sent" />
+          )}
+          {receipt === "delivered" && (
+            <CheckCheck className="h-3 w-3" aria-label="Delivered" />
+          )}
+          {receipt === "read" && (
+            <CheckCheck
+              className="h-3 w-3 text-[var(--accent)]"
+              aria-label="Read"
+            />
+          )}
         </div>
       )}
     </ContextMenu>

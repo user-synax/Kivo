@@ -592,9 +592,9 @@ export function DocsScreen() {
                 <Bullet>Private invite links for Spaces</Bullet>
                 <Bullet>Video/audio attachments (images & documents only)</Bullet>
                 <Bullet>
-                  Using the installed app fully offline — chat lists and the
-                  latest messages are cached, but full history still needs the
-                  network
+                  Full offline message history — only the latest 50 messages
+                  per chat are cached (text you send while offline is queued
+                  and delivered automatically when you're back)
                 </Bullet>
               </ul>
             </Section>

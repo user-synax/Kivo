@@ -68,10 +68,11 @@ export function clearSession() {
   }
   if (uid) {
     // Fire-and-forget: IDB clear must never block logout or throw.
-    // Dynamic import avoids circular dependency (cache.js is standalone).
+    // Dynamic imports avoid circular dependencies (cache/outbox are standalone).
     import("./cache.js")
       .then((m) => m.clearUserCache(uid).catch(() => {}))
       .catch(() => {});
+    import("./outbox.js").then((m) => m.resetOutbox()).catch(() => {});
   }
 }
 
