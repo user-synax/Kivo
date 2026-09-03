@@ -135,9 +135,11 @@ export default function Home() {
         </section>
 
         <FeaturesSection />
+        <PowerFeaturesSection />
         <CustomizationSection />
         <SecuritySection />
         <RoadmapSection />
+        <FaqSection />
 
         <SiteFooter />
       </main>
@@ -702,6 +704,260 @@ function RoadmapSection() {
             Roadmap items are factual and update-friendly — check back as
             milestones ship.
           </motion.p>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Power features — differentiators the hero grid doesn't cover
+   ─────────────────────────────────────────────────────────── */
+function PowerFeaturesSection() {
+  const reduce = useReducedMotion();
+  const containerVariants = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.06, delayChildren: 0.08 },
+    },
+  };
+  const itemVariants = reduce
+    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+    : {
+        hidden: { opacity: 0, y: 12 },
+        show: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.5, ease: EASE_SMOOTH_OUT },
+        },
+      };
+
+  const items = [
+    {
+      label: "Search",
+      title: "Ctrl+K global search",
+      desc: "One command palette across messages, people, and Spaces — with jump-to-message that lands you on the exact bubble, highlighted.",
+    },
+    {
+      label: "Attachments",
+      title: "Images & documents",
+      desc: "Up to 10 files per message at 30 MB each. Images open in a fullscreen lightbox with keyboard navigation; docs render as download cards.",
+    },
+    {
+      label: "PWA & offline",
+      title: "Installable, queue-aware",
+      desc: "Install Kivo to your home screen, get VAPID push when it's closed, and keep typing offline — text queues in a durable outbox and flushes on reconnect.",
+    },
+    {
+      label: "Profiles",
+      title: "Public pages & verified badges",
+      desc: "Every account gets a shareable /u/username page with country flag and GitHub graph. Trusted accounts carry an admin-granted verified badge.",
+    },
+    {
+      label: "Invites",
+      title: "Private Space invite codes",
+      desc: "Private Spaces stay hidden from Discover and admit members only through rotating 7-day invite codes — share a link or a code, rotate or revoke anytime.",
+    },
+    {
+      label: "Sounds",
+      title: "Per-category sound cues",
+      desc: "DMs, mentions, groups, Spaces, and friend requests each get their own synthesized chime with preview and a master switch. Already viewing the DM? Kivo stays quiet.",
+    },
+  ];
+
+  return (
+    <section
+      id="power-features"
+      className="scroll-mt-24 border-t border-hairline/60 px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24"
+    >
+      <div className="mx-auto max-w-[1280px]">
+        <motion.div
+          variants={containerVariants}
+          initial={reduce ? false : "hidden"}
+          whileInView="show"
+          viewport={{ once: true, margin: "-80px" }}
+          className="flex flex-col gap-6"
+        >
+          <motion.div variants={itemVariants} className="flex flex-col gap-4">
+            <SectionEyebrow>Power features</SectionEyebrow>
+            <SectionTitle>
+              The details <span className="text-ink-muted">that add up</span>
+            </SectionTitle>
+            <p className="max-w-[640px] font-sans text-[15px] leading-[1.6] text-ink-muted sm:text-[16px]">
+              Beyond the basics — the differentiators that make Kivo feel
+              finished, not demo-grade.
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={containerVariants}
+            className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {items.map((f) => (
+              <motion.div
+                key={f.title}
+                variants={itemVariants}
+                className="flex flex-col gap-3 rounded-cards border border-hairline bg-surface-1 p-6"
+              >
+                <span className="inline-flex w-fit rounded-full border border-hairline bg-surface-2 px-2.5 py-1 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                  {f.label}
+                </span>
+                <h3 className="font-goga text-[18px] font-medium leading-tight tracking-tight text-ink">
+                  {f.title}
+                </h3>
+                <p className="font-sans text-[14px] leading-[1.6] text-ink-muted">
+                  {f.desc}
+                </p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   FAQ — t-acc accordion + FAQPage JSON-LD for SEO
+   ─────────────────────────────────────────────────────────── */
+const FAQ_ITEMS = [
+  {
+    q: "Is Kivo free?",
+    a: "Yes. Kivo is a free student full-stack project. Sign up with a display name, username, email, and password (at least 8 characters) and you land in chat instantly — no OTP, no waiting, no paid tier.",
+  },
+  {
+    q: "Do I need to install anything?",
+    a: "No — Kivo runs in any modern browser. If you want it to feel native, install it: use the install icon in the Chrome/Edge address bar, Add to Home Screen on Android, or Share → Add to Home Screen on iPhone. The installed app opens straight into chat.",
+  },
+  {
+    q: "How is Kivo different from Discord or WhatsApp?",
+    a: "It puts both styles under one identity: WhatsApp-like private DMs and small groups, plus Discord-like Spaces with text and announcement channels. The differentiator on top is customization — a theme engine with per-user and per-Space palettes. It is deliberately not a Slack-style work tool.",
+  },
+  {
+    q: "Is my account secure?",
+    a: "Passwords are hashed with bcrypt and never stored readably. Sessions use short-lived 15-minute access tokens plus an httpOnly refresh cookie you can revoke with logout-everywhere, and every request is validated server-side with rate limiting on auth endpoints. Optional two-factor via authenticator app with backup codes adds a second step, and a password reset signs you out on all devices.",
+  },
+  {
+    q: "Does Kivo work offline?",
+    a: "Partly. Your lists and the latest 50 messages per chat are cached in the browser and paint instantly, and text you send while offline is queued in a durable outbox that delivers automatically on reconnect. Attachments need a connection, and full history requires one too.",
+  },
+  {
+    q: "What isn't in Kivo yet?",
+    a: "Threads, voice/video calls, and pinned or saved messages are not built yet — see the roadmap above for what shipped versus what is coming next. The Docs page documents exactly what works today.",
+  },
+];
+
+function FaqSection() {
+  const reduce = useReducedMotion();
+  const [openIndex, setOpenIndex] = useState(0);
+
+  const containerVariants = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.06, delayChildren: 0.08 },
+    },
+  };
+  const itemVariants = reduce
+    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+    : {
+        hidden: { opacity: 0, y: 12 },
+        show: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.5, ease: EASE_SMOOTH_OUT },
+        },
+      };
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ_ITEMS.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+
+  return (
+    <section
+      id="faq"
+      className="scroll-mt-24 border-t border-hairline/60 px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24"
+    >
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static FAQ JSON-LD serialized from a local constant — no user input */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <div className="mx-auto max-w-[800px]">
+        <motion.div
+          variants={containerVariants}
+          initial={reduce ? false : "hidden"}
+          whileInView="show"
+          viewport={{ once: true, margin: "-80px" }}
+          className="flex flex-col gap-6"
+        >
+          <motion.div variants={itemVariants} className="flex flex-col gap-4">
+            <SectionEyebrow>FAQ</SectionEyebrow>
+            <SectionTitle>
+              Questions, <span className="text-ink-muted">answered</span>
+            </SectionTitle>
+            <p className="max-w-[640px] font-sans text-[15px] leading-[1.6] text-ink-muted sm:text-[16px]">
+              The short version. For the full how-to, see the{" "}
+              <a
+                href="/docs"
+                className="kivo-focus rounded-sm font-medium text-accent-blue underline-offset-2 hover:underline"
+              >
+                Docs
+              </a>
+              .
+            </p>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="flex flex-col gap-3">
+            {FAQ_ITEMS.map((item, i) => {
+              const isOpen = openIndex === i;
+              return (
+                <div
+                  key={item.q}
+                  className="t-acc"
+                  data-open={String(isOpen)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenIndex(isOpen ? -1 : i)}
+                    aria-expanded={isOpen}
+                    className="t-acc-head kivo-focus"
+                  >
+                    <span className="font-sans text-[14px] font-semibold leading-[1.4] text-ink sm:text-[15px]">
+                      {item.q}
+                    </span>
+                    <span className="t-acc-chevron" aria-hidden="true">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <path
+                          d="M4 6.5 8 10.5 12 6.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                  <div className="t-acc-panel">
+                    <div className="t-acc-panel-inner px-6 pb-6">
+                      <p className="font-sans text-[14px] leading-[1.65] text-ink-muted">
+                        {item.a}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </motion.div>
         </motion.div>
       </div>
     </section>
