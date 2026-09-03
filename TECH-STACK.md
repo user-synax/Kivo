@@ -115,7 +115,7 @@ MongoDB is the canonical source of truth. Core collections:
 
 | Model | Notes |
 |---|---|
-| `User` | email, username, displayName, bio (280), status (60), avatar (URL + Appwrite file id), avatarStyle, banner, **country**, **githubUsername**, **verified / showBadge**, blockedUsers, ban fields, lastActiveAt, email-verification & password-reset token hashes, **notificationPreferences** |
+| `User` | email, username, displayName, bio (280), status (60), avatar (URL + Appwrite file id), avatarStyle, banner, **country**, **githubUsername**, **verified / showBadge**, blockedUsers, ban fields, lastActiveAt, email-verification & password-reset token hashes, **notificationPreferences**, **appearance** (`{accent, tint}` hex pair for the theme studio — returned only on self/session shapes, never in other users' profiles/search) |
 | `Session` | Backs each refresh token; `expiresAt` TTL index → deleting/expiring a session revokes it |
 | `Conversation` | `type: dm / group / space_channel`, participants, admins (groups), `spaceId`+`channelId` for channel conversations, `lastMessageAt`; messages are **not** embedded |
 | `Message` | conversationId + senderId, content (4000), type `text/system`, replyToMessageId, reactions (subdocs), deliveredTo, readBy, mentions, **attachments** (embedded), isEdited, isDeleted |

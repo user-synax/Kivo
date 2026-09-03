@@ -145,6 +145,12 @@ function publicUser(user) {
     role: user.role,
     isEmailVerified: user.isEmailVerified || false,
     createdAt: user.createdAt,
+    // Appearance customization ships with every session user so the client can
+    // re-apply the user's colors on login without an extra round-trip.
+    appearance: {
+      accent: user.appearance?.accent || null,
+      tint: user.appearance?.tint || null,
+    },
   };
 }
 

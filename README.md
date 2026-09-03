@@ -118,6 +118,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Typing indicators & presence (realtime via Socket.IO, scoped to peers, offline grace to avoid flicker)
 - **Reconnect gap-fill** (refetches conversation list + messages newer than the newest known message after every reconnect)
 - Theme system (**10 themes**, 6 dark + 4 light, live switching, no reload)
+- **Custom per-user colors** — theme studio in Settings: recolor any preset's accent + canvas tone, live preview, saved to your account (server-synced, follows you across devices)
 - **Mobile UX** (bottom tab bar with 5 tabs, responsive panels, edge-swipe back, safe-area handling)
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
@@ -471,7 +472,7 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 | **Phase 1.5** | Voice & video calls, threads |
 | **Phase 2** | Threads, pinned/saved messages, stronger search, video/audio attachments |
 | **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
-| **Phase 4** | Developer platform, mini-apps, marketplace & custom themes |
+| **Phase 4** | Developer platform, mini-apps, marketplace & per-Space themes |
 
 ---
 

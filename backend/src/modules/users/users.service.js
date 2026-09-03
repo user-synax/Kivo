@@ -33,6 +33,20 @@ function publicUser(user) {
   };
 }
 
+// Self profile shape — everything from publicUser plus the user's own
+// appearance customization. Appearance is deliberately NOT included in
+// publicUser, so other people's search results / profiles never carry it.
+function selfUser(user) {
+  const u = user.toObject ? user.toObject() : user;
+  return {
+    ...publicUser(user),
+    appearance: {
+      accent: u.appearance?.accent || null,
+      tint: u.appearance?.tint || null,
+    },
+  };
+}
+
 // Relationship of `userId` -> `otherId` for UI hints: friends / outgoing request
 // / incoming request / none.
 async function relationship(userId, otherId) {
@@ -73,10 +87,10 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role createdAt lastActiveAt",
+    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role appearance createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
-  return publicUser(user);
+  return selfUser(user);
 }
 
 // Public profile of any user by id — used by the conversation detail panel.
@@ -166,7 +180,7 @@ export async function updateAvatar({ userId, buffer, contentType }) {
   user.avatarUrl = url;
   user.avatarFileId = fileId;
   await user.save();
-  return publicUser(user);
+  return selfUser(user);
 }
 
 // Remove the uploaded display picture and (best-effort) its Appwrite file.
@@ -184,7 +198,7 @@ export async function deleteAvatar({ userId }) {
   user.avatarUrl = null;
   user.avatarFileId = null;
   await user.save();
-  return publicUser(user);
+  return selfUser(user);
 }
 
 // --- Block / Unblock helpers ---
@@ -348,11 +362,20 @@ export async function updateMe({ userId, data }) {
   if (data.showBadge !== undefined) {
     update.showBadge = Boolean(data.showBadge);
   }
+  if (data.appearance !== undefined) {
+    // Normalize: null clears both; a partial object nulls the missing color.
+    update.appearance = {
+      accent: data.appearance?.accent || null,
+      tint: data.appearance?.tint || null,
+    };
+  }
 
   const user = await User.findByIdAndUpdate(userId, update, {
     new: true,
     runValidators: true,
-  }).select("displayName username email bio status avatarStyle banner country githubUsername verified showBadge role createdAt");
+  }).select(
+    "displayName username email bio status avatarStyle banner country githubUsername verified showBadge role appearance createdAt",
+  );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
-  return publicUser(user);
+  return selfUser(user);
 }

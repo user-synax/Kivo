@@ -1,12 +1,22 @@
 "use client";
 
-import { Bell, Eye, EyeOff, Palette } from "lucide-react";
+import {
+  Bell,
+  Check,
+  Eye,
+  EyeOff,
+  Loader2,
+  Palette,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { Switch } from "@/components/ui/switch";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiGet, apiPatch } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
+import { ACCENT_PRESETS, TINT_PRESETS } from "@/lib/theme";
 import { TwoFactorSection } from "./two-factor-section";
 
 function SectionCard({ icon: Icon, title, description, children }) {
@@ -32,13 +42,274 @@ function SectionCard({ icon: Icon, title, description, children }) {
   );
 }
 
+// Small round color swatch used by the studio rows (presets + neutral).
+function ColorDot({ color, selected, label, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex size-7 shrink-0 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 ${
+        selected
+          ? "ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-surface)]"
+          : "ring-1 ring-[var(--border)]"
+      }`}
+      style={
+        color ? { background: color } : { background: "var(--bg-elevated)" }
+      }
+    >
+      {!color && (
+        <span className="size-2 rounded-full bg-[var(--text-muted)]" />
+      )}
+    </button>
+  );
+}
+
+// Native color input styled as a circular swatch — the "anything goes" option
+// at the end of each preset row.
+function ColorInput({ value, label, onChange, badge = false }) {
+  return (
+    <label
+      title={label}
+      aria-label={label}
+      className="relative flex size-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full ring-1 ring-[var(--border)] transition-transform duration-150 hover:scale-110"
+    >
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+      />
+      <span className="size-full rounded-full" style={{ background: value }} />
+      {badge && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="rounded-full bg-[var(--bg-surface)]/80 px-1 text-[9px] font-bold leading-4 text-[var(--text-muted)]">
+            +
+          </span>
+        </span>
+      )}
+    </label>
+  );
+}
+
+function ThemeStudio() {
+  const { theme, custom, preview, previewColors, applyCustom } = useTheme();
+  const [busy, setBusy] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [error, setError] = useState(null);
+
+  // The draft currently applied (live) vs. what is persisted on the account.
+  const active = preview ?? custom;
+  const baseline = custom;
+  const draft = {
+    accent: active?.accent || null,
+    tint: active?.tint || null,
+  };
+  const baseAccent = theme.colors.accent;
+
+  const touch = (partial) => previewColors({ ...draft, ...partial });
+
+  const hasChanges =
+    (draft.accent?.toLowerCase() || null) !==
+      (baseline?.accent?.toLowerCase() || null) ||
+    (draft.tint?.toLowerCase() || null) !==
+      (baseline?.tint?.toLowerCase() || null);
+
+  const handleSave = async () => {
+    if (!hasChanges) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await apiPatch("/api/v1/users/me", {
+        appearance: { accent: draft.accent, tint: draft.tint },
+      });
+      applyCustom(updated.appearance);
+      setSession(updated, getToken());
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1600);
+    } catch (err) {
+      setError(err?.message || "Could not save your colors");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await apiPatch("/api/v1/users/me", {
+        appearance: { accent: null, tint: null },
+      });
+      applyCustom(null);
+      setSession(updated, getToken());
+    } catch (err) {
+      setError(err?.message || "Could not reset your colors");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const accentSelected = (hex) =>
+    Boolean(draft.accent) && draft.accent.toLowerCase() === hex.toLowerCase();
+  const tintSelected = (hex) =>
+    Boolean(draft.tint) && draft.tint.toLowerCase() === hex.toLowerCase();
+
+  return (
+    <div className="mt-3 border-t border-[var(--border)] pt-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[12px] font-semibold text-[var(--text-primary)]">
+            Theme studio
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-muted)]">
+            Recolor the active theme with your own accent &amp; canvas tone.
+            Changes apply live and are saved to your account.
+          </p>
+        </div>
+        {baseline && (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--accent)]">
+            <Check className="h-3 w-3" />
+            Custom colors on
+          </span>
+        )}
+      </div>
+
+      {/* Accent */}
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <p className="text-[12px] font-medium text-[var(--text-primary)]">
+          Accent
+        </p>
+        <p className="text-[10px] text-[var(--text-muted)]">
+          links · buttons · badges · unread dots
+        </p>
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <ColorDot
+          color={baseAccent}
+          label="Use the theme's default accent"
+          selected={!draft.accent}
+          onClick={() => touch({ accent: null })}
+        />
+        {ACCENT_PRESETS.map((hex) => (
+          <ColorDot
+            key={hex}
+            color={hex}
+            label={`Accent ${hex}`}
+            selected={accentSelected(hex)}
+            onClick={() => touch({ accent: hex })}
+          />
+        ))}
+        <ColorInput
+          value={draft.accent || baseAccent}
+          label="Pick a custom accent color"
+          badge={!draft.accent}
+          onChange={(hex) => touch({ accent: hex })}
+        />
+      </div>
+
+      {/* Canvas tint */}
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <p className="text-[12px] font-medium text-[var(--text-primary)]">
+          Canvas tone
+        </p>
+        <p className="text-[10px] text-[var(--text-muted)]">
+          washes surfaces · keeps contrast
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {TINT_PRESETS.map((p) =>
+          p.hex ? (
+            <ColorDot
+              key={p.hex}
+              color={p.hex}
+              label={`Canvas tint ${p.label}`}
+              selected={tintSelected(p.hex)}
+              onClick={() => touch({ tint: p.hex })}
+            />
+          ) : (
+            <ColorDot
+              key="neutral"
+              color={null}
+              label="Neutral canvas (keep the theme's own colors)"
+              selected={!draft.tint}
+              onClick={() => touch({ tint: null })}
+            />
+          ),
+        )}
+        <ColorInput
+          value={draft.tint || "#f43f5e"}
+          label="Pick a custom canvas tint"
+          badge={!draft.tint}
+          onChange={(hex) => touch({ tint: hex })}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {hasChanges ? (
+          <>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+              Save to my account
+            </button>
+            {preview && (
+              <button
+                type="button"
+                onClick={() => previewColors(null)}
+                disabled={busy}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                Discard
+              </button>
+            )}
+          </>
+        ) : baseline ? (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--destructive)] disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Remove my colors
+          </button>
+        ) : null}
+        {savedFlash && (
+          <span className="text-[11px] font-medium text-[var(--text-muted)]">
+            Saved ✓
+          </span>
+        )}
+        {error && (
+          <span className="text-[11px] text-[var(--destructive)]">{error}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ThemeSection() {
   const { themeId, themes, setThemeId } = useTheme();
   return (
     <SectionCard
       icon={Palette}
       title="Appearance"
-      description="Choose your theme."
+      description="Pick a base theme, then make it yours with the studio below."
     >
       <div className="space-y-1">
         {themes.map((t) => (
@@ -65,6 +336,7 @@ function ThemeSection() {
           </button>
         ))}
       </div>
+      <ThemeStudio />
     </SectionCard>
   );
 }

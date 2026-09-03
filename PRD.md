@@ -80,7 +80,8 @@ Kivo
 | Typing Indicators | **Complete** | Realtime via Socket.IO |
 | Presence | **Complete** | Online/offline, snapshot on connect |
 | Realtime Events | **Complete** | Socket.IO with authenticated connections |
-| Theme System | **Complete** | 10 themes (6 dark + 4 light) with live switching, persisted in localStorage |
+| Theme System | **Complete** | 10 themes (6 dark + 4 light), live switching; preset persisted in localStorage |
+| Custom Colors (Theme Studio) | **Complete** | Per-user accent + canvas-tint overlay over any preset, live preview, saved to the account (`appearance` field) and synced on login |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
@@ -451,7 +452,9 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 
 #### 5.6 Future Customization (Post-MVP)
 
-- Custom themes (user-created).
+> Shipped in the MVP: the **theme studio** — per-user accent + canvas-tint overlay applied over any of the 10 presets, persisted on the user record (`appearance: { accent, tint }`) and returned with every session/login. The engine (`derivePalette` in `lib/theme.js`) washes only the surface family and preserves each token's lightness, so contrast is never broken.
+
+- Per-Space palettes and appearance overrides.
 - Custom fonts.
 - Advanced message styles.
 - Custom emoji/reaction packs.
@@ -1479,7 +1482,7 @@ These may be considered after the core communication experience is stable.
 - Developer platform.
 - Mini-apps.
 - Automation.
-- Marketplace / custom themes.
+- Marketplace themes & per-Space palettes.
 - Theme sharing.
 
 ---
@@ -1491,7 +1494,7 @@ The MVP is successful when:
 1. Users can reliably communicate in realtime (DMs, typing, presence, read receipts).
 2. Conversation loading is fast with cursor-based pagination.
 3. Mobile and desktop UX both feel polished.
-4. Customization is visibly deeper than ordinary chat apps (10 themes — 6 dark + 4 light, live switching).
+4. Customization is visibly deeper than ordinary chat apps (10 themes — 6 dark + 4 light — plus a per-user theme studio for accent & canvas color, account-synced).
 5. Permissions and security are enforced server-side.
 6. The architecture can support future voice/video/community features without rewriting.
 

@@ -142,6 +142,15 @@ const userSchema = new mongoose.Schema(
       spaceMessages: { type: Boolean, default: false },
       announcements: { type: Boolean, default: true },
     },
+
+    // Client-side appearance customization: an accent + canvas-tint overlay on
+    // top of the user's active preset theme. Stored as 6-digit hex colors (or
+    // null = keep the preset's own value). The frontend derives the full CSS
+    // palette from these; the server validates and echoes them back.
+    appearance: {
+      accent: { type: String, default: null },
+      tint: { type: String, default: null },
+    },
   },
   { timestamps: true }
 );

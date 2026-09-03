@@ -50,6 +50,25 @@ export const updateMeSchema = z.object({
     .optional()
     .or(z.literal("")),
   showBadge: z.boolean().optional(),
+
+  // Per-user appearance customization (theme studio). Both colors are optional
+  // 6-digit hex codes; a null value (or null object) clears the customization
+  // and falls back to the preset theme's own colors.
+  appearance: z
+    .object({
+      accent: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a 6-digit hex code (e.g. #ff5500)")
+        .nullable()
+        .optional(),
+      tint: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a 6-digit hex code (e.g. #ff5500)")
+        .nullable()
+        .optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const usernameParamSchema = z.object({

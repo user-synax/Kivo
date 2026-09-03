@@ -420,7 +420,7 @@ Search results that point at a person open this same profile in a drawer inside 
 
 **Where:** **Settings → Appearance** (gear/avatar rail on desktop; Settings tab on mobile).
 
-**Ten** live palettes (no page reload). Choice is stored in the browser (`localStorage`, key `kivo:theme`).
+**Ten** live palettes (no page reload). Your base-theme choice is stored in the browser (`localStorage`, key `kivo:theme`); custom colors below are saved to your account so they follow you across devices.
 
 | Theme | Family | Feel |
 |-------|--------|------|
@@ -434,6 +434,15 @@ Search results that point at a person open this same profile in a drawer inside 
 | **Linen** | Light | Warm cream canvas |
 | **Mist** | Light | Cool blue-gray canvas |
 | **Sage** | Light | Soft green-tinted canvas |
+
+### Theme studio (custom colors)
+
+Below the palette in **Settings → Appearance** is the theme studio. It layers **your colors** on top of whichever base theme is active:
+
+- **Accent** — recolor links, buttons, badges, unread dots, and selection. Pick a preset or open the color picker for any hex.
+- **Canvas tone** — wash all surfaces (background, sidebars, borders, bubbles) with a hue. *Neutral* keeps the theme's own colors.
+
+Every click applies **live** to the whole app — no preview modal, no reload. The wash preserves each surface's original lightness, so text contrast is never broken (the engine only shifts hue, never ink). **Save to my account** persists the pair to your profile (`appearance` on the user record); log in anywhere and your colors come with you. **Remove my colors** clears it and falls back to the preset palette.
 
 All themes share the same layout, corner radius, and elevation; only colors change. If your OS asks for reduced motion, animations stay minimal.
 
@@ -715,7 +724,7 @@ Do not expect these in the current MVP:
 - **Threads**, pinned messages, saved messages
 - **Voice / video** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
-- Custom user-created themes
+- Per-Space palettes & theme sharing
 - Private / invite-linked Spaces
 - Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
 - Video/audio attachments (images and documents only in this pass)
@@ -739,7 +748,7 @@ Do not expect these in the current MVP:
 | Profile, avatar, frame, banner, bio, status, country, GitHub | Icon-rail avatar / Profile tab |
 | Public profile & verified badge | `/u/:username` (badge toggle in Settings) |
 | Block / unblock users | DM header, profile drawer, public profile |
-| Ten themes (6 dark / 4 light) | Settings → Appearance |
+| Ten themes + custom accent/canvas (theme studio) | Settings → Appearance → Save to my account |
 | Notification preferences | Settings → Notification preferences |
 | In-app notifications | Bell in panel header |
 | Web push | Allow notifications when opening the bell |

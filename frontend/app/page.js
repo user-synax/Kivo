@@ -370,8 +370,8 @@ function CustomizationSection() {
             <p className="max-w-[560px] font-sans text-[15px] leading-[1.6] text-ink-muted">
               One theme object restyles the whole app — canvas, surfaces,
               borders, bubbles, and motion — with no component edits. Switch
-              live, persist to storage, and keep the same near-black, hairline
-              geometry everywhere.
+              live, layer on your own accent and canvas tone, and keep the same
+              near-black, hairline geometry everywhere.
             </p>
             <div className="flex flex-col gap-3 pt-2">
               <div className="flex items-start gap-3 rounded-xl border border-hairline bg-surface-1 p-4">
@@ -390,11 +390,12 @@ function CustomizationSection() {
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-accent-blue" />
                 <div className="flex flex-col gap-1">
                   <span className="font-sans text-[13px] font-semibold text-ink">
-                    Per-user & per-Space themes (planned)
+                    Theme studio — yours, live
                   </span>
                   <span className="font-sans text-[13px] leading-[1.5] text-ink-muted">
-                    Personal and community identity without forking the product
-                    — your Space, your palette.
+                    Pick any palette as your base, then recolor its accent and
+                    canvas tone. Saved to your account, everywhere you sign
+                    in. Per-Space palettes are next.
                   </span>
                 </div>
               </div>

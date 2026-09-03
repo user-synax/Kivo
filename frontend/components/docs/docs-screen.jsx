@@ -484,8 +484,8 @@ export function DocsScreen() {
               <h3 className="doc-h3">Themes</h3>
               <p>
                 Open Settings → Appearance and pick a palette. Switching is
-                live — no reload. Your choice is saved in this browser. Ten
-                themes: six dark and four light.
+                live — no reload. Your base-theme choice is saved in this
+                browser. Ten themes: six dark and four light.
               </p>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>Framer — default near-black, blue accent</Bullet>
@@ -495,6 +495,16 @@ export function DocsScreen() {
                 <Bullet>Porcelain — neutral off-white · Linen — warm cream</Bullet>
                 <Bullet>Mist — cool blue-gray · Sage — soft green</Bullet>
               </ul>
+              <h3 className="doc-h3">Theme studio (custom colors)</h3>
+              <p>
+                Below the palette in Settings → Appearance is the theme
+                studio: recolor the active theme's accent (links, buttons,
+                badges) and wash its canvas with a tone. Changes apply live as
+                you click, and Save to my account syncs them to your profile —
+                you keep your colors on every device. Contrast is preserved
+                automatically: only surface hues change, never ink lightness.
+                Remove my colors returns you to the theme's own palette.
+              </p>
             </Section>
 
             <Section id="notifications" title="Notifications & install">
@@ -576,12 +586,9 @@ export function DocsScreen() {
                 kivo.usersynax.dev yet:
               </p>
               <ul className="mt-4 flex flex-col gap-2">
-                <Bullet>Threads, pins, and saved messages</Bullet>
-                <Bullet>
-                  Voice or video calls — no call backend or UI yet
+                <Bullet>Threads, pins, and saved messages</Bullet>                <Bullet>Voice or video calls — no call backend or UI yet
                 </Bullet>
-                <Bullet>2FA (two-factor authentication)</Bullet>
-                <Bullet>Custom user-created themes</Bullet>
+                <Bullet>Per-Space palettes &amp; theme sharing</Bullet>
                 <Bullet>Private invite links for Spaces</Bullet>
                 <Bullet>Video/audio attachments (images & documents only)</Bullet>
                 <Bullet>

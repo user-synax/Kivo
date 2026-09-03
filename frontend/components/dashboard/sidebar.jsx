@@ -297,7 +297,7 @@ function ProfileNav({ currentUser, onEditProfile, collapsed }) {
 }
 
 function ThemeSwitcher({ collapsed }) {
-  const { themeId, themes, setThemeId } = useTheme();
+  const { themeId, themes, setThemeId, accentColor } = useTheme();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const current = themes.find((t) => t.id === themeId) || themes[0];
@@ -326,7 +326,7 @@ function ThemeSwitcher({ collapsed }) {
           onClick={() => setOpen((v) => !v)}
           aria-label="Change theme"
           className="kivo-focus mx-auto block size-8 rounded-full ring-1 ring-[var(--border)] transition-transform duration-200 ease-[${EASE}] hover:scale-105"
-          style={{ background: current.swatch }}
+          style={{ background: accentColor }}
         />
         {open && (
           <div className="absolute bottom-full left-2 mb-2 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1 shadow-xl">
@@ -369,7 +369,7 @@ function ThemeSwitcher({ collapsed }) {
       >
         <span
           className="size-4 shrink-0 rounded-full ring-1 ring-[var(--border)]"
-          style={{ background: current.swatch }}
+          style={{ background: accentColor }}
         />
         <span className="flex-1 text-left">Theme</span>
         <span className="text-[var(--text-muted)]">{current.label}</span>
