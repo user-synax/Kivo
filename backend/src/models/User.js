@@ -144,12 +144,24 @@ const userSchema = new mongoose.Schema(
     },
 
     // Client-side appearance customization: an accent + canvas-tint overlay on
-    // top of the user's active preset theme. Stored as 6-digit hex colors (or
-    // null = keep the preset's own value). The frontend derives the full CSS
-    // palette from these; the server validates and echoes them back.
+    // top of the user's active preset theme, plus a chat wallpaper pattern and
+    // message-bubble style. Colors are 6-digit hex (or null = keep the
+    // preset's own value); wallpaper/bubbleStyle are enum ids (null = default).
+    // The frontend derives the full CSS palette from these; the server
+    // validates and echoes them back.
     appearance: {
       accent: { type: String, default: null },
       tint: { type: String, default: null },
+      wallpaper: {
+        type: String,
+        enum: ["none", "dots", "grid", "diagonal", "bubbles", "wash"],
+        default: null,
+      },
+      bubbleStyle: {
+        type: String,
+        enum: ["rounded", "pill", "squared", "outline"],
+        default: null,
+      },
     },
   },
   { timestamps: true }

@@ -15,8 +15,9 @@ export const updateSpaceSchema = z.object({
   category: z.enum(SPACE_CATEGORIES).optional(),
   banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),
 
-  // Per-Space palette (theme studio). Both colors are optional 6-digit hex
-  // codes; null clears the palette and members keep their own themes.
+  // Per-Space look (theme studio + chat style). Colors are optional 6-digit
+  // hex codes; wallpaper/bubbleStyle are enum ids; null clears the value and
+  // members keep their own themes.
   appearance: z
     .object({
       accent: z
@@ -27,6 +28,14 @@ export const updateSpaceSchema = z.object({
       tint: z
         .string()
         .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a 6-digit hex code (e.g. #ff5500)")
+        .nullable()
+        .optional(),
+      wallpaper: z
+        .enum(["none", "dots", "grid", "diagonal", "bubbles", "wash"])
+        .nullable()
+        .optional(),
+      bubbleStyle: z
+        .enum(["rounded", "pill", "squared", "outline"])
         .nullable()
         .optional(),
     })

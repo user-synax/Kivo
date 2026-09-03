@@ -3,6 +3,7 @@
 import {
   Bell,
   Check,
+  ChevronRight,
   Eye,
   EyeOff,
   Loader2,
@@ -20,6 +21,10 @@ import { Switch } from "@/components/ui/switch";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
+import {
+  BubbleStylePicker,
+  WallpaperPicker,
+} from "./chat-style-picker";
 import {
   getSoundPrefs,
   previewCue,
@@ -105,7 +110,7 @@ export function ColorInput({ value, label, onChange, badge = false }) {
   );
 }
 
-function ThemeStudio() {
+export function ThemeStudio() {
   const { theme, custom, preview, previewColors, applyCustom } = useTheme();
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -315,41 +320,164 @@ function ThemeStudio() {
   );
 }
 
-function ThemeSection() {
-  const { themeId, themes, setThemeId } = useTheme();
+// Personal chat look: wallpaper + bubble style for DMs/groups (Space channels
+// can override per-field). Saved to `appearance` on the account like colors.
+export function ChatStyleSection() {
+  const { custom } = useTheme();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  const session = getSession();
+  const saved = session?.appearance || {};
+  // Draft values; null keeps the server default (plain + rounded).
+  const [wallpaper, setWallpaper] = useState(saved.wallpaper || null);
+  const [bubbleStyle, setBubbleStyle] = useState(saved.bubbleStyle || null);
+
+  const hasWallpaper = Boolean(saved.wallpaper);
+  const hasBubbleStyle = Boolean(saved.bubbleStyle);
+  const hasChanges =
+    (wallpaper || null) !== (saved.wallpaper || null) ||
+    (bubbleStyle || null) !== (saved.bubbleStyle || null);
+
+  const appearancePayload = (wp, bs) => ({
+    accent: custom?.accent ?? null,
+    tint: custom?.tint ?? null,
+    wallpaper: wp || null,
+    bubbleStyle: bs || null,
+  });
+
+  const handleSave = async () => {
+    if (!hasChanges) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await apiPatch("/api/v1/users/me", {
+        appearance: appearancePayload(wallpaper, bubbleStyle),
+      });
+      setSession(updated, getToken());
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1600);
+    } catch (err) {
+      setError(err?.message || "Could not save your chat look");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await apiPatch("/api/v1/users/me", {
+        appearance: appearancePayload(null, null),
+      });
+      setWallpaper(null);
+      setBubbleStyle(null);
+      setSession(updated, getToken());
+    } catch (err) {
+      setError(err?.message || "Could not reset your chat look");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <SectionCard
-      icon={Palette}
-      title="Appearance"
-      description="Pick a base theme, then make it yours with the studio below."
-    >
-      <div className="space-y-1">
-        {themes.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setThemeId(t.id)}
-            role="radio"
-            aria-checked={t.id === themeId}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] transition-colors duration-150 hover:bg-[var(--hover)] ${
-              t.id === themeId
-                ? "text-[var(--text-primary)]"
-                : "text-[var(--text-muted)]"
-            }`}
-          >
-            <span
-              className="size-4 shrink-0 rounded-full ring-1 ring-[var(--border)]"
-              style={{ background: t.swatch }}
-            />
-            <span className="flex-1 truncate">{t.label}</span>
-            {t.id === themeId && (
-              <span className="size-2 shrink-0 rounded-full bg-[var(--accent)]" />
-            )}
-          </button>
-        ))}
+    <div className="mt-3 border-t border-[var(--border)] pt-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[12px] font-semibold text-[var(--text-primary)]">
+            Chat look
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-muted)]">
+            A wallpaper behind messages and a bubble style for your DMs and
+            groups. Spaces can set their own look for their channels.
+          </p>
+        </div>
+        {(hasWallpaper || hasBubbleStyle) && (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--accent)]">
+            <Check className="h-3 w-3" />
+            Custom chat look on
+          </span>
+        )}
       </div>
-      <ThemeStudio />
-    </SectionCard>
+
+      <p className="mb-1.5 mt-3 text-[12px] font-medium text-[var(--text-primary)]">
+        Wallpaper
+      </p>
+      <WallpaperPicker value={wallpaper} onChange={setWallpaper} />
+
+      <p className="mb-1.5 mt-3 text-[12px] font-medium text-[var(--text-primary)]">
+        Bubble style
+      </p>
+      <BubbleStylePicker value={bubbleStyle} onChange={setBubbleStyle} />
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {hasChanges ? (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
+            Save chat look
+          </button>
+        ) : hasWallpaper || hasBubbleStyle ? (
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--destructive)] disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Reset chat look
+          </button>
+        ) : null}
+        {savedFlash && (
+          <span className="text-[11px] font-medium text-[var(--text-muted)]">
+            Saved ✓
+          </span>
+        )}
+        {error && (
+          <span className="text-[11px] text-[var(--destructive)]">{error}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Launcher row shown at the top of Settings when the host surface can open the
+// full-screen Appearance page (desktop settings column). Appearance is a page
+// of its own now — Settings only points at it.
+function AppearanceLinkCard({ onOpenAppearance }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpenAppearance}
+      className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+        <Palette className="h-4 w-4" strokeWidth={1.8} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium text-[var(--text-primary)]">
+          Appearance
+        </span>
+        <span className="mt-0.5 block text-[12px] leading-snug text-[var(--text-muted)]">
+          Theme, colors, chat wallpaper &amp; bubble style
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+    </button>
   );
 }
 
@@ -757,13 +885,15 @@ function BlockedUsersSection() {
   );
 }
 
-export function SettingsPanel() {
+export function SettingsPanel({ onOpenAppearance }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-3">
+          {onOpenAppearance ? (
+            <AppearanceLinkCard onOpenAppearance={onOpenAppearance} />
+          ) : null}
           <BadgeSection />
-          <ThemeSection />
           <TwoFactorSection />
           <BlockedUsersSection />
           <NotificationsSection />

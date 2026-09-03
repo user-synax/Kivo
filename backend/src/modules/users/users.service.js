@@ -33,17 +33,46 @@ function publicUser(user) {
   };
 }
 
+// Flat appearance shape echoed to clients (colors + chat look). Every field is
+// null when unset so the client can fall back to its own defaults.
+function flatAppearance(a = {}) {
+  return {
+    accent: a.accent || null,
+    tint: a.tint || null,
+    wallpaper: a.wallpaper || null,
+    bubbleStyle: a.bubbleStyle || null,
+  };
+}
+
+// Layer an appearance update onto the existing values: absent keys are kept
+// (partial updates never wipe sibling fields), null clears, provided values
+// replace.
+function mergeAppearance(existing = {}, incoming = {}) {
+  return {
+    accent:
+      incoming.accent !== undefined
+        ? incoming.accent
+        : existing.accent ?? null,
+    tint:
+      incoming.tint !== undefined ? incoming.tint : existing.tint ?? null,
+    wallpaper:
+      incoming.wallpaper !== undefined
+        ? incoming.wallpaper
+        : existing.wallpaper ?? null,
+    bubbleStyle:
+      incoming.bubbleStyle !== undefined
+        ? incoming.bubbleStyle
+        : existing.bubbleStyle ?? null,
+  };
+}
+
 // Self profile shape — everything from publicUser plus the user's own
 // appearance customization. Appearance is deliberately NOT included in
 // publicUser, so other people's search results / profiles never carry it.
 function selfUser(user) {
-  const u = user.toObject ? user.toObject() : user;
   return {
     ...publicUser(user),
-    appearance: {
-      accent: u.appearance?.accent || null,
-      tint: u.appearance?.tint || null,
-    },
+    appearance: flatAppearance(user.appearance),
   };
 }
 
@@ -363,11 +392,10 @@ export async function updateMe({ userId, data }) {
     update.showBadge = Boolean(data.showBadge);
   }
   if (data.appearance !== undefined) {
-    // Normalize: null clears both; a partial object nulls the missing color.
-    update.appearance = {
-      accent: data.appearance?.accent || null,
-      tint: data.appearance?.tint || null,
-    };
+    // Merge onto the current appearance: absent keys are kept, explicit null
+    // clears (so "reset colors" doesn't wipe the chat look and vice versa).
+    const currentUser = await User.findById(userId).select("appearance").lean();
+    update.appearance = mergeAppearance(currentUser?.appearance, data.appearance);
   }
 
   const user = await User.findByIdAndUpdate(userId, update, {

@@ -846,7 +846,7 @@
         --bubble-pad: 10px 16px;
     }
 
-    /* ── transitions-dev: text states swap ──────────────────────────── */
+    /* Transitions-dev: text states swap ─────────────────────────── */
     @keyframes t-text-swap-in {
         from {
             opacity: 0;
@@ -1087,8 +1087,8 @@ html {
 }
 body {
     overscroll-behavior: auto;
-    -webkit-overflow-scrolling: touch;
-}
+    -webkit-overflow-scrolling: touch;}
+
 @media (max-width: 767px) {
     html {
         overscroll-behavior: none;
@@ -1098,4 +1098,30 @@ body {
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
     }
+}
+
+/* ── Chat appearance: bubble style overrides ────────────────────────────────
+   IMPORTANT: deliberately UNLAYERED (top-level, outside @layer components).
+   The chat container carries a `kivo-bubbles-*` class and the bubble content
+   is styled by Tailwind utilities (rounded-xl, bg-primary on BubbleContent);
+   Tailwind v4 puts utilities AFTER components in the cascade, so any layered
+   override loses. These rules sit above every layer so the chosen style
+   always wins, and they keep using theme tokens (per-Space palettes scope
+   them automatically). Covers the main timeline and the thread panel, which
+   both render inside the container. */
+.kivo-bubbles-pill [data-slot="bubble-content"] {
+    border-radius: 24px;
+    padding: 11px 18px;
+}
+
+.kivo-bubbles-squared [data-slot="bubble-content"] {
+    border-radius: 5px;
+}
+
+.kivo-bubbles-outline
+    [data-slot="bubble"][data-align="end"]
+    > [data-slot="bubble-content"] {
+    background: transparent;
+    border: 1.5px solid var(--accent);
+    color: var(--text-primary);
 }

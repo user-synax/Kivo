@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, Palette, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
@@ -12,6 +13,7 @@ import {
   participantId,
   participantName,
 } from "@/lib/chat";
+import { AppearanceScreen } from "./appearance-screen";
 import { ChatPanel } from "./chat-panel";
 import { FriendsModal } from "./friends-modal";
 import { GroupCreateModal } from "./group-create-modal";
@@ -194,20 +196,35 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
   );
 }
 
-function MobileSettingsTab() {
+// Settings is a pushed sub-screen of the mobile Menu now (the bottom bar only
+// holds Chats / Groups / Spaces / Menu). onBack returns to the menu.
+function MobileSettingsTab({ onBack }) {
   return (
     <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
-      <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
-        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</span>
+      <div className={`flex shrink-0 items-center border-b border-[var(--border)] ${onBack ? "gap-1 px-3 py-2.5" : "px-5 py-3.5"}`}>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to menu"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</span>
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5" style={{ overscrollBehavior: "contain" }}>
+      <div
+        className={`min-h-0 flex-1 overflow-hidden pt-1.5 ${onBack ? "pb-[max(env(safe-area-inset-bottom),0.75rem)]" : "pb-[calc(64px+env(safe-area-inset-bottom))]"}`}
+        style={{ overscrollBehavior: "contain" }}
+      >
         <SettingsPanel />
       </div>
     </div>
   );
 }
 
-function MobileProfileTab({ currentUser, onProfileUpdate }) {
+function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [user, setUser] = useState(currentUser);
@@ -269,10 +286,23 @@ function MobileProfileTab({ currentUser, onProfileUpdate }) {
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
-      <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
-        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Profile</span>
+      <div className={`flex shrink-0 items-center border-b border-[var(--border)] ${onBack ? "gap-1 px-3 py-2.5" : "px-5 py-3.5"}`}>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to menu"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Profile</span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-5 pb-[calc(64px+env(safe-area-inset-bottom))] pt-6" style={{ overscrollBehavior: "contain" }}>
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-5 pt-6 ${onBack ? "pb-[max(env(safe-area-inset-bottom),1.25rem)]" : "pb-[calc(64px+env(safe-area-inset-bottom))]"}`}
+        style={{ overscrollBehavior: "contain" }}
+      >
         {user.banner ? (
           <div className="h-28 w-full overflow-hidden rounded-xl border border-[var(--border)]">
             <img src={user.banner} alt="" aria-hidden="true" className="h-full w-full object-cover" />
@@ -316,6 +346,81 @@ function MobileProfileTab({ currentUser, onProfileUpdate }) {
         </button>
       </div>
       <ProfileEditModal open={editOpen} currentUser={user} onClose={() => setEditOpen(false)} onSaved={handleSaved} />
+    </div>
+  );
+}
+
+// Mobile hamburger tab: the bottom bar stays to Chats / Groups / Spaces / Menu;
+// Profile, Appearance and Settings open as pushed screens from here.
+function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings }) {
+  const displayName =
+    currentUser?.displayName || currentUser?.username || currentUser?.email || "Account";
+  return (
+    <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+      <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
+        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Menu</span>
+      </div>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-2"
+        style={{ overscrollBehavior: "contain" }}
+      >
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <Avatar name={displayName} avatarStyle={currentUser?.avatarStyle} url={currentUser?.avatarUrl} size="sm" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                {currentUser?.displayName || currentUser?.username || "Profile"}
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                {currentUser?.username ? `@${currentUser.username}` : "Your public profile"}
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenAppearance}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+              <Palette className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Appearance
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Theme, colors &amp; chat look — opens full screen
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+              <Settings className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Settings
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Badge, 2FA, blocked users, notifications &amp; sounds
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1558,21 +1663,43 @@ export function DashboardShell() {
                     onDiscover={() => setShowDiscover(true)}
                   />
                 )}
-                {mobileTab === "settings" && <MobileSettingsTab />}
+                {mobileTab === "menu" && (
+                  <MobileMenuTab
+                    currentUser={currentUser}
+                    onOpenProfile={() => setMobileTab("profile")}
+                    onOpenAppearance={() => setMobileTab("appearance")}
+                    onOpenSettings={() => setMobileTab("settings")}
+                  />
+                )}
+                {mobileTab === "settings" && (
+                  <MobileSettingsTab onBack={() => setMobileTab("menu")} />
+                )}
                 {mobileTab === "profile" && (
-                  <MobileProfileTab currentUser={currentUser} onProfileUpdate={refreshUser} />
+                  <MobileProfileTab
+                    currentUser={currentUser}
+                    onProfileUpdate={refreshUser}
+                    onBack={() => setMobileTab("menu")}
+                  />
                 )}
               </div>
-              <BottomTabBar
-                active={mobileTab}
-                onChange={(id) => {
-                  setMobileTab(id);
-                }}
-                unread={tabUnread}
-              />
+              {(mobileTab === "chats" ||
+                mobileTab === "groups" ||
+                mobileTab === "spaces" ||
+                mobileTab === "menu") && (
+                <BottomTabBar
+                  active={mobileTab}
+                  onChange={(id) => {
+                    setMobileTab(id);
+                  }}
+                  unread={tabUnread}
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
+      {mobileTab === "appearance" && (
+        <AppearanceScreen onClose={() => setMobileTab("menu")} />
+      )}
       <FriendsModal
         open={showFriends}
         onClose={() => setShowFriends(false)}

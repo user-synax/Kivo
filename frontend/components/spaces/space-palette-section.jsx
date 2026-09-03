@@ -2,9 +2,14 @@
 
 import { Check, Loader2, Palette } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  BubbleStylePicker,
+  WallpaperPicker,
+} from "@/components/dashboard/chat-style-picker";
 import { ColorDot, ColorInput } from "@/components/dashboard/settings-panel";
 import { useTheme } from "@/components/theme-provider";
 import { apiPatch } from "@/lib/api";
+import { wallpaperCss } from "@/lib/chat-style";
 import {
   ACCENT_PRESETS,
   cssVarsForColors,
@@ -12,40 +17,64 @@ import {
   TINT_PRESETS,
 } from "@/lib/theme";
 
-// Per-Space palette editor. Owners/admins pick an accent + canvas tint that
-// members' clients layer on top of their own theme while viewing this Space's
-// channels (chat-panel scopes the tokens to the open channel view). The same
-// derivePalette engine drives it, so contrast is preserved exactly like the
-// personal theme studio in Settings.
+// Per-Space look editor. Owners/admins pick an accent + canvas tint, a chat
+// wallpaper, and a bubble style that members' clients layer on top of their
+// own theme while viewing this Space's channels (chat-panel scopes the tokens
+// to the open channel view). The same derivePalette engine drives it, so
+// contrast is preserved exactly like the personal theme studio in Settings.
+// Wallpaper/bubbleStyle use null = "each member's own" (inherit), mirroring
+// how null accent/tint keep the member's own colors.
 export function SpacePaletteSection({ space, onUpdated, canEdit }) {
   const { colors: baseColors } = useTheme();
   const saved = space?.appearance || null;
 
   const [accent, setAccent] = useState(saved?.accent || null);
   const [tint, setTint] = useState(saved?.tint || null);
+  const [wallpaper, setWallpaper] = useState(saved?.wallpaper || null);
+  const [bubbleStyle, setBubbleStyle] = useState(saved?.bubbleStyle || null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     setAccent(space?.appearance?.accent || null);
     setTint(space?.appearance?.tint || null);
+    setWallpaper(space?.appearance?.wallpaper || null);
+    setBubbleStyle(space?.appearance?.bubbleStyle || null);
     setError(null);
   }, [space]);
 
   const hasChanges =
     (accent?.toLowerCase() || null) !==
       (saved?.accent?.toLowerCase() || null) ||
-    (tint?.toLowerCase() || null) !== (saved?.tint?.toLowerCase() || null);
-  const hasPalette = Boolean(saved?.accent || saved?.tint);
+    (tint?.toLowerCase() || null) !== (saved?.tint?.toLowerCase() || null) ||
+    (wallpaper || null) !== (saved?.wallpaper || null) ||
+    (bubbleStyle || null) !== (saved?.bubbleStyle || null);
+  const hasLook = Boolean(
+    saved?.accent ||
+      saved?.tint ||
+      saved?.wallpaper ||
+      saved?.bubbleStyle,
+  );
 
-  // Live preview: layer the draft palette on the member's current colors.
-  const previewVars =
+  // Live preview: layer the draft palette on the member's current colors and
+  // paint the draft wallpaper / bubble style onto the mini chat mock.
+  const colorVars =
     accent || tint
-      ? {
-          ...cssVarsForColors(derivePalette(baseColors, { accent, tint })),
-          background: "var(--bg-base)",
-        }
+      ? cssVarsForColors(derivePalette(baseColors, { accent, tint }))
       : null;
+  const previewWallCss = wallpaperCss(wallpaper || "none");
+  const sentBubbleStyle =
+    bubbleStyle === "outline"
+      ? {
+          background: "transparent",
+          border: "1.5px solid var(--accent)",
+          color: "var(--accent)",
+        }
+      : {
+          background: "var(--bubble-sent)",
+          color: "var(--bubble-sent-fg)",
+        };
+  const miniRadius = bubbleStyle === "squared" ? 4 : bubbleStyle === "rounded" ? 10 : 9;
 
   const save = async (values) => {
     if (!canEdit) return;
@@ -57,17 +86,25 @@ export function SpacePaletteSection({ space, onUpdated, canEdit }) {
       });
       onUpdated?.(updated);
     } catch (e) {
-      setError(e?.message || "Could not save palette");
+      setError(e?.message || "Could not save look");
     } finally {
       setBusy(false);
     }
   };
 
-  const savePalette = () => save({ accent, tint });
-  const resetPalette = () => {
+  const saveLook = () =>
+    save({ accent, tint, wallpaper: wallpaper || null, bubbleStyle: bubbleStyle || null });
+  const resetLook = () => {
     setAccent(null);
     setTint(null);
-    save({ accent: null, tint: null });
+    setWallpaper(null);
+    setBubbleStyle(null);
+    save({
+      accent: null,
+      tint: null,
+      wallpaper: null,
+      bubbleStyle: null,
+    });
   };
 
   const accentSelected = (hex) =>
@@ -83,11 +120,12 @@ export function SpacePaletteSection({ space, onUpdated, canEdit }) {
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium text-[var(--text-primary)]">
-            Space palette
+            Space look
           </h3>
           <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--text-muted)]">
-            Give this Space its own accent and canvas tone. Members see these
-            colors layered on their theme while viewing its channels.
+            Give this Space its own accent, canvas tone, chat wallpaper, and
+            bubble style. Members see these layered on their theme while
+            viewing its channels.
           </p>
         </div>
       </div>
@@ -166,62 +204,90 @@ export function SpacePaletteSection({ space, onUpdated, canEdit }) {
             </div>
           </div>
 
-          {/* Live mini preview rendered with the composed tokens */}
-          {previewVars && (
-            <div
-              className="mt-3 rounded-lg border border-[var(--border)] p-3"
-              style={previewVars}
-            >
-              <div className="flex">
-                <div
-                  className="max-w-[75%] rounded-lg rounded-bl-sm px-2.5 py-1.5 text-[11px] leading-snug"
-                  style={{
-                    background: "var(--bg-elevated)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  Hey everyone 👋
-                </div>
-              </div>
-              <div className="mt-1.5 flex justify-end">
-                <div
-                  className="max-w-[75%] rounded-lg rounded-br-sm px-2.5 py-1.5 text-[11px] leading-snug"
-                  style={{
-                    background: "var(--bubble-sent)",
-                    color: "var(--bubble-sent-fg)",
-                  }}
-                >
-                  Welcome to the Space ✨
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                <span
-                  className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
-                  style={{
-                    background: "var(--accent)",
-                    color: "var(--on-accent)",
-                  }}
-                >
-                  #general
-                </span>
-                <span
-                  className="rounded-full px-2 py-0.5 text-[9px] font-medium"
-                  style={{
-                    background: "var(--accent-soft)",
-                    color: "var(--accent)",
-                  }}
-                >
-                  accent preview
-                </span>
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <p className="text-[12px] font-medium text-[var(--text-primary)]">
+                Chat wallpaper
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                pattern behind messages
+              </p>
+            </div>
+            <WallpaperPicker
+              value={wallpaper}
+              onChange={setWallpaper}
+              allowInherit
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <p className="text-[12px] font-medium text-[var(--text-primary)]">
+                Bubble style
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                shape of message bubbles
+              </p>
+            </div>
+            <BubbleStylePicker
+              value={bubbleStyle}
+              onChange={setBubbleStyle}
+              allowInherit
+            />
+          </div>
+
+          {/* Live mini preview composed from the draft tokens */}
+          <div
+            className="mt-3 rounded-lg border border-[var(--border)] p-3"
+            style={{ ...colorVars, background: "var(--bg-base)", ...previewWallCss }}
+          >
+            <div className="flex">
+              <div
+                className="max-w-[75%] px-2.5 py-1.5 text-[11px] leading-snug"
+                style={{
+                  background: "var(--bubble-received)",
+                  color: "var(--text-primary)",
+                  borderRadius: miniRadius,
+                }}
+              >
+                Hey everyone 👋
               </div>
             </div>
-          )}
+            <div className="mt-1.5 flex justify-end">
+              <div
+                className="max-w-[75%] px-2.5 py-1.5 text-[11px] leading-snug"
+                style={sentBubbleStyle}
+              >
+                Welcome to the Space ✨
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              <span
+                className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+                style={{
+                  background: "var(--accent)",
+                  color: "var(--on-accent)",
+                }}
+              >
+                #general
+              </span>
+              <span
+                className="rounded-full px-2 py-0.5 text-[9px] font-medium"
+                style={{
+                  background: "var(--accent-soft)",
+                  color: "var(--accent)",
+                }}
+              >
+                accent preview
+              </span>
+            </div>
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {hasChanges && (
               <button
                 type="button"
-                onClick={savePalette}
+                onClick={saveLook}
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 self-start rounded-full bg-[var(--accent)] px-4 py-2 text-[12px] font-semibold text-[var(--on-accent)] transition-opacity hover:opacity-90 disabled:opacity-40"
               >
@@ -230,13 +296,13 @@ export function SpacePaletteSection({ space, onUpdated, canEdit }) {
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}
-                Save palette
+                Save look
               </button>
             )}
-            {hasPalette && !hasChanges && (
+            {hasLook && !hasChanges && (
               <button
                 type="button"
-                onClick={resetPalette}
+                onClick={resetLook}
                 disabled={busy}
                 className="inline-flex items-center self-start rounded-full border border-[var(--border)] px-4 py-2 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
               >
@@ -252,9 +318,9 @@ export function SpacePaletteSection({ space, onUpdated, canEdit }) {
         </>
       ) : (
         <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
-          {hasPalette
-            ? "This Space has a custom palette — you'll see it while viewing its channels."
-            : "This Space uses its default palette. Only owners and admins can change it."}
+          {hasLook
+            ? "This Space has a custom look — you'll see it while viewing its channels."
+            : "This Space uses the default look. Only owners and admins can change it."}
         </p>
       )}
     </div>

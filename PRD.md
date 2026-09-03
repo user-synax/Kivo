@@ -85,6 +85,7 @@ Kivo
 | Theme System | **Complete** | 10 themes (6 dark + 4 light), live switching; preset persisted in localStorage |
 | Custom Colors (Theme Studio) | **Complete** | Per-user accent + canvas-tint overlay over any preset, live preview, saved to the account (`appearance` field) and synced on login |
 | Space Palettes | **Complete** | Per-Space accent + tint (`Space.appearance`), set by owners/admins in Space settings with live preview; scoped to the channel chat view for all members |
+| Chat Look (Wallpaper & Bubble Style) | **Complete** | `appearance.wallpaper` (none/dots/diagonal/wash) + `appearance.bubbleStyle` (rounded/squared/outline) on user and Space; wallpapers painted with CSS `color-mix()` over theme tokens (auto re-tint for dark/light + Space palettes, zero extra color state), bubble geometry via container-scoped CSS classes; partial updates merge (a color reset never wipes the chat look and vice versa); Spaces can set per-field "member's own" inheritance |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
@@ -541,7 +542,7 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 
 | Breakpoint | Layout |
 |---|---|
-| Mobile (< 768px) | Stack: conversation list → chat panel → detail panel, with a **bottom tab bar** (Chats / Spaces / Profile) |
+| Mobile (< 768px) | Stack: conversation list → chat panel → detail panel, with a **bottom tab bar** (Chats / Groups / Spaces / Menu); Profile, Settings and Appearance open as pushed screens from the Menu |
 | Desktop (768px+) | Sidebar + chat panel + optional detail panel |
 | Desktop XL (1280px+) | Three-column: sidebar + chat + user detail panel |
 

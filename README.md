@@ -37,7 +37,7 @@
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
 - 🤝 **Complete friends system** — send, accept, decline, **remove**, search, and jump straight into a DM.
-- 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Settings / Profile) and an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
+- 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Menu) with Profile, Settings, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
 - 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
 - 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation, and audit logging.
@@ -90,7 +90,7 @@ Although Kivo is a **student project**, the messaging core is **fully functional
 - 🎨 **Personalizing your chat** with 10 live-switchable themes (dark & light)
 - 📎 **Sharing files and images** — drag or click to upload up to 10 files (30 MB each), preview images in a lightbox, view documents inline
 - 🟢 Real-time presence, typing indicators, read receipts, `@mentions`, and message replies, **forwarding & pinning**
-- 📱 A **bottom tab bar** (Chats / Groups / Spaces / Settings / Profile) makes the app feel native on phones
+- 📱 A **bottom tab bar** (Chats / Groups / Spaces / Menu) makes the app feel native on phones; Profile, Settings and a full-screen Appearance page open from the Menu
 - 🧑‍🤝‍🧑 Public profile pages at `/u/username` — shareable, with badges, country, and GitHub activity
 
 It's a great platform for **normal, everyday conversations** — no enterprise features needed.
@@ -126,7 +126,9 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Theme system (**10 themes**, 6 dark + 4 light, live switching, no reload)
 - **Custom per-user colors** — theme studio in Settings: recolor any preset's accent + canvas tone, live preview, saved to your account (server-synced, follows you across devices)
 - **Per-Space palettes** — owners/admins give a Space its own accent + canvas tone (Space settings); every member's chat view adopts them while viewing that Space's channels
-- **Mobile UX** (bottom tab bar with 5 tabs, responsive panels, edge-swipe back, safe-area handling)
+- **Chat wallpapers & bubble styles** — six patterns (dots / grid / lines / bubbles / accent wash / plain) behind the message list plus Rounded / Pill / Squared / Outlined-mine bubbles; set per user (Appearance page → Chat look) and per Space (Space settings → Space look, with "member's own" inheritance)
+- **Avatar rings follow your accent** — identity ring re-tints with your theme-studio color
+- **Mobile UX** (Chats / Groups / Spaces / Menu bottom bar, pushed Settings & Profile screens, full-screen Appearance page, responsive panels, edge-swipe back, safe-area handling)
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
 - **Voice messages** (hold-to-record in the composer, slide up to cancel, inline play/pause player with progress + duration — recorded in-browser via MediaRecorder, stored as-is, no transcoding)

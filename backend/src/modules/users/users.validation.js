@@ -52,9 +52,10 @@ export const updateMeSchema = z.object({
     .or(z.literal("")),
   showBadge: z.boolean().optional(),
 
-  // Per-user appearance customization (theme studio). Both colors are optional
-  // 6-digit hex codes; a null value (or null object) clears the customization
-  // and falls back to the preset theme's own colors.
+  // Per-user appearance customization (theme studio + chat look). Colors are
+  // optional 6-digit hex codes; wallpaper/bubbleStyle are enum ids; a null
+  // value (or null object) clears the customization and falls back to the
+  // preset theme's own values.
   appearance: z
     .object({
       accent: z
@@ -65,6 +66,14 @@ export const updateMeSchema = z.object({
       tint: z
         .string()
         .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a 6-digit hex code (e.g. #ff5500)")
+        .nullable()
+        .optional(),
+      wallpaper: z
+        .enum(["none", "dots", "grid", "diagonal", "bubbles", "wash"])
+        .nullable()
+        .optional(),
+      bubbleStyle: z
+        .enum(["rounded", "pill", "squared", "outline"])
         .nullable()
         .optional(),
     })

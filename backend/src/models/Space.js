@@ -55,12 +55,23 @@ const spaceSchema = new mongoose.Schema(
     members: { type: [memberSchema], default: [] },
     channels: { type: [channelSchema], default: [] },
 
-    // Per-Space palette (theme studio): an accent + canvas tint that members'
-    // clients apply while viewing this Space's channels. Hex colors, or null
-    // = keep each member's own theme. Only owner/admins can edit.
+    // Per-Space look (theme studio): an accent + canvas tint that members'
+    // clients apply while viewing this Space's channels, plus a chat wallpaper
+    // pattern and message-bubble style. Hex colors, or null = keep each
+    // member's own theme. Only owner/admins can edit.
     appearance: {
       accent: { type: String, default: null },
       tint: { type: String, default: null },
+      wallpaper: {
+        type: String,
+        enum: ["none", "dots", "grid", "diagonal", "bubbles", "wash"],
+        default: null,
+      },
+      bubbleStyle: {
+        type: String,
+        enum: ["rounded", "pill", "squared", "outline"],
+        default: null,
+      },
     },
 
     // Discoverability & access. `public` spaces appear in Discover and accept

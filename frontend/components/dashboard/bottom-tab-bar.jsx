@@ -1,15 +1,16 @@
 "use client";
 
-import { Layers, MessageCircle, Settings, Users, User } from "lucide-react";
+import { Layers, Menu, MessageCircle, Users } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
+// Mobile bottom navigation: Settings, Profile and Appearance moved behind the
+// hamburger “Menu” tab so the bar stays to four primary destinations.
 const TABS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
   { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
-  { id: "settings", label: "Settings", icon: Settings },
-  { id: "profile", label: "Profile", icon: User },
+  { id: "menu", label: "Menu", icon: Menu },
 ];
 
 const EASE = [0.22, 1, 0.36, 1];

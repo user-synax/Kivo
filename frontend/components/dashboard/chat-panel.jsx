@@ -62,6 +62,10 @@ import {
     subscribeOutbox,
 } from "@/lib/outbox";
 import { cssVarsForColors, customIsActive, derivePalette } from "@/lib/theme";
+import {
+  resolveChatLook,
+  wallpaperCss,
+} from "@/lib/chat-style";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { uploadSingleFileObject, useFileUpload } from "@/lib/use-file-upload";
 
@@ -2129,6 +2133,17 @@ export function ChatPanel({
             ? cssVarsForColors(derivePalette(memberColors, spaceAppearance))
             : undefined;
 
+    // Chat look: wallpaper + bubble style. In a Space channel the Space's own
+    // look wins per-field when it is set (a Space may pin "plain" to override
+    // members' wallpapers); otherwise the member's personal chat appearance
+    // applies (defaults: plain + rounded). Both values re-tint through CSS
+    // vars, so they compose with per-Space palettes automatically.
+    const chatLook = resolveChatLook({
+        spaceAppearance: isChannel ? spaceAppearance : null,
+        personalAppearance: currentUser?.appearance,
+    });
+    const chatWallpaperCss = wallpaperCss(chatLook.wallpaper);
+
     const pinPreview = (pm) => {
         if (pm.content) {
             const flat = pm.content.replace(/\s+/g, " ").trim();
@@ -2149,11 +2164,21 @@ export function ChatPanel({
 
     return (
         <div
-            className="relative flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] max-md:isolate"
+            className={`relative isolate flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] kivo-bubbles-${chatLook.bubbleStyle}`}
             style={spaceThemeVars}
         >
+            {/* Wallpaper layer — sits under every opaque surface (header,
+                pinned banner, composer) and shows through the transparent
+                message list, fixed while messages scroll. */}
+            {convId && chatWallpaperCss && (
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 z-0"
+                    style={chatWallpaperCss}
+                />
+            )}
             {/* Header — keep visible on mobile when keyboard opens (sticky + bg) */}
-            <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0">
+            <div className="relative z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0">
                 {onBack && (
                     <button
                         type="button"
@@ -2312,7 +2337,7 @@ export function ChatPanel({
 
             {/* Pinned messages banner — newest pins first, jump-to-message on tap */}
             {pinnedMessages.length > 0 && !selectMode && (
-                <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-1.5 scrollbar-none">
+                <div className="relative z-10 flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-1.5 scrollbar-none">
                     <Pin className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
                     {pinnedMessages.slice(0, 3).map((pm) => (
                         <button
@@ -2351,7 +2376,7 @@ export function ChatPanel({
                         if (nearBottom) markConversationRead();
                     }
                 }}
-                className="t-scroll flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12"
+                className="t-scroll relative z-10 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12"
                 style={{ overscrollBehavior: "contain" }}
             >
                 {loadingHistory && (

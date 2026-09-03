@@ -109,7 +109,7 @@ The open conversation or channel. For DMs on very wide screens a **right panel**
 
 ### Mobile
 
-On a phone, Kivo shows a **bottom tab bar** with five sections — **Chats**, **Groups**, **Spaces**, **Settings**, and **Profile** — so navigation feels native. Open a chat to see messages; use **Back** (header or edge-swipe) to return to the list. Safe-area insets are handled on notched devices.
+On a phone, Kivo shows a **bottom tab bar** with four destinations — **Chats**, **Groups**, **Spaces**, and **Menu** — so navigation feels native. The **Menu** tab opens your profile, **Appearance** (a full-screen theme page), and **Settings** as pushed screens with a back button to the Menu. Open a chat to see messages; use **Back** (header or edge-swipe) to return to the list. Safe-area insets are handled on notched devices.
 
 **Remembered state & instant paint:** the last open conversation is restored after refresh, Space expand state is saved, and your conversations, Spaces, friends, and friend requests are cached in the browser (IndexedDB), so lists paint instantly while fresh data loads. The latest 50 messages of each chat are cached too.
 
@@ -419,9 +419,9 @@ You cannot assign the **owner** role directly. You cannot remove the last owner.
 - Remove a member (or leave yourself).
 - Join/leave and role changes emit system messages into channels and update live.
 
-### Space palette (owners & admins)
+### Space look (owners & admins)
 
-A Space can carry its own **accent + canvas tone** (the same theme-studio controls as Settings). Open **Space settings → Space palette**, pick colors — a live mini-preview shows how they'll look — and **Save palette**. The palette rides on the Space record, so **every member sees it automatically**: while viewing that Space's channels, the chat view is scoped to the Space's colors while the rest of the app (sidebar, lists) keeps each member's own theme. **Reset to default** puts members back on their personal themes. Members without edit rights can view the current state but not change it.
+A Space can carry its own **look**: an accent + canvas tone (the same theme-studio controls as Settings), a **chat wallpaper** (the pattern behind messages in its channels), and a **bubble style**. Open **Space settings → Space look**, pick any of the four controls — a live mini-preview shows a mock chat with your colors, wallpaper, and bubble shapes — and **Save look**. The look rides on the Space record, so **every member sees it automatically**: while viewing that Space's channels, the chat view is scoped to the Space's colors/wallpaper/bubble style while the rest of the app (sidebar, lists) keeps each member's own theme. Each field can also stay on **"Member's own"** so that control keeps following each member's personal choice. **Reset to default** puts members back on their personal themes. Members without edit rights can view the current state but not change it.
 
 ### Delete a Space
 
@@ -478,7 +478,7 @@ Search results that point at a person open this same profile in a drawer inside 
 
 ## 10. Themes
 
-**Where:** **Settings → Appearance** (gear/avatar rail on desktop; Settings tab on mobile).
+**Where:** the **Appearance** page — full screen. Desktop: Settings column → **Appearance** row. Mobile: Menu tab → **Appearance**.
 
 **Ten** live palettes (no page reload). Your base-theme choice is stored in the browser (`localStorage`, key `kivo:theme`); custom colors below are saved to your account so they follow you across devices.
 
@@ -504,7 +504,16 @@ Below the palette in **Settings → Appearance** is the theme studio. It layers 
 
 Every click applies **live** to the whole app — no preview modal, no reload. The wash preserves each surface's original lightness, so text contrast is never broken (the engine only shifts hue, never ink). **Save to my account** persists the pair to your profile (`appearance` on the user record); log in anywhere and your colors come with you. **Remove my colors** clears it and falls back to the preset palette.
 
-All themes share the same layout, corner radius, and elevation; only colors change. If your OS asks for reduced motion, animations stay minimal.
+### Chat look (wallpaper & bubble style)
+
+Below the studio, **Settings → Appearance → Chat look** styles the chat surface itself (applies to your DMs and groups; Spaces can override per-field with their own look):
+
+- **Wallpaper** — a subtle pattern behind the message list: **Plain**, **Dots**, **Grid**, **Lines** (thin diagonals), **Bubbles** (two dot scales), or **Wash** (a soft accent gradient). Patterns are painted in the theme's own ink at low opacity, so they stay faint on both dark and light canvases and re-tint automatically when a Space palette is active. **Plain** keeps the flat background.
+- **Bubble style** — **Rounded** (default, 12px), **Pill** (extra-round airy corners), **Squared** (tight corners), or **Outlined (mine)**: your messages become accent-outlined bubbles with a transparent fill.
+
+Changes save to your account (`appearance.wallpaper` / `appearance.bubbleStyle`), follow you across devices, and apply to the main chat **and** thread panel. Wallpapers are pure CSS — a fixed layer behind the scrolling messages — so they cost nothing to paint or scroll.
+
+All themes share the same layout and elevation; only colors change — plus the optional bubble geometry and wallpaper you pick above. If your OS asks for reduced motion, animations stay minimal.
 
 ---
 
@@ -785,7 +794,7 @@ What does **not** queue: file/photo attachments (uploads need a live connection)
 
 ### Enabling 2FA
 
-- Open **Settings → Security** (bottom of the left sidebar on desktop, the Settings tab on mobile).
+- Open **Settings → Security** (desktop: gear icon → Settings; mobile: Menu tab → Settings).
 - Click **Enable two-factor authentication** — the app generates a secret and shows a QR code plus a manual entry code.
 - Scan the QR with any authenticator app (Google Authenticator, Authy, 1Password, …) or enter the secret manually, then type the 6-digit code to confirm. Nothing is enabled until this step verifies.
 - Once enabled, Kivo shows **one-time backup codes** — save them somewhere safe. Each code can be used once to sign in if you lose access to your authenticator.
@@ -818,7 +827,7 @@ Do not expect these in the current MVP:
 | Feature | How you use it |
 |---------|----------------|
 | Sign up / log in / session refresh | `/signup`, `/login`; instant signup, stay on `/app` |
-| Log out | Profile tab / `/app/profile` |
+| Log out | Menu → Profile / `/app/profile` |
 | Friends: add, accept, decline, list, search, remove | New menu → Friends; Unfriend on profiles |
 | Open DM from a friend | Friends → **Message** |
 | Send / reply / react / edit / delete / copy / forward / pin messages | Chat panel + bubble menu (double-click = ❤️) |
@@ -829,15 +838,16 @@ Do not expect these in the current MVP:
 | Typing, presence, read receipts | Automatic while connected |
 | Group create / members / admins | Groups panel → New group + group settings |
 | Spaces, channels, roles, Discover | Spaces panel + Discover + Space settings |
-| Profile, avatar, frame, banner, bio, status, country, GitHub | Icon-rail avatar / Profile tab |
+| Profile, avatar, frame, banner, bio, status, country, GitHub | Icon-rail avatar (desktop) / Menu → Profile (mobile) |
 | Public profile & verified badge | `/u/:username` (badge toggle in Settings) |
 | Block users + manage the list | DM header, profile drawer, public profile, Settings → Blocked users |
-| Ten themes + custom accent/canvas (theme studio) | Settings → Appearance → Save to my account |
+| Ten themes + custom accent/canvas (theme studio) | Appearance page → Save to my account (desktop: Settings → Appearance row; mobile: Menu → Appearance) |
+| Chat wallpapers + bubble styles (personal + per-Space) | Appearance page → Chat look · Space settings → Space look |
 | Notification preferences | Settings → Notification preferences |
 | In-app notifications | Bell in panel header |
 | Web push | Allow notifications when opening the bell |
 | Install PWA | Browser install / Add to Home Screen |
-| Mobile bottom tab bar (Chats/Groups/Spaces/Settings/Profile) | On phone-sized screens |
+| Mobile bottom tab bar (Chats/Groups/Spaces/Menu) + full-screen Appearance page | On phone-sized screens |
 | Offline list + message caching | Automatic via IndexedDB (last 50 per chat) |
 | Reconnect gap-fill | Automatic after socket reconnect |
 | File & image attachments (images, PDFs, docs) | Paperclip button in composer |

@@ -19,6 +19,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
+import { AppearanceScreen } from "@/components/dashboard/appearance-screen";
 import { IconRail } from "@/components/dashboard/icon-rail";
 import { SettingsPanel } from "@/components/dashboard/settings-panel";
 import { cn } from "@/lib/utils";
@@ -327,6 +328,7 @@ export function NestedSidebar({
 }) {
   const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState("chats");
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -563,7 +565,7 @@ export function NestedSidebar({
                 style={{ overscrollBehavior: "contain" }}
               >
                 {/* Skip search for settings if filtered — but keep panel consistent */}
-                <SettingsPanel />
+                <SettingsPanel onOpenAppearance={() => setAppearanceOpen(true)} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -576,6 +578,10 @@ export function NestedSidebar({
         onClose={() => setProfileOpen(false)}
         onSaved={() => onProfileUpdate?.()}
       />
+
+      {appearanceOpen && (
+        <AppearanceScreen onClose={() => setAppearanceOpen(false)} />
+      )}
     </div>
   );
 }

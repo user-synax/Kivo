@@ -230,10 +230,11 @@ export function DocsScreen() {
               </ul>
               <p>
                 On a phone the same panels live in a bottom tab bar — Chats,
-                Groups, Spaces, Settings, and Profile — so it feels like a
-                native app. Open a chat, then use Back in the header (or an
-                edge swipe) to return. Click your avatar in the rail (or open
-                the Profile tab) to edit your profile. Kivo remembers the last
+                Groups, Spaces, and Menu — so it feels like a native app. The
+                Menu opens your profile, a full-screen Appearance page, and
+                Settings. Open a chat, then use Back in the header (or an edge
+                swipe) to return. Click your avatar in the rail (or open the
+                Menu → Profile) to edit your profile. Kivo remembers the last
                 chat you had open, and your lists plus the latest messages
                 paint instantly from a local browser cache while fresh data
                 arrives.
@@ -515,12 +516,15 @@ export function DocsScreen() {
                 can rejoin from Discover (public Spaces) or a fresh invite
                 (private Spaces).
               </p>
-              <h3 className="doc-h3">Space palette</h3>
+              <h3 className="doc-h3">Space look</h3>
               <p>
-                Owners and admins can give a Space its own accent and canvas
-                tone (Space settings → Space palette, with a live preview).
-                Everyone sees those colors while viewing the Space's channels;
-                the rest of the app keeps their own theme. Reset to default
+                Owners and admins can give a Space its own look (Space
+                settings → Space look, with a live mini chat preview): an
+                accent and canvas tone, a chat wallpaper (pattern behind
+                messages), and a bubble style. Everyone sees those while
+                viewing the Space's channels; the rest of the app keeps their
+                own theme. Each control can also stay on "Member's own" so it
+                follows each member's personal choice. Reset to default
                 returns to personal themes.
               </p>
               <h3 className="doc-h3">Channel types</h3>
@@ -545,8 +549,10 @@ export function DocsScreen() {
 
             <Section id="profile" title="Profile & themes">
               <p>
-                Click your avatar in the icon rail (or the Profile tab on
-                mobile) to edit your profile.
+                Click your avatar in the icon rail (or open Menu → Profile on
+                mobile) to edit your profile. Appearance lives on its own
+                full-screen page — Settings → Appearance on desktop, Menu →
+                Appearance on mobile.
               </p>
               <ul className="mt-3 flex flex-col gap-2">
                 <Bullet>Display name, unique username, bio (280), status (60)</Bullet>
@@ -591,6 +597,17 @@ export function DocsScreen() {
                 you keep your colors on every device. Contrast is preserved
                 automatically: only surface hues change, never ink lightness.
                 Remove my colors returns you to the theme's own palette.
+              </p>
+              <h3 className="doc-h3">Chat look (wallpaper & bubble style)</h3>
+              <p>
+                On the Appearance page → Chat look you can style the chat
+                surface for your DMs and groups: a wallpaper behind messages
+                (Plain, Dots, Grid, Lines, Bubbles, or an accent Wash — the
+                pattern re-tints for dark/light themes automatically) and a
+                bubble style (Rounded, Pill, Squared, or Outlined (mine),
+                which turns your own messages into accent-outlined bubbles).
+                Saved to your account like colors. Spaces can set their own
+                look for their channels in Space settings.
               </p>
             </Section>
 

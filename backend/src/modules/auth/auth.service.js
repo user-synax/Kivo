@@ -146,10 +146,12 @@ function publicUser(user) {
     isEmailVerified: user.isEmailVerified || false,
     createdAt: user.createdAt,
     // Appearance customization ships with every session user so the client can
-    // re-apply the user's colors on login without an extra round-trip.
+    // re-apply the user's colors + chat look on login without a round-trip.
     appearance: {
       accent: user.appearance?.accent || null,
       tint: user.appearance?.tint || null,
+      wallpaper: user.appearance?.wallpaper || null,
+      bubbleStyle: user.appearance?.bubbleStyle || null,
     },
   };
 }

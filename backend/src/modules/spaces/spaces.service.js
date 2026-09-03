@@ -72,11 +72,13 @@ async function toPublicSpace(space, userId) {
     visibility: obj.visibility || "public",
     avatarUrl: obj.avatarUrl || null,
     banner: obj.banner || null,
-    // Per-Space palette — carried on every public payload (avatar/banner are
+    // Per-Space look — carried on every public payload (avatar/banner are
     // public too) so members' clients can apply it without an extra fetch.
     appearance: {
       accent: obj.appearance?.accent || null,
       tint: obj.appearance?.tint || null,
+      wallpaper: obj.appearance?.wallpaper || null,
+      bubbleStyle: obj.appearance?.bubbleStyle || null,
     },
     owner: obj.owner.toString(),
     members,
@@ -197,6 +199,8 @@ export async function listSpaces({ userId }) {
       appearance: {
         accent: s.appearance?.accent || null,
         tint: s.appearance?.tint || null,
+        wallpaper: s.appearance?.wallpaper || null,
+        bubbleStyle: s.appearance?.bubbleStyle || null,
       },
       owner: s.owner.toString(),
       members,
@@ -261,10 +265,26 @@ export async function updateSpace({ spaceId, userId, data, avatar }) {
   if (data.category !== undefined) update.category = data.category;
   if (data.banner !== undefined) update.banner = data.banner || null;
   if (data.appearance !== undefined) {
-    // Normalize: null clears both; a partial object nulls the missing color.
+    // Merge onto the Space's current appearance: absent keys are kept, explicit
+    // null clears (so resetting the palette doesn't wipe the chat look and
+    // vice versa).
     update.appearance = {
-      accent: data.appearance?.accent || null,
-      tint: data.appearance?.tint || null,
+      accent:
+        data.appearance?.accent !== undefined
+          ? data.appearance.accent
+          : space.appearance?.accent ?? null,
+      tint:
+        data.appearance?.tint !== undefined
+          ? data.appearance.tint
+          : space.appearance?.tint ?? null,
+      wallpaper:
+        data.appearance?.wallpaper !== undefined
+          ? data.appearance.wallpaper
+          : space.appearance?.wallpaper ?? null,
+      bubbleStyle:
+        data.appearance?.bubbleStyle !== undefined
+          ? data.appearance.bubbleStyle
+          : space.appearance?.bubbleStyle ?? null,
     };
   }
   if (data.visibility !== undefined) update.visibility = data.visibility;
