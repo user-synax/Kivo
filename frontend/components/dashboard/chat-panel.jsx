@@ -936,6 +936,8 @@ export function ChatPanel({
     const pendingVoiceRef = useRef(null); // { cancelled, duration } consumed on recorder stop
     const recordingStartYRef = useRef(0);
     const micBtnRef = useRef(null);
+    const recordDownAtRef = useRef(0); // when the mic press started (tap vs hold)
+    const recordTapModeRef = useRef(false); // true = pointer already released (hands-free)
     const {
         files: pendingFiles,
         addFiles,
@@ -1979,6 +1981,11 @@ export function ChatPanel({
     const startRecording = async (e) => {
         if (e?.preventDefault) e.preventDefault();
         if (recording || uploadBusy || !convId) return;
+        // Mark the press start BEFORE the async permission prompt: a quick tap
+        // releases while getUserMedia is still pending, and recordTapModeRef
+        // remembers that so recording switches to hands-free once it starts.
+        recordDownAtRef.current = Date.now();
+        recordTapModeRef.current = false;
         if (isOffline) {
             setSendError(
                 "Voice messages need a connection. Text messages will be queued while you're offline.",
@@ -2043,7 +2050,12 @@ export function ChatPanel({
         } catch {
             /* pointer capture can throw on edge cases */
         }
-        setRecording({ startedAt: Date.now(), seconds: 0, cancelling: false });
+        setRecording({
+            startedAt: Date.now(),
+            seconds: 0,
+            cancelling: false,
+            handsfree: recordTapModeRef.current,
+        });
     };
 
     const finishRecording = () => {
@@ -2082,6 +2094,28 @@ export function ChatPanel({
         if (cancelling !== recording.cancelling) {
             setRecording((prev) => (prev ? { ...prev, cancelling } : prev));
         }
+    };
+
+    // Pointer-up while recording. A real hold (>=250 ms) releases to send (or
+    // cancels when slid up past the threshold); a quick tap keeps recording
+    // hands-free until the user taps the ✓/✕ controls in the composer pill.
+    const endRecordingPress = () => {
+        if (recorderRef.current) {
+            const held = Date.now() - recordDownAtRef.current;
+            if (held < 250) {
+                recordTapModeRef.current = true;
+                setRecording((prev) =>
+                    prev
+                        ? { ...prev, handsfree: true, cancelling: false }
+                        : prev,
+                );
+                return;
+            }
+            finishRecording();
+            return;
+        }
+        // Released while the mic permission prompt was still open.
+        recordTapModeRef.current = true;
     };
 
     const sendVoiceMessage = async (blob, duration) => {
@@ -3210,12 +3244,13 @@ export function ChatPanel({
                                                     recording.seconds,
                                                 )}
                                             </span>
-                                            {!recording.cancelling && (
-                                                <ArrowUp
-                                                    className="size-3.5 shrink-0 text-[var(--text-muted)]"
-                                                    aria-hidden
-                                                />
-                                            )}
+                                            {!recording.cancelling &&
+                                                !recording.handsfree && (
+                                                    <ArrowUp
+                                                        className="size-3.5 shrink-0 text-[var(--text-muted)]"
+                                                        aria-hidden
+                                                    />
+                                                )}
                                             <span
                                                 className={`min-w-0 flex-1 truncate text-[12px] transition-colors ${
                                                     recording.cancelling
@@ -3225,8 +3260,22 @@ export function ChatPanel({
                                             >
                                                 {recording.cancelling
                                                     ? "Release to cancel"
-                                                    : "Release to send · slide up to cancel"}
+                                                    : recording.handsfree
+                                                      ? "Recording… tap ✓ to send"
+                                                      : "Release to send · slide up to cancel"}
                                             </span>
+                                            {recording.handsfree && (
+                                                <button
+                                                    type="button"
+                                                    aria-label="Send voice message"
+                                                    onClick={finishRecording}
+                                                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--on-accent)] transition-[filter] hover:brightness-110"
+                                                >
+                                                    <CheckCheck
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
                                                 aria-label="Cancel recording"
@@ -3259,6 +3308,26 @@ export function ChatPanel({
                                                 className="flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                                             >
                                                 <Paperclip className="h-5 w-5" />
+                                            </button>
+
+                                            <button
+                                                ref={micBtnRef}
+                                                type="button"
+                                                aria-label="Record voice message"
+                                                title="Hold to record — tap for hands-free"
+                                                onPointerDown={startRecording}
+                                                onPointerUp={endRecordingPress}
+                                                onPointerMove={moveDuringRecording}
+                                                onPointerCancel={cancelRecording}
+                                                onContextMenu={(e) =>
+                                                    e.preventDefault()
+                                                }
+                                                disabled={
+                                                    uploadBusy || !canPost
+                                                }
+                                                className="flex size-9 shrink-0 touch-none select-none items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] active:text-[var(--accent)] disabled:pointer-events-none disabled:opacity-40"
+                                            >
+                                                <Mic className="h-5 w-5" />
                                             </button>
 
                                             <textarea
