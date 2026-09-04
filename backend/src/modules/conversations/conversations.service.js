@@ -67,6 +67,12 @@ function publicConversation(conversation, userId, onlineLookup, blockFlags) {
     createdBy: conversation.createdBy ? toId(conversation.createdBy) : null,
     isAdmin: conversation.type === "group" ? admins.includes(userId) : false,
     avatarUrl: conversation.avatarUrl || null,
+    // Shared chat look for this DM/group (wallpaper + bubble style). Null per
+    // field = fall back to each member's own look.
+    appearance: {
+      wallpaper: conversation.appearance?.wallpaper || null,
+      bubbleStyle: conversation.appearance?.bubbleStyle || null,
+    },
     lastMessageAt: conversation.lastMessageAt || null,
     createdAt: conversation.createdAt,
     spaceId: conversation.spaceId ? conversation.spaceId.toString() : null,
@@ -313,6 +319,44 @@ export async function updateGroup({ conversationId, userId, name, avatar }) {
   if (Object.keys(update).length === 0) {
     throw badRequest("Nothing to update", "NO_UPDATE");
   }
+
+  const updated = await Conversation.findByIdAndUpdate(conversationId, update, {
+    new: true,
+  })
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("admins", "id")
+    .lean();
+
+  const payload = publicConversation(updated, userId, onlineSnapshot());
+  emitToConversation(conversationId, "conversation:updated", { conversation: payload });
+  return payload;
+}
+
+// Set a conversation's shared chat look (wallpaper + bubble style). Either DM
+// participant may set it; group changes are admin-only. Space channels are
+// rejected — their Space owns the look members see.
+export async function updateConversationLook({ conversationId, userId, wallpaper, bubbleStyle }) {
+  const conversation = await assertMembership(conversationId, userId);
+  if (conversation.type === "space_channel") {
+    throw badRequest("Space channels use their Space's look", "NOT_ALLOWED");
+  }
+  if (conversation.type === "group") {
+    assertAdmin(conversation, userId);
+  }
+
+  // Partial merge: absent keys are kept, null clears a field back to inherit.
+  const update = {
+    appearance: {
+      wallpaper:
+        wallpaper !== undefined
+          ? wallpaper
+          : conversation.appearance?.wallpaper ?? null,
+      bubbleStyle:
+        bubbleStyle !== undefined
+          ? bubbleStyle
+          : conversation.appearance?.bubbleStyle ?? null,
+    },
+  };
 
   const updated = await Conversation.findByIdAndUpdate(conversationId, update, {
     new: true,

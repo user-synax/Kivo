@@ -20,6 +20,20 @@ export const updateGroupSchema = z.object({
   name: z.string().trim().min(1, "Group name cannot be empty").max(50, "Name too long").optional(),
 });
 
+// Shared chat look for a DM/group (wallpaper + bubble style). Null per field =
+// fall back to each member's own look. Enum ids mirror the personal and Space
+// look options.
+export const conversationLookSchema = z.object({
+  wallpaper: z
+    .enum(["none", "dots", "grid", "diagonal", "bubbles", "wash"])
+    .nullable()
+    .optional(),
+  bubbleStyle: z
+    .enum(["rounded", "pill", "squared", "outline"])
+    .nullable()
+    .optional(),
+});
+
 // Add members to a group.
 export const addMembersSchema = z.object({
   memberIds: z.array(z.string().min(1)).min(1, "Select at least one member"),

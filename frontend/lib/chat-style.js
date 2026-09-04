@@ -44,12 +44,23 @@ export function chatLook(appearance) {
   return { wallpaper, bubbleStyle };
 }
 
-// Resolve the look that applies in a chat: per-Space fields win when the Space
-// sets them (null = inherit), otherwise the member's own preference applies.
-export function resolveChatLook({ spaceAppearance = null, personalAppearance = null } = {}) {
+// Resolve the look that applies in a chat. Priority is: per-conversation
+// (DM/group shared look) > per-Space (its channels) > the member's own
+// preference. Each level may leave a field null to inherit the next one down.
+export function resolveChatLook({
+  conversationAppearance = null,
+  spaceAppearance = null,
+  personalAppearance = null,
+} = {}) {
   return chatLook({
-    wallpaper: spaceAppearance?.wallpaper ?? personalAppearance?.wallpaper,
-    bubbleStyle: spaceAppearance?.bubbleStyle ?? personalAppearance?.bubbleStyle,
+    wallpaper:
+      conversationAppearance?.wallpaper ??
+      spaceAppearance?.wallpaper ??
+      personalAppearance?.wallpaper,
+    bubbleStyle:
+      conversationAppearance?.bubbleStyle ??
+      spaceAppearance?.bubbleStyle ??
+      personalAppearance?.bubbleStyle,
   });
 }
 

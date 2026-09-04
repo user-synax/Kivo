@@ -6,6 +6,7 @@ import {
   createGroupSchema,
   updateGroupSchema,
   addMembersSchema,
+  conversationLookSchema,
 } from "./conversations.validation.js";
 import * as conversationsService from "./conversations.service.js";
 
@@ -100,6 +101,22 @@ export const updateGroup = [
     res.status(200).json({ success: true, data: conversation });
   }),
 ];
+
+// Update a conversation's shared chat look (wallpaper + bubble style). Either
+// DM participant, or group admins only; space channels are rejected server-side.
+export const updateLook = asyncHandler(async (req, res) => {
+  const { wallpaper, bubbleStyle } = parseBody(
+    conversationLookSchema,
+    req.body,
+  );
+  const conversation = await conversationsService.updateConversationLook({
+    conversationId: req.params.id,
+    userId: req.user.userId,
+    wallpaper,
+    bubbleStyle,
+  });
+  res.status(200).json({ success: true, data: conversation });
+});
 
 // Add members to a group. Admin only.
 export const addMembers = asyncHandler(async (req, res) => {

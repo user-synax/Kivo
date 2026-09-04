@@ -535,6 +535,10 @@ Below the studio, **Settings → Appearance → Chat look** styles the chat surf
 
 Changes save to your account (`appearance.wallpaper` / `appearance.bubbleStyle`), follow you across devices, and apply to the main chat **and** thread panel. Wallpapers are pure CSS — a fixed layer behind the scrolling messages — so they cost nothing to paint or scroll.
 
+### Chat look per conversation (DMs & groups)
+
+Each DM or group can carry its **own** wallpaper + bubble style, seen by everyone in that chat. Tap the **palette icon** in the chat header → **Chat look**. Either person in a DM can set it; in a group only admins can (everyone else sees a read-only note). Values layer on top of the personal look — priority is **conversation look > Space look (in its channels) > member's own** — and each field can stay on **"Member's own"** to inherit. Saves apply instantly to everyone viewing the chat.
+
 All themes share the same layout and elevation; only colors change — plus the optional bubble geometry and wallpaper you pick above. If your OS asks for reduced motion, animations stay minimal.
 
 ---
@@ -865,7 +869,7 @@ Do not expect these in the current MVP:
 | Public profile & verified badge | `/u/:username` (badge toggle in Settings) |
 | Block users + manage the list | DM header, profile drawer, public profile, Settings → Blocked users |
 | Ten themes + custom accent/canvas (theme studio) | Appearance page → Save to my account (desktop: Settings → Appearance row; mobile: Menu → Appearance) |
-| Chat wallpapers + bubble styles (personal + per-Space) | Appearance page → Chat look · Space settings → Space look |
+| Chat wallpapers + bubble styles (personal + per-Space + per-chat) | Appearance page → Chat look · Space settings → Space look · chat header → palette icon |
 | Notification preferences | Settings → Notification preferences |
 | In-app notifications | Bell in panel header |
 | Web push | Allow notifications when opening the bell |

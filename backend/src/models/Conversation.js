@@ -67,6 +67,23 @@ const conversationSchema = new mongoose.Schema(
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
     },
+    // Per-conversation chat look (wallpaper + bubble style) for DMs and groups.
+    // null per field = fall back to each member's own look (a Space's look
+    // still wins inside its channels). Set by either DM participant or group
+    // admins; space channels never carry one — their Space owns the look.
+    appearance: {
+      wallpaper: {
+        type: String,
+        enum: ["none", "dots", "grid", "diagonal", "bubbles", "wash"],
+        default: null,
+      },
+      bubbleStyle: {
+        type: String,
+        enum: ["rounded", "pill", "squared", "outline"],
+        default: null,
+      },
+    },
+
     // Denormalized timestamp of the latest message, used to sort the inbox.
     lastMessageAt: { type: Date, default: null, index: true },
   },

@@ -13,6 +13,7 @@ import {
     Mic,
     MoreVertical,
     Paperclip,
+    Palette,
     Pin,
     Reply,
     Send,
@@ -33,6 +34,7 @@ import React, {
 } from "react";
 import { UploadPreview } from "@/components/chat/attachments";
 import { Avatar } from "@/components/dashboard/avatar";
+import { ConversationLookModal } from "@/components/dashboard/conversation-look-modal";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { ThreadPanel } from "@/components/dashboard/thread-panel";
@@ -394,6 +396,7 @@ export function ChatPanel({
     // multi-select mode.
     const [pinnedMessages, setPinnedMessages] = useState([]);
     const [pinBusyId, setPinBusyId] = useState(null);
+    const [lookOpen, setLookOpen] = useState(false);
     const [forwardOpen, setForwardOpen] = useState(false);
     const [forwardQueue, setForwardQueue] = useState([]);
     const [forwardConvs, setForwardConvs] = useState([]);
@@ -444,6 +447,7 @@ export function ChatPanel({
         setSelectMode(false);
         setSelectedIds(new Set());
         setForwardOpen(false);
+        setLookOpen(false);
         setPinnedMessages([]);
         setThreadRoot(null);
         setThreadSummaries({});
@@ -2268,6 +2272,10 @@ export function ChatPanel({
     // applies (defaults: plain + rounded). Both values re-tint through CSS
     // vars, so they compose with per-Space palettes automatically.
     const chatLook = resolveChatLook({
+        conversationAppearance:
+            isChannel || !conversation?.appearance
+                ? null
+                : conversation.appearance,
         spaceAppearance: isChannel ? spaceAppearance : null,
         personalAppearance: currentUser?.appearance,
     });
@@ -2347,6 +2355,16 @@ export function ChatPanel({
                         )}
                     </p>
                 </div>
+                {conversation && !isChannel && (
+                    <button
+                        type="button"
+                        onClick={() => setLookOpen(true)}
+                        aria-label="Chat look"
+                        className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                    >
+                        <Palette className="h-5 w-5" />
+                    </button>
+                )}
                 {(isGroup || isChannel) && onOpenGroupSettings && (
                     <button
                         type="button"
@@ -3604,6 +3622,19 @@ export function ChatPanel({
                     onForward={(m) => openForwardPicker([m])}
                     onOpenProfile={(username) => setProfileUsername(username)}
                     isMobile={isMobile}
+                />
+            )}
+
+            {/* Shared chat look editor (DM/group wallpaper + bubble style) */}
+            {lookOpen && conversation && !isChannel && (
+                <ConversationLookModal
+                    conversation={conversation}
+                    onClose={() => setLookOpen(false)}
+                    onSaved={(updated) => {
+                        setLookOpen(false);
+                        if (onConversationUpdate && updated?.id)
+                            onConversationUpdate(updated);
+                    }}
                 />
             )}
         </div>

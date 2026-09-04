@@ -31,6 +31,9 @@ router.post("/:id/messages", messageSendLimiter, messagesController.createMessag
 router.patch("/:id/read", messagesController.markRead);
 router.post("/:id/unread", messagesController.markUnread);
 
+// Shared chat look for a DM/group (wallpaper + bubble style).
+router.patch("/:id/look", conversationsController.updateLook);
+
 // Group management (admin-restricted actions enforced in the service layer).
 router.patch("/:id", conversationsController.updateGroup);
 router.post("/:id/members", conversationsController.addMembers);

@@ -129,7 +129,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Theme system (**10 themes**, 6 dark + 4 light, live switching, no reload)
 - **Custom per-user colors** — theme studio in Settings: recolor any preset's accent + canvas tone, live preview, saved to your account (server-synced, follows you across devices)
 - **Per-Space palettes** — owners/admins give a Space its own accent + canvas tone (Space settings); every member's chat view adopts them while viewing that Space's channels
-- **Chat wallpapers & bubble styles** — six patterns (dots / grid / lines / bubbles / accent wash / plain) behind the message list plus Rounded / Pill / Squared / Outlined-mine bubbles; set per user (Appearance page → Chat look) and per Space (Space settings → Space look, with "member's own" inheritance)
+- **Chat wallpapers & bubble styles** — six patterns (dots / grid / lines / bubbles / accent wash / plain) behind the message list plus Rounded / Pill / Squared / Outlined-mine bubbles; set per user (Appearance page → Chat look), per Space (Space settings → Space look) and per DM/group (chat header → palette icon), each with "member's own" inheritance (conversation > Space > personal)
 - **Avatar rings follow your accent** — identity ring re-tints with your theme-studio color
 - **Mobile UX** (Chats / Groups / Spaces / Menu bottom bar, pushed Settings & Profile screens, full-screen Appearance page, responsive panels, edge-swipe back, safe-area handling)
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
