@@ -25,6 +25,10 @@ function publicUser(user) {
     banner: u.banner || null,
     country: u.country || null,
     githubUsername: u.githubUsername || null,
+    xUsername: u.xUsername || null,
+    instagramUsername: u.instagramUsername || null,
+    youtubeUrl: u.youtubeUrl || null,
+    websiteUrl: u.websiteUrl || null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
     // Plus profile effect ("none" | "glow" | "gradient-name" | "aura") —
@@ -123,7 +127,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role plan profileEffect appearance bannerFileId createdAt lastActiveAt",
+    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge role plan profileEffect appearance bannerFileId createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);
@@ -135,7 +139,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role profileEffect createdAt lastActiveAt",
+    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge role profileEffect createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -156,6 +160,10 @@ function publicProfile(user) {
     banner: u.banner || null,
     country: u.country || null,
     githubUsername: u.githubUsername || null,
+    xUsername: u.xUsername || null,
+    instagramUsername: u.instagramUsername || null,
+    youtubeUrl: u.youtubeUrl || null,
+    websiteUrl: u.websiteUrl || null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
     profileEffect: u.profileEffect || "none",
@@ -169,7 +177,7 @@ function publicProfile(user) {
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status avatarStyle avatarUrl banner country githubUsername verified showBadge profileEffect createdAt blockedUsers lastActiveAt",
+    "displayName username bio status avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge profileEffect createdAt blockedUsers lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -450,11 +458,23 @@ export async function updateMe({ userId, data }) {
     update.appearance = mergeAppearance(currentUser?.appearance, data.appearance);
   }
 
+  // Social links — each is nullable so an empty string clears the field.
+  for (const key of [
+    "xUsername",
+    "instagramUsername",
+    "youtubeUrl",
+    "websiteUrl",
+  ]) {
+    if (data[key] !== undefined) {
+      update[key] = data[key] ? String(data[key]).trim() : null;
+    }
+  }
+
   const user = await User.findByIdAndUpdate(userId, update, {
     new: true,
     runValidators: true,
   }).select(
-    "displayName username email bio status avatarStyle banner country githubUsername verified showBadge role plan profileEffect appearance bannerFileId createdAt",
+    "displayName username email bio status avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge role plan profileEffect appearance bannerFileId createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);

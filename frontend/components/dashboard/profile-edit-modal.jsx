@@ -83,6 +83,10 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [banner, setBanner] = useState("");
     const [country, setCountry] = useState(null);
     const [githubUsername, setGithubUsername] = useState("");
+    const [xUsername, setXUsername] = useState("");
+    const [instagramUsername, setInstagramUsername] = useState("");
+    const [youtubeUrl, setYoutubeUrl] = useState("");
+    const [websiteUrl, setWebsiteUrl] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
 
@@ -191,6 +195,10 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                     : null,
             );
             setGithubUsername(me?.githubUsername || "");
+            setXUsername(me?.xUsername || "");
+            setInstagramUsername(me?.instagramUsername || "");
+            setYoutubeUrl(me?.youtubeUrl || "");
+            setWebsiteUrl(me?.websiteUrl || "");
             setError(null);
             setRender(true);
             const id = requestAnimationFrame(() => setShown(true));
@@ -229,6 +237,10 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                 banner,
                 country: country?.code || "",
                 githubUsername: githubUsername.trim(),
+                xUsername: xUsername.trim(),
+                instagramUsername: instagramUsername.trim(),
+                youtubeUrl: youtubeUrl.trim(),
+                websiteUrl: websiteUrl.trim(),
             });
             // Persist the refreshed user object (drives the sidebar avatar + session).
             setSession(updated, getToken());
@@ -402,6 +414,16 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                     onChange={setCountry}
                                 />
                             </Field>
+                        </div>
+                    </Section>
+
+                    <Section label="Links" delay={60}>
+                        <p className="-mt-1 text-[11px] leading-snug text-[var(--text-muted)]">
+                            Handles and sites shown as icon chips on your
+                            profile. GitHub also powers your contribution
+                            graph.
+                        </p>
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <Field
                                 label="GitHub"
                                 hint="Shows your contribution graph."
@@ -422,6 +444,79 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                         autoComplete="off"
                                     />
                                 </div>
+                            </Field>
+                            <Field label="X (Twitter)" hint="Username, no @.">
+                                <div className="flex items-stretch gap-2">
+                                    <span className="flex shrink-0 items-center rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-2.5 text-[13px] text-[var(--text-muted)]">
+                                        @
+                                    </span>
+                                    <input
+                                        className={`${inputCls} flex-1 px-3`}
+                                        value={xUsername}
+                                        maxLength={60}
+                                        onChange={(e) =>
+                                            setXUsername(e.target.value)
+                                        }
+                                        placeholder="username"
+                                        spellCheck={false}
+                                        autoComplete="off"
+                                    />
+                                </div>
+                            </Field>
+                            <Field
+                                label="Instagram"
+                                hint="Username, no @."
+                            >
+                                <div className="flex items-stretch gap-2">
+                                    <span className="flex shrink-0 items-center rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-2.5 text-[13px] text-[var(--text-muted)]">
+                                        @
+                                    </span>
+                                    <input
+                                        className={`${inputCls} flex-1 px-3`}
+                                        value={instagramUsername}
+                                        maxLength={60}
+                                        onChange={(e) =>
+                                            setInstagramUsername(
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="username"
+                                        spellCheck={false}
+                                        autoComplete="off"
+                                    />
+                                </div>
+                            </Field>
+                            <Field
+                                label="YouTube"
+                                hint="Full channel link."
+                            >
+                                <input
+                                    className={inputCls}
+                                    value={youtubeUrl}
+                                    maxLength={500}
+                                    onChange={(e) =>
+                                        setYoutubeUrl(e.target.value)
+                                    }
+                                    placeholder="https://youtube.com/@channel"
+                                    spellCheck={false}
+                                    autoComplete="off"
+                                />
+                            </Field>
+                            <Field
+                                label="Website"
+                                hint="Full link (https://…)."
+                            >
+                                <input
+                                    className={inputCls}
+                                    value={websiteUrl}
+                                    maxLength={500}
+                                    onChange={(e) =>
+                                        setWebsiteUrl(e.target.value)
+                                    }
+                                    placeholder="https://example.com"
+                                    spellCheck={false}
+                                    autoComplete="off"
+                                />
                             </Field>
                         </div>
                     </Section>

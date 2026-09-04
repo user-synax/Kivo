@@ -68,6 +68,34 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxlength: 39,
     },
+    // Social handles for the profile link row: X/Twitter, Instagram, YouTube
+    // and a personal website. Stored as plain handles/URLs (X/Instagram store
+    // the handle, YouTube/website store a full URL); the client renders them
+    // as icon chips. Optional, like githubUsername.
+    xUsername: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 60,
+    },
+    instagramUsername: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 60,
+    },
+    youtubeUrl: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 500,
+    },
+    websiteUrl: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 500,
+    },
     // Whether the account has been verified (admin-set or auto-verified).
     verified: {
       type: Boolean,

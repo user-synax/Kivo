@@ -8,6 +8,8 @@ import {
 import {
   Ban,
   CalendarDays,
+  Hand,
+  Loader2,
   MessageCircle,
   ShieldBan,
   UserMinus,
@@ -24,6 +26,10 @@ import {
   effectAvatarClass,
   effectNameClass,
 } from "@/lib/profile-effects";
+import {
+  SocialGlyph,
+  socialLinksFor,
+} from "@/lib/social-links";
 import { cn } from "@/lib/utils";
 import {
   ContributionGraph,
@@ -155,6 +161,9 @@ export function ProfileContent({
     : username
       ? `@${username}`
       : "";
+  // Social chips (GitHub included when present) — the contribution graph card
+  // further down still renders separately when githubUsername is set.
+  const socialLinks = socialLinksFor(profile);
   const joined = formatJoined(profile?.joinedAt);
   const isSelf =
     rel === "self" || getSession()?.username === profile?.username;
@@ -265,6 +274,45 @@ export function ProfileContent({
       );
     } catch (e) {
       window.alert(e?.message || "Could not remove friend");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // "Wave at {name}" — a friendly ping delivered as a notification. The server
+  // enforces a per-recipient cooldown; we mirror it client-side with a 1s
+  // countdown so the button reads "Waved · Ns" and stays disabled meanwhile.
+  const [waveLeft, setWaveLeft] = useState(0);
+  const WAVE_COOLDOWN = 20;
+  useEffect(() => {
+    if (waveLeft <= 0) return undefined;
+    const t = setInterval(() => {
+      setWaveLeft((s) => {
+        const next = s - 1;
+        if (next <= 0) return 0;
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [waveLeft]);
+  const handleWave = async () => {
+    if (!profile?.id || busy || waveLeft > 0) return;
+    setBusy("wave");
+    try {
+      const res = await apiPost(
+        `/api/v1/notifications/${profile.id}/wave`,
+        {},
+      );
+      const serverCd = Number(res?.cooldownSeconds);
+      setWaveLeft(serverCd > 0 ? serverCd : WAVE_COOLDOWN);
+    } catch (e) {
+      // Respect a server-side cooldown verdict even when we hit one.
+      const msg = e?.message || "Couldn't wave";
+      if (e?.code === "WAVE_COOLDOWN") {
+        const cd = Number(e?.extra?.cooldownSeconds);
+        setWaveLeft(cd > 0 ? cd : WAVE_COOLDOWN);
+      }
+      window.alert(msg);
     } finally {
       setBusy(null);
     }
@@ -525,6 +573,29 @@ export function ProfileContent({
             </motion.p>
           )}
 
+          {/* ── Social links (GitHub/X/Instagram/YouTube/website chips) ──── */}
+          {socialLinks.length > 0 && (
+            <motion.div
+              variants={item}
+              className="mt-4 flex flex-wrap items-center gap-2"
+            >
+              {socialLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={link.title}
+                  aria-label={link.label}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--ink)]/30 hover:text-[var(--ink)]"
+                >
+                  <SocialGlyph glyph={link.glyph} />
+                  {link.label}
+                </a>
+              ))}
+            </motion.div>
+          )}
+
           {/* ── Meta row (joined + relationship badge) ───────────────────── */}
           <motion.div
             variants={item}
@@ -687,6 +758,38 @@ export function ProfileContent({
               variants={item}
               className="mt-5 flex flex-wrap items-center gap-2"
             >
+              {/* Wave — a lightweight ping independent of the relationship
+                  state (works for friends, strangers and pending requests).
+                  Hidden entirely once either side is blocked. */}
+              {!isBlocked && (
+                <motion.button
+                  type="button"
+                  onClick={handleWave}
+                  disabled={busy === "wave" || waveLeft > 0}
+                  whileTap={reduce ? undefined : { scale: 0.97 }}
+                  whileHover={reduce ? undefined : { scale: 1.02 }}
+                  title={
+                    waveLeft > 0
+                      ? `You already waved — again in ${waveLeft}s`
+                      : `Wave at ${name}`
+                  }
+                  className={cn(
+                    pillSecondary,
+                    waveLeft > 0 && "opacity-60",
+                  )}
+                >
+                  {busy === "wave" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Hand className="h-4 w-4" />
+                  )}
+                  {busy === "wave"
+                    ? "…"
+                    : waveLeft > 0
+                      ? `Waved · ${waveLeft}s`
+                      : "Wave"}
+                </motion.button>
+              )}
               <AnimatePresence mode="wait">
                 {isBlocked ? (
                   <motion.div

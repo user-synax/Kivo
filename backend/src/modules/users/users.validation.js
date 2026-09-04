@@ -62,6 +62,40 @@ export const updateMeSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal("")),
+  xUsername: z
+    .string()
+    .trim()
+    .max(60)
+    .regex(/^[a-zA-Z0-9_]*$/, "X username may only contain letters, numbers, and underscores")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+  instagramUsername: z
+    .string()
+    .trim()
+    .max(60)
+    .regex(/^[a-zA-Z0-9_.]*$/, "Instagram username may only contain letters, numbers, dots, and underscores")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+  // YouTube/website links accept full URLs only — must start with a scheme so
+  // the client can link out safely (no javascript:/etc).
+  youtubeUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .regex(/^https?:\/\//i, "YouTube link must start with http:// or https://")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+  websiteUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .regex(/^https?:\/\//i, "Website link must start with http:// or https://")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
   showBadge: z.boolean().optional(),
 
   // Per-user appearance customization (theme studio + chat look). Colors are

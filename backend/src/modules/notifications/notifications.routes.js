@@ -7,6 +7,7 @@ const router = Router();
 // All notification routes require a valid access token.
 router.use(authenticate);
 
+router.post("/:id/wave", notificationsController.sendWave);
 router.get("/preferences", notificationsController.getPreferences);
 router.patch("/preferences", notificationsController.updatePreferences);
 router.get("/unread-count", notificationsController.getUnreadCount);

@@ -1,5 +1,5 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
-import { parseBody, parseQuery, listNotificationsQuerySchema, markReadSchema, updatePreferencesSchema } from "./notifications.validation.js";
+import { parseBody, parseParams, parseQuery, listNotificationsQuerySchema, markReadSchema, updatePreferencesSchema, userIdParamSchema } from "./notifications.validation.js";
 import * as notificationsService from "./notifications.service.js";
 
 export const listNotifications = asyncHandler(async (req, res) => {
@@ -37,4 +37,13 @@ export const updatePreferences = asyncHandler(async (req, res) => {
   const patch = parseBody(updatePreferencesSchema, req.body);
   const prefs = await notificationsService.updatePreferences({ userId: req.user.userId, patch });
   res.status(200).json({ success: true, data: prefs });
+});
+
+export const sendWave = asyncHandler(async (req, res) => {
+  const { id } = parseParams(userIdParamSchema, req.params);
+  const result = await notificationsService.sendWave({
+    userId: req.user.userId,
+    targetId: id,
+  });
+  res.status(201).json({ success: true, data: result });
 });

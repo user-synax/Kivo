@@ -203,6 +203,9 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | banner | String | Yes | Curated animated GIF cover |
 | country | String | Yes | ISO-3166 alpha-2 → flag shown on profiles |
 | githubUsername | String | Yes | GitHub contribution graph on the public profile |
+| xUsername / instagramUsername | String | Yes | Social link chips on the public profile (handle, no @) |
+| youtubeUrl / websiteUrl | String | Yes | Social link chips (full http(s) URL) |
+| plan | String | No | `free`/`plus`, admin-granted (see 1.5) |
 | verified / showBadge | Boolean | No / Yes | Admin grants `verified`; the user toggles `showBadge` visibility in Settings |
 | avatarStyle | String | Yes | One of 10 presets: Default + My accent (follows the theme token) + 6 solid colors + 2 gradient rings |
 | avatarUrl | String | Via upload | Hosted on Appwrite Storage |
@@ -757,6 +760,7 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 | `friend_accept` | A user accepts your friend request |
 | `space_invite` | Reserved for a future "invite this person" notification (today's Space invites use rotating link codes) |
 | `mention` | `@mention` in a message (shipped) |
+| `wave` | A user taps **Wave 👋** on your profile (20s per-recipient cooldown) |
 
 #### 8.2 Delivery Model
 
@@ -779,6 +783,7 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 | PATCH | `/api/v1/notifications/read` | Yes | `{ ids: [...] }` and/or `{ all: true }` mark read |
 | GET | `/api/v1/notifications/preferences` | Yes | Read per-category notification preferences |
 | PATCH | `/api/v1/notifications/preferences` | Yes | Update one or more preference toggles |
+| POST | `/api/v1/notifications/:id/wave` | Yes | Send a **wave** ping to user `:id` (self-wave / blocked / 20s cooldown guards) |
 
 #### 8.4 Notification Schema
 
@@ -787,7 +792,7 @@ Notification {
   recipientId:  ObjectId → User (required, indexed)
   senderId:     ObjectId → User (nullable)
   type:         enum ["dm_message","group_message","space_message",
-                      "friend_request","friend_accept","space_invite","mention"]
+                      "friend_request","friend_accept","space_invite","mention","wave"]
   conversationId: ObjectId → Conversation (nullable, indexed)
   messageId:    ObjectId → Message (nullable)
   spaceId:      ObjectId → Space (nullable)

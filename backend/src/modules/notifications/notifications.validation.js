@@ -24,6 +24,11 @@ export const markReadSchema = z
     message: "Provide ids[] or all:true",
   });
 
+// ObjectId param for "wave at user X" style routes.
+export const userIdParamSchema = z.object({
+  id: z.string().min(1).max(64),
+});
+
 export const updatePreferencesSchema = z
   .object({
     directMessages: z.boolean().optional(),
@@ -52,6 +57,18 @@ export function parseBody(schema, body) {
 
 export function parseQuery(schema, query) {
   const result = schema.safeParse(query);
+  if (!result.success) {
+    const first = result.error.issues[0];
+    const err = new Error(first?.message || "Validation failed");
+    err.statusCode = 400;
+    err.code = "VALIDATION_ERROR";
+    throw err;
+  }
+  return result.data;
+}
+
+export function parseParams(schema, params) {
+  const result = schema.safeParse(params);
   if (!result.success) {
     const first = result.error.issues[0];
     const err = new Error(first?.message || "Validation failed");

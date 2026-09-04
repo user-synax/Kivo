@@ -8,6 +8,7 @@ const NOTIFICATION_TYPES = [
   "friend_accept",
   "space_invite",
   "mention",
+  "wave",
 ];
 
 const notificationSchema = new mongoose.Schema(
@@ -21,6 +22,12 @@ const notificationSchema = new mongoose.Schema(
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null,
+    },
+    // Username of the acting user (denormalized at send time so a "wave" or
+    // friend event can deep-link to the sender's profile without a join).
+    senderUsername: {
+      type: String,
       default: null,
     },
     type: {

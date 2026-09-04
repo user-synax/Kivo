@@ -134,9 +134,11 @@ export function NotificationCenter({
                             ? "Friend request"
                             : n.type === "friend_accept"
                               ? "Accepted"
-                              : n.type === "mention"
-                                ? "Mention"
-                                : n.type}
+                              : n.type === "wave"
+                                ? "Wave"
+                                : n.type === "mention"
+                                  ? "Mention"
+                                  : n.type}
                   </span>
                 </span>
               </button>

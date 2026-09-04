@@ -470,6 +470,7 @@ You can set:
 | Banner | Preset animated GIF covers |
 | Country | Optional; rendered as a **flag** on your profile |
 | GitHub | Optional username; renders a **contribution graph** on your public profile |
+| X, Instagram, YouTube, Website | Optional social links shown as **icon chips** on your public profile |
 
 Save to apply. Email is **not** editable here.
 
@@ -485,7 +486,7 @@ Verified accounts (a status granted by admins) can show a **verified badge** nex
 
 ### Public profile (`/u/username`)
 
-Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status, bio, and join date — plus a **GitHub contribution graph** when a GitHub username is set.
+Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status, bio, and join date — plus **social link chips** (GitHub, X, Instagram, YouTube, website) and a **GitHub contribution graph** when a GitHub username is set.
 
 What you can do there depends on your relationship:
 
@@ -493,6 +494,7 @@ What you can do there depends on your relationship:
 - Friends: **Message** (opens the DM).
 - Not friends: **Add friend** (or **Accept** if they already requested you) and **Message** if they're a friend.
 - Anyone you're connected to: **Block / Unblock** and, for friends, **Unfriend**.
+- Anyone (not blocked): **Wave 👋** — sends a one-tap ping notification (per-recipient 20s cooldown; opens the sender's profile from the notification center).
 
 Search results that point at a person open this same profile in a drawer inside the app.
 
@@ -727,7 +729,7 @@ On a wide desktop (XL), the **right column** shows the other user: banner, avata
 
 ### Profile drawer / public page
 
-Open a person's profile from search results or any avatar shortcut. The same profile content powers the public page at `/u/<username>`. From it you can Message, Add friend / accept, Unfriend, or Block/Unblock.
+Open a person's profile from search results or any avatar shortcut. The same profile content powers the public page at `/u/<username>`. From it you can Wave 👋, Message, Add friend / accept, Unfriend, or Block/Unblock.
 
 ---
 

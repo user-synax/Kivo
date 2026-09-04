@@ -646,6 +646,13 @@ export function DashboardShell() {
           typeof document !== "undefined" && document.visibilityState !== "visible";
         if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
       }
+      // A wave is a light ping — cue it like friend activity, only when the
+      // tab is hidden or the notification center isn't already open.
+      if (notif.type === "wave") {
+        const pageHidden =
+          typeof document !== "undefined" && document.visibilityState !== "visible";
+        if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
+      }
       if (notif.type === "dm_message" && notif.conversationId === selectedIdRef.current) {
         const cur = conversationsRef.current.find((c) => c.id === selectedIdRef.current);
         if (cur?.type === "dm") return;
@@ -1275,6 +1282,12 @@ export function DashboardShell() {
     const t = notif.type;
     if (t === "friend_request" || t === "friend_accept") {
       setShowFriends(true);
+      return;
+    }
+    // A wave has no conversation to open — show the sender's profile instead
+    // so the user can wave back or start a chat.
+    if (t === "wave" && notif.senderUsername) {
+      setProfileUsernameSearch(notif.senderUsername);
       return;
     }
     if (notif.conversationId) {

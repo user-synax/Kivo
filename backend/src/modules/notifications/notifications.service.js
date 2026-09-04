@@ -3,7 +3,7 @@ import Notification from "../../models/Notification.js";
 import PushSubscription from "../../models/PushSubscription.js";
 import User from "../../models/User.js";
 import Space from "../../models/Space.js";
-import { badRequest } from "../../utils/errors.js";
+import { badRequest, forbidden, notFound } from "../../utils/errors.js";
 import { getIO } from "../../socket/index.js";
 import { emitToUser } from "../../socket/io.js";
 import webpush from "../../config/webpush.js";
@@ -73,6 +73,7 @@ function publicNotification(doc) {
     id: obj._id.toString(),
     recipientId: obj.recipientId.toString(),
     senderId: obj.senderId ? obj.senderId.toString() : null,
+    senderUsername: obj.senderUsername || null,
     type: obj.type,
     conversationId: obj.conversationId ? obj.conversationId.toString() : null,
     messageId: obj.messageId ? obj.messageId.toString() : null,
@@ -283,16 +284,21 @@ export async function createForMessage({ message, conversation, inThread = false
   return created;
 }
 
-export async function createFriendNotification({ recipientId, senderId, type, title, body, avatarUrl }) {
-  // Preference gate for friend request/accept notifications — suppress entirely if friendRequests OFF
-  try {
-    const prefs = await getPreferences({ userId: recipientId.toString() });
-    if (prefs.friendRequests === false) return null;
-  } catch {}
+export async function createFriendNotification({ recipientId, senderId, type, title, body, avatarUrl, senderUsername }) {
+  // Preference gate for friend request/accept notifications — suppress entirely
+  // if friendRequests OFF. Other types (e.g. "wave") flow through ungated: they
+  // are lightweight pings with their own server-side cooldown.
+  if (type === "friend_request" || type === "friend_accept") {
+    try {
+      const prefs = await getPreferences({ userId: recipientId.toString() });
+      if (prefs.friendRequests === false) return null;
+    } catch {}
+  }
 
   const doc = await Notification.create({
     recipientId,
     senderId: senderId || null,
+    senderUsername: senderUsername || null,
     type,
     conversationId: null,
     messageId: null,
@@ -385,6 +391,96 @@ export async function markRead({ userId, ids, all }) {
   return { modifiedCount: res.modifiedCount || 0 };
 }
 
-export async function markAllRead({ userId }) {
-  return markRead({ userId, all: true });
+// Seconds a user must wait before waving the same person again. Client uses the
+// returned cooldownSeconds to disable the button; server is authoritative.
+const WAVE_COOLDOWN_SECONDS = 20;
+
+/**
+ * Send a friendly "wave" ping to another user's profile. Creates a `wave`
+ * notification through the same delivery pipeline as friend events (in-app
+ * when online, web push when offline). Guards: no self-waves, no waving
+ * someone who blocked you, no wave spam (per-recipient cooldown).
+ *
+ * Returns { notification, cooldownSeconds, lastWaveAt } so the client can show
+ * the right button state ("Waved" with a live lockout).
+ */
+export async function sendWave({ userId, targetId }) {
+  const senderId = String(userId);
+  const recipientId = String(targetId);
+
+  if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+    throw badRequest("Invalid user id", "INVALID_ID");
+  }
+  if (senderId === recipientId) {
+    throw badRequest("You can't wave at yourself", "SELF_WAVE");
+  }
+
+  const [sender, recipient] = await Promise.all([
+    User.findById(senderId).select("displayName username avatarUrl").lean(),
+    User.findById(recipientId).select("blockedUsers").lean(),
+  ]);
+  if (!recipient) throw notFound("User not found", "USER_NOT_FOUND");
+
+  // Blocked both ways: you can't wave someone you blocked, and someone who
+  // blocked you shouldn't receive your pings.
+  const targetBlocksMe = (recipient.blockedUsers || [])
+    .map((id) => String(id))
+    .includes(senderId);
+  if (targetBlocksMe) {
+    throw forbidden(
+      "You can't wave at this user",
+      "WAVE_BLOCKED",
+    );
+  }
+  if (sender) {
+    const me = await User.findById(senderId).select("blockedUsers").lean();
+    const iBlockTarget = (me?.blockedUsers || [])
+      .map((id) => String(id))
+      .includes(recipientId);
+    if (iBlockTarget) {
+      throw forbidden(
+        "You can't wave at a user you blocked",
+        "WAVE_BLOCKED",
+      );
+    }
+  }
+
+  // Cooldown: only one wave per recipient per window (spam guard).
+  const lastWave = await Notification.findOne({
+    senderId,
+    recipientId,
+    type: "wave",
+  })
+    .sort({ createdAt: -1 })
+    .select("createdAt")
+    .lean();
+  if (lastWave?.createdAt) {
+    const elapsed = (Date.now() - new Date(lastWave.createdAt).getTime()) / 1000;
+    const remaining = Math.ceil(WAVE_COOLDOWN_SECONDS - elapsed);
+    if (remaining > 0) {
+      const err = badRequest(
+        `You already waved — try again in ${remaining}s`,
+        "WAVE_COOLDOWN",
+      );
+      err.extra = { cooldownSeconds: remaining, lastWaveAt: lastWave.createdAt };
+      throw err;
+    }
+  }
+
+  const senderName = sender?.displayName || sender?.username || "Someone";
+  const doc = await createFriendNotification({
+    recipientId,
+    senderId,
+    senderUsername: sender?.username || null,
+    type: "wave",
+    title: `${senderName} waved at you`,
+    body: "👋",
+    avatarUrl: sender?.avatarUrl || null,
+  });
+
+  return {
+    notification: doc,
+    cooldownSeconds: WAVE_COOLDOWN_SECONDS,
+    lastWaveAt: new Date().toISOString(),
+  };
 }
