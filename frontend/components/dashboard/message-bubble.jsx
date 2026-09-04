@@ -47,7 +47,80 @@ import { cn } from "@/lib/utils";
 // all state lives in the parent (chat-panel) and is passed in as props.
 
 import { AttachmentBubble } from "@/components/chat/attachments";
+import { LinkPreview } from "@/components/chat/link-preview";
 import { MentionToken } from "@/components/mentions/mention-token";
+import { firstUrl, normalizeUrl } from "@/lib/links";
+
+const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
+const TRAILING_PUNCT_RE = /[.,;:!?'\"`>]+$/;
+
+function LinkToken({ href, label }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="break-words text-[var(--accent)] underline decoration-[var(--accent)]/50 underline-offset-2 hover:decoration-[var(--accent)] [overflow-wrap:anywhere]"
+    >
+      {label}
+    </a>
+  );
+}
+
+// Split a plain-text chunk into link tokens + text, keeping trailing
+// punctuation (".", ")", …) outside the clickable range. Mirrors
+// normalizeUrl's paren-balancing so the visible label matches the href.
+function splitTrailing(raw) {
+  let core = raw.replace(TRAILING_PUNCT_RE, "");
+  let trailing = raw.slice(core.length);
+  for (const [open, close] of [["(", ")"], ["[", "]"], ["{", "}"]]) {
+    while (core.endsWith(close)) {
+      const opens = core.split(open).length - 1;
+      const closes = core.split(close).length - 1;
+      if (closes > opens) {
+        core = core.slice(0, -1);
+        trailing = close + trailing;
+      } else break;
+    }
+  }
+  const tailPunct = (core.match(TRAILING_PUNCT_RE) || [""])[0];
+  if (tailPunct) {
+    core = core.slice(0, -tailPunct.length);
+    trailing = tailPunct + trailing;
+  }
+  return { core, trailing };
+}
+
+function tokenizeLinks(chunk, keyPrefix) {
+  const out = [];
+  let last = 0;
+  URL_SPLIT_RE.lastIndex = 0;
+  let m;
+  while ((m = URL_SPLIT_RE.exec(chunk)) !== null) {
+    const raw = m[0];
+    const idx = m.index;
+    if (idx > last) out.push(chunk.slice(last, idx));
+    const { core, trailing } = splitTrailing(raw);
+    const href = normalizeUrl(core);
+    if (href && core) {
+      out.push(
+        <LinkToken
+          key={`${keyPrefix}-${idx}`}
+          href={href}
+          label={core}
+        />,
+      );
+      if (trailing) out.push(trailing);
+    } else {
+      out.push(raw);
+    }
+    last = idx + raw.length;
+    if (raw.length === 0) URL_SPLIT_RE.lastIndex += 1;
+  }
+  if (last < chunk.length) out.push(chunk.slice(last));
+  return out;
+}
 
 function MessageContent({
   content,
@@ -69,55 +142,62 @@ function MessageContent({
     }
   }
 
-  if (Object.keys(resolvedUsernames).length === 0) {
-    return (
-      <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-        {content}
-      </span>
-    );
-  }
-
+  const hasMentions = Object.keys(resolvedUsernames).length > 0;
   const parts = [];
-  let lastIndex = 0;
-  const regex = /@([a-zA-Z0-9_.-]+)/g;
-  let match;
+  let key = 0;
 
-  while ((match = regex.exec(content)) !== null) {
-    const rawMatch = match[0];
-    const uname = match[1];
-    const lower = uname.toLowerCase();
-
-    if (match.index > lastIndex) {
-      parts.push(content.slice(lastIndex, match.index));
+  const pushMentionChunk = (chunk) => {
+    if (!hasMentions) {
+      for (const t of tokenizeLinks(chunk, `l${key++}`)) parts.push(t);
+      return;
     }
-
-    if (resolvedUsernames[lower]) {
-      const user = resolvedUsernames[lower];
-      const uid = (user.id || user._id)?.toString?.();
-      const online = Boolean(isUserOnline?.(uid));
-      parts.push(
-        <MentionToken
-          key={`${match.index}-${lower}`}
-          username={uname}
-          user={user}
-          isOnline={online}
-          onOpenProfile={onOpenProfile}
-        />,
-      );
-    } else {
-      parts.push(rawMatch);
+    const regex = /@([a-zA-Z0-9_.-]+)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(chunk)) !== null) {
+      const uname = match[1];
+      const lower = uname.toLowerCase();
+      if (match.index > lastIndex) {
+        const textSeg = chunk.slice(lastIndex, match.index);
+        for (const t of tokenizeLinks(textSeg, `l${key++}`)) parts.push(t);
+      }
+      if (resolvedUsernames[lower]) {
+        const user = resolvedUsernames[lower];
+        const uid = (user.id || user._id)?.toString?.();
+        const online = Boolean(isUserOnline?.(uid));
+        parts.push(
+          <MentionToken
+            key={`m${key++}-${match.index}-${lower}`}
+            username={uname}
+            user={user}
+            isOnline={online}
+            onOpenProfile={onOpenProfile}
+          />,
+        );
+      } else {
+        for (const t of tokenizeLinks(match[0], `l${key++}`)) parts.push(t);
+      }
+      lastIndex = regex.lastIndex;
     }
+    if (lastIndex < chunk.length) {
+      for (const t of tokenizeLinks(chunk.slice(lastIndex), `l${key++}`))
+        parts.push(t);
+    }
+  };
 
-    lastIndex = regex.lastIndex;
-  }
-
-  if (lastIndex < content.length) {
-    parts.push(content.slice(lastIndex));
-  }
+  pushMentionChunk(content);
 
   return (
     <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-      {parts}
+      {parts.map((p, i) =>
+        typeof p === "string" ? (
+          <span key={`t-${i}`}>{p}</span>
+        ) : (
+          <span key={`n-${i}`} className="contents">
+            {p}
+          </span>
+        ),
+      )}
     </span>
   );
 }
@@ -342,6 +422,9 @@ export function MessageBubble({
                   isUserOnline={isUserOnline}
                   onOpenProfile={onOpenProfile}
                 />
+                {!deleted && !isEditing && message.content ? (
+                  <LinkPreview url={firstUrl(message.content)} />
+                ) : null}
                 <AttachmentBubble
                   attachments={message.attachments}
                   audioDuration={message.audioDuration}
