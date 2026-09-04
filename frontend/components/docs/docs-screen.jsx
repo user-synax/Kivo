@@ -293,7 +293,8 @@ export function DocsScreen() {
               <p>
                 Type in “Type a message…”, then Enter to send. Shift+Enter
                 adds a new line. Max 4000 characters. If a send fails, retry
-                from that bubble.
+                from that bubble. Unsent text is kept per chat automatically —
+                switch conversations or reload and your draft is still there.
               </p>
               <h3 className="doc-h3">Reply</h3>
               <p>
@@ -321,10 +322,26 @@ export function DocsScreen() {
                 </Bullet>
                 <Bullet>
                   Edit or delete: only your own messages. Edit saves with
-                  Enter, Escape cancels. Delete clears the text but keeps the
-                  row so replies stay in place. Edited messages show “edited”.
+                  Enter, Escape cancels — or press ↑ with an empty composer
+                  to edit your last message. Delete clears the text but keeps
+                  the row so replies stay in place. Edited messages show
+                  “edited”.
                 </Bullet>
               </ul>
+              <h3 className="doc-h3">Links & previews</h3>
+              <p>
+                Links in messages are clickable and open in a new tab. The
+                first link also shows a preview card with the page’s title,
+                description, and image.
+              </p>
+              <h3 className="doc-h3">Timeline</h3>
+              <p>
+                Long chats are split by day (“Today”, “Yesterday”, a weekday,
+                or a date). Messages that are just 1–3 emoji render big with
+                no bubble. Reading old history never yanks you to the bottom —
+                a floating “N new” pill appears instead, and one tap takes you
+                back to the latest.
+              </p>
               <h3 className="doc-h3">Copy & share</h3>
               <p>
                 Copy puts the message text on your clipboard (attachments copy
@@ -415,7 +432,8 @@ export function DocsScreen() {
                 Allowed types: JPG, PNG, GIF, WebP, PDF, DOC/DOCX, XLS/XLSX,
                 PPT/PPTX, TXT, and audio (WebM, OGG, MP3, M4A, AAC, WAV) —
                 max 30 MB each. Multiple files of mixed types can be sent in
-                one message.
+                one message. Tip: pasting a screenshot straight into the
+                composer attaches it directly.
               </p>
               <h3 className="doc-h3">Record a voice message</h3>
               <Steps
@@ -676,6 +694,7 @@ export function DocsScreen() {
                       ["Insert mention", "Enter or Tab"],
                       ["Move mention highlight", "Arrow up / down"],
                       ["Save edit", "Enter"],
+                      ["Edit last message (empty composer)", "↑"],
                       ["Cancel edit / close panel", "Escape"],
                     ].map(([action, keys]) => (
                       <tr key={action} className="border-t border-hairline">

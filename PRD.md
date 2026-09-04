@@ -74,7 +74,7 @@ Kivo
 | User Profiles | **Complete** | Display name, username, bio, status, avatar + frames, banner, country, GitHub username |
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
 | DM Conversations | **Complete** | Create, list, message history, unread counts |
-| Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts, copy, select mode |
+| Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts (**group "Seen by"** — tap the ticks on your own message for per-member read time / delivered), copy, select mode |
 | **@Mentions** | **Complete** | Autocomplete + mention notifications |
 | Message Replies | **Complete** | Reply-to with inline quote preview |
 | Message Forwarding | **Complete** | Forward any visible message to another chat with a "Forwarded from @user" pill (original author kept, no caption) |
@@ -458,7 +458,7 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | `message:pin-updated` | Server → Room | Message pinned or unpinned |
 | `message:new` (thread replies) | Server → Room | Same event as main messages; payload includes `threadId` so clients route to the thread panel / chip refresh |
 | `message:reaction` | Server → Room | Reaction added or removed |
-| `message:read` | Server → Room | Messages marked as read |
+| `message:read` | Server → Room | Messages marked as read — payload carries the reader + the `upToMessageId`/`upToCreatedAt` anchor and `readAt`, so clients can stamp precise per-message receipts (group "Seen by") |
 | `message:unread` | Server → Room | Conversation marked unread (badge + "New messages" separator) |
 | `message:delivered` | Client → Server | Acknowledge receipt of `message:new` |
 | `message:delivery-updated` | Server → Room | Broadcast updated `deliveredTo` array |

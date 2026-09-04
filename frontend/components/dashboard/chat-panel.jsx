@@ -1212,17 +1212,31 @@ export function ChatPanel({
         const onRead = (payload) => {
             if (payload.conversationId !== convId || payload.userId === userId)
                 return;
+            const readerId = String(payload.userId);
+            const readAt = payload.readAt
+                ? new Date(payload.readAt)
+                : new Date();
+            // The server marks everything up to the anchor read (no anchor =
+            // whole conversation), so only stamp messages at/before the cutoff.
+            // Without this, a member who read a few messages would appear to
+            // have read newer ones they never saw.
+            const cutoff = payload.upToCreatedAt
+                ? new Date(payload.upToCreatedAt).getTime()
+                : Infinity;
             setMessages((prev) =>
                 prev.map((m) => {
                     if (m.senderId !== userId) return m;
-                    if (m.readBy?.some((r) => r.userId === payload.userId))
+                    if (
+                        m.readBy?.some(
+                            (r) =>
+                                String(r.userId || r) === readerId,
+                        )
+                    )
                         return m;
+                    if (new Date(m.createdAt).getTime() > cutoff) return m;
                     return {
                         ...m,
-                        readBy: [
-                            ...(m.readBy || []),
-                            { userId: payload.userId, readAt: new Date() },
-                        ],
+                        readBy: [...(m.readBy || []), { userId: payload.userId, readAt }],
                     };
                 }),
             );
@@ -2690,6 +2704,11 @@ export function ChatPanel({
                                                     }
                                                     replyTo={replyTo}
                                                     receipt={receipt}
+                                                    viewerId={
+                                                        !isChannel
+                                                            ? userId
+                                                            : undefined
+                                                    }
                                                     participants={
                                                         conversation?.participants ||
                                                         []

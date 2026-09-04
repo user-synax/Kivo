@@ -20,9 +20,11 @@ import {
   ShieldBan,
   Trash,
   UserRound,
+  X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -31,7 +33,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/motion/context-menu";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
-import { formatTime } from "@/lib/chat";
+import { formatTime, participantAvatarName, participantName } from "@/lib/chat";
 import { EASE_OUT_CSS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +53,7 @@ import { LinkPreview } from "@/components/chat/link-preview";
 import { MentionToken } from "@/components/mentions/mention-token";
 import { firstUrl, normalizeUrl } from "@/lib/links";
 import { emojiCount } from "@/lib/emoji";
+import { Avatar } from "@/components/dashboard/avatar";
 
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?'\"`>]+$/;
@@ -205,6 +208,177 @@ function MessageContent({
 
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
+/* ── Read receipts ("Seen by") ────────────────────────────────────────────────
+   Every message already carries deliveredTo (user ids) and readBy
+   ([{ userId, readAt }]). For the sender these resolve to one row per current
+   participant (everyone but themselves): read (with time), delivered, or —
+   never received — simply absent from the list. */
+function participantKey(p) {
+  return String(p?.id || p?._id || p || "");
+}
+
+function buildReceiptPeers(message, participants, viewerId) {
+  if (!message || !viewerId || !message.id || message.tempId) return null;
+  const readBy = (message.readBy || []).map((r) => ({
+    uid: String(r.userId || r),
+    readAt: r.readAt,
+  }));
+  const delivered = new Set(
+    (message.deliveredTo || []).map((id) => String(id)),
+  );
+  const read = [];
+  const deliveredList = [];
+  let others = 0;
+  for (const p of participants || []) {
+    const pid = participantKey(p);
+    if (!pid || pid === String(viewerId)) continue;
+    others += 1;
+    const entry = readBy.find((r) => r.uid === pid);
+    const row = {
+      pid,
+      name: participantName(p),
+      avatarName: participantAvatarName(p),
+      avatarStyle: p?.avatarStyle || null,
+      avatarUrl: p?.avatarUrl || null,
+    };
+    if (entry) read.push({ ...row, readAt: entry.readAt });
+    else if (delivered.has(pid)) deliveredList.push(row);
+  }
+  return { others, read, delivered: deliveredList };
+}
+
+const RECEIPTS_WIDTH = 288;
+
+// Theme tokens are injected on the ThemeProvider wrapper div, NOT on :root, so
+// a node portaled to <body> sees none of them (transparent card). Capture the
+// resolved values from an element inside the themed tree and re-declare them
+// inline on the panel, where they then cascade to its own children.
+const THEME_VARS = [
+  "--bg-elevated",
+  "--border",
+  "--text-primary",
+  "--text-muted",
+  "--accent",
+  "--hover",
+];
+
+// Floating "Seen by" card, portaled to <body> so the message list's overflow
+// can't clip it. Anchored to the ticks that opened it; dismisses on outside
+// click, Escape, or any scroll (so it never floats away from its message).
+function ReceiptsPanel({ vars, anchor, read, delivered, others, onClose }) {
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    const onDown = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) onClose();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onScroll = () => onClose();
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [onClose]);
+
+  const rowCount = read.length + delivered.length;
+  const estHeight = Math.min(320, 60 + rowCount * 44 + 12);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // Below the anchor by default; flip above when it would overflow the bottom.
+  let top = anchor.bottom + 6;
+  if (top + estHeight > vh - 8 && anchor.top - estHeight - 6 > 8) {
+    top = anchor.top - estHeight - 6;
+  }
+  const left = Math.min(
+    Math.max(anchor.right - RECEIPTS_WIDTH, 8),
+    Math.max(vw - RECEIPTS_WIDTH - 8, 8),
+  );
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-label="Message receipts"
+      className="fixed flex flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_16px_44px_-12px_rgba(0,0,0,0.55)]"
+      style={{ ...vars, top, left, width: RECEIPTS_WIDTH }}
+    >
+      <div className="flex items-center justify-between border-b border-[var(--border)] py-2 pl-3.5 pr-2">
+        <span className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">
+          Seen by
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close receipts"
+          className="flex size-7 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="t-scroll max-h-[272px] overflow-y-auto p-1.5">
+        {read.length > 0 && (
+          <p className="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Read · {read.length}
+            {read.length < others ? ` of ${others}` : ""}
+          </p>
+        )}
+        {read.map((row) => (
+          <div
+            key={row.pid}
+            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
+          >
+            <Avatar
+              name={row.avatarName}
+              avatarStyle={row.avatarStyle}
+              url={row.avatarUrl}
+              size="xs"
+            />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">
+              {row.name}
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-[var(--accent)]">
+              <CheckCheck className="h-3.5 w-3.5" aria-hidden />
+              {formatTime(row.readAt)}
+            </span>
+          </div>
+        ))}
+        {delivered.length > 0 && (
+          <p className="px-2 pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Delivered
+          </p>
+        )}
+        {delivered.map((row) => (
+          <div
+            key={row.pid}
+            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
+          >
+            <Avatar
+              name={row.avatarName}
+              avatarStyle={row.avatarStyle}
+              url={row.avatarUrl}
+              size="xs"
+            />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">
+              {row.name}
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-[11px] text-[var(--text-muted)]">
+              <CheckCheck className="h-3.5 w-3.5" aria-hidden />
+              Delivered
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function MessageBubble({
   message,
   mine,
@@ -229,6 +403,7 @@ export function MessageBubble({
   contentClassName,
   replyTo,
   participants = [],
+  viewerId,
   isUserOnline,
   onOpenProfile,
   isMobile = false,
@@ -258,6 +433,58 @@ export function MessageBubble({
   const [pressing, setPressing] = useState(false);
   const [likeAnimKey, setLikeAnimKey] = useState(0);
   const reduceMotion = useReducedMotion();
+
+  // Read receipts ("Seen by"): the sender can open a per-message breakdown of
+  // who received/read it. Needs a viewer id + participant list, so this is
+  // DMs and private groups — big space channels don't surface per-user receipts.
+  const receiptPeers = useMemo(
+    () => buildReceiptPeers(message, participants, viewerId),
+    [message, participants, viewerId],
+  );
+  const [receiptsOpen, setReceiptsOpen] = useState(false);
+  const [receiptsAnchor, setReceiptsAnchor] = useState(null);
+  const [receiptsVars, setReceiptsVars] = useState(null);
+  const ticksRef = useRef(null);
+  const receiptInFlight = ["queued", "sending", "failed"].includes(
+    message?.status,
+  );
+  const canShowReceipts =
+    mine &&
+    Boolean(viewerId) &&
+    Boolean(message?.id) &&
+    !message?.tempId &&
+    !receiptInFlight &&
+    receiptPeers?.others > 0;
+  const allRead =
+    canShowReceipts && receiptPeers.read.length >= receiptPeers.others;
+  const anySeen =
+    canShowReceipts &&
+    (receiptPeers.read.length > 0 || receiptPeers.delivered.length > 0);
+  const closeReceipts = useCallback(() => {
+    setReceiptsOpen(false);
+    setReceiptsAnchor(null);
+    setReceiptsVars(null);
+  }, []);
+  const openReceipts = () => {
+    const el = ticksRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    // Read the theme values where the bubble actually renders, then carry them
+    // onto the portaled card (see THEME_VARS above).
+    const cs = window.getComputedStyle(el);
+    const vars = {};
+    for (const name of THEME_VARS) {
+      vars[name] = cs.getPropertyValue(name).trim();
+    }
+    setReceiptsVars(vars);
+    setReceiptsAnchor({
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+    });
+    setReceiptsOpen(true);
+  };
 
   // --- Double-click / double-tap like — optimized ---
   const lastTapRef = useRef(0);
@@ -714,20 +941,64 @@ export function MessageBubble({
               failed · retry
             </button>
           )}
-          {receipt === "sent" && (
-            <Check className="h-3 w-3" aria-label="Sent" />
-          )}
-          {receipt === "delivered" && (
-            <CheckCheck className="h-3 w-3" aria-label="Delivered" />
-          )}
-          {receipt === "read" && (
-            <CheckCheck
-              className="h-3 w-3 text-[var(--accent)]"
-              aria-label="Read"
-            />
+          {canShowReceipts ? (
+            anySeen ? (
+              <button
+                type="button"
+                ref={ticksRef}
+                onClick={openReceipts}
+                aria-label={
+                  allRead ? "Seen by everyone" : "View receipts"
+                }
+                aria-expanded={receiptsOpen}
+                className={cn(
+                  "flex cursor-pointer items-center rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none",
+                  receiptsOpen && "opacity-70",
+                )}
+              >
+                <CheckCheck
+                  className={cn(
+                    "h-3 w-3",
+                    allRead && "text-[var(--accent)]",
+                  )}
+                  aria-hidden
+                />
+              </button>
+            ) : (
+              <Check className="h-3 w-3" aria-label="Sent" />
+            )
+          ) : (
+            <>
+              {receipt === "sent" && (
+                <Check className="h-3 w-3" aria-label="Sent" />
+              )}
+              {receipt === "delivered" && (
+                <CheckCheck className="h-3 w-3" aria-label="Delivered" />
+              )}
+              {receipt === "read" && (
+                <CheckCheck
+                  className="h-3 w-3 text-[var(--accent)]"
+                  aria-label="Read"
+                />
+              )}
+            </>
           )}
         </div>
       )}
+      {receiptsOpen &&
+        canShowReceipts &&
+        receiptPeers &&
+        receiptsAnchor &&
+        receiptsVars && (
+          <ReceiptsPanel
+            vars={receiptsVars}
+            anchor={receiptsAnchor}
+            read={receiptPeers.read}
+            delivered={receiptPeers.delivered}
+            others={receiptPeers.others}
+            onClose={closeReceipts}
+          />
+        )}
     </ContextMenu>
   );
 }

@@ -714,22 +714,33 @@ export async function markRead({ conversationId, userId, upToMessageId }) {
     senderId: { $ne: uid },
     readBy: { $not: { $elemMatch: { userId: uid } } },
   };
+  let upToCreatedAt = null;
   if (upToMessageId) {
     if (!mongoose.Types.ObjectId.isValid(upToMessageId)) {
       throw badRequest("Invalid upToMessageId", "INVALID_CURSOR");
     }
     const upTo = await Message.findById(upToMessageId).select("createdAt");
-    if (upTo) filter.createdAt = { $lte: upTo.createdAt };
+    if (upTo) {
+      filter.createdAt = { $lte: upTo.createdAt };
+      upToCreatedAt = upTo.createdAt;
+    }
   }
 
+  const readAt = new Date();
   const result = await Message.updateMany(filter, {
-    $addToSet: { readBy: { userId: uid, readAt: new Date() } },
+    $addToSet: { readBy: { userId: uid, readAt } },
   });
 
   const payload = {
     conversationId,
     userId,
     readCount: result.modifiedCount || 0,
+    // Anchor precision for read receipts: clients only mark messages up to
+    // this point as read by the user (never newer ones). readAt is the moment
+    // the server stamped the receipts so every client shows the same time.
+    upToMessageId: upToMessageId && mongoose.Types.ObjectId.isValid(upToMessageId) ? upToMessageId : null,
+    upToCreatedAt: upToCreatedAt ? new Date(upToCreatedAt).toISOString() : null,
+    readAt: readAt.toISOString(),
   };
   emitToConversation(conversationId, "message:read", payload);
   return payload;

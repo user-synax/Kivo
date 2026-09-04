@@ -311,8 +311,10 @@ Scroll **up**. History loads in pages (cursor pagination, newest-first). Keep sc
 On your own bubbles:
 
 - Single check: **sent**
-- Double check: **delivered**
-- Filled / read state: the other participant(s) **read** it
+- Double check: **delivered** (to at least one recipient)
+- Accent double check: **everyone read it**
+
+Tap the double check on any sent message to open **Seen by**: it lists each DM / group member with **Read · time** or **Delivered**, so you can see exactly who has (and hasn't) seen your message. Space channels don't surface per-member receipts.
 
 The chat is marked read when you have it open. System messages (e.g. "Admin added X") do not bump unread counts.
 

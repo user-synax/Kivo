@@ -336,7 +336,7 @@ Registration / Login
 | `message:deleted` | Server → Room | Message soft-deleted |
 | `message:pin-updated` | Server → Room | Message pinned/unpinned (banner + bubble state refresh) |
 | `message:reaction` | Server → Room | Reaction added/removed |
-| `message:read` | Server → Room | Marked as read |
+| `message:read` | Server → Room | Marked as read (payload includes the reader's anchor + `readAt` for precise per-message receipts) |
 | `message:unread` | Server → Room | Conversation marked unread (badge + separator) |
 | `message:delivery-updated` | Server → Room | Delivery state changed |
 | `typing:start` / `typing:stop` | Client → Room | Typing indicator (re-broadcast to others) |
@@ -416,7 +416,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - **Jump-to-latest pill** — floating button with the unread count when scrolled up; tap to return to the live edge
 - **Composer drafts, paste-to-attach, ↑-to-edit** — drafts persist per chat, pasted images attach directly, ↑ on empty edits your last message
 - Emoji picker — 9 categories (Smileys, People, Hearts, Animals, Food, Activity, Travel, Objects, Symbols), 270+ emojis
-- Delivery & read receipts; typing indicators
+- Delivery & read receipts — tap the ticks on your own message for a **Seen by** breakdown (each DM/group member with read time or delivered); typing indicators
 - **Reconnect gap-fill** — after the socket reconnects, missed messages are fetched and merged into the cache
 
 ### 👥 Groups
