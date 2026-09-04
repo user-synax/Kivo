@@ -29,6 +29,19 @@ const uploadAvatarMulter = multer({
   },
 }).single("avatar");
 
+// Custom (Plus) banner upload — single image field "banner", max 8MB. Same
+// image allow-list as avatars; the service enforces the plan entitlement.
+const uploadBannerMulter = multer({
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_AVATAR_TYPES.has(file.mimetype)) {
+      cb(new Error("Unsupported image type"));
+      return;
+    }
+    cb(null, true);
+  },
+}).single("banner");
+
 export const getMe = asyncHandler(async (req, res) => {
   const user = await usersService.getMe({ userId: req.user.userId });
   res.status(200).json({ success: true, data: user });
@@ -78,6 +91,39 @@ export const updateAvatar = (req, res) => {
         throw e;
       }
       const user = await usersService.updateAvatar({
+        userId: req.user.userId,
+        buffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+      res.status(200).json({ success: true, data: user });
+    } catch (e) {
+      const status = e.statusCode || 500;
+      res.status(status).json({
+        success: false,
+        error: { message: e.message, code: e.code || "SERVER_ERROR" },
+      });
+    }
+  });
+};
+
+// Custom banner upload (Kivo Plus). Mirrors the avatar upload shape; the
+// service rejects non-plus plans with PLUS_REQUIRED.
+export const updateBanner = (req, res) => {
+  uploadBannerMulter(req, res, async (err) => {
+    try {
+      if (err) {
+        const e = new Error(err.message || "Upload failed");
+        e.statusCode = 400;
+        e.code = "UPLOAD_ERROR";
+        throw e;
+      }
+      if (!req.file) {
+        const e = new Error("No file uploaded");
+        e.statusCode = 400;
+        e.code = "NO_FILE";
+        throw e;
+      }
+      const user = await usersService.updateBanner({
         userId: req.user.userId,
         buffer: req.file.buffer,
         contentType: req.file.mimetype,

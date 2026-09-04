@@ -19,6 +19,16 @@ export const searchQuerySchema = z.object({
   q: z.string().trim().max(50).optional(),
 });
 
+// Kivo Plus profile-effect ids ("glow" avatar halo, "gradient-name", or
+// "aura" = both). Only meaningful for plus-plan users; free users are forced
+// back to "none" server-side.
+export const PROFILE_EFFECT_IDS = [
+  "none",
+  "glow",
+  "gradient-name",
+  "aura",
+];
+
 // Self-service profile update. All fields optional (partial update).
 export const updateMeSchema = z.object({
   displayName: z.string().trim().max(50).optional(),
@@ -33,6 +43,8 @@ export const updateMeSchema = z.object({
   bio: z.string().trim().max(280).optional(),
   status: z.string().trim().max(60).optional(),
   avatarStyle: z.enum(AVATAR_STYLE_IDS).nullable().optional(),
+  profileEffect: z.enum(PROFILE_EFFECT_IDS).nullable().optional(),
+  // `plan` is deliberately NOT accepted here — tiers are admin-granted only.
   banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),
   country: z
     .string()

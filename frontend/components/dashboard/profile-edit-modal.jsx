@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Trash2, Upload, X } from "lucide-react";
+import { Check, Crown, Loader2, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -10,6 +10,11 @@ import { getSession, getToken, setSession } from "@/lib/auth";
 import { AVATAR_STYLES } from "@/lib/avatar-styles";
 import { BANNER_OPTIONS } from "@/lib/banners";
 import { COUNTRIES } from "@/lib/countries";
+import {
+  effectAvatarClass,
+  effectNameClass,
+  PROFILE_EFFECTS,
+} from "@/lib/profile-effects";
 
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 
@@ -74,6 +79,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [bio, setBio] = useState("");
     const [status, setStatus] = useState("");
     const [avatarStyle, setAvatarStyle] = useState("default");
+    const [profileEffect, setProfileEffect] = useState("none");
     const [banner, setBanner] = useState("");
     const [country, setCountry] = useState(null);
     const [githubUsername, setGithubUsername] = useState("");
@@ -84,6 +90,45 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [uploading, setUploading] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const fileRef = useRef(null);
+
+    // Custom banner upload (Kivo Plus).
+    const [bannerUploading, setBannerUploading] = useState(false);
+    const bannerFileRef = useRef(null);
+
+    const isPlus = (currentUser || getSession())?.plan === "plus";
+
+    const handleBannerUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            setError("Please choose an image file.");
+            return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            setError("Image must be under 8MB.");
+            return;
+        }
+        setError(null);
+        setBannerUploading(true);
+        try {
+            const form = new FormData();
+            form.append("banner", file);
+            const updated = await apiUpload(
+                "/api/v1/users/me/banner",
+                form,
+            );
+            setSession(updated, getToken());
+            onSaved?.(updated);
+            setBanner(updated.banner || "");
+        } catch (err) {
+            setError(
+                err?.message || "Could not upload custom banner",
+            );
+        } finally {
+            setBannerUploading(false);
+            if (bannerFileRef.current) bannerFileRef.current.value = "";
+        }
+    };
 
     const handleAvatarChange = async (e) => {
         const file = e.target.files?.[0];
@@ -138,6 +183,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             setBio(me?.bio || "");
             setStatus(me?.status || "");
             setAvatarStyle(me?.avatarStyle || "default");
+            setProfileEffect(me?.profileEffect || "none");
             setBanner(me?.banner || "");
             setCountry(
                 me?.country
@@ -179,6 +225,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                 bio: bio.trim(),
                 status: status.trim(),
                 avatarStyle,
+                profileEffect,
                 banner,
                 country: country?.code || "",
                 githubUsername: githubUsername.trim(),
@@ -266,7 +313,11 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                             )}
                         </div>
                         <div className="min-w-0 flex-1 pb-0.5">
-                            <p className="truncate text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
+                            <p
+                                className={`truncate text-[15px] font-semibold leading-tight text-[var(--text-primary)] ${
+                                    effectNameClass(profileEffect) || ""
+                                }`}
+                            >
                                 {displayName ||
                                     currentUser?.displayName ||
                                     "Profile"}
@@ -470,6 +521,40 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                             Animated cover shown at the top of your profile —
                             previewed live in the header above.
                         </p>
+                        {isPlus ? (
+                            <div className="flex flex-wrap items-center gap-3">
+                                <input
+                                    ref={bannerFileRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/gif"
+                                    onChange={handleBannerUpload}
+                                    className="hidden"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        bannerFileRef.current?.click()
+                                    }
+                                    disabled={bannerUploading}
+                                    className={`group flex h-10 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-3.5 text-[12px] font-medium text-[var(--text-primary)] transition-[border-color,background-color,transform] duration-200 ${EASE} hover:border-[var(--accent)] hover:bg-[var(--hover)] active:scale-[0.98] disabled:opacity-50`}
+                                >
+                                    <Upload
+                                        className={`h-3.5 w-3.5 text-[var(--text-muted)] transition-colors duration-200 ${EASE} group-hover:text-[var(--accent)]`}
+                                    />
+                                    {bannerUploading
+                                        ? "Uploading…"
+                                        : "Upload custom banner"}
+                                </button>
+                                <span className="text-[11px] text-[var(--text-muted)]">
+                                    GIF, JPG, PNG or WebP · up to 8MB
+                                </span>
+                            </div>
+                        ) : (
+                            <p className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+                                <Crown className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                                Custom banner uploads are a Kivo Plus perk
+                            </p>
+                        )}
                         <div className="grid grid-cols-3 gap-2">
                             <button
                                 type="button"
@@ -517,6 +602,81 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                 );
                             })}
                         </div>
+                    </Section>
+
+                    <Section label="Profile effects" delay={160}>
+                        <p className="-mt-1 text-[11px] leading-snug text-[var(--text-muted)]">
+                            Small presence flourishes everyone sees on your
+                            profile. Kivo Plus perk.
+                        </p>
+                        {isPlus ? (
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {PROFILE_EFFECTS.map((fx) => {
+                                    const active =
+                                        profileEffect === fx.id;
+                                    return (
+                                        <button
+                                            key={fx.id}
+                                            type="button"
+                                            onClick={() =>
+                                                setProfileEffect(fx.id)
+                                            }
+                                            aria-pressed={active}
+                                            title={fx.label}
+                                            className={`group relative flex flex-col gap-1.5 rounded-xl border p-2 text-left transition-[border-color,background-color,transform] duration-200 ${EASE} active:scale-[0.95] ${
+                                                active
+                                                    ? "border-[var(--accent)] bg-[var(--hover)]"
+                                                    : "border-[var(--border)] hover:bg-[var(--hover)]"
+                                            }`}
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <span
+                                                    className={`rounded-lg bg-[var(--bg-base)] p-px ${
+                                                        effectAvatarClass(
+                                                            fx.id,
+                                                        ) ||
+                                                        ""
+                                                    }`}
+                                                >
+                                                    <Avatar
+                                                        name="A"
+                                                        size="xs"
+                                                    />
+                                                </span>
+                                                <span
+                                                    className={`text-[11px] font-semibold leading-none text-[var(--text-primary)] ${
+                                                        effectNameClass(
+                                                            fx.id,
+                                                        ) ||
+                                                        ""
+                                                    }`}
+                                                >
+                                                    Name
+                                                </span>
+                                            </span>
+                                            <span className="text-[10px] font-medium leading-tight text-[var(--text-muted)]">
+                                                {fx.label}
+                                            </span>
+                                            {active && (
+                                                <span className="t-badge-pop absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] ring-2 ring-[var(--bg-surface)]">
+                                                    <Check
+                                                        className="h-2.5 w-2.5"
+                                                        strokeWidth={3}
+                                                    />
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-base)] px-3 py-2.5 text-[11px] leading-snug text-[var(--text-muted)]">
+                                <Crown className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                                Effects are locked on the free plan — a glow
+                                around your avatar and an animated gradient
+                                name unlock with Kivo Plus.
+                            </p>
+                        )}
                     </Section>
 
                     {error && (

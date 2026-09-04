@@ -84,6 +84,16 @@ export const unbanUser = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+export const setUserPlan = asyncHandler(async (req, res) => {
+  const { plan } = req.body || {};
+  const data = await adminService.setUserPlan({
+    userId: req.params.id,
+    plan,
+    ip: getClientIp(req),
+  });
+  res.status(200).json({ success: true, data });
+});
+
 // ── Groups ──────────────────────────────────────────────────────────────────
 
 export const listGroups = asyncHandler(async (req, res) => {

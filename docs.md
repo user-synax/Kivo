@@ -870,6 +870,7 @@ Do not expect these in the current MVP:
 | Block users + manage the list | DM header, profile drawer, public profile, Settings → Blocked users |
 | Ten themes + custom accent/canvas (theme studio) | Appearance page → Save to my account (desktop: Settings → Appearance row; mobile: Menu → Appearance) |
 | Chat wallpapers + bubble styles (personal + per-Space + per-chat) | Appearance page → Chat look · Space settings → Space look · chat header → palette icon |
+| Custom banners + profile effects (Kivo Plus) | Profile editor · admin panel grants Plus |
 | Notification preferences | Settings → Notification preferences |
 | In-app notifications | Bell in panel header |
 | Web push | Allow notifications when opening the bell |

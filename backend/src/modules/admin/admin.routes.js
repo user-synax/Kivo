@@ -30,6 +30,7 @@ router.get("/users", adminController.listUsers);
 router.get("/users/:id", adminController.getUserDetail);
 router.post("/users/:id/ban", adminController.banUser);
 router.post("/users/:id/unban", adminController.unbanUser);
+router.post("/users/:id/plan", adminController.setUserPlan);
 
 // Groups
 router.get("/groups", adminController.listGroups);

@@ -9,6 +9,7 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Crown,
   Database,
   FileText,
   Loader2,
@@ -186,6 +187,21 @@ function UsersTab() {
     }
   };
 
+  const handlePlan = async (userId, plan) => {
+    setActionBusy(userId);
+    try {
+      await adminFetch(`/api/admin/users/${userId}/plan`, {
+        method: "POST",
+        body: JSON.stringify({ plan }),
+      });
+      load(page, search, bannedFilter);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Controls */}
@@ -268,36 +284,66 @@ function UsersTab() {
                     {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    {u.isBanned ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#ff5577]/15 px-2.5 py-0.5 text-[12px] font-medium text-[#ff5577]">
-                        <Ban className="h-3 w-3" /> Banned
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#22c55e]/15 px-2.5 py-0.5 text-[12px] font-medium text-[#22c55e]">
-                        <CheckCircle className="h-3 w-3" /> Active
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {u.plan === "plus" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#a78bfa]/15 px-2.5 py-0.5 text-[12px] font-medium text-[#c4b5fd]">
+                          <Crown className="h-3 w-3" /> Plus
+                        </span>
+                      )}
+                      {u.isBanned ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ff5577]/15 px-2.5 py-0.5 text-[12px] font-medium text-[#ff5577]">
+                          <Ban className="h-3 w-3" /> Banned
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#22c55e]/15 px-2.5 py-0.5 text-[12px] font-medium text-[#22c55e]">
+                          <CheckCircle className="h-3 w-3" /> Active
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    {actionBusy === u.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-[#999]" />
-                    ) : u.isBanned ? (
-                      <button
-                        type="button"
-                        onClick={() => handleUnban(u.id)}
-                        className="rounded-lg bg-[#22c55e]/15 px-3 py-1.5 text-[12px] font-medium text-[#22c55e] hover:bg-[#22c55e]/25"
-                      >
-                        Unban
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleBan(u.id)}
-                        className="rounded-lg bg-[#ff5577]/15 px-3 py-1.5 text-[12px] font-medium text-[#ff5577] hover:bg-[#ff5577]/25"
-                      >
-                        Ban
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {actionBusy === u.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#999]" />
+                      ) : (
+                        <>
+                          {u.plan === "plus" ? (
+                            <button
+                              type="button"
+                              onClick={() => handlePlan(u.id, "free")}
+                              className="rounded-lg bg-[#a78bfa]/15 px-3 py-1.5 text-[12px] font-medium text-[#c4b5fd] hover:bg-[#a78bfa]/25"
+                            >
+                              Revoke Plus
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handlePlan(u.id, "plus")}
+                              className="rounded-lg bg-[#a78bfa]/15 px-3 py-1.5 text-[12px] font-medium text-[#c4b5fd] hover:bg-[#a78bfa]/25"
+                            >
+                              Grant Plus
+                            </button>
+                          )}
+                          {u.isBanned ? (
+                            <button
+                              type="button"
+                              onClick={() => handleUnban(u.id)}
+                              className="rounded-lg bg-[#22c55e]/15 px-3 py-1.5 text-[12px] font-medium text-[#22c55e] hover:bg-[#22c55e]/25"
+                            >
+                              Unban
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleBan(u.id)}
+                              className="rounded-lg bg-[#ff5577]/15 px-3 py-1.5 text-[12px] font-medium text-[#ff5577] hover:bg-[#ff5577]/25"
+                            >
+                              Ban
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

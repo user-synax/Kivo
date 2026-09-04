@@ -38,6 +38,7 @@
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status, bio, banner, avatar uploads & frames, **country flag**, and **GitHub contribution graph** on a public profile page (`/u/username`).
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
+- 👑 **Kivo Plus (entitlement scaffold)** — admin-granted `free`/`plus` plan with Plus-only profile perks: **custom banner uploads** (own GIF/image, not just curated covers) and **profile effects** (avatar glow halo, animated gradient name, or both). Payments are intentionally not wired yet — Plus is a grant, not a purchase.
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
 - 🤝 **Complete friends system** — send, accept, decline, **remove**, search, and jump straight into a DM.
 - 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Menu) with Profile, Settings, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.

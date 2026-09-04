@@ -109,6 +109,7 @@ Kivo
 | **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
 | **Blocking** | **Complete** | Block from DMs & profiles; **Blocked users manager** (Settings list + one-tap unblock); server-enforced, friendships removed |
 | **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
+| **Kivo Plus (entitlement scaffold)** | **Complete** | `User.plan` (`free`/`plus`, admin-granted via `/admin` — no payments wired); Plus perks so far: custom profile-banner upload (`PATCH /users/me/banner`, 8MB, Appwrite) + profile effects (`profileEffect`: `none`/`glow`/`gradient-name`/`aura`, CSS-driven, reduced-motion safe) — both enforced server-side |
 | **Reconnect Gap-Fill** | **Complete** | Conversation list + messages newer than newest-known refetched after socket reconnect |
 | **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
 | **Two-Factor Auth (2FA)** | **Complete** | TOTP via authenticator app (QR setup in Settings), one-time backup codes, two-step login challenge |

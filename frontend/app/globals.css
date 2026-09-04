@@ -1125,3 +1125,54 @@ body {
     border: 1.5px solid var(--accent);
     color: var(--text-primary);
 }
+
+/* ── Kivo Plus profile effects ──────────────────────────────────────────────
+   Applied to profile pages (public /u/, drawers, own profile). The avatar
+   halo pulses a soft ring outward; the display name animates an accent
+   gradient behind clipped text. Colors use the theme accent token when it
+   exists and fall back to the product blue elsewhere. Both are switched off
+   under prefers-reduced-motion. Deliberately top-level so they always win. */
+@keyframes kivo-pfx-ring {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #4ba9e1) 45%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent, #4ba9e1) 0%, transparent);
+    }
+}
+
+.kivo-pfx-avatar {
+    border-radius: 0.75rem;
+    animation: kivo-pfx-ring 2.6s ease-in-out infinite;
+}
+
+@keyframes kivo-pfx-slide {
+    to {
+        background-position: 200% center;
+    }
+}
+
+.kivo-pfx-name {
+    background-image: linear-gradient(
+        90deg,
+        var(--accent, #4ba9e1) 0%,
+        #e879f9 28%,
+        var(--accent, #4ba9e1) 55%,
+        #fbbf24 80%,
+        var(--accent, #4ba9e1) 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: kivo-pfx-slide 9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kivo-pfx-avatar,
+    .kivo-pfx-name {
+        animation: none;
+    }
+}

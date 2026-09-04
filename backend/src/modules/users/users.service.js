@@ -27,6 +27,9 @@ function publicUser(user) {
     githubUsername: u.githubUsername || null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
+    // Plus profile effect ("none" | "glow" | "gradient-name" | "aura") —
+    // public so any visitor renders the user's chosen effect on their profile.
+    profileEffect: u.profileEffect || "none",
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
     lastActiveAt: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
     online,
@@ -67,11 +70,15 @@ function mergeAppearance(existing = {}, incoming = {}) {
 }
 
 // Self profile shape — everything from publicUser plus the user's own
-// appearance customization. Appearance is deliberately NOT included in
-// publicUser, so other people's search results / profiles never carry it.
+// appearance customization and tier. Appearance/plan are deliberately NOT
+// included in publicUser, so other people's search results / profiles never
+// carry them.
 function selfUser(user) {
   return {
     ...publicUser(user),
+    plan: user.plan || "free",
+    // Lets the editor show a "custom upload" affordance and clean removal.
+    bannerUploaded: Boolean(user.bannerFileId),
     appearance: flatAppearance(user.appearance),
   };
 }
@@ -116,7 +123,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role appearance createdAt lastActiveAt",
+    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role plan profileEffect appearance bannerFileId createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);
@@ -128,7 +135,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role createdAt lastActiveAt",
+    "displayName username email bio status avatarStyle avatarUrl banner country githubUsername verified showBadge role profileEffect createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -151,6 +158,7 @@ function publicProfile(user) {
     githubUsername: u.githubUsername || null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
+    profileEffect: u.profileEffect || "none",
     bio: u.bio || null,
     status: u.status || null,
     joinedAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
@@ -161,7 +169,7 @@ function publicProfile(user) {
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status avatarStyle avatarUrl banner country githubUsername verified showBadge createdAt blockedUsers lastActiveAt",
+    "displayName username bio status avatarStyle avatarUrl banner country githubUsername verified showBadge profileEffect createdAt blockedUsers lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -208,6 +216,29 @@ export async function updateAvatar({ userId, buffer, contentType }) {
   );
   user.avatarUrl = url;
   user.avatarFileId = fileId;
+  await user.save();
+  return selfUser(user);
+}
+
+// Upload a custom profile banner (Kivo Plus perk). Stored in the avatar
+// bucket like display pictures; switching away later (curated/none) retires
+// the file through the updateMe banner branch.
+export async function updateBanner({ userId, buffer, contentType }) {
+  const user = await User.findById(userId).select("plan banner bannerFileId");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  if (user.plan !== "plus") {
+    throw forbidden(
+      "Custom banners are a Kivo Plus perk",
+      "PLUS_REQUIRED",
+    );
+  }
+  const { fileId, url } = await uploadAvatar(
+    buffer,
+    contentType,
+    user.bannerFileId || null,
+  );
+  user.banner = url;
+  user.bannerFileId = fileId;
   await user.save();
   return selfUser(user);
 }
@@ -380,7 +411,28 @@ export async function updateMe({ userId, data }) {
     update.avatarStyle = data.avatarStyle || null;
   }
   if (data.banner !== undefined) {
-    update.banner = data.banner || null;
+    const nextBanner = data.banner || null;
+    update.banner = nextBanner;
+    // Switching from an uploaded (Plus) banner to a curated one (or none)
+    // retires the Appwrite file so storage doesn't leak. Only when the value
+    // actually changes — re-saving the same banner keeps its file.
+    const current = await User.findById(userId).select("banner bannerFileId").lean();
+    const oldFile = current?.bannerFileId ? String(current.bannerFileId) : null;
+    if (oldFile && (current?.banner ?? null) !== nextBanner) {
+      update.bannerFileId = null;
+      try {
+        const store = getStorageSafe();
+        if (store) await store.deleteFile(env.appwriteBucketId, oldFile);
+      } catch {
+        // Non-fatal — the DB record is what matters for the client.
+      }
+    }
+  }
+  if (data.profileEffect !== undefined) {
+    // Plus-only field; a free user trying to set it is downgraded to none.
+    const me = await User.findById(userId).select("plan").lean();
+    update.profileEffect =
+      me?.plan === "plus" ? data.profileEffect || "none" : "none";
   }
   if (data.country !== undefined) {
     update.country = data.country || null;
@@ -402,7 +454,7 @@ export async function updateMe({ userId, data }) {
     new: true,
     runValidators: true,
   }).select(
-    "displayName username email bio status avatarStyle banner country githubUsername verified showBadge role appearance createdAt",
+    "displayName username email bio status avatarStyle banner country githubUsername verified showBadge role plan profileEffect appearance bannerFileId createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);

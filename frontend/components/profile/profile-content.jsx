@@ -20,6 +20,10 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import {
+  effectAvatarClass,
+  effectNameClass,
+} from "@/lib/profile-effects";
 import { cn } from "@/lib/utils";
 import {
   ContributionGraph,
@@ -157,6 +161,11 @@ export function ProfileContent({
   const isBlockedByMe = Boolean(profile?.isBlockedByMe);
   const isBlockedByOther = Boolean(profile?.isBlockedByOther);
   const isBlocked = isBlockedByMe || isBlockedByOther;
+
+  // Kivo Plus profile effect (avatar halo + gradient name).
+  const profileEffect = profile?.profileEffect || "none";
+  const pfxAvatar = effectAvatarClass(profileEffect);
+  const pfxName = effectNameClass(profileEffect);
 
   const handleAddFriend = async () => {
     if (!profile?.username || busy) return;
@@ -446,7 +455,10 @@ export function ProfileContent({
                       delay: 0.15,
                     }
               }
-              className="-mt-8 inline-block rounded-2xl bg-[var(--canvas)] p-1 sm:-mt-10"
+              className={cn(
+                "-mt-8 inline-block rounded-2xl bg-[var(--canvas)] p-1 sm:-mt-10",
+                pfxAvatar,
+              )}
             >
               <span
                 className="inline-block rounded-xl p-[2px]"
@@ -461,7 +473,12 @@ export function ProfileContent({
               </span>
             </motion.span>
             <div className="min-w-0 flex-1 pb-1">
-              <h1 className="flex items-center gap-1.5 truncate font-display text-[22px] font-semibold tracking-tight text-[var(--ink)] sm:text-[24px]">
+              <h1
+                className={cn(
+                  "flex items-center gap-1.5 truncate font-display text-[22px] font-semibold tracking-tight text-[var(--ink)] sm:text-[24px]",
+                  pfxName,
+                )}
+              >
                 {name}
                 {profile.verified && profile.showBadge !== false && (
                   <VerifiedBadge size="sm" decorative />

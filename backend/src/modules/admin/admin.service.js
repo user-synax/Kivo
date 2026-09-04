@@ -78,7 +78,7 @@ export async function listUsers({ page = 1, limit = 20, q, banned }) {
   const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
   const [users, total] = await Promise.all([
     User.find(filter)
-      .select("displayName username email avatarUrl isBanned bannedAt bannedReason createdAt")
+      .select("displayName username email avatarUrl isBanned bannedAt bannedReason plan createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
@@ -96,6 +96,7 @@ export async function listUsers({ page = 1, limit = 20, q, banned }) {
       isBanned: Boolean(u.isBanned),
       bannedAt: u.bannedAt || null,
       bannedReason: u.bannedReason || null,
+      plan: u.plan || "free",
       createdAt: u.createdAt,
     })),
     total,
@@ -110,7 +111,7 @@ export async function getUserDetail(userId) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(userId)
-    .select("displayName username email avatarUrl bio status isBanned bannedAt bannedReason createdAt")
+    .select("displayName username email avatarUrl bio status isBanned bannedAt bannedReason plan profileEffect createdAt")
     .lean();
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -131,6 +132,8 @@ export async function getUserDetail(userId) {
     isBanned: Boolean(user.isBanned),
     bannedAt: user.bannedAt || null,
     bannedReason: user.bannedReason || null,
+    plan: user.plan || "free",
+    profileEffect: user.profileEffect || "none",
     createdAt: user.createdAt,
     conversationCount,
     groupCount,
@@ -200,6 +203,39 @@ export async function unbanUser({ userId, ip }) {
   });
 
   return { unbanned: true };
+}
+
+// Grant or revoke the Kivo Plus plan (admin-only entitlement; there is no
+// self-serve payment flow yet, so a grant is the only way to become plus).
+export async function setUserPlan({ userId, plan, ip }) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw badRequest("Invalid user id", "INVALID_ID");
+  }
+  if (!["free", "plus"].includes(plan)) {
+    throw badRequest("Plan must be 'free' or 'plus'", "INVALID_PLAN");
+  }
+  const user = await User.findById(userId).select("displayName username plan");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  if (user.plan === plan) {
+    throw badRequest(`User is already on the ${plan} plan`, "ALREADY_PLAN");
+  }
+
+  await User.findByIdAndUpdate(userId, { plan });
+  // Downgrading also clears any Plus-only profile effect.
+  if (plan === "free") {
+    await User.findByIdAndUpdate(userId, { profileEffect: "none" });
+  }
+
+  await logAction({
+    action: plan === "plus" ? "grant_plus" : "revoke_plus",
+    targetType: "user",
+    targetId: user._id,
+    targetName: user.displayName || user.username || userId,
+    reason: null,
+    ip,
+  });
+
+  return { plan };
 }
 
 // ── Groups Management ───────────────────────────────────────────────────────

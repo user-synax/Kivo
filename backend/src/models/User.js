@@ -79,9 +79,34 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Account tier: "free" (default) or "plus" (admin-granted entitlement for
+    // premium profile perks — custom banner uploads, profile effects). Users
+    // can never self-grant; the admin panel manages it. Payments are out of
+    // scope, so "plus" is a grant, not a purchase.
+    plan: {
+      type: String,
+      enum: ["free", "plus"],
+      default: "free",
+    },
+    // Profile-effect id (Kivo Plus): "none" (default), "glow" (avatar halo),
+    // "gradient-name" (animated name), or "aura" (both). Rendered only on
+    // profile pages; validated server-side against PROFILE_EFFECT_IDS.
+    profileEffect: {
+      type: String,
+      enum: ["none", "glow", "gradient-name", "aura"],
+      default: "none",
+    },
     // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
     // so the previous file can be deleted on re-upload.
     avatarFileId: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    // Appwrite file id backing an uploaded (Plus) banner. Server-only: lets
+    // the previous file be deleted when the user switches back to a curated
+    // banner or removes it.
+    bannerFileId: {
       type: String,
       default: null,
       select: false,
