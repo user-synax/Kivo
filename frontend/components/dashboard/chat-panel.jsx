@@ -55,6 +55,7 @@ import {
     participantAvatarName,
     participantName,
 } from "@/lib/chat";
+import { clearDraft, draftsKey, loadDraft, saveDraft } from "@/lib/drafts";
 import { useLiveLastActive } from "@/lib/last-active";
 import {
     enqueueOutbox,
@@ -359,6 +360,35 @@ export function ChatPanel({
     const [hasMore, setHasMore] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [text, setText] = useState("");
+
+    // Composer drafts: unsent text is kept per conversation in localStorage
+    // (survives switches + reloads) and cleared on send. The suppress flag
+    // stops the save effect from filing the freshly-loaded draft under the
+    // wrong conversation on the switch render.
+    const draftSaveTimer = useRef(null);
+    const suppressDraftSaveRef = useRef(false);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: restore-on-switch only; userId is stable per session.
+    useEffect(() => {
+        if (!convId) return;
+        suppressDraftSaveRef.current = true;
+        setText(loadDraft(draftsKey(userId), convId));
+        setMentionOpen(false);
+    }, [convId]);
+    useEffect(() => {
+        if (!convId || !userId) return undefined;
+        if (suppressDraftSaveRef.current) {
+            suppressDraftSaveRef.current = false;
+            return undefined;
+        }
+        if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+        const snapshot = text;
+        draftSaveTimer.current = setTimeout(() => {
+            saveDraft(draftsKey(userId), convId, snapshot);
+        }, 250);
+        return () => {
+            if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+        };
+    }, [text, convId, userId]);
 
     // Message actions: pinned banner, forward picker, copy/share feedback, and
     // multi-select mode.
@@ -1466,6 +1496,7 @@ export function ChatPanel({
                 status: "queued",
             });
             setText("");
+            clearDraft(draftsKey(userId), convId);
             clearAll();
             setMentionOpen(false);
             if (typingTimer.current) clearTimeout(typingTimer.current);
@@ -1504,6 +1535,7 @@ export function ChatPanel({
         };
         insertOptimistic(optimistic);
         setText("");
+        clearDraft(draftsKey(userId), convId);
         clearAll();
         setMentionOpen(false);
         if (typingTimer.current) clearTimeout(typingTimer.current);
@@ -3202,6 +3234,43 @@ export function ChatPanel({
                                                         e.target.selectionStart,
                                                     );
                                                 }}
+                                                onPaste={(e) => {
+                                                    // Pasting a screenshot/photo attaches it
+                                                    // directly (text in the same paste still
+                                                    // flows through normally).
+                                                    const pasted = [
+                                                        ...(e.clipboardData
+                                                            ?.files || []),
+                                                    ].filter((f) =>
+                                                        f?.type?.startsWith(
+                                                            "image/",
+                                                        ),
+                                                    );
+                                                    if (
+                                                        !pasted.length ||
+                                                        !convId ||
+                                                        !canPost ||
+                                                        recording ||
+                                                        uploadBusy
+                                                    ) {
+                                                        return;
+                                                    }
+                                                    const named = pasted.map(
+                                                        (f, i) =>
+                                                            f.name
+                                                                ? f
+                                                                : new File(
+                                                                      [f],
+                                                                      `Pasted image ${Date.now() + i}.png`,
+                                                                      {
+                                                                          type:
+                                                                              f.type ||
+                                                                              "image/png",
+                                                                      },
+                                                                  ),
+                                                    );
+                                                    addFiles(named);
+                                                }}
                                                 onClick={(e) => {
                                                     checkMentionTrigger(
                                                         text,
@@ -3291,6 +3360,42 @@ export function ChatPanel({
                                                             e.preventDefault();
                                                             setMentionOpen(
                                                                 false,
+                                                            );
+                                                            return;
+                                                        }
+                                                    }
+
+                                                    // ↑ on an empty composer edits your
+                                                    // last message (Telegram/Discord
+                                                    // behavior). Mention popup takes
+                                                    // precedence when open.
+                                                    if (
+                                                        e.key === "ArrowUp" &&
+                                                        !text.trim() &&
+                                                        editingId == null
+                                                    ) {
+                                                        const lastOwn = [
+                                                            ...messages,
+                                                        ]
+                                                            .reverse()
+                                                            .find(
+                                                                (m) =>
+                                                                    m.senderId ===
+                                                                        userId &&
+                                                                    !m.isDeleted &&
+                                                                    m.type !==
+                                                                        "system" &&
+                                                                    Boolean(
+                                                                        m.content,
+                                                                    ),
+                                                            );
+                                                        if (lastOwn) {
+                                                            e.preventDefault();
+                                                            setEditingId(
+                                                                lastOwn.id,
+                                                            );
+                                                            setEditText(
+                                                                lastOwn.content,
                                                             );
                                                             return;
                                                         }
