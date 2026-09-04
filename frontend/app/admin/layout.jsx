@@ -16,6 +16,7 @@ const outfit = Outfit({
 export const metadata = {
   title: "Kivo Admin",
   description: "Kivo admin panel",
+  robots: { index: false, follow: false },
 };
 
 export default function AdminLayout({ children }) {

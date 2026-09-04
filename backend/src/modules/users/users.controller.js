@@ -66,8 +66,10 @@ export const getUserById = asyncHandler(async (req, res) => {
 
 export const getProfileByUsername = asyncHandler(async (req, res) => {
   const { username } = parseParams(usernameParamSchema, req.params);
+  // Route is optional-auth: req.user exists only when a valid Bearer token was
+  // sent. Anonymous readers get the public shape with no relationship state.
   const profile = await usersService.getProfileByUsername({
-    requesterId: req.user.userId,
+    requesterId: req.user?.userId || null,
     username,
   });
   res.status(200).json({ success: true, data: profile });

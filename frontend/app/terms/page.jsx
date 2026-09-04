@@ -1,9 +1,27 @@
 import { LegalPage } from "@/components/legal/legal-page";
+import { defaultOgImage } from "@/lib/seo";
 
 export const metadata = {
   title: "Terms — Kivo",
   description:
     "The rules for using Kivo: accounts, acceptable use, content, Spaces moderation, availability, and liability.",
+  openGraph: {
+    type: "website",
+    url: "/terms",
+    siteName: "Kivo",
+    title: "Terms — Kivo",
+    description:
+      "The rules for using Kivo: accounts, acceptable use, content, Spaces moderation, availability, and liability.",
+    locale: "en_US",
+    images: [defaultOgImage()],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms — Kivo",
+    description:
+      "The rules for using Kivo: accounts, acceptable use, content, Spaces moderation, availability, and liability.",
+    images: [defaultOgImage().url],
+  },
 };
 
 const SECTIONS = [

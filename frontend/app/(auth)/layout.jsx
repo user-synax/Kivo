@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Kivo",
+  title: "Kivo — Accounts",
 };
 
 export default function AuthLayout({ children }) {

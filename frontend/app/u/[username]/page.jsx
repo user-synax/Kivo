@@ -1,151 +1,125 @@
-"use client";
+import { notFound } from "next/navigation";
+import { defaultOgImage, SITE_NAME } from "@/lib/seo";
+import { PublicProfileView } from "./public-profile-view";
 
-import { Share2 } from "lucide-react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { JoinKivoModal } from "@/components/profile/join-kivo-modal";
-import { ProfileContent } from "@/components/profile/profile-content";
-import { ShareProfileModal } from "@/components/profile/share-profile-modal";
-import { apiGet } from "@/lib/api";
-import { getSession } from "@/lib/auth";
-import { ownerSkin } from "@/lib/profile-skin";
+// The Next.js rewrites in next.config.mjs proxy /api/v1 to the Express backend;
+// this server component fetches that same backend directly so public profile
+// pages are server-rendered for crawlers and logged-out visitors. Same env var
+// next.config.mjs reads, so it follows the project's existing configuration.
+const BACKEND_BASE = process.env.BACKEND_URL || "http://localhost:4000";
 
-export default function PublicProfilePage() {
-  const params = useParams();
-  const username = params?.username
-    ? decodeURIComponent(params.username)
-    : null;
+// Public-safe decode of the route segment ("@"-style usernames are plain
+// [a-zA-Z0-9_]; anything that fails to decode is simply not a valid profile).
+function safeUsername(raw) {
+  if (!raw) return null;
+  try {
+    const decoded = decodeURIComponent(raw);
+    return /^[a-zA-Z0-9_]{1,64}$/.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
 
-  const [showJoin, setShowJoin] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [fetchError, setFetchError] = useState(false);
-
-  // The page fetches the profile once so the chrome (top bar, background) can
-  // adopt the OWNER's colors, and hands the loaded profile to ProfileContent
-  // (which skips its own fetch when it receives one).
-  useEffect(() => {
-    if (!username) return;
-    let active = true;
-    setProfile(null);
-    setFetchError(false);
-    apiGet(`/api/v1/users/${encodeURIComponent(username)}/profile`)
-      .then((data) => {
-        if (!active) return;
-        setProfile(data || null);
-      })
-      .catch(() => {
-        if (!active) return;
-        setFetchError(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [username]);
-
-  // Show the "Join Kivo" modal for visitors without a session.
-  useEffect(() => {
-    if (!getSession()) {
-      // Brief delay so the profile page renders first — the modal is
-      // a gentle nudge, not a wall.
-      const t = setTimeout(() => setShowJoin(true), 600);
-      return () => clearTimeout(t);
-    }
-  }, []);
-
-  if (!username) {
-    return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[var(--canvas)] px-6">
-        <p className="text-sm text-[var(--ink-muted)]">Invalid profile.</p>
-      </div>
+async function fetchPublicProfile(username) {
+  try {
+    const res = await fetch(
+      `${BACKEND_BASE}/api/v1/users/${encodeURIComponent(username)}/profile`,
+      { headers: { Accept: "application/json" }, next: { revalidate: 60 } },
     );
+    if (res.status === 404) return { status: "missing", profile: null };
+    if (!res.ok) return { status: "unavailable", profile: null };
+    const json = await res.json();
+    if (!json?.data) return { status: "unavailable", profile: null };
+    return { status: "ok", profile: json.data };
+  } catch {
+    // Backend unreachable at render time — fall back to the client-side fetch
+    // inside PublicProfileView instead of mislabeling the profile as missing.
+    return { status: "unavailable", profile: null };
+  }
+}
+
+function plain(s) {
+  return (s || "").toString().replace(/\s+/g, " ").trim();
+}
+
+function truncate(s, max) {
+  const t = plain(s);
+  return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
+}
+
+export async function generateMetadata({ params }) {
+  const { username: raw } = await params;
+  const username = safeUsername(raw);
+  if (!username) {
+    return { title: "Profile not found — Kivo", robots: { index: false } };
   }
 
-  // Owner skin: accent + canvas tint adopted from the profile owner so the
-  // public page wears *their* look (falls back to the default palette when
-  // the owner hasn't customized anything).
-  const skinVars = ownerSkin(profile?.appearance);
+  const { status, profile } = await fetchPublicProfile(username);
+
+  if (status === "missing") {
+    return { title: "Profile not found — Kivo", robots: { index: false } };
+  }
+
+  // Backend hiccup at render time: emit username-based metadata (indexable —
+  // the profile may exist and the client retries below) rather than noindexing
+  // a transient outage.
+  const displayName = profile?.displayName || username;
+  const title = `${truncate(displayName, 26)} (@${username}) — ${SITE_NAME}`;
+  const avatarUrl = profile?.avatarUrl?.startsWith("http")
+    ? profile.avatarUrl
+    : null;
+  const bio = plain(profile?.bio);
+  const description = bio
+    ? truncate(bio, 150)
+    : `Join ${displayName} (@${username}) on Kivo — a realtime chat app for DMs, group chats, and community Spaces.`;
+
+  const ogImage = avatarUrl
+    ? [
+        {
+          url: avatarUrl,
+          width: 512,
+          height: 512,
+          alt: `${displayName} on Kivo`,
+        },
+      ]
+    : [defaultOgImage()];
+  const twitterImage = avatarUrl || defaultOgImage().url;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/u/${username}` },
+    robots: { index: true, follow: true },
+    openGraph: {
+      type: "profile",
+      url: `/u/${username}`,
+      siteName: SITE_NAME,
+      title,
+      description,
+      locale: "en_US",
+      images: ogImage,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [twitterImage],
+    },
+  };
+}
+
+export default async function PublicProfilePage({ params }) {
+  const { username: raw } = await params;
+  const username = safeUsername(raw);
+  if (!username) notFound();
+
+  const { status, profile } = await fetchPublicProfile(username);
+  if (status === "missing") notFound();
 
   return (
-    <div
-      className="min-h-[100dvh] bg-[var(--canvas)]"
-      style={skinVars || undefined}
-    >
-      {/* Top bar */}
-      <div className="sticky top-0 z-10 border-b border-[var(--hairline)] bg-[var(--canvas)]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[720px] items-center gap-3 px-5 py-3 sm:px-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-[13px] text-[var(--ink-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-[var(--ink)]"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M15 5l-7 7 7 7"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Back to home
-          </Link>
-          <span className="h-3 w-px bg-[var(--hairline)]" aria-hidden="true" />
-          <span className="truncate text-[13px] font-medium text-[var(--ink)]">
-            @{username}
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowShare(true)}
-            aria-label="Share this profile"
-            className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--hairline)] bg-[var(--surface-1)] px-3 text-[12px] font-medium text-[var(--ink-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--ink)]/30 hover:text-[var(--ink)]"
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            <span className="max-sm:hidden">Share</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Profile content */}
-      <div className="mx-auto max-w-[720px] border-x border-[var(--hairline-soft)] max-sm:border-x-0">
-        {fetchError ? (
-          <div className="px-6 py-16 text-center">
-            <p className="text-sm text-[var(--ink-muted)]">
-              Profile not found.
-            </p>
-            <Link
-              href="/"
-              className="mt-3 inline-block text-[13px] font-medium text-[var(--accent-blue)] hover:underline"
-            >
-              Back to home
-            </Link>
-          </div>
-        ) : (
-          <ProfileContent
-            username={username}
-            profile={profile}
-            ownerAppearance={profile?.appearance || null}
-            fetchDisabled
-          />
-        )}
-      </div>
-
-      {/* Share modal — QR + copy + downloadable share card */}
-      <ShareProfileModal
-        username={username}
-        profile={profile}
-        open={showShare}
-        onClose={() => setShowShare(false)}
-      />
-
-      {/* Join Kivo modal — only for non-logged-in visitors */}
-      <JoinKivoModal open={showJoin} onClose={() => setShowJoin(false)} />
-    </div>
+    <PublicProfileView
+      username={username}
+      serverProfile={status === "ok" ? profile : null}
+    />
   );
 }

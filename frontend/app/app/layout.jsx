@@ -6,6 +6,8 @@ import ThemeProvider from "@/components/theme-provider";
 
 export const metadata = {
   title: "Kivo — Chat",
+  // The chat shell is an authenticated app — never a search result.
+  robots: { index: false, follow: false },
 };
 
 export default function AppLayout({ children }) {

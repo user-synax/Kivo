@@ -1,9 +1,27 @@
 import { LegalPage } from "@/components/legal/legal-page";
+import { defaultOgImage } from "@/lib/seo";
 
 export const metadata = {
   title: "Privacy — Kivo",
   description:
     "How Kivo collects, uses, and protects your data: accounts, messages, attachments, sessions, and push notifications.",
+  openGraph: {
+    type: "website",
+    url: "/privacy",
+    siteName: "Kivo",
+    title: "Privacy — Kivo",
+    description:
+      "How Kivo collects, uses, and protects your data: accounts, messages, attachments, sessions, and push notifications.",
+    locale: "en_US",
+    images: [defaultOgImage()],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy — Kivo",
+    description:
+      "How Kivo collects, uses, and protects your data: accounts, messages, attachments, sessions, and push notifications.",
+    images: [defaultOgImage().url],
+  },
 };
 
 const SECTIONS = [

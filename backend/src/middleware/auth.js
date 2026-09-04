@@ -46,6 +46,31 @@ export function authenticate(req, res, next) {
   }
 }
 
+// Like `authenticate`, but OPTIONAL: attaches req.user when a valid Bearer token
+// is present, and lets the request through anonymously otherwise (invalid or
+// expired tokens are treated as anonymous, never rejected). Used by the public
+// /users/:username/profile route so logged-out visitors and search engines can
+// read a shareable profile while signed-in users still get relationship state.
+export function authenticateOptional(req, res, next) {
+  try {
+    const header = req.headers.authorization || "";
+    const [scheme, token] = header.split(" ");
+    if (scheme !== "Bearer" || !token) return next();
+
+    try {
+      const payload = jwt.verify(token, env.accessTokenSecret);
+      if (payload.userId && payload.sessionId) {
+        req.user = { userId: payload.userId, sessionId: payload.sessionId };
+      }
+    } catch {
+      // Expired/invalid token — fall through as anonymous.
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Role-based authorization. The access token does not carry the role (see spec),
 // so we resolve it from the DB using the verified userId. Reused by admin routes.
 export function authorize(roles = []) {

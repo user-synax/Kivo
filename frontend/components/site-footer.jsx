@@ -18,6 +18,7 @@ const COLUMNS = [
     title: "Resources",
     links: [
       { label: "Docs", href: "/docs" },
+      { label: "Author", href: "/author" },
       { label: "Open app", href: "/app" },
       { label: "Log in", href: "/login" },
       { label: "Sign up", href: "/signup" },
@@ -132,10 +133,40 @@ export function SiteFooter() {
 
         {/* Bottom bar */}
         <div className="flex flex-col items-center justify-between gap-3 border-t border-hairline-soft pt-6 sm:flex-row">
-          <p className="font-sans text-[12px] leading-[1.2] text-ink-muted">
-            © {year} Kivo — Built for realtime. Designed to be yours.
-          </p>
+          <div className="flex flex-col items-center gap-1 sm:items-start">
+            <p className="font-sans text-[12px] leading-[1.2] text-ink-muted">
+              © {year} Kivo — Built for realtime. Designed to be yours.
+            </p>
+            <p className="font-sans text-[12px] leading-[1.2] text-ink-muted/70">
+              Crafted by{" "}
+              <a
+                href="/author"
+                className="kivo-focus rounded-sm font-medium text-ink-muted transition-colors duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink"
+              >
+                Ayush
+              </a>{" "}
+              ·{" "}
+              <a
+                href="https://github.com/user-synax/Kivo"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="kivo-focus rounded-sm font-medium text-ink-muted transition-colors duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink"
+              >
+                Open source
+              </a>
+            </p>
+          </div>
           <div className="flex items-center gap-4">
+            <a
+              href="/author"
+              className="kivo-focus rounded-sm font-sans text-[12px] text-ink-muted transition-colors duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink"
+            >
+              Author
+            </a>
+            <span
+              aria-hidden="true"
+              className="size-1 rounded-full bg-hairline"
+            />
             <a
               href="/privacy"
               className="kivo-focus rounded-sm font-sans text-[12px] text-ink-muted transition-colors duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink"

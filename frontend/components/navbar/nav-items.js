@@ -1,8 +1,9 @@
 export const navItems = [
   { label: "Features", href: "/#features" },
   { label: "Docs", href: "/docs" },
+  { label: "FAQ", href: "#faq" },
   { label: "Customization", href: "/#customization" },
-  { label: "Security", href: "/#security" },
+  { label: "Author", href: "/author" },
 ];
 
 export const authItems = [
