@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    ArrowDown,
     ArrowUp,
     Ban,
     CheckCheck,
@@ -932,10 +933,57 @@ export function ChatPanel({
         };
     }, [convId, highlightMessageId]);
 
-    // Keep pinned to the bottom on new messages / typing changes.
+    // Jump-to-latest pill: appears when the user scrolls up away from the
+    // live edge. Shows the unread count when there is one; one tap returns
+    // to the bottom.
+    const [showJumpPill, setShowJumpPill] = useState(false);
+    const NEAR_BOTTOM_PX = 120;
+    const PILL_SHOW_PX = 200;
+
+    const distanceFromBottom = () => {
+        const el = scrollRef.current;
+        if (!el) return 0;
+        return el.scrollHeight - el.scrollTop - el.clientHeight;
+    };
+    const isNearBottom = () => distanceFromBottom() < NEAR_BOTTOM_PX;
+
+    const scrollToBottom = (smooth = true) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setShowJumpPill(false);
+        el.scrollTo({
+            top: el.scrollHeight,
+            behavior: smooth && !reduce ? "smooth" : "auto",
+        });
+    };
+
+    // Unread others' messages — drives the pill's "N new" label.
+    const unreadCount = useMemo(() => {
+        if (!userId) return 0;
+        let n = 0;
+        for (const m of messages) {
+            if (
+                !m.isDeleted &&
+                m.type !== "system" &&
+                m.senderId !== userId &&
+                !m.readBy?.some(
+                    (r) => (r.userId || r)?.toString() === userId.toString(),
+                )
+            ) {
+                n += 1;
+            }
+        }
+        return n;
+    }, [messages, userId]);
+
+    // Keep pinned to the bottom on new messages / typing changes — but only
+    // when the user is already at the live edge (or just sent something
+    // themselves). Reading history no longer gets yanked to the bottom; the
+    // pill offers the way back instead.
     // Skip auto-scroll when we have a highlight target (jump-to-message), and
     // once that jump session ends, consume the flag WITHOUT scrolling — the page
     // is already anchored where the user wants to be.
+    const prevConvForPinRef = useRef(null);
     useEffect(() => {
         if (highlightMessageId) return;
         if (wasAnchorSessionRef.current && anchorConvRef.current === convId) {
@@ -944,9 +992,21 @@ export function ChatPanel({
             return;
         }
         wasAnchorSessionRef.current = false;
-        void messages.length;
         void typing;
-        bottomRef.current?.scrollIntoView({ block: "end" });
+        const convChanged = prevConvForPinRef.current !== convId;
+        prevConvForPinRef.current = convId;
+        if (convChanged) {
+            setShowJumpPill(false);
+            bottomRef.current?.scrollIntoView({ block: "end" });
+            return;
+        }
+        const last = messages[messages.length - 1];
+        const ownLatest = last && last.senderId === userId;
+        if (isNearBottom() || ownLatest) {
+            bottomRef.current?.scrollIntoView({ block: "end" });
+        } else {
+            setShowJumpPill(true);
+        }
     }, [messages.length, typing, highlightMessageId, convId]);
 
     // Jump-to-message highlight: when highlightMessageId is set, scroll to it
@@ -2390,12 +2450,13 @@ export function ChatPanel({
                 ref={scrollRef}
                 onScroll={(e) => {
                     if (e.currentTarget.scrollTop <= 8) loadOlder();
+                    const el = e.currentTarget;
+                    const dist =
+                        el.scrollHeight - el.scrollTop - el.clientHeight;
+                    setShowJumpPill(dist > PILL_SHOW_PX);
                     // if near bottom and unread exists, mark as read (removes separator)
                     if (firstUnreadId) {
-                        const el = e.currentTarget;
-                        const nearBottom =
-                            el.scrollHeight - el.scrollTop - el.clientHeight <
-                            120;
+                        const nearBottom = dist < NEAR_BOTTOM_PX;
                         if (nearBottom) markConversationRead();
                     }
                 }}
@@ -2782,6 +2843,39 @@ export function ChatPanel({
                     <div ref={bottomRef} />
                 </div>
             </div>
+
+            {/* Jump-to-latest pill — only when scrolled up off the live edge */}
+            <AnimatePresence>
+                {showJumpPill && (
+                    <motion.button
+                        key="jump-latest"
+                        type="button"
+                        onClick={() => scrollToBottom()}
+                        aria-label={
+                            unreadCount > 0
+                                ? `Jump to latest, ${unreadCount} new messages`
+                                : "Jump to latest"
+                        }
+                        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                        transition={
+                            reduce
+                                ? { duration: 0 }
+                                : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                        }
+                        className="absolute bottom-24 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] py-1.5 pr-3.5 pl-3 text-[12px] font-semibold text-[var(--text-primary)] shadow-xl hover:bg-[var(--hover)]"
+                    >
+                        {unreadCount > 0 ? (
+                            <span className="flex size-5 items-center justify-center rounded-full bg-[var(--accent)] text-[11px] font-bold text-[var(--on-accent)]">
+                                {unreadCount > 99 ? "99+" : unreadCount}
+                            </span>
+                        ) : null}
+                        {unreadCount > 0 ? "New messages" : "Latest"}
+                        <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
             {/* Composer / selection toolbar */}
             <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
