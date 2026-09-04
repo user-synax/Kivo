@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.7
+**Version:** 2.8
 **Last Updated:** September 4, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades Complete)
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Perf Optimizations Complete)
 
 ---
 
@@ -71,10 +71,10 @@ Kivo
 | Authentication & Sessions | **Complete** | JWT access + httpOnly refresh cookie, session-backed |
 | Email Verification | **Backend wired** | Link flow (`/verify-email`, resend API); no auto-email at signup since the OTP step was removed |
 | Password Reset | **Complete** | Forgot/reset via emailed token (1h), invalidates all sessions |
-| User Profiles | **Complete** | Display name, username, bio, status, avatar + frames, banner, country, GitHub username |
+| User Profiles | **Complete** | Display name, username, bio, status + emoji chip (32 emoji + 6 vibe presets), avatar + frames, banner (curated + Plus custom 8 MB), country, GitHub username, **X/Instagram/YouTube/website social links**, **profileEffect** (4 Plus presets) |
 | Friends System | **Complete** | Request/accept/decline, friend list, search |
-| DM Conversations | **Complete** | Create, list, message history, unread counts |
-| Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts (**group "Seen by"** — tap the ticks on your own message for per-member read time / delivered), copy, select mode |
+| DM Conversations | **Complete** | Create, list, message history, unread counts (single-aggregation unread badge) |
+| Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts (**"Seen by" modal** — tap ticks on own message → avatar + `Read · time` / Delivered per participant, DMs/groups/Space channels, flip-positioned card, Escape/scroll dismiss), copy, select mode, **swipe-to-reply** (mobile) |
 | **@Mentions** | **Complete** | Autocomplete + mention notifications |
 | Message Replies | **Complete** | Reply-to with inline quote preview |
 | Message Forwarding | **Complete** | Forward any visible message to another chat with a "Forwarded from @user" pill (original author kept, no caption) |
@@ -85,7 +85,9 @@ Kivo
 | Theme System | **Complete** | 10 themes (6 dark + 4 light), live switching; preset persisted in localStorage |
 | Custom Colors (Theme Studio) | **Complete** | Per-user accent + canvas-tint overlay over any preset, live preview, saved to the account (`appearance` field) and synced on login |
 | Space Palettes | **Complete** | Per-Space accent + tint (`Space.appearance`), set by owners/admins in Space settings with live preview; scoped to the channel chat view for all members |
-| Chat Look (Wallpaper & Bubble Style) | **Complete** | `appearance.wallpaper` (none/dots/diagonal/wash) + `appearance.bubbleStyle` (rounded/squared/outline) on user and Space; wallpapers painted with CSS `color-mix()` over theme tokens (auto re-tint for dark/light + Space palettes, zero extra color state), bubble geometry via container-scoped CSS classes; partial updates merge (a color reset never wipes the chat look and vice versa); Spaces can set per-field "member's own" inheritance; DMs/groups carry a shared conversation-level `appearance` (wallpaper/bubbleStyle) set via the chat header palette icon — either DM participant or group admins — resolving conversation > Space > personal per field |
+| Chat Look (Wallpaper & Bubble Style) | **Complete** | `appearance.wallpaper` (`none`/`dots`/`grid`/`diagonal`/`bubbles`/`wash`) + `appearance.bubbleStyle` (`rounded`/`pill`/`squared`/`outline`) on user and Space (`chat-style.js`: `WALLPAPER_OPTIONS`, `BUBBLE_STYLE_OPTIONS`, `wallpaperCss`, `resolveChatLook`); wallpapers painted with CSS `color-mix()` over theme tokens (auto re-tint for dark/light + Space palettes, zero extra color state), bubble geometry via container-scoped CSS classes (`kivo-bubbles-*`); partial updates merge (a color reset never wipes the chat look and vice versa); Spaces can set per-field "member's own" inheritance; DMs/groups carry a shared conversation-level `appearance` (wallpaper/bubbleStyle) set via the chat header palette icon (`PATCH /conversations/:id/look`, `conversationLookSchema`) — either DM participant or group admins — resolving conversation > Space > personal per field |
+| **Wave & Social Links** | **Complete** | `User.xUsername`/`instagramUsername`/`youtubeUrl`/`websiteUrl` + `githubUsername`; `social-links.jsx` chips + brand glyphs + contribution graph; **Wave** ping (`POST /notifications/:id/wave`, type `wave`, senderUsername denormalized, 20 s per-recipient cooldown, blocked/self guards) — deep-links to sender profile from notification center; **Share sheet + QR code** on `/u/username` |
+| **Perf — Unread & Notifications** | **Complete** | `unreadCountsByConversation()` — one aggregation vs N+1 `countDocuments`; notifications bulk `insertMany` + batch-prefetch prefs + fire-and-forget `sendWebPushToUser` (sender's POST doesn't wait on VAPID); message list `React.memo` `MessageRows`, O(1) `byId` map, stable `rowsCtx`, throttled like/anim |
 | Landing Page | **Complete** | Animated hero, floating navbar, responsive |
 | Group Chats | **Complete** | Create, manage members, admins, realtime updates |
 | Spaces & Channels | **Complete** | Create, discover, moderate, text/announcement channels |
@@ -102,21 +104,21 @@ Kivo
 | Saved Messages | **Complete** | Bookmark any message (menu → Save message; own, others', thread replies); per-user `savedBy` on the Message; Saved panel (sidebar bookmark icon) lists them across chats newest-first with jump-to-message; deleted messages drop out |
 | Mention Notifications | **Complete** | `@mention` feature shipped |
 | **Global Search (Ctrl+K)** | **Complete** | Unified search: messages, people, spaces; jump-to-message |
-| **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, audit logging |
+| **Admin Panel** | **Complete** | Standalone dashboard: user/group/space management, ban/unban, **Plus plan grant/revoke** (`POST /api/admin/users/:id/plan`), audit logging (`AdminActionLog` `grant_plus`/`revoke_plus`) |
 | **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, durable send queue (outbox) that flushes queued text on reconnect |
 | **Last Online Status** | **Complete** | "active … ago" labels for offline users (DMs + profiles) |
 | **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
 | **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
 | **Blocking** | **Complete** | Block from DMs & profiles; **Blocked users manager** (Settings list + one-tap unblock); server-enforced, friendships removed |
 | **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
-| **Kivo Plus (entitlement scaffold)** | **Complete** | `User.plan` (`free`/`plus`, admin-granted via `/admin` — no payments wired); Plus perks so far: custom profile-banner upload (`PATCH /users/me/banner`, 8MB, Appwrite) + profile effects (`profileEffect`: `none`/`glow`/`gradient-name`/`aura`, CSS-driven, reduced-motion safe) — both enforced server-side |
+| **Kivo Plus (entitlement scaffold)** | **Complete** | `User.plan` (`free`/`plus`, admin-granted via `/admin` — no payments wired; `ADMIN_*` env); Plus perks so far: custom profile-banner upload (`PATCH /users/me/banner`, 8 MB, Appwrite, old file retired on switch) + profile effects (`profileEffect`: `none`/`glow`/`gradient-name`/`aura`, CSS `kivo-pfx-*` in `globals.css`, previewed in `ProfileEditModal`, enforced server-side — free users forced to `none`, downgrade resets to `none`) |
 | **Reconnect Gap-Fill** | **Complete** | Conversation list + messages newer than newest-known refetched after socket reconnect |
 | **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
 | **Two-Factor Auth (2FA)** | **Complete** | TOTP via authenticator app (QR setup in Settings), one-time backup codes, two-step login challenge |
 | **Link Previews** | **Complete** | `GET /api/v1/link-preview?url=…` unfurls og-title/description/image server-side (SSRF-guarded, 1h cache, 30/min); clickable links + first-URL preview card in bubbles (main timeline + threads) |
 | **Date Dividers + Big Emoji** | **Complete** | Today/Yesterday/weekday/date pills across history (grouping breaks across days); 1–3 emoji-only messages render large and chromeless (`lib/emoji.js`, grapheme-aware) |
 | **Jump-to-Latest Pill** | **Complete** | Floating "N new"/"Latest" button when scrolled off the live edge; auto-scroll only pins at the bottom (or for own sends) — history reading never yanked |
-| **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits your last message |
+| **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits last message; **mobile swipe-to-reply** (right swipe ~45 px with direction lock, haptics) |
 | Voice / Video Calls | **Not started** | No voice/call backend or UI |
 
 ---
@@ -196,31 +198,32 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 
 | Field | Type | Editable | Notes |
 |---|---|---|---|
-| displayName | String | Yes | Trimmed |
-| username | String | Yes | Unique, validated |
+| displayName | String | Yes | Trimmed, max 50 |
+| username | String | Yes | Unique, validated, 3–30 chars `^[a-zA-Z0-9_]+$` |
 | bio | String | Yes | Max 280 characters |
 | status | String | Yes | Max 60 characters (custom status line) |
-| statusEmoji | String | Yes | Optional single emoji chip before the status line (vibe presets set emoji + text) |
-| banner | String | Yes | Curated animated GIF cover |
-| country | String | Yes | ISO-3166 alpha-2 → flag shown on profiles |
-| githubUsername | String | Yes | GitHub contribution graph on the public profile |
-| xUsername / instagramUsername | String | Yes | Social link chips on the public profile (handle, no @) |
-| youtubeUrl / websiteUrl | String | Yes | Social link chips (full http(s) URL) |
-| plan | String | No | `free`/`plus`, admin-granted (see 1.5) |
+| statusEmoji | String | Yes | Optional single emoji chip before the status line (max 8, 32-emoji picker + 6 **vibe presets**: Gaming/Vibing/Away/Studying/Working/Sleepy set emoji + text together) |
+| banner | String | Yes | **Free:** curated animated GIF cover. **Plus:** custom upload via `PATCH /users/me/banner` (image/*, max 8 MB, Appwrite `avatar` bucket, old file deleted on switch) |
+| profileEffect | String | Yes (Plus) | `none` / `glow` (avatar halo) / `gradient-name` (animated name) / `aura` (both). `PROFILE_EFFECT_IDS` in `users.validation.js`; free users forced to `none` server-side; downgrade resets to `none` |
+| country | String | Yes | ISO-3166 alpha-2 → flag shown on profiles (`flagcdn.com`) |
+| githubUsername | String | Yes | GitHub contribution graph on the public profile (max 39, `^[a-zA-Z0-9-]*$`) |
+| xUsername | String | Yes | Social link chip — X/Twitter handle, no @ (max 60, `^[a-zA-Z0-9_]*$`) |
+| instagramUsername | String | Yes | Social link chip — Instagram handle, no @ (max 60, `^[a-zA-Z0-9_.]*$`) |
+| youtubeUrl | String | Yes | Social link chip — full `https://` URL (max 500) |
+| websiteUrl | String | Yes | Social link chip — full `https://` URL (max 500) — brand glyphs via `social-links.jsx` (`SocialGlyph`) |
+| plan | String | No | `free`/`plus`, admin-granted (`POST /api/admin/users/:id/plan`); see admin 7.2 |
 | verified / showBadge | Boolean | No / Yes | Admin grants `verified`; the user toggles `showBadge` visibility in Settings |
-| avatarStyle | String | Yes | One of 10 presets: Default + My accent (follows the theme token) + 6 solid colors + 2 gradient rings |
-| avatarUrl | String | Via upload | Hosted on Appwrite Storage |
+| avatarStyle | String | Yes | One of 10 presets: Default + My accent (follows the theme token) + 6 solid colors + 2 gradient rings (`AVATAR_STYLE_IDS`) |
+| avatarUrl | String | Via upload | Hosted on Appwrite Storage (`PATCH /users/me/avatar`, 4 MB) |
 | email | String | No | Read-only |
 | role | String | No | `user` or `admin` |
 
-#### 1.7 Avatar Upload
+#### 1.7 Avatar & Banner Upload
 
-- Endpoint: `PATCH /api/v1/users/me/avatar`
-- Storage: Appwrite Storage
-- Max size: 4MB
-- Accepted types: png, jpeg, webp, gif
-- Old avatar file is deleted on re-upload
-- Removal: `DELETE /api/v1/users/me/avatar`
+- Avatar: `PATCH /api/v1/users/me/avatar` — Appwrite Storage, max **4 MB**, types `png/jpeg/webp/gif`, old file deleted on re-upload, removal `DELETE /api/v1/users/me/avatar` (`users.service.js` `deleteAvatar`).
+- Banner (Kivo Plus): `PATCH /api/v1/users/me/banner` — same Appwrite bucket, **image/*, max 8 MB** (`users.service.js` `updateBanner`, `PLUS_REQUIRED` if not plus). Curated covers still via `PATCH /users/me` `{ banner: url | "" }`; switching from a custom upload to a curated/empty value retires the Appwrite file (`bannerFileId` cleared).
+- Profile effects: `PATCH /api/v1/users/me` `{ profileEffect }` — `none`/`glow`/`gradient-name`/`aura` (`PROFILE_EFFECT_IDS`). Server clamps free users to `none`; downgrade via admin `setUserPlan` also clears.
+- Validation in `users.validation.js`: `updateMeSchema` (`statusEmoji` max 8, `profileEffect` enum, `xUsername`/`instagramUsername` regexes, `youtubeUrl`/`websiteUrl` `^https?`, `country` `^[A-Z]{2}$`, `appearance` hex + enum).
 
 ---
 
@@ -288,6 +291,7 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | Save / unsave message | `POST /api/v1/messages/:id/save` | Must be participant (non-system, non-deleted) |
 | Saved feed | `GET /api/v1/messages/saved` | Own saves across conversations, newest save first |
 | Mark read | `PATCH /api/v1/conversations/:id/read` | Must be participant |
+| **Receipts ("Seen by")** | **Tap ticks on own message (client)** | Must be participant — floating card shows per-user `Read · time` / `Delivered` (DMs, groups, Space channels); portaled, flip-positioned, `THEME_VARS` capture |
 
 #### 3.4 Message Schema
 
@@ -343,7 +347,7 @@ Message {
 
 ---
 
-### 3.8 Group Messaging
+### 3.8 Group Messaging & Conversation Look
 
 Group chats are private multi-person conversations (2+ members) for friends, college, projects, and gaming squads.
 
@@ -355,6 +359,13 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | Remove member / leave | `DELETE /api/v1/conversations/:id/members/:userId` | Admin, or self-leave |
 | Promote to admin | `POST /api/v1/conversations/:id/admins/:userId` | Group admin |
 | Demote admin | `DELETE /api/v1/conversations/:id/admins/:userId` | Group admin |
+| **Conversation look** | **`PATCH /api/v1/conversations/:id/look`** `{ wallpaper?, bubbleStyle? }` | DM: either participant; Group: admin only; Space channel: 403 `NOT_ALLOWED` |
+
+**Conversation look rules**
+
+- Enum ids `WALLPAPER_OPTIONS` (`none`/`dots`/`grid`/`diagonal`/`bubbles`/`wash`) + `BUBBLE_STYLE_OPTIONS` (`rounded`/`pill`/`squared`/`outline`) validated by `conversationLookSchema`; `null` per field = "Member's own" inheritance.
+- `Conversation.appearance` (`wallpaper`, `bubbleStyle`) + `resolveChatLook({ conversationAppearance, spaceAppearance, personalAppearance })` priority: **conversation > Space > personal** per field.
+- Partial merges never wipe sibling fields; emit `conversation:updated` so every member repaints instantly. Wallpapers are pure CSS `wallpaperCss()` / `color-mix()`; bubble geometry is `kivo-bubbles-*` on the chat container.
 
 **Rules & constraints**
 - A group needs at least **2 other members** (3 total, creator included).
@@ -772,7 +783,8 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 
 - **DM-focused suppression** — when a recipient is actively viewing a DM (`io.isUserFocusedOnConversation`), notifications for that conversation are skipped entirely (spec: "when user is on the dm do not send them notification").
 - System messages (`type: "system"`) never create notifications, and users are never notified of their own messages.
-- For group/space messages, one notification document is fanned out **per recipient** (excluding the sender).
+- For group/space messages, one notification document is fanned out **per recipient** (excluding the sender) via a **single `insertMany`** (batch-loaded prefs in one query) — the old sequential `create` loop is gone.
+- `createForMessage` is **fire-and-forget** from `POST /messages`: the sender's response never waits on VAPID HTTP. Online recipients get `notification:new` synchronously; offline push (`sendWebPushToUser`) runs detached and persists `delivery.pushDelivered` afterwards via `persistPushState`.
 - Expired push endpoints (HTTP 404/410) are removed automatically; overall push delivery success/error is tracked on the notification's `delivery` field.
 
 #### 8.3 Notification Endpoints

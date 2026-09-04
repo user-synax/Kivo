@@ -32,13 +32,14 @@
 - ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), double-click/long-press ❤️, `@mentions`, edit (or ↑ on an empty composer), and soft-delete.
 - 🔗 **Links & previews** — clickable URLs with server-fetched preview cards (title, description, og-image); day dividers across history and WhatsApp-style big emoji.
 - ⬇️ **Jump-to-latest pill** — reading history never yanks to the bottom; a floating "N new" pill offers the way back.
-- ✍️ **Composer that remembers** — per-chat drafts survive switches and reloads; paste screenshots straight into attachments.
+- ✍️ **Composer that remembers** — per-chat drafts survive switches and reloads; paste screenshots straight into attachments; swipe a bubble right on mobile to reply.
 - 📋 **Rich message actions** — right-click / long-press any bubble: quick reactions, **copy**, **view profile / block**, **forward with attribution**, **pin to chat**, select mode, and native **Share…** on mobile.
+- ✅ **Read receipts** — tap ticks on your own message for a **Seen by** card (avatar + `Read · time` / `Delivered` per participant — DMs, groups, and Space channels; auto-flips above/below, dismiss on Escape/scroll).
 - 📎 **File & image attachments** — up to 10 images/PDFs/documents per message (30 MB each) in any chat; image lightbox with navigation, inline previews, and download.
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
-- 👤 **Rich profiles** — display name, custom status (with emoji chip & vibe presets), bio, banner, avatar uploads & frames, **country flag**, **GitHub contribution graph**, and **social link chips** (GitHub/X/Instagram/YouTube/website) on a public profile page (`/u/username`) — plus a one-tap **Wave 👋** ping, a **Share** sheet with **QR code** for the profile, and the page **wears the owner's theme colors**.
+- 👤 **Rich profiles** — display name, custom status (32 emoji chip + 6 vibe presets: Gaming/Vibing/Away/Studying/Working/Sleepy), bio, banner, avatar uploads & frames, **country flag**, **GitHub contribution graph**, and **social link chips** (GitHub/X/Instagram/YouTube/website) on a public profile page (`/u/username`) — plus a one-tap **Wave 👋** ping (20 s cooldown, `wave` notification that deep-links to the sender's profile), a **Share** sheet with **QR code** for the profile, and the page **wears the owner's theme colors** (`profile-skin.js`).
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
-- 👑 **Kivo Plus (entitlement scaffold)** — admin-granted `free`/`plus` plan with Plus-only profile perks: **custom banner uploads** (own GIF/image, not just curated covers) and **profile effects** (avatar glow halo, animated gradient name, or both). Payments are intentionally not wired yet — Plus is a grant, not a purchase.
+- 👑 **Kivo Plus (entitlement scaffold)** — admin-granted `free`/`plus` plan (`POST /api/admin/users/:id/plan`; no payments/stripe UI) with Plus-only profile perks: **custom banner uploads** (own GIF/image up to 8 MB, `PATCH /api/v1/users/me/banner`, auto-retires old file) and **profile effects** (`none`/`glow`/`gradient-name`/`aura` — avatar halo + animated name via `profile-effects.js` / `globals.css`). Downgrade resets effects to `none`; free users are server-forced to `none`.
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
 - 🤝 **Complete friends system** — send, accept, decline, **remove**, search, and jump straight into a DM.
 - 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Menu) with Profile, Settings, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
@@ -107,23 +108,23 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - Authentication & sessions (JWT + httpOnly refresh cookie, session-backed; instant signup — no OTP)
 - Email verification (link-based flow, `/verify-email` page + resend API; signup itself is instant and doesn't block chat)
 - Password reset (forgot/reset password via emailed token, invalidates all sessions)
-- User profiles (name, username, bio, custom status, banner, country, GitHub username, avatar upload & frames)
-- **Public profile pages** (`/u/:username`) with verified badge, country flag, and GitHub contribution graph
+- User profiles (name, username, bio, custom status + 32 emoji chip & 6 vibe presets, banner, country, GitHub username, **X/Instagram/YouTube/website social links**, avatar upload & frames)
+- **Public profile pages** (`/u/:username`) with verified badge, country flag, GitHub contribution graph, **social link chips**, **Wave 👋** button (20 s cooldown, `wave` notification), **Share sheet + QR code**, and **owner-theme skin** (`profile-skin.js`)
 - **Verification badges** (admin-granted `verified`, visibility toggled by the user in Settings)
-- **Blocking** (block from DMs/profiles; **Blocked users manager in Settings** — list + one-tap unblock; relationships respected server-side)
+- **Blocking** (block from DMs/profiles; **Blocked users manager in Settings** — list + one-tap unblock; relationships & wave/ping respected server-side)
 - Friends system (request / accept / decline / list / search / **remove**)
-- DM conversations (create, list, history, unread counts)
-- Text messaging (send, **reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, receipts)
-- **Message actions** — right-click / long-press any bubble: quick-reaction strip, **copy**, **view profile**, **block**, reply, edit/delete (own), **forward**, **pin**, **select mode** (multi-copy/forward/delete), and native **Share…** on mobile
+- DM conversations (create, list, history, unread counts — list uses a **single aggregation** for unread badges)
+- Text messaging (send, **reply** + **mobile swipe-to-reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, **per-message Seen-by receipts**)
+- **Message actions** — right-click / long-press any bubble: quick-reaction strip, **copy**, **view profile**, **block**, reply, edit/delete (own), **forward**, **pin**, **select mode** (multi-copy/forward/delete), and native **Share…** on mobile; bubble list is **memoized** (`MessageRows`) with O(1) reply map and throttled double-tap like
 - **Forwarding** — resend any message into another conversation with a **"Forwarded from @user"** attribution pill (original author kept)
 - **Pinned messages** — any member pins/unpins; a pinned banner sits under the chat header, newest first (max 10), cleared by unpin or by deleting the message
 - **Threads** — any message can host a side conversation: replies open in a dedicated panel (desktop drawer / mobile sheet), live "N replies" chips sit under root bubbles, and thread activity never spams the main timeline, unread badge, or notification bell (unless you're @mentioned)
 - **Saved messages** — bookmark any message (menu → Save message, thread replies included); the Saved panel (bookmark icon next to search) lists them across all your chats newest-first with one-click jump-to-message
 - **Group chats** (create, add/remove members, promote/demote admins, realtime updates)
 - **Spaces & Channels** (create, discover, join, moderation roles, text & announcement channels)
-- **Notification system** (in-app center + sounds + bell with unread badge)
-- **Notification preferences** (per-category toggles: DMs, groups, mentions, friend requests, Space messages, announcements)
-- **Web Push** (PWA service worker, VAPID subscriptions, offline push delivery)
+ - **Notification system** (in-app center + sounds + bell with unread badge; **bulk `insertMany` fan-out**, fire-and-forget push)
+- **Notification preferences** (per-category toggles: DMs, groups, mentions, friend requests, Space messages off by default, announcements; **mentions override muted categories**, **wave** flows as ungated lightweight ping)
+- **Web Push** (PWA service worker, VAPID subscriptions, offline push delivery; expired endpoints auto-pruned)
 - **Progressive Web App** (installable, manifest, service worker)
 - Typing indicators & presence (realtime via Socket.IO, scoped to peers, offline grace to avoid flicker)
 - **Reconnect gap-fill** (refetches conversation list + messages newer than the newest known message after every reconnect)
@@ -137,7 +138,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
 - **Voice messages** (hold-to-record in the composer, slide up to cancel, inline play/pause player with progress + duration — recorded in-browser via MediaRecorder, stored as-is, no transcoding)
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
-- **Admin panel** — standalone dashboard with user/group/space management, ban/unban, audit logging
+- **Admin panel** — standalone dashboard with user/group/space management, ban/unban, **Plus plan grant/revoke (`POST /api/admin/users/:id/plan`)**, audit logging
 - **Offline indicator** — "You are offline" banner + composer keeps working for text
 - **Offline send queue** — text sent while offline goes to a durable per-account outbox (survives reloads) and flushes automatically on reconnect/online; attachments still need a connection
 - **Last online status** — "active … ago" labels for offline users in DMs & profiles
@@ -145,7 +146,9 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Link previews** — `GET /api/v1/link-preview?url=…` unfurls og-title/description/image server-side (SSRF-guarded, 1h cache); first URL per bubble renders a card
 - **Date dividers + big emoji** — Today/Yesterday/weekday/date pills; 1–3 emoji-only messages render large and chromeless
 - **Jump-to-latest pill** — floating unread-count button when scrolled off the live edge; auto-scroll only pins when already at the bottom (or for your own sends)
-- **Composer upgrades** — per-conversation drafts in localStorage (debounced, cleared on send), paste-image to attach, ↑-on-empty-composer edits your last message
+- **Composer upgrades** — per-conversation drafts in localStorage (debounced, cleared on send), paste-image to attach, ↑-on-empty-composer edits your last message, **mobile swipe-to-reply**
+- **Kivo Plus extras** — custom banner upload (8 MB, `PATCH /users/me/banner`), profile effects (4 presets, `profile-effects.js` / `globals.css`), locked state for free users
+- **Wave & social links** — GitHub/X/Instagram/YouTube/Website fields on profile, `social-links.jsx` chips + brand glyphs, wave ping (`POST /notifications/:id/wave`, 20 s cooldown)
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
 - Animated landing page
 

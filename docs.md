@@ -314,7 +314,12 @@ On your own bubbles:
 - Double check: **delivered** (to at least one recipient)
 - Accent double check: **everyone read it**
 
-Tap the double check on any sent message to open **Seen by**: it lists each DM / group member with **Read · time** or **Delivered**, so you can see exactly who has (and hasn't) seen your message. Space channels don't surface per-member receipts.
+Tap the **ticks** on any sent message (check / double-check) to open **Seen by** — a floating card portaled above the chat so the list never gets clipped. It works in **DMs, groups, and Space channels**:
+
+- **Read** rows show avatar, name, and `Read · 10:42 AM` (the server-stamped `readAt` for that message, not the current time).
+- **Delivered** rows show who received but hasn't read yet.
+- Header counts like `Read · 2 of 3` so you know how many are still pending.
+- The card flips above the bubble if there is no room below, dismisses on **outside click, Escape, or any scroll**, and reuses the chat's own theme tokens so it matches your palette.
 
 The chat is marked read when you have it open. System messages (e.g. "Admin added X") do not bump unread counts.
 
@@ -324,7 +329,11 @@ Right-click (or long-press on mobile) a conversation → **Mark as unread**. The
 
 ### Typing indicator
 
-When someone else is typing in the open conversation, you see a typing line. Your typing is broadcast while you type and stops after you pause or send.
+When someone else is typing in the open conversation, you see a typing line. Your typing is broadcast while you type and stops after you pause or send. The bubble list itself is **memoized** (`React.memo` `MessageRows`): keystrokes, scroll-pill toggles, and presence updates no longer re-render every bubble — only messages, thread chips, unread dividers, selections, and viewport size re-drive the list. Reply targets are resolved via an O(1) `byId` map instead of `find()` inside the loop.
+
+### Swipe to reply (mobile)
+
+On touch devices, **swipe a bubble right** (horizontal lock, ~45 px threshold) to reply — a reply affordance slides in from the left; release to set the quote. Left swipes are ignored. The gesture co-exists with vertical scroll via a direction lock.
 
 ### Failed / sending states
 
@@ -461,18 +470,22 @@ You can set:
 
 | Field | Limit / notes |
 |-------|----------------|
-| Display name | Shown in chats |
-| Username | Unique handle for search and `@mentions` |
-| Bio | Max 280 characters |
-| Custom status | Max 60 characters, with an optional **emoji chip** and one-tap **vibe presets** (🎮 Gaming, 🎧 Vibing, 😴 Away, 📚 Studying, 💼 Working, 🌙 Sleepy) |
+| Display name | Shown in chats. Max 50 characters. |
+| Username | Unique handle for search and `@mentions`. 3–30 chars, letters/numbers/underscores only. |
+| Bio | Max 280 characters. |
+| Custom status | Max 60 characters, with an optional **emoji chip** (8-char max, 32 curated emoji in the picker: 😀 😎 🥳 🎮 🎧 📚 💼 🌙 ⚡ 🔥 …). One-tap **vibe presets** set chip + text together: 🎮 Gaming, 🎧 Vibing, 😴 Away, 📚 Studying, 💼 Working, 🌙 Sleepy. |
 | Avatar photo | PNG, JPEG, WebP, or GIF; max **4MB** (Appwrite). Replace or remove. |
-| Avatar frame | Presets: Default, **My accent** (follows your theme color), Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora |
-| Banner | Preset animated GIF covers |
-| Country | Optional; rendered as a **flag** on your profile |
-| GitHub | Optional username; renders a **contribution graph** on your public profile |
-| X, Instagram, YouTube, Website | Optional social links shown as **icon chips** on your public profile |
+| Avatar frame | 10 presets: Default, **My accent** (follows your theme color), Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora |
+| Banner | **Free:** preset animated GIF covers (grid of curated covers, plus "None"). **Kivo Plus:** upload your own image/GIF up to **8 MB** (`PATCH /api/v1/users/me/banner`) — stored in Appwrite, old custom file auto-deleted when you switch to a curated cover or remove it. |
+| Profile effects | **Kivo Plus only:** `none` (default), `glow` (soft avatar halo), `gradient-name` (animated color-shift on the display name), or `aura` (both). Previewed live in the editor. Free users are forced to `none` server-side and see a locked state with a Crown badge — downgrading from Plus resets to `none` automatically. |
+| Country | Optional ISO 3166 alpha-2 code; rendered as a **flag** on your profile (`flagcdn.com`). |
+| GitHub | Optional username (max 39, letters/numbers/hyphens). Renders a **contribution graph** on your public profile. |
+| X | Optional username (max 60, letters/numbers/underscores). |
+| Instagram | Optional username (max 60, letters/numbers/dots/underscores). |
+| YouTube | Optional full URL (`https://…`, max 500). |
+| Website | Optional full URL (`https://…`, max 500). |
 
-Save to apply. Email is **not** editable here.
+The four social-link fields plus GitHub render as **icon chips** on your public profile (GitHub/X/Instagram build URLs from handles, YouTube/website use the full URL). Each chip links out safely (`target=_blank rel=noopener`). Save to apply. Email is **not** editable here. Username validation re-checks uniqueness server-side and the `plan` field is never accepted from clients.
 
 ### Your full profile page
 
@@ -486,19 +499,21 @@ Verified accounts (a status granted by admins) can show a **verified badge** nex
 
 ### Public profile (`/u/username`)
 
-Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status (+ **emoji chip**), bio, and join date — plus **social link chips** (GitHub, X, Instagram, YouTube, website) and a **GitHub contribution graph** when a GitHub username is set.
+Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status (+ **emoji chip** inside a pill chip), bio, and join date — plus **social link chips** (GitHub, X, Instagram, YouTube, website, each with a brand glyph that matches lucide-style icons) and a **GitHub contribution graph** when a GitHub username is set. The contribution graph renders a 7-day calendar with a total count and legend, styled to the page's own palette.
 
-The page **wears the owner's theme**: if the account has custom colors (accent + canvas tint from the theme studio), the public page renders in *those* colors instead of the default palette.
+**Plus flourishes** render automatically: if the user has a Kivo Plus **profileEffect** (`glow` / `gradient-name` / `aura`), the avatar halo and/or animated name Gradient show on their public page (CSS in `globals.css` `.kivo-pfx-*`, reduced-motion safe).
 
-A **Share** button in the top bar opens a share sheet with a **QR code** (scan to open the profile on Kivo), **copy link**, and native **Share** (mobile).
+The page **wears the owner's theme**: if the account has custom colors (accent + canvas tint from the theme studio), the public page renders in *those* colors instead of the default palette (`frontend/lib/profile-skin.js` maps the derived palette back onto legacy `--canvas` tokens so the profile subtree re-skins without component edits).
+
+A **Share** button in the top bar opens a share sheet with a **QR code** (scan to open the profile on Kivo — canvas-rendered, light/dark-aware, with error-correction and Kivo mark), **copy link**, and native **Share** (mobile Web Share API when available). The sheet is a slide-over on mobile and a dialog on desktop.
 
 What you can do there depends on your relationship:
 
 - Signed out: a "Join Kivo" prompt appears after a moment.
 - Friends: **Message** (opens the DM).
-- Not friends: **Add friend** (or **Accept** if they already requested you) and **Message** if they're a friend.
+- Not friends: **Add friend** (or **Accept** if they already requested you) and **Message** if you're friends.
 - Anyone you're connected to: **Block / Unblock** and, for friends, **Unfriend**.
-- Anyone (not blocked): **Wave 👋** — sends a one-tap ping notification (per-recipient 20s cooldown; opens the sender's profile from the notification center).
+- Anyone (not blocked, not self): **Wave 👋** — sends a one-tap ping notification. The **Wave** button lives among the primary actions (Hand icon) with a live countdown (`Waved · 12s`) while the **20 s per-recipient cooldown** is active. The server enforces the cooldown authoritatively (`WAVE_COOLDOWN_SECONDS = 20`, `WAVE_COOLDOWN` error with `cooldownSeconds`/`lastWaveAt`), rejects self-waves and blocked-user waves (`WAVE_BLOCKED`), and delivers as a `wave` notification (in-app if the recipient is online, web-push if offline — clicking it opens the sender's profile). The notification center deep-links waves to `/u/username`.
 
 Search results that point at a person open this same profile in a drawer inside the app.
 
@@ -536,14 +551,14 @@ Every click applies **live** to the whole app — no preview modal, no reload. T
 
 Below the studio, **Settings → Appearance → Chat look** styles the chat surface itself (applies to your DMs and groups; Spaces can override per-field with their own look):
 
-- **Wallpaper** — a subtle pattern behind the message list: **Plain**, **Dots**, **Grid**, **Lines** (thin diagonals), **Bubbles** (two dot scales), or **Wash** (a soft accent gradient). Patterns are painted in the theme's own ink at low opacity, so they stay faint on both dark and light canvases and re-tint automatically when a Space palette is active. **Plain** keeps the flat background.
-- **Bubble style** — **Rounded** (default, 12px), **Pill** (extra-round airy corners), **Squared** (tight corners), or **Outlined (mine)**: your messages become accent-outlined bubbles with a transparent fill.
+- **Wallpaper** — a subtle pattern behind the message list: **Plain** (`none`), **Dots**, **Grid**, **Lines** (`diagonal` — thin diagonals), **Bubbles** (two dot scales at `5%` / `7%` ink), or **Wash** (a soft accent gradient at `5%` / `2%`). Patterns are painted with `color-mix()` over `var(--text-primary)` / `var(--accent)`, so they stay faint on both dark and light canvases and re-tint automatically when a Space palette is active. **Plain** keeps the flat background. Helpers: `frontend/lib/chat-style.js` (`WALLPAPER_OPTIONS`, `wallpaperCss`).
+- **Bubble style** — **Rounded** (default, 12px), **Pill** (extra-round airy corners), **Squared** (tight corners), or **Outlined (mine)**: your messages become accent-outlined bubbles with a transparent fill. Helpers: `BUBBLE_STYLE_OPTIONS`, `chatLook()`. Both enums are stored as `appearance.wallpaper` / `appearance.bubbleStyle` on the User and Space (and validated via `appearance` / `conversationLookSchema`).
 
-Changes save to your account (`appearance.wallpaper` / `appearance.bubbleStyle`), follow you across devices, and apply to the main chat **and** thread panel. Wallpapers are pure CSS — a fixed layer behind the scrolling messages — so they cost nothing to paint or scroll.
+Changes save to your account (`appearance.wallpaper` / `appearance.bubbleStyle`), follow you across devices, and apply to the main chat **and** thread panel (wallpaper is a fixed CSS layer behind the scrolling list; bubble geometry is a single container-scoped class `kivo-bubbles-*`, so no prop drilling). Wallpapers are pure CSS — a fixed layer behind the scrolling messages — so they cost nothing to paint or scroll.
 
 ### Chat look per conversation (DMs & groups)
 
-Each DM or group can carry its **own** wallpaper + bubble style, seen by everyone in that chat. Tap the **palette icon** in the chat header → **Chat look**. Either person in a DM can set it; in a group only admins can (everyone else sees a read-only note). Values layer on top of the personal look — priority is **conversation look > Space look (in its channels) > member's own** — and each field can stay on **"Member's own"** to inherit. Saves apply instantly to everyone viewing the chat.
+Each DM or group can carry its **own** wallpaper + bubble style, seen by everyone in that chat. Tap the **palette icon** in the chat header → **Chat look** (a modal with 6 wallpapers + 4 bubble styles, each "Member's own" option inherits). Either person in a DM can set it; in a group only admins can (everyone else sees a read-only note). Backend: `PATCH /api/v1/conversations/:id/look` (`conversationLookSchema`, `updateConversationLook` — space channels rejected with `NOT_ALLOWED`). Values layer on top of the personal look — priority is **conversation look > Space look (in its channels) > member's own** via `resolveChatLook()` — and each field can stay on **"Member's own"** to inherit. Partial updates merge (a color reset never wipes the chat look and vice versa). Saves emit `conversation:updated` and apply instantly to everyone viewing the chat.
 
 All themes share the same layout and elevation; only colors change — plus the optional bubble geometry and wallpaper you pick above. If your OS asks for reduced motion, animations stay minimal.
 
@@ -618,17 +633,21 @@ The **bell** sits in the panel header (Chats, Groups, and Spaces panels). The ba
 - New **DM** message
 - New **group** message
 - New **Space channel** message (incl. announcements)
-- Someone **@mentioned** you
+- Someone **@mentioned** you (overrides muted categories if your Mentions pref is on)
 - **Friend request**
 - Friend request **accepted**
+- **Wave 👋** — someone waved at your profile (per-recipient 20 s cooldown)
+- **Space invite** (reserved for future invite notifications; today invites use rotating link codes)
 
 You are never notified of your **own** messages. **System** messages (joins/leaves) do not create notifications.
 
 **Quiet when you are already in a DM:** if that DM is open and focused, the server **does not** send a notification for it. Group/Space notifications still fan out to other members.
 
-**Notification preferences (Settings → Notification preferences):** choose which categories you receive — Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages, and Announcements. Space Messages are **off by default**; `@mentions` override a muted category. Toggles apply to both in-app and push delivery.
+**Notification preferences (Settings → Notification preferences):** choose which categories you receive — Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages, and Announcements. Space Messages are **off by default**; `@mentions` override a muted category (but still respect your Mentions toggle). Friend requests/acceptances are gated on `friendRequests`; lightweight pings like **Waves** flow ungated with their own 20 s server cooldown. Toggles apply to both in-app (`notification:new`) and push delivery.
 
 **Sound cues (Settings → Sounds):** every category has its own audio toggle — Direct Messages, Mentions, Group Messages, Space Messages, and Friend Requests — under a master **Notification sounds** switch, each with a **▶ preview** button so you can hear a cue before enabling it. Cues fire only when a message/request deserves attention: DMs chime when the tab is hidden or that DM isn't focused; **@mentions** chime when the conversation isn't focused (they override the group/space categories, like the server preferences); group and Space messages only chime while the tab is in the background; friend requests/acceptances chime unless the notification center is open. Cues are synthesized in-browser with the Web Audio API (no audio assets), and preferences live in `localStorage["kivo:sounds"]` — the old `kivo:sound` flag is migrated into the master switch on first read.
+
+**Under the hood (performance):** message fan-out now groups recipients in one `insertMany` (~1 DB round-trip) instead of sequential creates, batch-loads per-recipient preferences in one query, and fire-and-forgets web-push so the sender's `POST /messages` never waits on VAPID HTTP. Offline push results are persisted asynchronously (`delivery.pushDelivered / pushError`), expired endpoints (404/410) are pruned, and DM-focused suppression (`isUserFocusedOnConversation`) still skips notifications for the DM you are actively viewing.
 
 ### Browser / lock-screen push (offline)
 
@@ -754,7 +773,7 @@ The admin panel uses a separate JWT cookie (`admin_token`) that is never accepte
 | Tab | What it shows |
 |-----|---------------|
 | **Overview** | Total users, banned users, groups, spaces, messages |
-| **Users** | Paginated user table with search, ban status filter, ban/unban actions |
+| **Users** | Paginated user table with search, ban status filter, ban/unban, **plan (Kivo Plus) grant/revoke**, and detail drawer (conversation/group/space counts) |
 | **Groups** | All group conversations with member count, admins, delete action |
 | **Spaces** | All spaces with member/channel count, owner, delete action |
 
@@ -762,6 +781,7 @@ The admin panel uses a separate JWT cookie (`admin_token`) that is never accepte
 
 - **Ban a user**: Sets `isBanned` on the user document (does not delete it — the email stays locked). Immediately disconnects their sockets and revokes all sessions. The user is also rejected at login.
 - **Unban a user**: Clears the ban fields so they can log in again.
+- **Kivo Plus grant**: `POST /api/admin/users/:id/plan` `{ plan: "plus" | "free" }`. Admin-only; users can never self-grant. Granting Plus unlocks custom banner uploads and profile effects; **revoking** (`free`) also resets `profileEffect` to `none` automatically. Every grant/revoke is logged (`grant_plus` / `revoke_plus`).
 
 ### Group & space management
 
@@ -849,6 +869,7 @@ Do not expect these in the current MVP:
 
 - **Voice / video calls** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
+- Self-serve Stripe/payment for Kivo Plus — Plus is admin-granted only (`free` → `plus`); no checkout UI
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
 - Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
 - Video attachments (voice messages are built; video is not)
@@ -875,20 +896,24 @@ Do not expect these in the current MVP:
 | Public profile & verified badge | `/u/:username` (badge toggle in Settings) |
 | Block users + manage the list | DM header, profile drawer, public profile, Settings → Blocked users |
 | Ten themes + custom accent/canvas (theme studio) | Appearance page → Save to my account (desktop: Settings → Appearance row; mobile: Menu → Appearance) |
-| Chat wallpapers + bubble styles (personal + per-Space + per-chat) | Appearance page → Chat look · Space settings → Space look · chat header → palette icon |
-| Custom banners + profile effects (Kivo Plus) | Profile editor · admin panel grants Plus |
-| Notification preferences | Settings → Notification preferences |
-| In-app notifications | Bell in panel header |
-| Web push | Allow notifications when opening the bell |
+| Chat wallpapers + bubble styles (personal + per-Space + per-chat) | Appearance page → Chat look · Space settings → Space look · chat header → palette icon (`PATCH /conversations/:id/look`) |
+| Custom banners + profile effects (Kivo Plus) | Profile editor (8 MB banner upload, 4 effects) · admin panel grants Plus (`POST /api/admin/users/:id/plan`) |
+| Social link chips + GitHub graph + Wave | Profile editor → public `/u/username` chips + graph; Wave button on any profile (20 s cooldown, `POST /notifications/:id/wave`) |
+| Share profile + QR code | Share button on `/u/username` / drawer → QR + copy + native Share |
+| Verification badge | `/u/:username` badge toggle in Settings → Verification badge |
+| Read receipts — "Seen by" panel | Tap ticks on your own message → floating card with avatars, Read · time / Delivered (DMs, groups, Space channels) |
+| Notification preferences | Settings → Notification preferences (DMs, groups, mentions, friend reqs, Space msgs off by default, announcements; mentions override) |
+| In-app notifications + Wave | Bell in panel header; Waves appear with sender username + deep-link to profile |
+| Web push | Allow notifications when opening the bell (`web-push` VAPID) |
 | Install PWA | Browser install / Add to Home Screen |
-| Mobile bottom tab bar (Chats/Groups/Spaces/Menu) + full-screen Appearance page | On phone-sized screens |
-| Offline list + message caching | Automatic via IndexedDB (last 50 per chat) |
-| Reconnect gap-fill | Automatic after socket reconnect |
+| Mobile bottom tab bar (Chats/Groups/Spaces/Menu) + full-screen Appearance page | On phone-sized screens; swipe-to-reply on bubbles |
+| Offline list + message caching | Automatic via IndexedDB (last 50 per chat; conversation list via single aggregation) |
+| Reconnect gap-fill | Automatic after socket reconnect (`after=` catch-up) |
 | File & image attachments (images, PDFs, docs) | Paperclip button in composer |
 | Voice messages (hold-to-record) | Mic button in composer → hold → release to send |
 | Image lightbox (fullscreen, arrows, download) | Click any image in chat |
 | Global search (Ctrl+K) | Ctrl+K or search icon in panel header |
-| Admin panel | `/admin` — standalone dashboard |
+| Admin panel | `/admin` — standalone dashboard (Plus grant/revoke, ban/unban, deletes + audit log) |
 | Offline indicator | "You are offline" banner in sidebar |
 | Forgot / reset password | `/forgot-password` → emailed link → `/reset-password` |
 | Last online status | "active … ago" in DMs & profiles when offline |
@@ -899,6 +924,7 @@ Do not expect these in the current MVP:
 | Composer drafts | Unsent text saved per conversation, survives switches + reloads |
 | Paste images to attach | Clipboard screenshots/photos join the attachment queue directly |
 | Up-arrow to edit | Empty composer + ↑ edits your last message |
+| Chat performance | Memoized `MessageRows`, O(1) reply map, throttled like/anim, bulk notification `insertMany` |
 | Health check (ops) | `GET /health` on the API |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).
