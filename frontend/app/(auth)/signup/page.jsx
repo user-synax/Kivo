@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthInput } from "@/components/auth/AuthInput";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { GuestGate } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { setSession } from "@/lib/auth";
@@ -39,8 +40,9 @@ function validate(fields) {
   return errors;
 }
 
-export default function SignUpPage() {
+export function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reduce = useReducedMotion();
   const [formData, setFormData] = useState({
     displayName: "",
@@ -52,6 +54,18 @@ export default function SignUpPage() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
+
+  useEffect(() => {
+    const err = searchParams?.get("oauth_error");
+    if (err) {
+      const msg = searchParams?.get("message");
+      setServerError(
+        msg && msg !== err
+          ? decodeURIComponent(msg)
+          : "Google/GitHub sign-up failed. Please try again.",
+      );
+    }
+  }, [searchParams]);
 
   const containerVariants = {
     hidden: {},
@@ -163,6 +177,10 @@ export default function SignUpPage() {
               {serverError}
             </motion.div>
           )}
+
+          <motion.div variants={itemVariants}>
+            <OAuthButtons mode="signup" />
+          </motion.div>
 
           <motion.div variants={itemVariants}>
             <AuthInput
@@ -285,5 +303,13 @@ export default function SignUpPage() {
         </motion.form>
       </AuthCard>
     </GuestGate>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpForm />
+    </Suspense>
   );
 }

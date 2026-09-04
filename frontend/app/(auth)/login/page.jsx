@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthInput } from "@/components/auth/AuthInput";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { GuestGate } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { setSession } from "@/lib/auth";
@@ -33,8 +34,9 @@ function validate(fields) {
   return errors;
 }
 
-export default function LoginPage() {
+export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reduce = useReducedMotion();
   // Two-step flow: credentials first; if the account has 2FA enabled the server
   // returns a short-lived ticket and we ask for a TOTP/backup code.
@@ -48,6 +50,36 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
+
+  // Surface OAuth failures (user cancelled, provider not configured, etc.)
+  // that the backend redirects back with as ?oauth_error=&message=.
+  useEffect(() => {
+    const err = searchParams?.get("oauth_error");
+    if (err) {
+      const msg = searchParams?.get("message");
+      setServerError(
+        msg && msg !== err
+          ? decodeURIComponent(msg)
+          : "Google/GitHub sign-in failed. Please try again.",
+      );
+    }
+    const linked = searchParams?.get("linked");
+    if (linked) {
+      setServerError("");
+    }
+    // OAuth + 2FA: the provider step passed, now the TOTP/backup code remains.
+    // The callback page stashed the one-time ticket in sessionStorage.
+    if (searchParams?.get("oauth2fa") === "1") {
+      try {
+        const t = sessionStorage.getItem("kivo:oauth-2fa-ticket");
+        if (t) {
+          setTicket(t);
+          setStep("verify");
+          sessionStorage.removeItem("kivo:oauth-2fa-ticket");
+        }
+      } catch {}
+    }
+  }, [searchParams]);
 
   const containerVariants = {
     hidden: {},
@@ -219,6 +251,9 @@ export default function LoginPage() {
           {step === "credentials" ? (
             <>
               <motion.div variants={itemVariants}>
+                <OAuthButtons mode="login" />
+              </motion.div>
+              <motion.div variants={itemVariants}>
                 <AuthInput
                   id="identifier"
                   label="Email or Username"
@@ -334,5 +369,13 @@ export default function LoginPage() {
         </motion.form>
       </AuthCard>
     </GuestGate>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

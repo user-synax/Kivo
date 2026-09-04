@@ -52,6 +52,22 @@ const env = {
   // Frontend base URL for building email verification / reset links.
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
 
+  // OAuth — Google & GitHub signup/login + account verification.
+  // Get Google creds at https://console.cloud.google.com/apis/credentials
+  // Get GitHub creds at https://github.com/settings/developers
+  // Redirect URIs default to the frontend origin (proxied via Next rewrites
+  // to the backend), e.g. http://localhost:3000/api/v1/auth/oauth/google/callback.
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  googleRedirectUri:
+    process.env.GOOGLE_REDIRECT_URI ||
+    `${process.env.FRONTEND_URL || "http://localhost:3000"}/api/v1/auth/oauth/google/callback`,
+  githubClientId: process.env.GITHUB_CLIENT_ID || "",
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET || "",
+  githubRedirectUri:
+    process.env.GITHUB_REDIRECT_URI ||
+    `${process.env.FRONTEND_URL || "http://localhost:3000"}/api/v1/auth/oauth/github/callback`,
+
   // Admin panel — standalone credential pair, NOT a DB user account.
   adminEmail: process.env.ADMIN_EMAIL || "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",

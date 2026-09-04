@@ -2,6 +2,7 @@ import { Router } from "express";
 import { rateLimiter } from "../../middleware/rateLimiter.js";
 import { authenticate } from "../../middleware/auth.js";
 import * as authController from "./auth.controller.js";
+import * as oauthController from "./oauth.controller.js";
 
 const router = Router();
 
@@ -55,5 +56,26 @@ router.post("/resend-verification", authenticate, resendVerificationLimiter, aut
 // Password reset (public, no auth required)
 router.post("/forgot-password", forgotPasswordLimiter, authController.forgotPassword);
 router.post("/reset-password", resetPasswordLimiter, authController.resetPassword);
+
+// OAuth — Google & GitHub signup/login + provider verification linking.
+// Start + callback are top-level browser navigations (302 redirects), not JSON.
+const oauthStartLimiter = rateLimiter({
+  keyPrefix: "oauth-start",
+  windowSeconds: 60,
+  max: 30,
+  keyFrom: (req) => req.ip,
+});
+const oauthCallbackLimiter = rateLimiter({
+  keyPrefix: "oauth-callback",
+  windowSeconds: 60,
+  max: 20,
+  keyFrom: (req) => req.ip,
+});
+const oauthLinkLimiter = rateLimiter({ keyPrefix: "oauth-link", windowSeconds: 60, max: 10 });
+
+router.get("/oauth/providers", oauthController.providers);
+router.get("/oauth/:provider", oauthStartLimiter, oauthController.start);
+router.post("/oauth/:provider/link-url", authenticate, oauthLinkLimiter, oauthController.linkUrl);
+router.get("/oauth/:provider/callback", oauthCallbackLimiter, oauthController.callback);
 
 export default router;

@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-} from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Ban,
   CalendarDays,
@@ -20,17 +16,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { ProviderVerifiedBadges } from "@/components/profile/provider-badges";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
-import {
-  effectAvatarClass,
-  effectNameClass,
-} from "@/lib/profile-effects";
+import { effectAvatarClass, effectNameClass } from "@/lib/profile-effects";
 import { ownerSkin } from "@/lib/profile-skin";
-import {
-  SocialGlyph,
-  socialLinksFor,
-} from "@/lib/social-links";
+import { SocialGlyph, socialLinksFor } from "@/lib/social-links";
 import { cn } from "@/lib/utils";
 import {
   ContributionGraph,
@@ -144,9 +135,7 @@ export function ProfileContent({
     let active = true;
     setLoading(true);
     setError(null);
-    apiGet(
-      `/api/v1/users/${encodeURIComponent(username)}/profile`,
-    )
+    apiGet(`/api/v1/users/${encodeURIComponent(username)}/profile`)
       .then((data) => {
         if (!active) return;
         setProfile(data);
@@ -168,8 +157,7 @@ export function ProfileContent({
     if (profileProp?.relationship) setRel(profileProp.relationship);
   }, [profileProp?.relationship]);
 
-  const name =
-    profile?.displayName || profile?.username || username || "—";
+  const name = profile?.displayName || profile?.username || username || "—";
   const handle = profile?.username
     ? `@${profile.username}`
     : username
@@ -184,8 +172,7 @@ export function ProfileContent({
   // passes `ownerAppearance`; in-app drawers leave it null so the profile
   // inherits the surrounding dashboard theme.
   const skinVars = ownerAppearance ? ownerSkin(ownerAppearance) : null;
-  const isSelf =
-    rel === "self" || getSession()?.username === profile?.username;
+  const isSelf = rel === "self" || getSession()?.username === profile?.username;
   const isBlockedByMe = Boolean(profile?.isBlockedByMe);
   const isBlockedByOther = Boolean(profile?.isBlockedByOther);
   const isBlocked = isBlockedByMe || isBlockedByOther;
@@ -203,9 +190,7 @@ export function ProfileContent({
         identifier: profile.username,
       });
       setRel("outgoing");
-      setProfile((p) =>
-        p ? { ...p, relationship: "outgoing" } : p,
-      );
+      setProfile((p) => (p ? { ...p, relationship: "outgoing" } : p));
     } catch (e) {
       window.alert(e?.message || "Could not send request");
     } finally {
@@ -224,10 +209,7 @@ export function ProfileContent({
         onMessage(conv);
       } else {
         try {
-          localStorage.setItem(
-            "kivo:selected-conversation",
-            conv.id,
-          );
+          localStorage.setItem("kivo:selected-conversation", conv.id);
         } catch {}
         router.push("/app");
       }
@@ -241,19 +223,12 @@ export function ProfileContent({
 
   const handleBlock = async () => {
     if (!profile?.id || busy) return;
-    if (
-      !window.confirm(
-        `Block ${name}? You won't see their messages.`,
-      )
-    )
-      return;
+    if (!window.confirm(`Block ${name}? You won't see their messages.`)) return;
     setBusy("block");
     try {
       await apiPost(`/api/v1/users/${profile.id}/block`, {});
       setProfile((p) =>
-        p
-          ? { ...p, isBlockedByMe: true, relationship: "none" }
-          : p,
+        p ? { ...p, isBlockedByMe: true, relationship: "none" } : p,
       );
       setRel("none");
     } catch (e) {
@@ -268,9 +243,7 @@ export function ProfileContent({
     setBusy("unblock");
     try {
       await apiPost(`/api/v1/users/${profile.id}/unblock`, {});
-      setProfile((p) =>
-        p ? { ...p, isBlockedByMe: false } : p,
-      );
+      setProfile((p) => (p ? { ...p, isBlockedByMe: false } : p));
     } catch (e) {
       window.alert(e?.message || "Could not unblock user");
     } finally {
@@ -280,17 +253,12 @@ export function ProfileContent({
 
   const handleUnfriend = async () => {
     if (!profile?.id || busy) return;
-    if (
-      !window.confirm(`Remove ${name} from friends?`)
-    )
-      return;
+    if (!window.confirm(`Remove ${name} from friends?`)) return;
     setBusy("unfriend");
     try {
       await apiDelete(`/api/v1/friends/${profile.id}`);
       setRel("none");
-      setProfile((p) =>
-        p ? { ...p, relationship: "none" } : p,
-      );
+      setProfile((p) => (p ? { ...p, relationship: "none" } : p));
     } catch (e) {
       window.alert(e?.message || "Could not remove friend");
     } finally {
@@ -318,10 +286,7 @@ export function ProfileContent({
     if (!profile?.id || busy || waveLeft > 0) return;
     setBusy("wave");
     try {
-      const res = await apiPost(
-        `/api/v1/notifications/${profile.id}/wave`,
-        {},
-      );
+      const res = await apiPost(`/api/v1/notifications/${profile.id}/wave`, {});
       const serverCd = Number(res?.cooldownSeconds);
       setWaveLeft(serverCd > 0 ? serverCd : WAVE_COOLDOWN);
     } catch (e) {
@@ -340,12 +305,7 @@ export function ProfileContent({
   /* ── Loading skeleton ──────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div
-        className={cn(
-          "w-full overflow-hidden",
-          "bg-[var(--canvas)]",
-        )}
-      >
+      <div className={cn("w-full overflow-hidden", "bg-[var(--canvas)]")}>
         {/* Banner shimmer */}
         <div className="t-skel h-[132px] w-full rounded-none sm:h-[160px]" />
         <div className="px-5 py-6 sm:px-6">
@@ -374,11 +334,7 @@ export function ProfileContent({
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={
-          reduce
-            ? { duration: 0 }
-            : { duration: 0.35, ease: EASE }
-        }
+        transition={reduce ? { duration: 0 } : { duration: 0.35, ease: EASE }}
         className="px-6 py-10 text-center"
       >
         <p className="text-sm text-[var(--ink-muted)]">
@@ -407,11 +363,7 @@ export function ProfileContent({
         initial={reduce ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-        transition={
-          reduce
-            ? { duration: 0 }
-            : { duration: 0.25, ease: EASE }
-        }
+        transition={reduce ? { duration: 0 } : { duration: 0.25, ease: EASE }}
         className={cn(
           "flex w-full flex-col overflow-hidden bg-[var(--canvas)]",
           isDrawer && "rounded-t-[20px]",
@@ -420,17 +372,9 @@ export function ProfileContent({
       >
         {/* ── Banner ──────────────────────────────────────────────────────── */}
         <motion.div
-          initial={
-            reduce
-              ? false
-              : { opacity: 0, scale: 1.04 }
-          }
+          initial={reduce ? false : { opacity: 0, scale: 1.04 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={
-            reduce
-              ? { duration: 0 }
-              : { duration: 0.6, ease: EASE }
-          }
+          transition={reduce ? { duration: 0 } : { duration: 0.6, ease: EASE }}
           className="relative h-[132px] w-full shrink-0 overflow-hidden border-b border-[var(--hairline)] bg-[var(--surface-1)] sm:h-[160px]"
         >
           {profile.banner ? (
@@ -461,11 +405,7 @@ export function ProfileContent({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              initial={
-                reduce
-                  ? false
-                  : { opacity: 0, scale: 0.8 }
-              }
+              initial={reduce ? false : { opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={
                 reduce
@@ -476,13 +416,9 @@ export function ProfileContent({
                       delay: 0.2,
                     }
               }
-              whileTap={
-                reduce ? undefined : { scale: 0.9 }
-              }
+              whileTap={reduce ? undefined : { scale: 0.9 }}
               whileHover={
-                reduce
-                  ? undefined
-                  : { backgroundColor: "rgba(0,0,0,0.55)" }
+                reduce ? undefined : { backgroundColor: "rgba(0,0,0,0.55)" }
               }
               className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/10 bg-black/30 text-white backdrop-blur-md transition-colors"
             >
@@ -499,16 +435,9 @@ export function ProfileContent({
           className="px-5 pb-6 pt-0 sm:px-6"
         >
           {/* ── Identity: avatar + name ──────────────────────────────────── */}
-          <motion.div
-            variants={item}
-            className="flex items-end gap-4"
-          >
+          <motion.div variants={item} className="flex items-end gap-4">
             <motion.span
-              initial={
-                reduce
-                  ? false
-                  : { opacity: 0, scale: 0.85, y: 8 }
-              }
+              initial={reduce ? false : { opacity: 0, scale: 0.85, y: 8 }}
               animate={{
                 opacity: 1,
                 scale: 1,
@@ -563,6 +492,10 @@ export function ProfileContent({
                   />
                 )}
               </p>
+              {/* Provider verification badges (Google / GitHub OAuth proof). */}
+              {(profile.googleVerified || profile.githubVerified) && (
+                <ProviderVerifiedBadges profile={profile} className="mt-1.5" />
+              )}
             </div>
           </motion.div>
 
@@ -637,11 +570,7 @@ export function ProfileContent({
           >
             {joined && (
               <motion.span
-                initial={
-                  reduce
-                    ? false
-                    : { opacity: 0, y: 4 }
-                }
+                initial={reduce ? false : { opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={
                   reduce
@@ -773,12 +702,8 @@ export function ProfileContent({
                 type="button"
                 onClick={handleUnblock}
                 disabled={busy === "unblock"}
-                whileTap={
-                  reduce ? undefined : { scale: 0.95 }
-                }
-                whileHover={
-                  reduce ? undefined : { scale: 1.03 }
-                }
+                whileTap={reduce ? undefined : { scale: 0.95 }}
+                whileHover={reduce ? undefined : { scale: 1.03 }}
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--ink)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--inverse-ink)] disabled:opacity-40"
               >
                 Unblock
@@ -807,10 +732,7 @@ export function ProfileContent({
                       ? `You already waved — again in ${waveLeft}s`
                       : `Wave at ${name}`
                   }
-                  className={cn(
-                    pillSecondary,
-                    waveLeft > 0 && "opacity-60",
-                  )}
+                  className={cn(pillSecondary, waveLeft > 0 && "opacity-60")}
                 >
                   {busy === "wave" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -858,13 +780,8 @@ export function ProfileContent({
                     <motion.button
                       type="button"
                       disabled
-                      whileTap={
-                        reduce ? undefined : { scale: 0.97 }
-                      }
-                      className={cn(
-                        pillPrimary,
-                        "opacity-40",
-                      )}
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      className={cn(pillPrimary, "opacity-40")}
                     >
                       <MessageCircle className="h-4 w-4" />
                       Message
@@ -874,22 +791,12 @@ export function ProfileContent({
                         type="button"
                         onClick={handleUnblock}
                         disabled={busy === "unblock"}
-                        whileTap={
-                          reduce
-                            ? undefined
-                            : { scale: 0.97 }
-                        }
-                        whileHover={
-                          reduce
-                            ? undefined
-                            : { scale: 1.02 }
-                        }
+                        whileTap={reduce ? undefined : { scale: 0.97 }}
+                        whileHover={reduce ? undefined : { scale: 1.02 }}
                         className={pillSecondary}
                       >
                         <ShieldBan className="h-4 w-4" />
-                        {busy === "unblock"
-                          ? "\u2026"
-                          : "Unblock"}
+                        {busy === "unblock" ? "\u2026" : "Unblock"}
                       </motion.button>
                     ) : (
                       <span className="text-[12px] text-[var(--ink-muted)]">
@@ -931,58 +838,30 @@ export function ProfileContent({
                       type="button"
                       onClick={handleMessage}
                       disabled={busy === "message"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillPrimary}
                     >
                       <MessageCircle className="h-4 w-4" />
-                      {busy === "message"
-                        ? "Opening\u2026"
-                        : "Message"}
+                      {busy === "message" ? "Opening\u2026" : "Message"}
                     </motion.button>
                     <motion.button
                       type="button"
                       onClick={handleUnfriend}
                       disabled={busy === "unfriend"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillGhost}
                     >
                       <UserMinus className="h-4 w-4" />
-                      {busy === "unfriend"
-                        ? "\u2026"
-                        : "Unfriend"}
+                      {busy === "unfriend" ? "\u2026" : "Unfriend"}
                     </motion.button>
                     <motion.button
                       type="button"
                       onClick={handleBlock}
                       disabled={busy === "block"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillGhost}
                     >
                       <Ban className="h-4 w-4" />
@@ -1026,16 +905,8 @@ export function ProfileContent({
                       type="button"
                       onClick={handleBlock}
                       disabled={busy === "block"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillGhost}
                     >
                       <Ban className="h-4 w-4" />
@@ -1079,16 +950,8 @@ export function ProfileContent({
                       type="button"
                       onClick={handleBlock}
                       disabled={busy === "block"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillGhost}
                     >
                       <Ban className="h-4 w-4" />
@@ -1129,37 +992,19 @@ export function ProfileContent({
                       type="button"
                       onClick={handleAddFriend}
                       disabled={busy === "add"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillPrimary}
                     >
                       <UserPlus className="h-4 w-4" />
-                      {busy === "add"
-                        ? "Sending\u2026"
-                        : "Add Friend"}
+                      {busy === "add" ? "Sending\u2026" : "Add Friend"}
                     </motion.button>
                     <motion.button
                       type="button"
                       onClick={handleMessage}
                       disabled={busy === "message"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillSecondary}
                     >
                       <MessageCircle className="h-4 w-4" />
@@ -1169,16 +1014,8 @@ export function ProfileContent({
                       type="button"
                       onClick={handleBlock}
                       disabled={busy === "block"}
-                      whileTap={
-                        reduce
-                          ? undefined
-                          : { scale: 0.97 }
-                      }
-                      whileHover={
-                        reduce
-                          ? undefined
-                          : { scale: 1.02 }
-                      }
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      whileHover={reduce ? undefined : { scale: 1.02 }}
                       className={pillGhost}
                     >
                       <Ban className="h-4 w-4" />

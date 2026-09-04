@@ -21,10 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
-import {
-  BubbleStylePicker,
-  WallpaperPicker,
-} from "./chat-style-picker";
+import { BubbleStylePicker, WallpaperPicker } from "./chat-style-picker";
 import {
   getSoundPrefs,
   previewCue,
@@ -34,6 +31,7 @@ import {
 import { ACCENT_PRESETS, TINT_PRESETS } from "@/lib/theme";
 import { Avatar } from "./avatar";
 import { TwoFactorSection } from "./two-factor-section";
+import { VerificationSection } from "./verification-section";
 
 function SectionCard({ icon: Icon, title, description, children }) {
   return (
@@ -894,6 +892,7 @@ export function SettingsPanel({ onOpenAppearance }) {
             <AppearanceLinkCard onOpenAppearance={onOpenAppearance} />
           ) : null}
           <BadgeSection />
+          <VerificationSection />
           <TwoFactorSection />
           <BlockedUsersSection />
           <NotificationsSection />

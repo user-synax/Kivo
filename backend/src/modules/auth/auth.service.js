@@ -119,7 +119,8 @@ async function getSession(sessionId) {
 // Issue a short-lived access token + long-lived refresh token, and create the
 // backing session document. Returns the tokens (refresh token is opaque to the
 // caller — it goes into an httpOnly cookie, never the response body).
-async function issueSession(userId, deviceInfo) {
+// Exported so the OAuth module reuses the exact same session primitive.
+export async function issueSession(userId, deviceInfo) {
   const sessionId = await storeSession(userId, deviceInfo);
 
   const accessToken = jwt.sign({ userId, sessionId }, env.accessTokenSecret, {
@@ -132,9 +133,9 @@ async function issueSession(userId, deviceInfo) {
   return { accessToken, refreshToken, sessionId };
 }
 
-function publicUser(user) {
+export function publicUser(user) {
   return {
-    id: user.id,
+    id: user.id || user._id?.toString(),
     email: user.email,
     displayName: user.displayName || null,
     username: user.username || null,
@@ -143,6 +144,11 @@ function publicUser(user) {
     avatarStyle: user.avatarStyle || null,
     avatarUrl: user.avatarUrl || null,
     role: user.role,
+    verified: Boolean(user.verified),
+    showBadge: user.showBadge !== false,
+    // Provider verification badges (public profile chips + Settings state).
+    googleVerified: Boolean(user.googleVerified),
+    githubVerified: Boolean(user.githubVerified),
     isEmailVerified: user.isEmailVerified || false,
     createdAt: user.createdAt,
     // Appearance customization ships with every session user so the client can
@@ -209,6 +215,15 @@ export async function loginUser({ identifier, password, deviceInfo }) {
     throw unauthorized(
       "This account has been suspended",
       "ACCOUNT_BANNED",
+    );
+  }
+
+  // OAuth-only accounts have no password — direct them to the provider button
+  // instead of leaking which identifier exists (same generic shape otherwise).
+  if (!user.passwordHash) {
+    throw unauthorized(
+      "This account uses Google or GitHub sign-in. Continue with your provider below.",
+      "OAUTH_ONLY_ACCOUNT",
     );
   }
 
@@ -309,7 +324,8 @@ export async function enableTwoFactor({ userId, code }) {
 }
 
 // Turn 2FA off. Requires the account password (so a stolen session alone can't
-// downgrade security) plus a valid TOTP code OR a backup code.
+// downgrade security) plus a valid TOTP code OR a backup code. OAuth-only
+// accounts have no password, so the code alone suffices for them.
 export async function disableTwoFactor({ userId, code, password }) {
   const user = await User.findById(userId).select(
     "+passwordHash +twoFactorSecret +twoFactorBackupCodes twoFactorEnabled"
@@ -319,9 +335,11 @@ export async function disableTwoFactor({ userId, code, password }) {
     throw badRequest("Two-factor authentication is not enabled.", "TWO_FACTOR_NOT_ENABLED");
   }
 
-  const passwordOk = await user.comparePassword(password);
-  if (!passwordOk) {
-    throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
+  if (user.passwordHash) {
+    const passwordOk = password ? await user.comparePassword(password) : false;
+    if (!passwordOk) {
+      throw unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
+    }
   }
 
   const codeValid = await isCodeValidForUser(user, code);

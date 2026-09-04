@@ -188,13 +188,13 @@ function TwoFactorFlow({ mode, onClose, onChanged }) {
 
   async function handleDisable(e) {
     e?.preventDefault();
-    if (!code.trim() || !password) return;
+    if (!code.trim()) return;
     setBusy(true);
     setError(null);
     try {
       await apiPost("/api/v1/auth/2fa/disable", {
         code: code.trim(),
-        password,
+        ...(password ? { password } : {}),
       });
       onChanged?.(false);
       onClose?.();
@@ -430,7 +430,7 @@ function TwoFactorFlow({ mode, onClose, onChanged }) {
             <form onSubmit={handleDisable} className="flex flex-col gap-3">
               <div className={fieldClass}>
                 <label htmlFor="tf-disable-password" className={labelClass}>
-                  Password
+                  Password (leave empty if you use Google/GitHub sign-in only)
                 </label>
                 <input
                   id="tf-disable-password"
@@ -460,7 +460,7 @@ function TwoFactorFlow({ mode, onClose, onChanged }) {
               {error && <p className="text-[12px] text-red-400">{error}</p>}
               <button
                 type="submit"
-                disabled={busy || !password || !code.trim()}
+                disabled={busy || !code.trim()}
                 className={`${ghostBtnClass} w-full !border-red-400/40 !text-red-400 hover:!bg-red-400/10 hover:!text-red-400`}
               >
                 {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

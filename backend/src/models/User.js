@@ -146,11 +146,47 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     // Never returned by default queries (select: false) and never logged.
+    // Nullable to support OAuth-only accounts (Google/GitHub signup) that
+    // never set a password. Local accounts always have a hash.
     passwordHash: {
       type: String,
-      required: true,
+      required: false,
+      default: null,
       select: false,
     },
+    // OAuth identity linkage. A single Kivo account can link both Google and
+    // GitHub: signing up via a provider sets its id + verified flag; a local
+    // account "verifies" later by linking (see oauth.service.js). When BOTH
+    // flags are true the account earns the native `verified` badge.
+    googleId: {
+      type: String,
+      default: null,
+      sparse: true,
+      trim: true,
+    },
+    githubId: {
+      type: String,
+      default: null,
+      sparse: true,
+      trim: true,
+    },
+    googleEmail: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+    },
+    githubEmail: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+    },
+    // Per-provider verification: true once the user proves ownership of that
+    // Google/GitHub account via OAuth. Drives the provider badges on public
+    // profiles; both true => native `verified` badge.
+    googleVerified: { type: Boolean, default: false, index: true },
+    githubVerified: { type: Boolean, default: false, index: true },
     role: {
       type: String,
       enum: ROLES,
@@ -237,6 +273,9 @@ userSchema.statics.hashPassword = function (plain) {
 // Indexes for search lookups.
 userSchema.index({ username: 1 });
 userSchema.index({ displayName: 1 });
+// OAuth lookups — sparse so local-only accounts (null ids) don't collide.
+userSchema.index({ googleId: 1 }, { sparse: true, unique: true });
+userSchema.index({ githubId: 1 }, { sparse: true, unique: true });
 
 export const Role = Object.freeze({ USER: "user", ADMIN: "admin" });
 export const User = mongoose.model("User", userSchema);

@@ -32,6 +32,9 @@ function publicUser(user) {
     websiteUrl: u.websiteUrl || null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
+    // OAuth provider verification badges (Google / GitHub chips).
+    googleVerified: Boolean(u.googleVerified),
+    githubVerified: Boolean(u.githubVerified),
     // Plus profile effect ("none" | "glow" | "gradient-name" | "aura") —
     // public so any visitor renders the user's chosen effect on their profile.
     profileEffect: u.profileEffect || "none",
@@ -79,11 +82,16 @@ function mergeAppearance(existing = {}, incoming = {}) {
 // included in publicUser, so other people's search results / profiles never
 // carry them.
 function selfUser(user) {
+  const base = publicUser(user);
+  const u = user.toObject ? user.toObject() : user;
   return {
-    ...publicUser(user),
+    ...base,
     plan: user.plan || "free",
     // Lets the editor show a "custom upload" affordance and clean removal.
     bannerUploaded: Boolean(user.bannerFileId),
+    // Own linked provider emails (Settings shows which account is linked).
+    googleEmail: u.googleEmail || null,
+    githubEmail: u.githubEmail || null,
     appearance: flatAppearance(user.appearance),
   };
 }
@@ -112,7 +120,7 @@ export async function searchUsers({ userId, q }) {
     _id: { $ne: userId },
     $or: [{ username: regex }, { email: regex }, { displayName: regex }],
   })
-    .select("displayName username email lastActiveAt")
+    .select("displayName username email verified showBadge googleVerified githubVerified lastActiveAt")
     .limit(20)
     .lean();
 
@@ -128,7 +136,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge role plan profileEffect appearance bannerFileId createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan profileEffect appearance bannerFileId createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);
@@ -140,7 +148,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge role profileEffect createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -167,6 +175,8 @@ function publicProfile(user) {
     websiteUrl: u.websiteUrl || null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
+    googleVerified: Boolean(u.googleVerified),
+    githubVerified: Boolean(u.githubVerified),
     profileEffect: u.profileEffect || "none",
     // The owner's colors/look — public so their /u/username page can render
     // in *their* theme (accent + canvas tint). Colors only; never plan/tier.
@@ -182,7 +192,7 @@ function publicProfile(user) {
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge profileEffect createdAt blockedUsers lastActiveAt",
+    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect createdAt blockedUsers lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -482,7 +492,7 @@ export async function updateMe({ userId, data }) {
     new: true,
     runValidators: true,
   }).select(
-    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge role plan profileEffect appearance bannerFileId createdAt",
+    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan profileEffect appearance bannerFileId createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);

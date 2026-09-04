@@ -45,7 +45,9 @@ export const twoFactorDisableSchema = z.object({
   code: twoFactorCode(),
   // Re-authentication: disabling 2FA needs the account password too, so a
   // stolen session cookie alone cannot silently downgrade security.
-  password: z.string().min(1, "Password is required"),
+  // OAuth-only accounts have no password — optional so they can disable
+  // with the code alone (the service skips the check when no hash exists).
+  password: z.string().min(1).optional().or(z.literal("")),
 });
 
 export const loginTwoFactorSchema = z.object({
