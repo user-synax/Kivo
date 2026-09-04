@@ -48,6 +48,8 @@ import {
     setCachedMessages,
 } from "@/lib/cache";
 import {
+    dayKey,
+    formatDayDivider,
     otherParticipant,
     participantAvatarName,
     participantName,
@@ -233,6 +235,27 @@ function NewMessagesSeparator() {
             <div className="h-px flex-1 bg-[var(--border)]" />
             <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--accent)]">
                 New messages
+            </span>
+            <div className="h-px flex-1 bg-[var(--border)]" />
+        </div>
+    );
+}
+
+// Sticky day divider ("Today" / "Yesterday" / "Monday" / "Mar 4") — same
+// visual language as the New-messages separator but neutral, so long
+// histories scan without extra chrome.
+function DateDivider({ ts }) {
+    const label = formatDayDivider(ts);
+    if (!label) return null;
+    return (
+        <div
+            className="my-4 flex items-center gap-3"
+            role="separator"
+            aria-label={label}
+        >
+            <div className="h-px flex-1 bg-[var(--border)]" />
+            <span className="rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1 text-[11px] font-medium tracking-wide text-[var(--text-muted)]">
+                {label}
             </span>
             <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
@@ -2391,9 +2414,17 @@ export function ChatPanel({
                     {messages.map((m, i) => {
                         const mine = m.senderId === userId;
                         const isFirstUnread = m.id === firstUnreadId;
+                        const prevMsg = i > 0 ? messages[i - 1] : null;
+                        const showDateDivider =
+                            i === 0 ||
+                            dayKey(m.createdAt) !==
+                                dayKey(prevMsg?.createdAt);
                         if (m.type === "system") {
                             return (
                                 <React.Fragment key={m.id}>
+                                    {showDateDivider && (
+                                        <DateDivider ts={m.createdAt} />
+                                    )}
                                     {isFirstUnread && <NewMessagesSeparator />}
                                     <SystemNotice content={m.content} />
                                 </React.Fragment>
@@ -2424,6 +2455,7 @@ export function ChatPanel({
                             prev.senderId === m.senderId &&
                             !m.isDeleted &&
                             !prev.isDeleted &&
+                            dayKey(m.createdAt) === dayKey(prev.createdAt) &&
                             new Date(m.createdAt).getTime() -
                                 new Date(prev.createdAt).getTime() <=
                                 GROUP_WINDOW_MS;
@@ -2447,6 +2479,9 @@ export function ChatPanel({
                             membersById[m.senderId]?.username || null;
                         return (
                             <React.Fragment key={m.id}>
+                                {showDateDivider && (
+                                    <DateDivider ts={m.createdAt} />
+                                )}
                                 {isFirstUnread && <NewMessagesSeparator />}
                                 <div
                                     id={`msg-${m.id}`}

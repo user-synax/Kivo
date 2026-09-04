@@ -28,6 +28,36 @@ export function participantAvatarName(p) {
   return name === "Unknown" ? "?" : name;
 }
 
+// Day key (yyyy-m-d) for grouping messages under date dividers.
+export function dayKey(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+// Sticky date-divider label: "Today" / "Yesterday" / "Mar 4" / "Mar 4, 2025".
+export function formatDayDivider(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) {
+    return d.toLocaleDateString([], { weekday: "long" });
+  }
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString(
+    [],
+    sameYear
+      ? { month: "short", day: "numeric" }
+      : { month: "short", day: "numeric", year: "numeric" },
+  );
+}
+
 // Compact timestamp for the conversation list and message meta.
 export function formatTime(ts) {
   if (!ts) return "";

@@ -50,6 +50,7 @@ import { AttachmentBubble } from "@/components/chat/attachments";
 import { LinkPreview } from "@/components/chat/link-preview";
 import { MentionToken } from "@/components/mentions/mention-token";
 import { firstUrl, normalizeUrl } from "@/lib/links";
+import { emojiCount } from "@/lib/emoji";
 
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?'\"`>]+$/;
@@ -349,8 +350,21 @@ export function MessageBubble({
     [deleted, isEditing, selectMode, triggerLike],
   );
 
+  // WhatsApp-style big emoji: 1-3 emoji, no text/attachments/quote/forward.
+  // Renders chromeless (ghost) at large size instead of inside a bubble.
+  const bigEmojiCount =
+    !deleted && !isEditing && message.content && !replyTo
+      ? emojiCount(message.content)
+      : 0;
+  const isBigEmoji =
+    bigEmojiCount >= 1 &&
+    bigEmojiCount <= 3 &&
+    !message.forwardedFromName &&
+    (!message.attachments || message.attachments.length === 0);
+
   // Sent messages use the primary (accent) bubble, received use the secondary.
-  const bubbleVariant = variant ?? (mine ? "default" : "secondary");
+  const bubbleVariant =
+    variant ?? (isBigEmoji ? "ghost" : mine ? "default" : "secondary");
 
   return (
     <ContextMenu>
@@ -375,7 +389,18 @@ export function MessageBubble({
           onTouchStart={handleLikeTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <BubbleContent className={cn("min-w-0", contentClassName)}>
+          <BubbleContent
+            className={cn(
+              "min-w-0",
+              isBigEmoji &&
+                (bigEmojiCount === 1
+                  ? "text-[44px] leading-none"
+                  : bigEmojiCount === 2
+                    ? "text-[36px] leading-none"
+                    : "text-[30px] leading-snug"),
+              contentClassName,
+            )}
+          >
             {replyTo ? (
               <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10">
                 <span className="block truncate text-[11px] font-semibold text-[var(--accent)]">
@@ -422,7 +447,7 @@ export function MessageBubble({
                   isUserOnline={isUserOnline}
                   onOpenProfile={onOpenProfile}
                 />
-                {!deleted && !isEditing && message.content ? (
+                {!deleted && !isEditing && !isBigEmoji && message.content ? (
                   <LinkPreview url={firstUrl(message.content)} />
                 ) : null}
                 <AttachmentBubble
