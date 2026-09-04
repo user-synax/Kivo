@@ -154,6 +154,30 @@ export async function createOrGetDm({ userId, participantId }) {
   return publicConversation(created, userId, onlineSnapshot(), blockFlags);
 }
 
+// Per-conversation unread counts for a user, computed in ONE aggregation.
+// The conversation-list endpoint runs on every app load and socket reconnect,
+// so the previous per-conversation countDocuments loop (an N+1 MongoDB
+// round-trip pattern) made that hot path scale linearly with chat count.
+// Filter semantics are identical to the old countDocuments query.
+async function unreadCountsByConversation(conversationIds, userId) {
+  if (!conversationIds || conversationIds.length === 0) return new Map();
+  const uid = new mongoose.Types.ObjectId(userId);
+  const rows = await Message.aggregate([
+    {
+      $match: {
+        conversationId: { $in: conversationIds },
+        senderId: { $ne: uid },
+        type: { $ne: "system" },
+        threadId: null, // thread replies never bump the main unread badge
+        isDeleted: false,
+        readBy: { $not: { $elemMatch: { userId: uid } } },
+      },
+    },
+    { $group: { _id: "$conversationId", count: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((r) => [r._id.toString(), r.count]));
+}
+
 // List the current user's conversations, newest activity first. Includes a
 // lightweight unread count (messages not authored by the user and not yet read).
 export async function listConversations({ userId }) {
@@ -164,7 +188,6 @@ export async function listConversations({ userId }) {
     .lean();
 
   const lookup = onlineSnapshot();
-  const uid = new mongoose.Types.ObjectId(userId);
 
   // Pre-fetch blockedUsers for DM flag computation
   const me = await User.findById(userId).select("blockedUsers").lean();
@@ -181,6 +204,11 @@ export async function listConversations({ userId }) {
     : [];
   const otherBlockedMap = new Map(otherUsers.map((u) => [u._id.toString(), new Set((u.blockedUsers || []).map((id) => id.toString()))]));
 
+  const unreadByConv = await unreadCountsByConversation(
+    conversations.map((c) => c._id),
+    userId,
+  );
+
   const result = [];
   for (const c of conversations) {
     let blockFlags = null;
@@ -193,15 +221,7 @@ export async function listConversations({ userId }) {
       blockFlags = { isBlockedByMe, isBlockedByOther };
     }
     const base = publicConversation(c, userId, lookup, blockFlags);
-    const unread = await Message.countDocuments({
-      conversationId: c._id,
-      senderId: { $ne: uid },
-      type: { $ne: "system" },
-      threadId: null, // thread replies never bump the main unread badge
-      isDeleted: false,
-      readBy: { $not: { $elemMatch: { userId: uid } } },
-    });
-    base.unreadCount = unread;
+    base.unreadCount = unreadByConv.get(c._id.toString()) || 0;
     result.push(base);
   }
   return result;
