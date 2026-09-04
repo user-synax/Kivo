@@ -26,6 +26,7 @@ import {
   effectAvatarClass,
   effectNameClass,
 } from "@/lib/profile-effects";
+import { ownerSkin } from "@/lib/profile-skin";
 import {
   SocialGlyph,
   socialLinksFor,
@@ -108,6 +109,10 @@ export function ProfileContent({
   onMessage,
   onClose,
   variant = "default",
+  ownerAppearance = null,
+  // When the parent owns the fetch (public /u page), pass `profile` from its
+  // own request and set this so no duplicate profile GET fires here.
+  fetchDisabled = false,
 }) {
   const router = useRouter();
   const { reduce, container, item } = useEntranceVariants();
@@ -124,6 +129,15 @@ export function ProfileContent({
       setProfile(profileProp);
       setRel(profileProp.relationship ?? null);
       setLoading(false);
+      return;
+    }
+    if (fetchDisabled) {
+      // Parent owns loading/error states; wait for the profile prop.
+      // Show the skeleton while the parent's fetch is in flight.
+      // biome-ignore lint/correctness/useExhaustiveDependencies: fetchDisabled
+      // is a constant prop set once at mount — including it would only re-run
+      // the effect and reset loading for no reason.
+      setLoading(!profileProp);
       return;
     }
     if (!username) return;
@@ -165,6 +179,11 @@ export function ProfileContent({
   // further down still renders separately when githubUsername is set.
   const socialLinks = socialLinksFor(profile);
   const joined = formatJoined(profile?.joinedAt);
+  // Owner-skin (public /u pages only): the card renders in the OWNER's
+  // accent/canvas-tint instead of the viewer's theme. Only the /u route
+  // passes `ownerAppearance`; in-app drawers leave it null so the profile
+  // inherits the surrounding dashboard theme.
+  const skinVars = ownerAppearance ? ownerSkin(ownerAppearance) : null;
   const isSelf =
     rel === "self" || getSession()?.username === profile?.username;
   const isBlockedByMe = Boolean(profile?.isBlockedByMe);
@@ -397,6 +416,7 @@ export function ProfileContent({
           "flex w-full flex-col overflow-hidden bg-[var(--canvas)]",
           isDrawer && "rounded-t-[20px]",
         )}
+        style={skinVars || undefined}
       >
         {/* ── Banner ──────────────────────────────────────────────────────── */}
         <motion.div
@@ -547,12 +567,26 @@ export function ProfileContent({
           </motion.div>
 
           {/* ── Status line ──────────────────────────────────────────────── */}
-          {profile.status && (
+          {(profile.status || profile.statusEmoji) && (
             <motion.p
               variants={item}
-              className="mt-3 text-sm italic text-[var(--ink-muted)]"
+              className="mt-3 flex items-center gap-2 text-sm italic text-[var(--ink-muted)]"
             >
-              &ldquo;{profile.status}&rdquo;
+              {profile.statusEmoji && (
+                <span
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--hairline)] bg-[var(--surface-1)] text-[13px] leading-none"
+                  aria-hidden="true"
+                >
+                  {profile.statusEmoji}
+                </span>
+              )}
+              {profile.status ? (
+                <span>&ldquo;{profile.status}&rdquo;</span>
+              ) : (
+                <span className="not-italic text-[var(--ink-muted)]/50">
+                  Set a status
+                </span>
+              )}
             </motion.p>
           )}
 

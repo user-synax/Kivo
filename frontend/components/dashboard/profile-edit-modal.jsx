@@ -18,6 +18,26 @@ import {
 
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 
+// Curated status emoji — a tight set that reads well as a small chip next to
+// the status line (kept separate from the chat reaction emoji pool).
+const STATUS_EMOJIS = [
+  "😀", "😎", "🥳", "🤩", "😴", "🤗", "🤔", "😅",
+  "🎮", "🎧", "🎬", "🎨", "📚", "💼", "🏋️", "🧘",
+  "🏃", "🚀", "☕", "🍜", "💻", "📱", "🎵", "🎸",
+  "✈️", "🌍", "🏝️", "🌙", "☀️", "⚡", "🔥", "💡",
+];
+
+// One-tap vibe presets — set emoji + status text together (Discord/WhatsApp
+// style "mood" chips shown under the status input).
+const VIBE_PRESETS = [
+  { label: "Gaming", emoji: "🎮", status: "gaming" },
+  { label: "Vibing", emoji: "🎧", status: "vibing" },
+  { label: "Away", emoji: "😴", status: "away" },
+  { label: "Studying", emoji: "📚", status: "studying" },
+  { label: "Working", emoji: "💼", status: "working" },
+  { label: "Sleepy", emoji: "🌙", status: "sleepy" },
+];
+
 function Field({ label, hint, counter, children }) {
     return (
         <div className="block">
@@ -78,6 +98,8 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [username, setUsername] = useState("");
     const [bio, setBio] = useState("");
     const [status, setStatus] = useState("");
+    const [statusEmoji, setStatusEmoji] = useState("");
+    const [showStatusEmojis, setShowStatusEmojis] = useState(false);
     const [avatarStyle, setAvatarStyle] = useState("default");
     const [profileEffect, setProfileEffect] = useState("none");
     const [banner, setBanner] = useState("");
@@ -186,6 +208,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             setUsername(me?.username || "");
             setBio(me?.bio || "");
             setStatus(me?.status || "");
+            setStatusEmoji(me?.statusEmoji || "");
             setAvatarStyle(me?.avatarStyle || "default");
             setProfileEffect(me?.profileEffect || "none");
             setBanner(me?.banner || "");
@@ -232,6 +255,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                 username: username.trim(),
                 bio: bio.trim(),
                 status: status.trim(),
+                statusEmoji: statusEmoji.trim(),
                 avatarStyle,
                 profileEffect,
                 banner,
@@ -377,16 +401,105 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
 
                         <Field
                             label="Status"
-                            hint="A short line shown under your name."
+                            hint="An emoji chip + short line shown under your name."
                             counter={<Counter value={status} max={60} />}
                         >
-                            <input
-                                className={inputCls}
-                                value={status}
-                                maxLength={60}
-                                onChange={(e) => setStatus(e.target.value)}
-                                placeholder="e.g. Available"
-                            />
+                            <div className="flex items-stretch gap-2">
+                                {/* Emoji chip button — mirrors the profile-page
+                                    rendering so the preview matches. */}
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setShowStatusEmojis((v) => !v)
+                                    }
+                                    aria-label="Pick a status emoji"
+                                    aria-pressed={showStatusEmojis}
+                                    title="Pick an emoji"
+                                    className={`flex h-[42px] w-[46px] shrink-0 items-center justify-center rounded-xl border text-lg transition-[border-color,background-color] duration-200 ${EASE} ${
+                                        statusEmoji
+                                            ? "border-[var(--accent)] bg-[var(--hover)]"
+                                            : "border-[var(--border)] bg-[var(--bg-base)]"
+                                    }`}
+                                >
+                                    {statusEmoji || "😊"}
+                                </button>
+                                <input
+                                    className={`${inputCls} flex-1`}
+                                    value={status}
+                                    maxLength={60}
+                                    onChange={(e) =>
+                                        setStatus(e.target.value)
+                                    }
+                                    placeholder="e.g. Available"
+                                />
+                            </div>
+
+                            {showStatusEmojis && (
+                                <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-2">
+                                    <div className="grid grid-cols-8 gap-1">
+                                        {STATUS_EMOJIS.map((e) => (
+                                            <button
+                                                key={e}
+                                                type="button"
+                                                onClick={() => {
+                                                    setStatusEmoji(e);
+                                                    setShowStatusEmojis(false);
+                                                }}
+                                                aria-label={`Status emoji ${e}`}
+                                                className={`flex aspect-square items-center justify-center rounded-lg text-lg transition-colors duration-100 ${
+                                                    statusEmoji === e
+                                                        ? "bg-[var(--accent)]/20 ring-1 ring-[var(--accent)]"
+                                                        : "hover:bg-[var(--hover)]"
+                                                }`}
+                                            >
+                                                {e}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {statusEmoji && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setStatusEmoji("");
+                                                setShowStatusEmojis(false);
+                                            }}
+                                            className="mt-1.5 w-full rounded-lg px-2 py-1 text-left text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                                        >
+                                            Clear emoji
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Vibe presets — one tap sets emoji + status text. */}
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {VIBE_PRESETS.map((v) => {
+                                    const active =
+                                        status === v.status &&
+                                        statusEmoji === v.emoji;
+                                    return (
+                                        <button
+                                            key={v.label}
+                                            type="button"
+                                            onClick={() => {
+                                                setStatusEmoji(v.emoji);
+                                                setStatus(v.status);
+                                            }}
+                                            aria-pressed={active}
+                                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-[border-color,background-color] duration-150 ${EASE} ${
+                                                active
+                                                    ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--text-primary)]"
+                                                    : "border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                                            }`}
+                                        >
+                                            <span className="text-[13px] leading-none">
+                                                {v.emoji}
+                                            </span>
+                                            {v.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </Field>
 
                         <Field

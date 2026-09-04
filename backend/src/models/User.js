@@ -34,6 +34,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxlength: 60,
     },
+    // Optional single emoji shown as a chip before the status line (e.g. 🎮).
+    statusEmoji: {
+      type: String,
+      default: null,
+      maxlength: 8,
+    },
     // Avatar border customization, broadcast to friends in the sidebar. One of
     // the AVATAR_STYLE_IDS values (see users.validation.js), or null for the
     // default border. Stored as an id so rendering stays client-driven.

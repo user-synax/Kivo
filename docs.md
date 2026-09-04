@@ -464,7 +464,7 @@ You can set:
 | Display name | Shown in chats |
 | Username | Unique handle for search and `@mentions` |
 | Bio | Max 280 characters |
-| Custom status | Max 60 characters |
+| Custom status | Max 60 characters, with an optional **emoji chip** and one-tap **vibe presets** (🎮 Gaming, 🎧 Vibing, 😴 Away, 📚 Studying, 💼 Working, 🌙 Sleepy) |
 | Avatar photo | PNG, JPEG, WebP, or GIF; max **4MB** (Appwrite). Replace or remove. |
 | Avatar frame | Presets: Default, **My accent** (follows your theme color), Lime, Blue, Rose, Amber, Violet, Ocean, Sunset, Aurora |
 | Banner | Preset animated GIF covers |
@@ -486,7 +486,11 @@ Verified accounts (a status granted by admins) can show a **verified badge** nex
 
 ### Public profile (`/u/username`)
 
-Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status, bio, and join date — plus **social link chips** (GitHub, X, Instagram, YouTube, website) and a **GitHub contribution graph** when a GitHub username is set.
+Every user gets a **public profile page** at `/u/<username>` — no login required to view. It shows the banner, avatar, name, `@handle`, verified badge, **country flag**, status (+ **emoji chip**), bio, and join date — plus **social link chips** (GitHub, X, Instagram, YouTube, website) and a **GitHub contribution graph** when a GitHub username is set.
+
+The page **wears the owner's theme**: if the account has custom colors (accent + canvas tint from the theme studio), the public page renders in *those* colors instead of the default palette.
+
+A **Share** button in the top bar opens a share sheet with a **QR code** (scan to open the profile on Kivo), **copy link**, and native **Share** (mobile).
 
 What you can do there depends on your relationship:
 

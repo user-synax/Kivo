@@ -42,6 +42,15 @@ export const updateMeSchema = z.object({
     .or(z.literal("")),
   bio: z.string().trim().max(280).optional(),
   status: z.string().trim().max(60).optional(),
+  // Single emoji rendered as a chip before the status line. Stored as-is;
+  // the client only offers real emoji so this stays short.
+  statusEmoji: z
+    .string()
+    .trim()
+    .max(8)
+    .nullable()
+    .optional()
+    .or(z.literal("")),
   avatarStyle: z.enum(AVATAR_STYLE_IDS).nullable().optional(),
   profileEffect: z.enum(PROFILE_EFFECT_IDS).nullable().optional(),
   // `plan` is deliberately NOT accepted here — tiers are admin-granted only.

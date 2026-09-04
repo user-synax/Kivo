@@ -200,6 +200,7 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | username | String | Yes | Unique, validated |
 | bio | String | Yes | Max 280 characters |
 | status | String | Yes | Max 60 characters (custom status line) |
+| statusEmoji | String | Yes | Optional single emoji chip before the status line (vibe presets set emoji + text) |
 | banner | String | Yes | Curated animated GIF cover |
 | country | String | Yes | ISO-3166 alpha-2 → flag shown on profiles |
 | githubUsername | String | Yes | GitHub contribution graph on the public profile |
