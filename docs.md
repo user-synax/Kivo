@@ -187,6 +187,14 @@ Max length: **4000** characters. Empty messages are rejected.
 
 Messages appear immediately (optimistic UI). If send fails, use **retry** on that bubble.
 
+### Composer drafts
+
+Unsent text is saved **per conversation** automatically. Switch chats (or reload the page) and your half-typed message is still there when you come back. Sending clears the draft.
+
+### Paste images to attach
+
+Copy a screenshot or photo and **paste it straight into the composer** — it joins the attachment queue with a preview chip, same as picking it through the paperclip button. Any text in the same paste still lands in the message box normally.
+
 ### Message menu (right-click / long-press)
 
 Every bubble has a menu — right-click on desktop, **press and hold** on mobile:
@@ -216,7 +224,7 @@ You can also open the **emoji picker** next to the composer (smile button) to in
 
 ### Edit your message
 
-1. Context menu → **Edit** (your own messages only).
+1. Context menu → **Edit** (your own messages only) — or press **↑** with an empty composer to jump straight into editing your last message.
 2. Change the text. **Enter** saves, **Escape** cancels.
 3. Edited messages show an **edited** label.
 
@@ -281,6 +289,18 @@ How threads behave:
 Mentioned people get a **mention** notification (title like "X mentioned you"). Mentions **override muted categories** — they arrive even if you muted that conversation type, as long as the Mentions preference is on.
 
 Mentions only resolve to people who are in that DM, group, or channel.
+
+### Links & link previews
+
+Links in messages are **clickable** (open in a new tab). The first link in a message also unfurls a **preview card** with the page's title, description, and preview image, fetched safely through the Kivo server (the target site never sees your browser). If a page offers nothing previewable, the link simply stays a plain link.
+
+### Date dividers & big emoji
+
+Long histories are split by **day dividers** — "Today", "Yesterday", a weekday, or a date — so you can scan across days at a glance. A message that is nothing but **1–3 emoji** renders large with no bubble, WhatsApp-style.
+
+### Jump to latest
+
+Reading old history no longer yanks you to the bottom when new messages arrive. Instead a floating pill appears — **"N new"** with the unread count, or **"Latest"** — and one tap scrolls you back to the live edge.
 
 ### Load older messages
 
@@ -523,7 +543,7 @@ You can send files, images, and voice messages in any DM, group, or Space channe
 
 ### Attach a file
 
-1. In the chat composer, click the **paperclip** button.
+1. In the chat composer, click the **paperclip** button — or **paste** an image straight from your clipboard.
 2. Pick one or more files from your device (**up to 10 files**).
 3. Each file shows a **preview chip** with name, size, and a progress bar while uploading.
 4. Type an optional caption, then **Enter** to send.
@@ -646,6 +666,7 @@ If the connection drops, Kivo reconnects automatically; on reconnect it **gap-fi
 | Confirm mention from autocomplete | **Enter** or **Tab** |
 | Move mention highlight | **Arrow up / down** |
 | Save edited message | **Enter** |
+| Edit your last message (empty composer) | **↑** |
 | Cancel edit | **Escape** |
 | Close modal / notification center | **Escape** |
 | Navigate lightbox images | **← / →** |
@@ -859,6 +880,12 @@ Do not expect these in the current MVP:
 | Forgot / reset password | `/forgot-password` → emailed link → `/reset-password` |
 | Last online status | "active … ago" in DMs & profiles when offline |
 | Mark as unread | Right-click conversation → Mark as unread |
+| Clickable links + link preview cards | Links open in a new tab; first link unfurls title/description/image (`GET /api/v1/link-preview?url=…`) |
+| Date dividers + big emoji | Day pills across history; 1–3 emoji-only messages render large, bubble-free |
+| Jump-to-latest pill | Floating "N new" / "Latest" button when scrolled up; no auto-scroll yank while reading |
+| Composer drafts | Unsent text saved per conversation, survives switches + reloads |
+| Paste images to attach | Clipboard screenshots/photos join the attachment queue directly |
+| Up-arrow to edit | Empty composer + ↑ edits your last message |
 | Health check (ops) | `GET /health` on the API |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).

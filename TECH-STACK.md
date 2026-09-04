@@ -44,7 +44,7 @@ UI and interaction · routing · responsive design · API consumption · Socket.
   - `/u/[username]` **public profiles**
   - `/docs` in-app guide, `/admin` + `/admin/dashboard`
 - `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals), `spaces/`, `notifications/`, `profile/`, `chat/` (attachments), `mentions/`, `ui/`, `motion/` (context menu), `navbar/`, `admin/`, `docs/`
-- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `chat-style.js` (wallpaper/bubble-style constants + CSS), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js`, `push.js`, `sound.js` (Web Audio sound cues), `last-active.js`, `use-breakpoint.js`, hooks, etc.
+- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `chat-style.js` (wallpaper/bubble-style constants + CSS), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js` (incl. day-divider helpers), `links.js` (URL extract/normalize), `emoji.js` (grapheme-aware emoji-only detection), `drafts.js` (per-chat composer drafts), `push.js`, `sound.js` (Web Audio sound cues), `last-active.js`, `use-breakpoint.js`, hooks, etc.
 - `frontend/Design.md` — visual design system & tokens (Framer dark canvas, `#4ba9e1` blue signal).
 
 ### Networking
@@ -80,7 +80,7 @@ backend/src/
 ├── models/              # User, Session, Conversation, Message, FriendRequest, Space,
 │                        #   Notification, PushSubscription, AdminActionLog
 ├── modules/             # auth, users, friends, conversations, messages, spaces,
-│                        #   notifications, push, attachments, search, admin
+│                        #   notifications, push, attachments, search, link-preview, admin
 ├── socket/              # index.js (init, JWT handshake, presence, rooms), io.js (emit helpers)
 └── utils/               # errors, asyncHandler
 ```
@@ -103,6 +103,7 @@ Versioned REST APIs under `/api/v1`; the standalone admin API lives under `/api/
 | `/api/v1/push` | vapid-public-key, subscribe, unsubscribe |
 | `/api/v1/attachments` | multipart upload (Multer → Appwrite) |
 | `/api/v1/search` | unified global search |
+| `/api/v1/link-preview` | server-side og unfurl (`?url=`) with SSRF guard + 1h cache |
 | `/api/admin` | admin login, stats, users (ban/unban/detail), groups & spaces (delete) |
 
 `GET /health` returns `{ success: true, data: { status: "ok" } }` for uptime checks.
@@ -156,7 +157,7 @@ Redis is **not** currently a dependency. Rate limiting is an **in-memory fixed-w
 
 ### Rate limiting (current)
 
-Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, login-2FA code step `10/5min/IP`, 2FA setup `5/5min`, 2FA code verification `5/60s`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, admin login `5/15min`.
+Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, login-2FA code step `10/5min/IP`, 2FA setup `5/5min`, 2FA code verification `5/60s`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, link-preview `30/min`, admin login `5/15min`.
 
 ### Appwrite Storage
 
@@ -239,6 +240,8 @@ Public browser variables are explicitly prefixed and contain no secrets. `.env.e
 - **Pins are message fields, not a collection**: `pinnedAt`/`pinnedBy` on the message itself — toggling is a single update, listing is an indexed query (max 10, newest first), and soft-delete clears the pin for free.
 - **Threads reuse the message collection**: a thread reply is just a `Message` with `threadId` set, and every main-timeline surface (list, cursors, search, pinned, unread counts) filters `threadId: null`. That keeps threads free of a second store while making them structurally quiet — replies never bump the unread badge or create category notifications, only `@mention` ones (mentions are resolved server-side from content, so they work identically in threads). The client keeps thread replies out of its IndexedDB message cache for the same reason.
 - **Saved messages are embedded per user** (`Message.savedBy`, mirroring reactions): no join table, single-document toggle, and an indexed per-user feed query. Read endpoints resolve a per-user `saved` boolean so the UI never needs a second fetch; the Saved panel is client state over `GET /messages/saved` + the conversation list, reusing the same jump-to-message highlight flow as Ctrl+K search.
+- **Link previews are unfurled server-side, never client-side**: the browser never fetches arbitrary pages (no IP leak, no mixed-content issues). The service parses `og:*`/twitter/`<title>`/meta tags with regex (no HTML parser dependency), guards SSRF on hostname + resolved IPs + post-redirect URL, and caches per URL for 1h — so popular links cost one fetch per hour. The client renders at most one card per message (first URL) and stays silent when there is nothing previewable, matching WhatsApp/Telegram behavior.
+- **Timeline polish is derived, not stored**: day dividers come from `dayKey` comparisons at render time (no schema change), big-emoji from grapheme counting in `lib/emoji.js`, and the jump pill from scroll position + the existing `readBy` receipts — so none of these add server state, migrations, or socket traffic. Composer drafts live in `localStorage` (`lib/drafts.js`) for the same reason: unsent text is device-local ephemera, not account data.
 - **Voice messages add no media pipeline**: the client records with `MediaRecorder` (opus/webm preferred, normalized to a bare audio MIME before upload) and the file rides the existing attachment upload — the server stores it as-is and the browser plays it straight from the Appwrite view URL. The only new state is `Message.audioDuration` (seconds, stamped at record time so bubbles show a duration before the audio loads) and a `kind: "audio"` attachment. Playback uses one shared client-side `<audio>` element so only one voice message plays at a time; forwards copy the source's `audioDuration`.
 - **The chat look is CSS-first and stateless**: wallpapers are painted with `color-mix()` over the theme's own tokens (`--text-primary`/`--accent`), so one pattern definition re-tints for dark/light presets and per-Space palette scopes — no extra color state server- or client-side. Bubble geometry is two container-scoped CSS rules (`kivo-bubbles-squared`/`-outline`) on the chat panel, so styling flows to every descendant bubble (main timeline + thread panel) without prop drilling. `appearance.wallpaper`/`bubbleStyle` are enum ids stored on the User and Space; partial appearance updates merge server-side (a color reset never wipes the chat look and vice versa), and in Space channels a per-field "member's own" inheritance mirrors how null palette colors inherit.
 - Build only features supported by the current PRD; keep the UI fast and polished; reuse design tokens from `frontend/Design.md`.

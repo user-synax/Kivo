@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.6
-**Last Updated:** September 2, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset Complete)
+**Version:** 2.7
+**Last Updated:** September 4, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades Complete)
 
 ---
 
@@ -112,6 +112,10 @@ Kivo
 | **Reconnect Gap-Fill** | **Complete** | Conversation list + messages newer than newest-known refetched after socket reconnect |
 | **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
 | **Two-Factor Auth (2FA)** | **Complete** | TOTP via authenticator app (QR setup in Settings), one-time backup codes, two-step login challenge |
+| **Link Previews** | **Complete** | `GET /api/v1/link-preview?url=…` unfurls og-title/description/image server-side (SSRF-guarded, 1h cache, 30/min); clickable links + first-URL preview card in bubbles (main timeline + threads) |
+| **Date Dividers + Big Emoji** | **Complete** | Today/Yesterday/weekday/date pills across history (grouping breaks across days); 1–3 emoji-only messages render large and chromeless (`lib/emoji.js`, grapheme-aware) |
+| **Jump-to-Latest Pill** | **Complete** | Floating "N new"/"Latest" button when scrolled off the live edge; auto-scroll only pins at the bottom (or for own sends) — history reading never yanked |
+| **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits your last message |
 | Voice / Video Calls | **Not started** | No voice/call backend or UI |
 
 ---
@@ -400,6 +404,28 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 - `GET /messages/saved` returns the user's saves across every conversation they're still in, newest save first (cap 200); deleted messages are excluded, so removing a message clears it from the list. The client joins conversation labels/avatars from its own conversation list.
 - Saves are purely personal (no notification, no broadcast) and follow the account across devices.
 
+### 3.13 Links, Timeline Polish & Composer Upgrades
+
+**Clickable links + previews.**
+
+- Message text renders URLs as links (`target=_blank rel=noopener`, trailing punctuation and prose parens kept outside the clickable range; `frontend/lib/links.js`).
+- The first URL per message unfurls a preview card (og-image, site name, title, 2-line description, domain). Preview data comes from `GET /api/v1/link-preview?url=…` (auth, `30/min` per user): the server fetches the page (8s timeout, 1.5MB cap), parses `og:*`/twitter/`<title>`/meta-description/favicon with relative-URL resolution, and caches per URL for 1h (500-entry cap). Hosts are SSRF-guarded (http(s) only; localhost/private/link-local rejected on the hostname and after DNS resolution, re-checked post-redirect). Pages with no title/description/image return `PREVIEW_EMPTY` and the link stays plain. The client caches previews per page-load (200-entry cap) and hides broken og-images to a text-only card.
+
+**Date dividers + big emoji.**
+
+- The main timeline inserts day pills (`Today` / `Yesterday` / weekday within 7 days / date + year when old; `dayKey`/`formatDayDivider` in `frontend/lib/chat.js`) for normal and system messages; sender grouping breaks across days.
+- Messages of 1–3 emoji only (grapheme-aware via `Intl.Segmenter`, so ZWJ sequences, flags, and skin tones count as one; `frontend/lib/emoji.js`) render chromeless (`ghost` bubble) at 44/36/30px. Quotes, forwards, and attachments never go big; previews are suppressed for big-emoji.
+
+**Jump-to-latest pill.**
+
+- The chat auto-scrolls on new messages/typing only while the user is within 120px of the live edge (or for the user's own sends, which always pin). Otherwise a floating pill appears past 200px of scroll-up showing the unread count ("N new") or "Latest"; one tap smooth-scrolls to the bottom (instant under reduced-motion). Conversation switches still land at the bottom; anchor (jump-to-message) sessions still suppress auto-scroll.
+
+**Composer upgrades.**
+
+- Unsent text persists per conversation in `localStorage` (`kivo:drafts:<userId>`, 250ms debounce, 50-chat cap, 4000-char clamp; `frontend/lib/drafts.js`) across switches and reloads; sending clears the entry.
+- Pasting an image from the clipboard feeds the existing upload queue directly (MIME-validated, fallback filename); text in the same paste still lands in the box.
+- `↑` on an empty composer (mention popup closed) enters edit mode on the user's last own text message.
+
 ---
 
 ### 4. Realtime System (Socket.IO)
@@ -564,7 +590,9 @@ Framer is the default palette; other themes only vary the canvas/surface hue cas
 #### 6.4 Chat Panel
 
 - Message list with cursor-based pagination.
-- Auto-scroll to bottom on new messages.
+- Smart auto-scroll (pins only at the live edge) + floating jump-to-latest pill with unread count.
+- Day dividers across history; big-emoji bubbles; clickable links with og-image preview cards.
+- Composer with per-chat drafts, paste-to-attach, and ↑-to-edit.
 - Typing indicator display.
 - Emoji picker (9 categories, 270+ emojis).
 - Message menu (right-click / long-press): quick-react strip, copy, save, thread, reply, forward, pin, select mode, profile/block; edit & delete on own messages.
@@ -1055,6 +1083,12 @@ Refresh token is sent automatically via httpOnly cookie.
 | GET | `/api/v1/push/vapid-public-key` | No | — |
 | POST | `/api/v1/push/subscribe` | Yes | `{ endpoint, keys: { p256dh, auth }, expirationTime? }` |
 | DELETE | `/api/v1/push/unsubscribe` | Yes | `{ endpoint }` |
+
+#### Link Preview
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| GET | `/api/v1/link-preview?url=…` | Yes (rate-limited 30/min) | — (returns `{ url, siteName, title, description, image, favicon, domain, cached }`) |
 
 #### Admin (standalone panel at `/admin`)
 

@@ -29,7 +29,10 @@
 - 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
-- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), double-click/long-press ❤️, `@mentions`, edit, and soft-delete.
+- ↩️ **Reply & reactions** — quote-reply on any message, emoji reactions (270+), double-click/long-press ❤️, `@mentions`, edit (or ↑ on an empty composer), and soft-delete.
+- 🔗 **Links & previews** — clickable URLs with server-fetched preview cards (title, description, og-image); day dividers across history and WhatsApp-style big emoji.
+- ⬇️ **Jump-to-latest pill** — reading history never yanks to the bottom; a floating "N new" pill offers the way back.
+- ✍️ **Composer that remembers** — per-chat drafts survive switches and reloads; paste screenshots straight into attachments.
 - 📋 **Rich message actions** — right-click / long-press any bubble: quick reactions, **copy**, **view profile / block**, **forward with attribution**, **pin to chat**, select mode, and native **Share…** on mobile.
 - 📎 **File & image attachments** — up to 10 images/PDFs/documents per message (30 MB each) in any chat; image lightbox with navigation, inline previews, and download.
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
@@ -138,6 +141,10 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Offline send queue** — text sent while offline goes to a durable per-account outbox (survives reloads) and flushes automatically on reconnect/online; attachments still need a connection
 - **Last online status** — "active … ago" labels for offline users in DMs & profiles
 - **Mark as unread** — context menu on conversations + "New messages" separator in chat
+- **Link previews** — `GET /api/v1/link-preview?url=…` unfurls og-title/description/image server-side (SSRF-guarded, 1h cache); first URL per bubble renders a card
+- **Date dividers + big emoji** — Today/Yesterday/weekday/date pills; 1–3 emoji-only messages render large and chromeless
+- **Jump-to-latest pill** — floating unread-count button when scrolled off the live edge; auto-scroll only pins when already at the bottom (or for your own sends)
+- **Composer upgrades** — per-conversation drafts in localStorage (debounced, cleared on send), paste-image to attach, ↑-on-empty-composer edits your last message
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
 - Animated landing page
 
@@ -197,7 +204,8 @@ kivo/
 │   ├── components/           # dashboard (chat shell, panels), spaces, notifications,
 │   │   │                     #   profile, chat, ui, motion, navbar, admin, docs
 │   ├── lib/                  # api, auth, cache, chat, theme, push, sound, spaces,
-│   │   │                     #   avatar-styles, banners, countries, last-active, hooks
+│   │   │                     #   avatar-styles, banners, countries, last-active, links,
+│   │   │                     #   emoji, drafts, hooks
 │   └── Design.md             # Visual design system & tokens
 │
 ├── backend/                  # Express 5 + Socket.IO + Mongoose (JS only)
@@ -208,7 +216,7 @@ kivo/
 │       ├── models/           # User, Session, Conversation, Message, FriendRequest,
 │       │                     #   Space, Notification, PushSubscription, AdminActionLog
 │       ├── modules/          # auth, users, friends, conversations, messages, spaces,
-│       │                     #   notifications, push, attachments, search, admin
+│       │                     #   notifications, push, attachments, search, link-preview, admin
 │       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
 │       └── utils/            # errors & async handlers
 │
@@ -309,7 +317,7 @@ Registration / Login
 - **Registration is instant** — no OTP or verification barrier; you land in `/app`. Sessions are server-backed (`Session` documents with a TTL index).
 - **GuestGate** redirects logged-in users away from `/login`, `/signup`, and the landing page.
 - **AuthGate** redirects unauthenticated users from `/app/*` to `/login`.
-- **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, admin login `5/15min`.
+- **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, link previews `30/min`, admin login `5/15min`.
 
 ### Email verification & password reset
 
@@ -402,6 +410,11 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - **Saved messages** — menu → Save message bookmarks any bubble (yours, others', thread replies); the Saved panel (bookmark icon next to search in the sidebar) lists them newest-first across chats and jumps straight to the message
 - 60-second message grouping & hover actions (context menu)
 - **New messages separator** — a labelled divider sits where your unread messages begin (auto-clears as you read to the bottom)
+- **Clickable links + preview cards** — URLs open in a new tab; the first URL per message unfurls a card with the page's og-image, title, and description (nothing renders when a page offers no preview)
+- **Date dividers** — Today / Yesterday / weekday / date pills split long histories (grouping breaks across days)
+- **Big emoji** — 1–3 emoji-only messages render large with no bubble (ZWJ, flags, and skin tones count as one)
+- **Jump-to-latest pill** — floating button with the unread count when scrolled up; tap to return to the live edge
+- **Composer drafts, paste-to-attach, ↑-to-edit** — drafts persist per chat, pasted images attach directly, ↑ on empty edits your last message
 - Emoji picker — 9 categories (Smileys, People, Hearts, Animals, Food, Activity, Travel, Objects, Symbols), 270+ emojis
 - Delivery & read receipts; typing indicators
 - **Reconnect gap-fill** — after the socket reconnects, missed messages are fetched and merged into the cache
