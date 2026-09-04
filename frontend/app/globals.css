@@ -807,6 +807,25 @@
         will-change: transform, opacity, filter;
     }
 
+    /* ── Rendering budget for long histories ───────────────────────
+       Heavy chats accumulate hundreds of loaded rows (infinite scroll
+       upward). content-visibility:auto makes the browser skip layout +
+       paint for rows outside the scrollport instead of building every
+       bubble subtree — no JS, no virtualization. Visible rows are always
+       fully rendered, so hover/long-press/context menus are unaffected.
+       The `auto` intrinsic-size form remembers each row's real height
+       (tall images/attachments) after first paint; the plain length is
+       the initial guess so scrollbars stay stable while history loads. */
+    .t-panel-in .t-msg-in {
+        content-visibility: auto;
+        contain-intrinsic-size: 48px;
+    }
+    @supports (contain-intrinsic-size: auto 48px) {
+        .t-panel-in .t-msg-in {
+            contain-intrinsic-size: auto 48px;
+        }
+    }
+
     /* ── Chat bubble (themeable; dashboard overrides via theme.js vars) ─ */
     .t-bubble {
         position: relative;
