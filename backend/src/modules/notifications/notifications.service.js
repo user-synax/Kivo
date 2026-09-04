@@ -89,15 +89,28 @@ function publicNotification(doc) {
   };
 }
 
-async function sendWebPushToUser(recipientId, pushPayload, doc) {
+// Persist web-push delivery state onto a notification document by id.
+// Notifications are now created via insertMany (plain docs), so delivery
+// flags are updated with a targeted updateOne instead of a hydrated doc.save().
+async function persistPushState(notificationId, patch) {
+  try {
+    await Notification.updateOne({ _id: notificationId }, { $set: patch });
+  } catch (err) {
+    console.error("[push] failed to persist delivery state:", err?.message || err);
+  }
+}
+
+async function sendWebPushToUser(recipientId, pushPayload, notificationId) {
   // Only called when recipient is offline — fetch their push subscriptions and
   // attempt delivery. Expired/unsubscribed endpoints (404/410) are cleaned up.
-  // Updates doc.delivery.pushDelivered/pushError and persists via doc.save().
+  // Delivery status is persisted via persistPushState.
   try {
     const subs = await PushSubscription.find({ userId: recipientId }).lean();
     if (!subs.length) {
-      doc.delivery.pushError = "No subscriptions";
-      await doc.save();
+      await persistPushState(notificationId, {
+        "delivery.pushDelivered": false,
+        "delivery.pushError": "No subscriptions",
+      });
       return;
     }
 
@@ -126,14 +139,15 @@ async function sendWebPushToUser(recipientId, pushPayload, doc) {
       }
     }
 
-    doc.delivery.pushDelivered = anySuccess;
-    doc.delivery.pushError = anySuccess ? null : lastError;
-    await doc.save();
+    await persistPushState(notificationId, {
+      "delivery.pushDelivered": anySuccess,
+      "delivery.pushError": anySuccess ? null : lastError,
+    });
   } catch (err) {
-    try {
-      doc.delivery.pushError = err?.message || String(err);
-      await doc.save();
-    } catch {}
+    await persistPushState(notificationId, {
+      "delivery.pushDelivered": false,
+      "delivery.pushError": err?.message || String(err),
+    });
   }
 }
 
@@ -176,7 +190,9 @@ export async function createForMessage({ message, conversation, inThread = false
   const body = (message.content || "").trim().slice(0, 120);
 
   const io = getIO();
-  const created = [];
+  // Docs to insert — built in memory first so delivery state (in-app vs push)
+  // is decided before the single insert below.
+  const docs = [];
 
   // Resolve announcement vs regular once for space channels (gate needs category)
   const announcement = convType === "space_channel" ? await isAnnouncementChannel(conversation) : false;
@@ -226,7 +242,11 @@ export async function createForMessage({ message, conversation, inThread = false
           : `${senderName} mentioned you`)
       : defaultTitle;
 
-    const doc = await Notification.create({
+    // Pre-set the in-app flag from the online check above; push state is filled
+    // in by the background delivery in Phase 3.
+    const isOnline = Boolean(io && io.isUserOnline && io.isUserOnline(recipientId));
+
+    docs.push({
       recipientId,
       senderId,
       type: recipientNotifType,
@@ -239,43 +259,48 @@ export async function createForMessage({ message, conversation, inThread = false
       read: false,
       seen: false,
       delivery: {
-        inAppDelivered: false,
+        inAppDelivered: isOnline,
         pushDelivered: false,
         pushError: null,
       },
     });
+  }
 
-    // Deliver in-app if online; otherwise attempt Web Push (Phase 2)
-    const isOnline = io && io.isUserOnline && io.isUserOnline(recipientId);
-    if (isOnline) {
+  if (docs.length === 0) return [];
+
+  // Phase 2 — insert every recipient's notification in ONE round-trip (the old
+  // loop did N sequential `await Notification.create(...)` calls).
+  const createdDocs = await Notification.insertMany(docs);
+
+  // Phase 3 — deliver. createForMessage is fire-and-forget from the message
+  // send path, so web push never delays the sender's response: it runs as
+  // detached background work and persists its own delivery state.
+  const created = [];
+  for (const doc of createdDocs) {
+    if (doc.delivery.inAppDelivered) {
+      // Recipient is online: emit over the live socket. No follow-up save is
+      // needed — the flag was already persisted at insert time.
       try {
-        const payload = publicNotification(doc);
-        emitToUser(recipientId, "notification:new", payload);
-        doc.delivery.inAppDelivered = true;
-        await doc.save();
+        emitToUser(doc.recipientId.toString(), "notification:new", publicNotification(doc));
       } catch {
-        // non-fatal: leave inAppDelivered false
+        // non-fatal: a failed emit leaves the stored flag as-is
       }
     } else {
-      // Offline — fan out to stored push subscriptions, non-blocking for caller
-      // but awaited here so delivery status is persisted before return. Wrapped so
-      // push failures never break the message flow (see catch inside helper).
+      // Recipient is offline — fan out to stored push subscriptions. Each call
+      // is self-contained (fetches subscriptions, sends, persists results) and
+      // intentionally NOT awaited so this function returns right away.
       const pushPayload = {
-        title: recipientTitle,
-        body,
-        icon: avatarUrl || "/icons/icon-192.png",
+        title: doc.title,
+        body: doc.body || "",
+        icon: doc.avatarUrl || "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         data: {
           conversationId: conversation._id.toString(),
           notificationId: doc._id.toString(),
-          type: recipientNotifType,
+          type: doc.type,
         },
       };
-      try {
-        await sendWebPushToUser(recipientId, pushPayload, doc);
-      } catch {
-        // helper already handles persistence; this is just a safety net
-      }
+      sendWebPushToUser(doc.recipientId.toString(), pushPayload, doc._id);
     }
 
     created.push(publicNotification(doc));
@@ -335,7 +360,7 @@ export async function createFriendNotification({ recipientId, senderId, type, ti
       },
     };
     try {
-      await sendWebPushToUser(recipientId.toString(), pushPayload, doc);
+      await sendWebPushToUser(recipientId.toString(), pushPayload, doc._id);
     } catch {}
   }
 

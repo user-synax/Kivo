@@ -349,12 +349,15 @@ export async function createMessage({
   const payload = publicMessage(message);
   emitToConversation(conversationId, "message:new", payload);
 
-  // In-app notifications: fan out per recipient (Phase 1 only, no push).
-  try {
-    await notificationsService.createForMessage({ message, conversation, inThread });
-  } catch (err) {
-    console.error("[notifications] createForMessage failed:", err?.message || err);
-  }
+  // Notifications + web push are fire-and-forget. Awaiting them here would make
+  // the sender's POST wait on per-recipient notification inserts and VAPID HTTP
+  // calls to offline members (hundreds of ms to seconds for busy groups). The
+  // message is already stored, broadcast to the room, and returned immediately.
+  notificationsService
+    .createForMessage({ message, conversation, inThread })
+    .catch((err) =>
+      console.error("[notifications] createForMessage failed:", err?.message || err),
+    );
 
   return payload;
 }
