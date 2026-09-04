@@ -292,6 +292,321 @@ function receiptState(message, userId, otherId) {
     return "sent";
 }
 
+// Memoized message-list rows. ChatPanel holds ~40 state hooks, so unrelated
+// re-renders (composer keystrokes, scroll-pill, typing indicator, presence)
+// used to re-execute the per-message loop and re-render every MessageBubble.
+// This memo boundary skips the whole list unless a row-affecting prop changed:
+// `messages`, thread chips, unread separator, presence, edit/reaction/select
+// state, or the viewport size. Handlers + per-conversation context travel in
+// `ctx`, a ref object mutated in place each ChatPanel render, so its identity
+// (and therefore the memo) stays stable while rows always call the freshest
+// closures when they do re-render.
+const MessageRows = React.memo(function MessageRows({
+    messages,
+    threadSummaries,
+    onlineUsers,
+    firstUnreadId,
+    editingId,
+    editText,
+    reactionFor,
+    replyingToId,
+    selectMode,
+    selectedIds,
+    blockBusy,
+    isMobile,
+    ctx,
+}) {
+    const a = ctx.current;
+    const { userId, otherId, isGroup, isChannel, isDm } = a;
+
+    // Presence lookup from the onlineUsers prop (its identity change is what
+    // triggers this list to re-render when peers come/go, refreshing rings).
+    const isUserOnline = (uid) => {
+        if (!uid) return false;
+        const str = uid.toString();
+        if (str === userId) return true;
+        return onlineUsers.has(str);
+    };
+
+    // O(n) id → message index for reply lookups. The old inline
+    // `messages.find(...)` inside the map was O(n²) once history grew.
+    const byId = new Map();
+    for (const msg of messages) byId.set(msg.id, msg);
+
+    const senderName = (senderId) => {
+        const s = a.membersById[senderId];
+        return s ? participantName(s) : "Unknown";
+    };
+    const senderAvatar = (senderId) => {
+        const s = a.membersById[senderId];
+        return s
+            ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl }
+            : { avatarStyle: null, avatarUrl: null };
+    };
+
+    return messages.map((m, i) => {
+        const mine = m.senderId === userId;
+        const isFirstUnread = m.id === firstUnreadId;
+        const prevMsg = i > 0 ? messages[i - 1] : null;
+        const showDateDivider =
+            i === 0 || dayKey(m.createdAt) !== dayKey(prevMsg?.createdAt);
+        if (m.type === "system") {
+            return (
+                <React.Fragment key={m.id}>
+                    {showDateDivider && <DateDivider ts={m.createdAt} />}
+                    {isFirstUnread && <NewMessagesSeparator />}
+                    <SystemNotice content={m.content} />
+                </React.Fragment>
+            );
+        }
+        const receipt =
+            m.status === "queued" ||
+            m.status === "sending" ||
+            m.status === "failed"
+                ? null
+                : receiptState(m, userId, otherId);
+        const replySource = m.replyToMessageId
+            ? byId.get(m.replyToMessageId)
+            : null;
+        const replyTo = replySource
+            ? {
+                  senderName: senderName(replySource.senderId),
+                  content: replySource.isDeleted
+                      ? "Message deleted"
+                      : replySource.content || "",
+              }
+            : null;
+        const prev = i > 0 ? messages[i - 1] : null;
+        const next =
+            i < messages.length - 1 ? messages[i + 1] : null;
+        const grouped =
+            !!prev &&
+            prev.senderId === m.senderId &&
+            !m.isDeleted &&
+            !prev.isDeleted &&
+            dayKey(m.createdAt) === dayKey(prev.createdAt) &&
+            new Date(m.createdAt).getTime() -
+                new Date(prev.createdAt).getTime() <=
+                GROUP_WINDOW_MS;
+        const groupLast =
+            !next ||
+            next.senderId !== m.senderId ||
+            m.isDeleted ||
+            next.isDeleted ||
+            new Date(next.createdAt).getTime() -
+                new Date(m.createdAt).getTime() >
+                GROUP_WINDOW_MS;
+        const showSender = (isGroup || isChannel) && !grouped && !mine;
+        const sAvatar = senderAvatar(m.senderId);
+        const senderLabel = senderName(m.senderId);
+        const hasCopy =
+            !m.isDeleted && Boolean(m.content || m.attachments?.length);
+        const realMessage = Boolean(m.id && !m.tempId);
+        const senderUsername = a.membersById[m.senderId]?.username || null;
+
+        return (
+            <React.Fragment key={m.id}>
+                {showDateDivider && <DateDivider ts={m.createdAt} />}
+                {isFirstUnread && <NewMessagesSeparator />}
+                <div
+                    id={`msg-${m.id}`}
+                    className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
+                        i === 0
+                            ? ""
+                            : grouped
+                              ? "mt-0.5"
+                              : "mt-2"
+                    }`}
+                >
+                    {showSender && (
+                        <span
+                            className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}
+                        >
+                            {senderLabel}
+                        </span>
+                    )}
+                    <div
+                        className={`flex w-fit max-w-[78%] gap-2 ${mine ? "flex-row-reverse self-end" : "flex-row self-start"} items-end min-w-0 sm:max-w-[62%]`}
+                    >
+                        {(isGroup || isChannel) && !mine ? (
+                            grouped ? (
+                                <span
+                                    className="hidden sm:block w-7 shrink-0"
+                                    aria-hidden="true"
+                                />
+                            ) : (
+                                <span className="hidden sm:flex shrink-0 mb-1">
+                                    <Avatar
+                                        name={senderLabel}
+                                        avatarStyle={sAvatar.avatarStyle}
+                                        url={sAvatar.avatarUrl}
+                                        size="sm"
+                                    />
+                                </span>
+                            )
+                        ) : null}
+                        {/* Mobile avatar — show only on first of group to keep clean */}
+                        {(isGroup || isChannel) && !mine && !grouped ? (
+                            <span className="flex sm:hidden shrink-0 mb-1">
+                                <Avatar
+                                    name={senderLabel}
+                                    avatarStyle={sAvatar.avatarStyle}
+                                    url={sAvatar.avatarUrl}
+                                    size="sm"
+                                />
+                            </span>
+                        ) : null}
+                        <div className="flex min-w-0 flex-1 flex-col max-w-full">
+                            <SwipeToReply
+                                enabled={isMobile && !selectMode}
+                                onReply={() => a.handleReply(m)}
+                                className="w-full min-w-0"
+                            >
+                                <MessageBubble
+                                    message={m}
+                                    mine={mine}
+                                    showMeta={groupLast}
+                                    reactionOpen={reactionFor === m.id}
+                                    isEditing={editingId === m.id}
+                                    editText={editText}
+                                    onEditTextChange={a.setEditText}
+                                    onSaveEdit={() => a.saveEdit(m.id)}
+                                    onCancelEdit={() => a.setEditingId(null)}
+                                    onToggleReactionPicker={() =>
+                                        a.toggleReactionPicker(m.id)
+                                    }
+                                    onReact={(emoji) => a.toggleReaction(m.id, emoji)}
+                                    onEdit={() => {
+                                        a.setEditingId(m.id);
+                                        a.setEditText(m.content);
+                                    }}
+                                    onDelete={() => a.removeMessage(m.id)}
+                                    onRetry={() => a.retry(m.tempId)}
+                                    onReply={a.handleReply}
+                                    onMarkUnread={() => a.handleMarkUnread(m.id)}
+                                    isReplying={replyingToId === m.id}
+                                    replyTo={replyTo}
+                                    receipt={receipt}
+                                    viewerId={a.viewerId}
+                                    participants={a.participants}
+                                    isUserOnline={isUserOnline}
+                                    onOpenProfile={a.setProfileUsername}
+                                    onCopy={
+                                        hasCopy
+                                            ? () => a.handleCopyMessage(m)
+                                            : undefined
+                                    }
+                                    onSaveToggle={
+                                        realMessage &&
+                                        !m.isDeleted &&
+                                        m.type !== "system"
+                                            ? () => a.toggleSavedMessage(m)
+                                            : undefined
+                                    }
+                                    onForward={
+                                        realMessage
+                                            ? () => a.openForwardPicker([m])
+                                            : undefined
+                                    }
+                                    onPinToggle={
+                                        realMessage
+                                            ? () => a.handlePinToggle(m)
+                                            : undefined
+                                    }
+                                    onSelectMode={
+                                        realMessage
+                                            ? () => a.enterSelectMode(m)
+                                            : undefined
+                                    }
+                                    onShare={
+                                        !m.isDeleted
+                                            ? () => a.handleShareMessage(m)
+                                            : undefined
+                                    }
+                                    onThread={
+                                        realMessage &&
+                                        !m.isDeleted &&
+                                        m.type !== "system"
+                                            ? () => a.openThread(m)
+                                            : undefined
+                                    }
+                                    onProfile={
+                                        !mine && senderUsername
+                                            ? () => a.openProfileForSender(m)
+                                            : undefined
+                                    }
+                                    onBlock={
+                                        isDm && otherId && !mine
+                                            ? a.isBlockedByMe
+                                                ? () => a.handleUnblock()
+                                                : () => a.handleBlock()
+                                            : undefined
+                                    }
+                                    blockedByMe={a.isBlockedByMe}
+                                    blockBusy={blockBusy}
+                                    blockName={
+                                        isDm && otherId ? a.otherName : ""
+                                    }
+                                    selectMode={selectMode}
+                                    selected={selectedIds.has(m.id)}
+                                    onSelectToggle={
+                                        selectMode && realMessage && !m.isDeleted
+                                            ? () => a.toggleSelected(m.id)
+                                            : undefined
+                                    }
+                                    className="!max-w-full"
+                                    contentClassName="max-w-full"
+                                    isMobile={isMobile}
+                                />
+                            </SwipeToReply>
+                        </div>
+                    </div>
+                    {/* Thread chip lives OUTSIDE the bubble's width-locked row so a
+                      wide chip can never stretch/re-center the bubble. Aligned
+                      to the bubble's edge: under the sender on the left for
+                      others' messages, flush right under your own. */}
+                    {!m.isDeleted && threadSummaries[m.id]?.replyCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => a.openThread(m)}
+                            className={`kivo-focus mt-1 flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--hover)] ${
+                                mine ? "self-end" : "self-start ml-8 sm:ml-9"
+                            }`}
+                        >
+                            <MessageSquareText
+                                className="h-3 w-3 shrink-0"
+                                aria-hidden
+                            />
+                            <span>
+                                {threadSummaries[m.id].replyCount}{" "}
+                                {threadSummaries[m.id].replyCount === 1
+                                    ? "reply"
+                                    : "replies"}
+                            </span>
+                            {threadSummaries[m.id].participants?.length > 0 && (
+                                <span className="text-[var(--text-muted)]">
+                                    ·{" "}
+                                    {threadSummaries[
+                                        m.id
+                                    ].participants.join(", ")}
+                                </span>
+                            )}
+                            {timeAgoShort(threadSummaries[m.id].lastReplyAt) && (
+                                <span className="text-[var(--text-muted)]">
+                                    ·{" "}
+                                    {timeAgoShort(
+                                        threadSummaries[m.id].lastReplyAt,
+                                    )}
+                                </span>
+                            )}
+                        </button>
+                    )}
+                </div>
+            </React.Fragment>
+        );
+    });
+});
+
 export function ChatPanel({
     conversation,
     space,
@@ -348,6 +663,11 @@ export function ChatPanel({
 
     const [messages, setMessages] = useState([]);
     const messagesRef = useRef(messages);
+    // Stable identity for the <MessageRows> ctx prop. Declared here (top of the
+    // component) because the early `!conversation` return below must never
+    // split hook calls between renders; only the `.current` mutation happens
+    // later, just before the main return.
+    const rowsCtx = useRef(null);
     useEffect(() => {
         messagesRef.current = messages;
     }, [messages]);
@@ -773,13 +1093,6 @@ export function ChatPanel({
             socket.off("presence:offline", onOffline);
         };
     }, [socket]);
-
-    const isUserOnline = (uid) => {
-        if (!uid) return false;
-        const str = uid.toString();
-        if (str === userId) return true;
-        return onlineUsers.has(str);
-    };
 
     const firstUnreadId = useMemo(() => {
         if (!userId) return null;
@@ -2299,6 +2612,44 @@ export function ChatPanel({
     const actionBtnCls =
         "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40";
 
+    // Fresh handlers + per-conversation context for <MessageRows>. Mutated in
+    // place on every render so the memo boundary sees a stable prop identity
+    // while rows always call the latest closures when they do re-render.
+    rowsCtx.current = {
+        userId,
+        otherId,
+        otherName,
+        isGroup,
+        isChannel,
+        isDm,
+        membersById,
+        participants: conversation?.participants || [],
+        viewerId: isChannel ? undefined : userId,
+        isBlockedByMe,
+        setProfileUsername,
+        setEditingId,
+        setEditText,
+        toggleReactionPicker: (id) =>
+            setReactionFor((cur) => (cur === id ? null : id)),
+        toggleReaction,
+        saveEdit,
+        removeMessage,
+        retry,
+        handleReply,
+        handleMarkUnread,
+        handleCopyMessage,
+        toggleSavedMessage,
+        openForwardPicker,
+        handlePinToggle,
+        enterSelectMode,
+        handleShareMessage,
+        openThread,
+        openProfileForSender,
+        handleUnblock,
+        handleBlock,
+        toggleSelected,
+    };
+
     return (
         <div
             className={`relative isolate flex h-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)] kivo-bubbles-${chatLook.bubbleStyle}`}
@@ -2536,369 +2887,21 @@ export function ChatPanel({
                     key={convId}
                     className="t-panel-in mx-auto flex max-w-3xl flex-col"
                 >
-                    {messages.map((m, i) => {
-                        const mine = m.senderId === userId;
-                        const isFirstUnread = m.id === firstUnreadId;
-                        const prevMsg = i > 0 ? messages[i - 1] : null;
-                        const showDateDivider =
-                            i === 0 ||
-                            dayKey(m.createdAt) !==
-                                dayKey(prevMsg?.createdAt);
-                        if (m.type === "system") {
-                            return (
-                                <React.Fragment key={m.id}>
-                                    {showDateDivider && (
-                                        <DateDivider ts={m.createdAt} />
-                                    )}
-                                    {isFirstUnread && <NewMessagesSeparator />}
-                                    <SystemNotice content={m.content} />
-                                </React.Fragment>
-                            );
-                        }
-                        const receipt =
-                            m.status === "queued" ||
-                            m.status === "sending" ||
-                            m.status === "failed"
-                                ? null
-                                : receiptState(m, userId, otherId);
-                        const replySource = m.replyToMessageId
-                            ? messages.find((x) => x.id === m.replyToMessageId)
-                            : null;
-                        const replyTo = replySource
-                            ? {
-                                  senderName: senderName(replySource.senderId),
-                                  content: replySource.isDeleted
-                                      ? "Message deleted"
-                                      : replySource.content || "",
-                              }
-                            : null;
-                        const prev = i > 0 ? messages[i - 1] : null;
-                        const next =
-                            i < messages.length - 1 ? messages[i + 1] : null;
-                        const grouped =
-                            !!prev &&
-                            prev.senderId === m.senderId &&
-                            !m.isDeleted &&
-                            !prev.isDeleted &&
-                            dayKey(m.createdAt) === dayKey(prev.createdAt) &&
-                            new Date(m.createdAt).getTime() -
-                                new Date(prev.createdAt).getTime() <=
-                                GROUP_WINDOW_MS;
-                        const groupLast =
-                            !next ||
-                            next.senderId !== m.senderId ||
-                            m.isDeleted ||
-                            next.isDeleted ||
-                            new Date(next.createdAt).getTime() -
-                                new Date(m.createdAt).getTime() >
-                                GROUP_WINDOW_MS;
-                        const showSender =
-                            (isGroup || isChannel) && !grouped && !mine;
-                        const sAvatar = senderAvatar(m.senderId);
-                        const senderLabel = senderName(m.senderId);
-                        const hasCopy =
-                            !m.isDeleted &&
-                            Boolean(m.content || m.attachments?.length);
-                        const realMessage = Boolean(m.id && !m.tempId);
-                        const senderUsername =
-                            membersById[m.senderId]?.username || null;
-                        return (
-                            <React.Fragment key={m.id}>
-                                {showDateDivider && (
-                                    <DateDivider ts={m.createdAt} />
-                                )}
-                                {isFirstUnread && <NewMessagesSeparator />}
-                                <div
-                                    id={`msg-${m.id}`}
-                                    className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
-                                        i === 0
-                                            ? ""
-                                            : grouped
-                                              ? "mt-0.5"
-                                              : "mt-2"
-                                    }`}
-                                >
-                                    {showSender && (
-                                        <span
-                                            className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}
-                                        >
-                                            {senderLabel}
-                                        </span>
-                                    )}
-                                    <div
-                                        className={`flex w-fit max-w-[78%] gap-2 ${mine ? "flex-row-reverse self-end" : "flex-row self-start"} items-end min-w-0 sm:max-w-[62%]`}
-                                    >
-                                        {(isGroup || isChannel) && !mine ? (
-                                            grouped ? (
-                                                <span
-                                                    className="hidden sm:block w-7 shrink-0"
-                                                    aria-hidden="true"
-                                                />
-                                            ) : (
-                                                <span className="hidden sm:flex shrink-0 mb-1">
-                                                    <Avatar
-                                                        name={senderLabel}
-                                                        avatarStyle={
-                                                            sAvatar.avatarStyle
-                                                        }
-                                                        url={sAvatar.avatarUrl}
-                                                        size="sm"
-                                                    />
-                                                </span>
-                                            )
-                                        ) : null}
-                                        {/* Mobile avatar — show only on first of group to keep clean */}
-                                        {(isGroup || isChannel) &&
-                                        !mine &&
-                                        !grouped ? (
-                                            <span className="flex sm:hidden shrink-0 mb-1">
-                                                <Avatar
-                                                    name={senderLabel}
-                                                    avatarStyle={
-                                                        sAvatar.avatarStyle
-                                                    }
-                                                    url={sAvatar.avatarUrl}
-                                                    size="sm"
-                                                />
-                                            </span>
-                                        ) : null}
-                                        <div className="flex min-w-0 flex-1 flex-col max-w-full">
-                                            <SwipeToReply
-                                                enabled={
-                                                    isMobile && !selectMode
-                                                }
-                                                onReply={() => handleReply(m)}
-                                                className="w-full min-w-0"
-                                            >
-                                                <MessageBubble
-                                                    message={m}
-                                                    mine={mine}
-                                                    showMeta={groupLast}
-                                                    reactionOpen={
-                                                        reactionFor === m.id
-                                                    }
-                                                    isEditing={
-                                                        editingId === m.id
-                                                    }
-                                                    editText={editText}
-                                                    onEditTextChange={
-                                                        setEditText
-                                                    }
-                                                    onSaveEdit={() =>
-                                                        saveEdit(m.id)
-                                                    }
-                                                    onCancelEdit={() =>
-                                                        setEditingId(null)
-                                                    }
-                                                    onToggleReactionPicker={() =>
-                                                        setReactionFor(
-                                                            reactionFor === m.id
-                                                                ? null
-                                                                : m.id,
-                                                        )
-                                                    }
-                                                    onReact={(emoji) =>
-                                                        toggleReaction(
-                                                            m.id,
-                                                            emoji,
-                                                        )
-                                                    }
-                                                    onEdit={() => {
-                                                        setEditingId(m.id);
-                                                        setEditText(m.content);
-                                                    }}
-                                                    onDelete={() =>
-                                                        removeMessage(m.id)
-                                                    }
-                                                    onRetry={() =>
-                                                        retry(m.tempId)
-                                                    }
-                                                    onReply={handleReply}
-                                                    onMarkUnread={() =>
-                                                        handleMarkUnread(m.id)
-                                                    }
-                                                    isReplying={
-                                                        replyingTo?.id === m.id
-                                                    }
-                                                    replyTo={replyTo}
-                                                    receipt={receipt}
-                                                    viewerId={
-                                                        !isChannel
-                                                            ? userId
-                                                            : undefined
-                                                    }
-                                                    participants={
-                                                        conversation?.participants ||
-                                                        []
-                                                    }
-                                                    isUserOnline={isUserOnline}
-                                                    onOpenProfile={
-                                                        setProfileUsername
-                                                    }
-                                                    onCopy={
-                                                        hasCopy
-                                                            ? () =>
-                                                                  handleCopyMessage(
-                                                                      m,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onSaveToggle={
-                                                        realMessage &&
-                                                        !m.isDeleted &&
-                                                        m.type !== "system"
-                                                            ? () =>
-                                                                  toggleSavedMessage(
-                                                                      m,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onForward={
-                                                        realMessage
-                                                            ? () =>
-                                                                  openForwardPicker(
-                                                                      [m],
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onPinToggle={
-                                                        realMessage
-                                                            ? () =>
-                                                                  handlePinToggle(
-                                                                      m,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onSelectMode={
-                                                        realMessage
-                                                            ? () =>
-                                                                  enterSelectMode(
-                                                                      m,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onShare={
-                                                        !m.isDeleted
-                                                            ? () =>
-                                                                  handleShareMessage(
-                                                                      m,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onThread={
-                                                        realMessage &&
-                                                        !m.isDeleted &&
-                                                        m.type !== "system"
-                                                            ? () =>
-                                                                  openThread(m)
-                                                            : undefined
-                                                    }
-                                                    onProfile={
-                                                        !mine && senderUsername
-                                                            ? () =>
-                                                                  openProfileForSender(
-                                                                      m,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    onBlock={
-                                                        isDm && otherId && !mine
-                                                            ? isBlockedByMe
-                                                                ? () =>
-                                                                      handleUnblock()
-                                                                : () =>
-                                                                      handleBlock()
-                                                            : undefined
-                                                    }
-                                                    blockedByMe={isBlockedByMe}
-                                                    blockBusy={blockBusy}
-                                                    blockName={
-                                                        isDm && otherId
-                                                            ? otherName
-                                                            : ""
-                                                    }
-                                                    selectMode={selectMode}
-                                                    selected={selectedIds.has(
-                                                        m.id,
-                                                    )}
-                                                    onSelectToggle={
-                                                        selectMode &&
-                                                        realMessage &&
-                                                        !m.isDeleted
-                                                            ? () =>
-                                                                  toggleSelected(
-                                                                      m.id,
-                                                                  )
-                                                            : undefined
-                                                    }
-                                                    className="!max-w-full"
-                                                    contentClassName="max-w-full"
-                                                    isMobile={isMobile}
-                                                />
-                                            </SwipeToReply>
-                                        </div>
-                                    </div>
-                                    {/* Thread chip lives OUTSIDE the bubble's width-locked row so a
-                      wide chip can never stretch/re-center the bubble. Aligned
-                      to the bubble's edge: under the sender on the left for
-                      others' messages, flush right under your own. */}
-                                    {!m.isDeleted &&
-                                        threadSummaries[m.id]?.replyCount >
-                                            0 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => openThread(m)}
-                                                className={`kivo-focus mt-1 flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--hover)] ${
-                                                    mine
-                                                        ? "self-end"
-                                                        : "self-start ml-8 sm:ml-9"
-                                                }`}
-                                            >
-                                                <MessageSquareText
-                                                    className="h-3 w-3 shrink-0"
-                                                    aria-hidden
-                                                />
-                                                <span>
-                                                    {
-                                                        threadSummaries[m.id]
-                                                            .replyCount
-                                                    }{" "}
-                                                    {threadSummaries[m.id]
-                                                        .replyCount === 1
-                                                        ? "reply"
-                                                        : "replies"}
-                                                </span>
-                                                {threadSummaries[m.id]
-                                                    .participants?.length >
-                                                    0 && (
-                                                    <span className="text-[var(--text-muted)]">
-                                                        ·{" "}
-                                                        {threadSummaries[
-                                                            m.id
-                                                        ].participants.join(
-                                                            ", ",
-                                                        )}
-                                                    </span>
-                                                )}
-                                                {timeAgoShort(
-                                                    threadSummaries[m.id]
-                                                        .lastReplyAt,
-                                                ) && (
-                                                    <span className="text-[var(--text-muted)]">
-                                                        ·{" "}
-                                                        {timeAgoShort(
-                                                            threadSummaries[
-                                                                m.id
-                                                            ].lastReplyAt,
-                                                        )}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        )}
-                                </div>
-                            </React.Fragment>
-                        );
-                    })}
+                    <MessageRows
+                        messages={messages}
+                        threadSummaries={threadSummaries}
+                        onlineUsers={onlineUsers}
+                        firstUnreadId={firstUnreadId}
+                        editingId={editingId}
+                        editText={editText}
+                        reactionFor={reactionFor}
+                        replyingToId={replyingTo ? replyingTo.id : null}
+                        selectMode={selectMode}
+                        selectedIds={selectedIds}
+                        blockBusy={blockBusy}
+                        isMobile={isMobile}
+                        ctx={rowsCtx}
+                    />
                     {typing && (
                         <div className="flex items-center gap-2 px-1 text-[12px] text-[var(--text-muted)]">
                             <span className="flex gap-1">
