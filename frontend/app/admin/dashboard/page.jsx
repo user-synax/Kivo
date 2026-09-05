@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { AdminGate } from "@/components/admin/admin-gate";
 import {
-  BarChart3,
   Ban,
+  BarChart3,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +17,10 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AdminGate } from "@/components/admin/admin-gate";
+import { UserDetailDrawer } from "@/components/admin/user-detail-drawer";
 
 // ── API helper ──────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function StatCard({ label, value, icon: Icon, accent }) {
     <div className="flex items-center gap-4 rounded-2xl border border-[#262626] bg-[#141414] p-5">
       <div
         className="flex size-10 items-center justify-center rounded-xl"
-        style={{ backgroundColor: accent + "18" }}
+        style={{ backgroundColor: `${accent}18` }}
       >
         <Icon className="h-5 w-5" style={{ color: accent }} strokeWidth={1.8} />
       </div>
@@ -109,11 +110,36 @@ function OverviewTab() {
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-      <StatCard label="Total Users" value={stats?.totalUsers} icon={Users} accent="#4ba9e1" />
-      <StatCard label="Banned Users" value={stats?.bannedUsers} icon={Ban} accent="#ff5577" />
-      <StatCard label="Groups" value={stats?.totalGroups} icon={FileText} accent="#22c55e" />
-      <StatCard label="Spaces" value={stats?.totalSpaces} icon={Database} accent="#d44df0" />
-      <StatCard label="Messages" value={stats?.totalMessages} icon={BarChart3} accent="#ff7a3d" />
+      <StatCard
+        label="Total Users"
+        value={stats?.totalUsers}
+        icon={Users}
+        accent="#4ba9e1"
+      />
+      <StatCard
+        label="Banned Users"
+        value={stats?.bannedUsers}
+        icon={Ban}
+        accent="#ff5577"
+      />
+      <StatCard
+        label="Groups"
+        value={stats?.totalGroups}
+        icon={FileText}
+        accent="#22c55e"
+      />
+      <StatCard
+        label="Spaces"
+        value={stats?.totalSpaces}
+        icon={Database}
+        accent="#d44df0"
+      />
+      <StatCard
+        label="Messages"
+        value={stats?.totalMessages}
+        icon={BarChart3}
+        accent="#ff7a3d"
+      />
     </div>
   );
 }
@@ -122,13 +148,14 @@ function OverviewTab() {
 
 function UsersTab() {
   const [users, setUsers] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [_total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [bannedFilter, setBannedFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(null);
+  const [detailUserId, setDetailUserId] = useState(null);
   const debounceRef = useRef(null);
 
   const load = useCallback(
@@ -150,7 +177,9 @@ function UsersTab() {
     [page, search, bannedFilter],
   );
 
-  useEffect(() => { load(1, "", ""); }, []);
+  useEffect(() => {
+    load(1, "", "");
+  }, []);
 
   const handleSearch = (val) => {
     setSearch(val);
@@ -202,6 +231,14 @@ function UsersTab() {
     }
   };
 
+  const handleRowClick = (userId) => {
+    setDetailUserId(userId);
+  };
+
+  const handleDetailClose = () => {
+    setDetailUserId(null);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Controls */}
@@ -245,15 +282,21 @@ function UsersTab() {
           <Loader2 className="h-5 w-5 animate-spin text-[#999]" />
         </div>
       ) : users.length === 0 ? (
-        <p className="py-12 text-center text-[14px] text-[#666]">No users found</p>
+        <p className="py-12 text-center text-[14px] text-[#666]">
+          No users found
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[#262626]">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[#262626] bg-[#141414]">
                 <th className="px-4 py-3 font-medium text-[#999]">User</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] md:table-cell">Email</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">Joined</th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] md:table-cell">
+                  Email
+                </th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">
+                  Joined
+                </th>
                 <th className="px-4 py-3 font-medium text-[#999]">Status</th>
                 <th className="px-4 py-3 font-medium text-[#999]">Actions</th>
               </tr>
@@ -262,7 +305,8 @@ function UsersTab() {
               {users.map((u) => (
                 <tr
                   key={u.id}
-                  className="border-b border-[#262626]/50 last:border-0 hover:bg-[#1c1c1c]/50"
+                  onClick={() => handleRowClick(u.id)}
+                  className={`border-b border-[#262626]/50 last:border-0 hover:bg-[#1c1c1c]/50 cursor-pointer ${actionBusy === u.id ? "opacity-40 pointer-events-none" : ""}`}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
@@ -279,9 +323,13 @@ function UsersTab() {
                       </div>
                     </div>
                   </td>
-                  <td className="hidden px-4 py-3 text-[#999] md:table-cell">{u.email}</td>
+                  <td className="hidden px-4 py-3 text-[#999] md:table-cell">
+                    {u.email}
+                  </td>
                   <td className="hidden px-4 py-3 text-[13px] text-[#999] sm:table-cell">
-                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                    {u.createdAt
+                      ? new Date(u.createdAt).toLocaleDateString()
+                      : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -310,7 +358,10 @@ function UsersTab() {
                           {u.plan === "plus" ? (
                             <button
                               type="button"
-                              onClick={() => handlePlan(u.id, "free")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePlan(u.id, "free");
+                              }}
                               className="rounded-lg bg-[#a78bfa]/15 px-3 py-1.5 text-[12px] font-medium text-[#c4b5fd] hover:bg-[#a78bfa]/25"
                             >
                               Revoke Plus
@@ -318,7 +369,10 @@ function UsersTab() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handlePlan(u.id, "plus")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePlan(u.id, "plus");
+                              }}
                               className="rounded-lg bg-[#a78bfa]/15 px-3 py-1.5 text-[12px] font-medium text-[#c4b5fd] hover:bg-[#a78bfa]/25"
                             >
                               Grant Plus
@@ -327,7 +381,10 @@ function UsersTab() {
                           {u.isBanned ? (
                             <button
                               type="button"
-                              onClick={() => handleUnban(u.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnban(u.id);
+                              }}
                               className="rounded-lg bg-[#22c55e]/15 px-3 py-1.5 text-[12px] font-medium text-[#22c55e] hover:bg-[#22c55e]/25"
                             >
                               Unban
@@ -335,7 +392,10 @@ function UsersTab() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleBan(u.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBan(u.id);
+                              }}
                               className="rounded-lg bg-[#ff5577]/15 px-3 py-1.5 text-[12px] font-medium text-[#ff5577] hover:bg-[#ff5577]/25"
                             >
                               Ban
@@ -352,7 +412,17 @@ function UsersTab() {
         </div>
       )}
 
-      <Pagination page={page} totalPages={totalPages} onPageChange={(p) => load(p, search, bannedFilter)} />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={(p) => load(p, search, bannedFilter)}
+      />
+
+      <UserDetailDrawer
+        userId={detailUserId}
+        open={Boolean(detailUserId)}
+        onClose={handleDetailClose}
+      />
     </div>
   );
 }
@@ -366,22 +436,28 @@ function GroupsTab() {
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(null);
 
-  const load = useCallback((p = page) => {
-    setLoading(true);
-    adminFetch(`/api/admin/groups?page=${p}&limit=20`)
-      .then((data) => {
-        setGroups(data.groups || []);
-        setTotalPages(data.totalPages || 1);
-        setPage(data.page || 1);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [page]);
+  const load = useCallback(
+    (p = page) => {
+      setLoading(true);
+      adminFetch(`/api/admin/groups?page=${p}&limit=20`)
+        .then((data) => {
+          setGroups(data.groups || []);
+          setTotalPages(data.totalPages || 1);
+          setPage(data.page || 1);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    },
+    [page],
+  );
 
-  useEffect(() => { load(1); }, []);
+  useEffect(() => {
+    load(1);
+  }, []);
 
   const handleDelete = async (groupId, name) => {
-    if (!window.confirm(`Delete group "${name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete group "${name}"? This cannot be undone.`))
+      return;
     setActionBusy(groupId);
     try {
       await adminFetch(`/api/admin/groups/${groupId}`, { method: "DELETE" });
@@ -400,7 +476,9 @@ function GroupsTab() {
           <Loader2 className="h-5 w-5 animate-spin text-[#999]" />
         </div>
       ) : groups.length === 0 ? (
-        <p className="py-12 text-center text-[14px] text-[#666]">No groups found</p>
+        <p className="py-12 text-center text-[14px] text-[#666]">
+          No groups found
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[#262626]">
           <table className="w-full text-left text-sm">
@@ -408,8 +486,12 @@ function GroupsTab() {
               <tr className="border-b border-[#262626] bg-[#141414]">
                 <th className="px-4 py-3 font-medium text-[#999]">Name</th>
                 <th className="px-4 py-3 font-medium text-[#999]">Members</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] md:table-cell">Admins</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">Created</th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] md:table-cell">
+                  Admins
+                </th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">
+                  Created
+                </th>
                 <th className="px-4 py-3 font-medium text-[#999]">Actions</th>
               </tr>
             </thead>
@@ -419,13 +501,19 @@ function GroupsTab() {
                   key={g.id}
                   className="border-b border-[#262626]/50 last:border-0 hover:bg-[#1c1c1c]/50"
                 >
-                  <td className="max-w-[160px] truncate px-4 py-3 font-medium text-white sm:max-w-none">{g.name}</td>
+                  <td className="max-w-[160px] truncate px-4 py-3 font-medium text-white sm:max-w-none">
+                    {g.name}
+                  </td>
                   <td className="px-4 py-3 text-[#999]">{g.memberCount}</td>
                   <td className="hidden px-4 py-3 text-[12px] text-[#666] md:table-cell">
-                    {(g.admins || []).map((a) => a.displayName || a.username).join(", ") || "—"}
+                    {(g.admins || [])
+                      .map((a) => a.displayName || a.username)
+                      .join(", ") || "—"}
                   </td>
                   <td className="hidden px-4 py-3 text-[13px] text-[#999] sm:table-cell">
-                    {g.createdAt ? new Date(g.createdAt).toLocaleDateString() : "—"}
+                    {g.createdAt
+                      ? new Date(g.createdAt).toLocaleDateString()
+                      : "—"}
                   </td>
                   <td className="px-4 py-3">
                     {actionBusy === g.id ? (
@@ -462,22 +550,28 @@ function SpacesTab() {
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(null);
 
-  const load = useCallback((p = page) => {
-    setLoading(true);
-    adminFetch(`/api/admin/spaces?page=${p}&limit=20`)
-      .then((data) => {
-        setSpaces(data.spaces || []);
-        setTotalPages(data.totalPages || 1);
-        setPage(data.page || 1);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [page]);
+  const load = useCallback(
+    (p = page) => {
+      setLoading(true);
+      adminFetch(`/api/admin/spaces?page=${p}&limit=20`)
+        .then((data) => {
+          setSpaces(data.spaces || []);
+          setTotalPages(data.totalPages || 1);
+          setPage(data.page || 1);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    },
+    [page],
+  );
 
-  useEffect(() => { load(1); }, []);
+  useEffect(() => {
+    load(1);
+  }, []);
 
   const handleDelete = async (spaceId, name) => {
-    if (!window.confirm(`Delete space "${name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete space "${name}"? This cannot be undone.`))
+      return;
     setActionBusy(spaceId);
     try {
       await adminFetch(`/api/admin/spaces/${spaceId}`, { method: "DELETE" });
@@ -496,18 +590,28 @@ function SpacesTab() {
           <Loader2 className="h-5 w-5 animate-spin text-[#999]" />
         </div>
       ) : spaces.length === 0 ? (
-        <p className="py-12 text-center text-[14px] text-[#666]">No spaces found</p>
+        <p className="py-12 text-center text-[14px] text-[#666]">
+          No spaces found
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[#262626]">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[#262626] bg-[#141414]">
                 <th className="px-4 py-3 font-medium text-[#999]">Name</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">Category</th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">
+                  Category
+                </th>
                 <th className="px-4 py-3 font-medium text-[#999]">Members</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] md:table-cell">Channels</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] lg:table-cell">Owner</th>
-                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">Created</th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] md:table-cell">
+                  Channels
+                </th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] lg:table-cell">
+                  Owner
+                </th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">
+                  Created
+                </th>
                 <th className="px-4 py-3 font-medium text-[#999]">Actions</th>
               </tr>
             </thead>
@@ -517,15 +621,23 @@ function SpacesTab() {
                   key={s.id}
                   className="border-b border-[#262626]/50 last:border-0 hover:bg-[#1c1c1c]/50"
                 >
-                  <td className="max-w-[140px] truncate px-4 py-3 font-medium text-white sm:max-w-none">{s.name}</td>
-                  <td className="hidden px-4 py-3 text-[13px] text-[#666] sm:table-cell">{s.category}</td>
+                  <td className="max-w-[140px] truncate px-4 py-3 font-medium text-white sm:max-w-none">
+                    {s.name}
+                  </td>
+                  <td className="hidden px-4 py-3 text-[13px] text-[#666] sm:table-cell">
+                    {s.category}
+                  </td>
                   <td className="px-4 py-3 text-[#999]">{s.memberCount}</td>
-                  <td className="hidden px-4 py-3 text-[#999] md:table-cell">{s.channelCount}</td>
+                  <td className="hidden px-4 py-3 text-[#999] md:table-cell">
+                    {s.channelCount}
+                  </td>
                   <td className="hidden px-4 py-3 text-[12px] text-[#666] lg:table-cell">
                     {s.owner?.displayName || s.owner?.username || "—"}
                   </td>
                   <td className="hidden px-4 py-3 text-[13px] text-[#999] sm:table-cell">
-                    {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}
+                    {s.createdAt
+                      ? new Date(s.createdAt).toLocaleDateString()
+                      : "—"}
                   </td>
                   <td className="px-4 py-3">
                     {actionBusy === s.id ? (

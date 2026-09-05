@@ -111,7 +111,7 @@ export async function getUserDetail(userId) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(userId)
-    .select("displayName username email avatarUrl bio status isBanned bannedAt bannedReason plan profileEffect createdAt")
+    .select("displayName username email avatarUrl bio status isBanned bannedAt bannedReason plan profileEffect twoFactorEnabled createdAt")
     .lean();
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -120,6 +120,17 @@ export async function getUserDetail(userId) {
     Conversation.countDocuments({ participants: userId, type: "group" }),
     Space.countDocuments({ "members.userId": userId }),
   ]);
+
+  // Ban history: every ban_user / unban_user action targeting this user,
+  // newest first. AdminActionLog carries action, reason, ip, performedAt.
+  const banHistory = await AdminActionLog.find({
+    targetType: "user",
+    targetId: userId,
+    action: { $in: ["ban_user", "unban_user"] },
+  })
+    .sort({ performedAt: -1 })
+    .limit(50)
+    .lean();
 
   return {
     id: user._id.toString(),
@@ -134,10 +145,18 @@ export async function getUserDetail(userId) {
     bannedReason: user.bannedReason || null,
     plan: user.plan || "free",
     profileEffect: user.profileEffect || "none",
+    twoFactorEnabled: Boolean(user.twoFactorEnabled),
     createdAt: user.createdAt,
     conversationCount,
     groupCount,
     spaceCount,
+    banHistory: banHistory.map((h) => ({
+      action: h.action,
+      reason: h.reason || null,
+      ip: h.ip || null,
+      performedAt: h.performedAt,
+      targetName: h.targetName || null,
+    })),
   };
 }
 
