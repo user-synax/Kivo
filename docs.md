@@ -64,16 +64,42 @@ Next.js rewrites proxy `/api/*` and `/socket.io` to the backend (see `BACKEND_UR
 - Email verification is a link-based flow on the backend (`/verify-email?token=…`, resend API). Signup currently does **not** email a verification link automatically and there is no in-app resend banner — nothing blocks chat either way.
 - Registration is rate-limited (5 per hour per IP), login 10 per 15 minutes.
 
+### Sign up with Google or GitHub
+
+You can also create an account (or log in) with **Google** or **GitHub** — no password needed.
+
+1. On `/signup` (or `/login`), click **Sign up with Google** or **Sign up with GitHub**.
+2. You are taken to the provider's consent screen. Authorize Kivo.
+3. If this is a new Kivo account, one is created for you automatically (your email is pre-verified, a username is generated from your profile/email, and your provider avatar is used if available).
+4. You land in `/app` immediately.
+
+**What happens behind the scenes**
+
+- If you already have a Kivo account with that email (local password account or another provider), the provider is **auto-linked** to your existing account — you keep your conversations and friends, and your email becomes verified instantly.
+- If the same provider account (Google `sub` / GitHub `id`) is already linked to a *different* Kivo account, you get a clear error and cannot double-link.
+- Some accounts are **OAuth-only** — they have no password. If you try to log in with email+password on such an account you are told to continue with the provider instead.
+
+**Provider badges**
+
+When you sign up or link a provider, your public profile (`/u/username`) shows a **Google Verified** or **GitHub Verified** chip. Linking **both** providers earns you the native **Kivo Verified** badge (admin-granted `verified` is not required).
+
+Rate limits: OAuth start is rate-limited separately from password login (`oauth-start`), the callback is rate-limited (`oauth-callback`), and the account-linking step is rate-limited (`oauth-link`, 10 per 60 s).
+
+> **Setup note:** Google and GitHub OAuth require provider credentials on the server (see `GOOGLE_CLIENT_ID/SECRET` and `GITHUB_CLIENT_ID/SECRET` in `backend/.env.example`). If a provider is not configured, the buttons redirect back with an `OAUTH_NOT_CONFIGURED` message.
+
 ---
 
 ## 2. Log in and log out
 
 **Log in** (`/login`)
 
-1. Enter your **email or username** and password.
-2. Submit. If two-factor authentication is enabled on the account, you'll be asked for an authenticator or backup code next (see §21) — then you go to `/app`.
+1. Enter your **email or username** and password, then submit.
+2. Or click **Continue with Google** / **Continue with GitHub** for passwordless sign-in.
+3. If two-factor authentication is enabled on the account, you'll be asked for an authenticator or backup code next (see §21) — then you go to `/app`.
 
 Sessions use a short-lived access token plus an httpOnly refresh cookie. The app refreshes the access token automatically before it expires (single-flight, 60 s before expiry).
+
+**OAuth-only accounts** — some accounts were created via Google or GitHub and have no password. If you try to log in with email+password on one of these, you are told to continue with the provider button instead.
 
 **Forgot your password?**
 
@@ -486,6 +512,18 @@ You can set:
 | Website | Optional full URL (`https://…`, max 500). |
 
 The four social-link fields plus GitHub render as **icon chips** on your public profile (GitHub/X/Instagram build URLs from handles, YouTube/website use the full URL). Each chip links out safely (`target=_blank rel=noopener`). Save to apply. Email is **not** editable here. Username validation re-checks uniqueness server-side and the `plan` field is never accepted from clients.
+
+### Account verification (Google / GitHub)
+
+Under **Settings → Account verification**, you can link Google or GitHub to your account to earn provider verification badges.
+
+1. Click **Verify with Google** or **Verify with GitHub**.
+2. You are taken to the provider's consent screen (you are already signed in, so this is account *linking*, not a new signup).
+3. Authorize. You are redirected back and the provider badge appears on your public profile.
+
+Linking **both** providers earns the native **Kivo Verified** badge automatically — no admin action needed. Provider badges (Google Verified, GitHub Verified) render as chips on your public profile alongside the verified badge.
+
+You can link a provider only if it is not already linked to another Kivo account. The link step is rate-limited (10 per 60 s).
 
 ### Your full profile page
 

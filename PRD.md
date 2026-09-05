@@ -151,6 +151,47 @@ Kivo
 | Banner | None currently — the resend endpoint is API-only after the OTP step was removed |
 | Token storage | SHA-256 hash stored on the user (`emailVerificationTokenHash`), never the raw token |
 
+#### 1.1.2 OAuth / Social Login (Google & GitHub)
+
+Kivo supports signup and login via **Google** and **GitHub** OAuth in addition to the local email/password flow.
+
+**Endpoints**
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/auth/oauth/providers` | No | Returns `{ google, github }` booleans — which provider buttons the login/signup pages should render |
+| GET | `/api/v1/auth/oauth/:provider` | No | Starts the OAuth flow: emits a signed state JWT, builds the provider authorization URL, and 302-redirects the browser to Google/GitHub |
+| POST | `/api/v1/auth/oauth/:provider/link-url` | Yes | For authenticated users linking a second provider in Settings: returns `{ url }` for the provider authorization URL (state embeds the userId) |
+| GET | `/api/v1/auth/oauth/:provider/callback` | No | Public callback: exchanges the provider code for a profile, handles login/signup/linking, and 302-redirects to the frontend callback page with tokens/query in the URL |
+
+**Flows**
+
+- **Signup via provider:** clicking the button on `/signup` hits `GET /oauth/:provider`, which redirects to the provider. On consent, the backend callback creates a new account (email pre-verified, username generated from profile/email hints, provider avatar used if available) or auto-links to an existing local account with that email. The callback sets the httpOnly refresh cookie and passes the short-lived access token to the frontend `/oauth/callback` page in the URL. Rate limits: `oauth-start`, `oauth-callback`.
+- **Login via provider:** same start/callback path; if the account has 2FA enabled, the callback redirects to `/login?oauth2fa=1` with a short-lived 2FA ticket in `sessionStorage` so the existing 2FA step can finish the login.
+- **Account linking (Settings):** an authenticated user hits `POST /oauth/:provider/link-url` to get a provider authorization URL whose state embeds their userId. After consent, the callback links the provider to the existing account — no new account is created. Linking **both** Google and GitHub earns the native Kivo `verified` badge automatically (`recomputeNativeVerified`). Rate limit: `oauth-link` (10 per 60 s).
+- **OAuth-only accounts:** accounts created via a provider have `passwordHash: null`. The login endpoint returns `OAUTH_ONLY_ACCOUNT` and tells the user to use the provider button instead. Disabling 2FA on such accounts is allowed (password is optional).
+
+**Provider profile**
+
+- Google: `openid email profile` scope; profile fetched from `userinfo` (sub = providerId, email verified by Google drives `isEmailVerified`).
+- GitHub: `read:user user:email` scope; profile from `/user`, emails from `/user/emails` (requires at least one verified email). GitHub login also seeds `githubUsername` from the handle if unset.
+
+**Verification badges**
+
+- Each linked provider sets a per-provider flag (`googleVerified` / `githubVerified`) and stores the provider email (`googleEmail` / `githubEmail`).
+- The public profile renders **Google Verified** / **GitHub Verified** chips when the respective flag is true.
+- When **both** providers are linked, the user document's `verified` flag is set to `true` automatically (native Kivo verified badge) — no admin action needed.
+- Providing the same provider identity to two different Kivo accounts is blocked (`PROVIDER_ALREADY_LINKED`); email auto-link only merges a provider into an existing local account when no other account already claims that provider id.
+
+**Provider-only account protection**
+
+- When a provider account is linked to an existing local account by email, the provider identity is attached and the email is marked verified; the local password (if any) stays valid.
+- Provider `sub`/`id` lookups use sparse indexes so local-only accounts (null ids) do not collide.
+
+**Environment variables**
+
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (default `${FRONTEND_URL}/api/v1/auth/oauth/google/callback`); `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI` (default `${FRONTEND_URL}/api/v1/auth/oauth/github/callback`). A provider button is only rendered when the backend reports it as configured (`isOAuthConfigured`).
+
 #### 1.2 Login
 
 - Accepts `emailOrUsername` + `password`.
@@ -1007,6 +1048,14 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/auth/resend-verification` | Yes | 1/min | — |
 | POST | `/api/v1/auth/forgot-password` | No | 5/5min | `{ email }` |
 | POST | `/api/v1/auth/reset-password` | No | 10/5min | `{ token, newPassword }` |
+| GET | `/api/v1/auth/2fa/status` | Yes | — | Current 2FA state (`enabled`, `secret` for QR setup) |
+| POST | `/api/v1/auth/2fa/setup` | Yes | 5/5min | `{ code }` — confirm setup code, activates 2FA + returns backup codes |
+| POST | `/api/v1/auth/2fa/enable` | Yes | 5/60s | `{ code }` — enable with a TOTP code (alternative to setup confirm) |
+| POST | `/api/v1/auth/2fa/disable` | Yes | 5/60s | `{ code }` — disable; requires current authenticator or backup code; invalidates backup codes |
+| GET | `/api/v1/auth/oauth/providers` | No | — | Which OAuth providers are configured (`{ google, github }`) |
+| GET | `/api/v1/auth/oauth/:provider` | No | oauth-start | Starts OAuth login/signup → 302 to provider |
+| POST | `/api/v1/auth/oauth/:provider/link-url` | Yes | oauth-link (10/60s) | `{ }` → `{ url }` for Settings account-linking |
+| GET | `/api/v1/auth/oauth/:provider/callback` | No | oauth-callback | Public callback — exchanges code, redirects to frontend |
 
 #### Users
 
@@ -1017,7 +1066,9 @@ Refresh token is sent automatically via httpOnly cookie.
 | PATCH | `/api/v1/users/me/avatar` | Yes | Multipart (max 4MB) |
 | DELETE | `/api/v1/users/me/avatar` | Yes | — |
 | GET | `/api/v1/users/search?q=` | Yes | — |
-| GET | `/api/v1/users/:id` | Yes | — |
+| GET | `/api/v1/users/:id` | Yes | — | Public profile fields by user id |
+| PATCH | `/api/v1/users/me/banner` | Yes | Plus required | Multipart — custom banner upload (image/*, max 8 MB, Appwrite); Plus-only, free users get `PLUS_REQUIRED` |
+| DELETE | `/api/v1/users/me/avatar` | Yes | — | Remove avatar (clears `avatarUrl` + `avatarFileId`) |
 
 #### Conversations
 
@@ -1038,6 +1089,12 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, audioDuration?, replyToMessageId?, threadId?, forwardedFromId? }` (content/attachments, `threadId`, or `forwardedFromId` required; forward copies can't add a caption, thread replies can't quote/forward) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
 | POST | `/api/v1/conversations/:id/unread` | Yes | `{ messageId? }` — mark unread from a message (or latest others') forward |
+| PATCH | `/api/v1/conversations/:id/look` | Yes | DM: either participant; Group: admin; Space channel: 403 `NOT_ALLOWED` | `{ wallpaper?, bubbleStyle? }` — per-conversation chat look (`conversationLookSchema`; `null` per field = "Member's own" inheritance; priority conversation > Space > personal via `resolveChatLook`) |
+| PATCH | `/api/v1/conversations/:id` | Group admin | `{ name?, avatar? }` — group name + avatar (routes file also mounts this for group updates) |
+| POST | `/api/v1/conversations/:id/members` | Group admin | `{ userId }` — add members |
+| DELETE | `/api/v1/conversations/:id/members/:userId` | Group admin or self | — — remove member / self-leave |
+| POST | `/api/v1/conversations/:id/admins/:userId` | Group admin | — — promote to admin |
+| DELETE | `/api/v1/conversations/:id/admins/:userId` | Group admin | — — demote admin |
 
 #### Spaces
 
@@ -1050,6 +1107,10 @@ Refresh token is sent automatically via httpOnly cookie.
 | PATCH | `/api/v1/spaces/:id` | Admin+ | `{ name?, description?, category? }` |
 | DELETE | `/api/v1/spaces/:id` | Owner | — |
 | POST | `/api/v1/spaces/:id/join` | Yes | Join public space |
+| POST | `/api/v1/spaces/join/:code` | Yes | — | Join a space (public or private) with a valid, unexpired invite code |
+| GET | `/api/v1/spaces/:id/invite` | Admin+ | — | Invite status (active code + expiry); codes never ship in space payloads |
+| POST | `/api/v1/spaces/:id/invite` | Admin+ | — | Create / rotate invite code (7-day expiry) |
+| DELETE | `/api/v1/spaces/:id/invite` | Admin+ | — | Turn invites off (clears `inviteCode` + `inviteExpiresAt`) |
 | POST | `/api/v1/spaces/:id/members` | Admin+ | `{ userId }` |
 | DELETE | `/api/v1/spaces/:id/members/:userId` | Admin+, or self | — |
 | PATCH | `/api/v1/spaces/:id/members/:userId/role` | Admin+ | `{ role }` |
@@ -1094,6 +1155,9 @@ Refresh token is sent automatically via httpOnly cookie.
 | GET | `/api/v1/notifications/unread-count` | Yes | — |
 | GET | `/api/v1/notifications` | Yes | `?cursor=&limit=&unreadOnly=` |
 | PATCH | `/api/v1/notifications/read` | Yes | `{ ids: [...], all?: boolean }` |
+| GET | `/api/v1/notifications/preferences` | Yes | — | Per-category notification preferences |
+| PATCH | `/api/v1/notifications/preferences` | Yes | — | `{ directMessages?, groupMessages?, mentions?, friendRequests?, spaceMessages?, announcements? }` — update one or more toggles |
+| POST | `/api/v1/notifications/:id/wave` | Yes | — | Send a **wave** ping to user `:id` (self-wave / blocked / 20 s cooldown guards; `WAVE_COOLDOWN`/`WAVE_BLOCKED` errors; `senderUsername` denormalized; deep-links to `/u/:username` from the notification center) |
 
 #### Push
 

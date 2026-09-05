@@ -10,6 +10,7 @@ export const LIVE_URL = "https://kivo.usersynax.dev";
 const TOC = [
   { id: "what-is-kivo", label: "What is Kivo" },
   { id: "get-in", label: "Create an account" },
+  { id: "social-login", label: "Social login (Google & GitHub)" },
   { id: "layout", label: "The chat layout" },
   { id: "friends", label: "Friends" },
   { id: "dms", label: "Direct messages" },
@@ -208,6 +209,66 @@ export function DocsScreen() {
                 go to the full profile page, and choose Log out.
               </p>
             </Section>
+
+            <Section id="social-login" title="Social login (Google & GitHub)">
+              <p>
+                You can sign up or log in with <strong>Google</strong> or
+                <strong>GitHub</strong> instead of a password. The same buttons
+                appear on the signup and login pages.
+              </p>
+              <h3 className="doc-h3">Sign up with a provider</h3>
+              <Steps
+                items={[
+                  "On /signup, click Sign up with Google or Sign up with GitHub.",
+                  "Authorize Kivo on the provider's consent screen.",
+                  "If this is a new Kivo account, one is created for you (email pre-verified, username generated from your profile, provider avatar used if available) and you land in /app.",
+                ]}
+              />
+              <p>
+                If you already have a Kivo account with that email, the provider
+                is auto-linked to your existing account — you keep your
+                conversations and friends, and the email becomes verified
+                instantly.
+              </p>
+              <h3 className="doc-h3">Log in with a provider</h3>
+              <p>
+                On /login, click Continue with Google or Continue with GitHub.
+                If your account has two-factor authentication enabled, you'll
+                still complete the second step after the provider confirms your
+                identity.
+              </p>
+              <p>
+                <strong>OAuth-only accounts</strong> — accounts created via a
+                provider have no password. If you try to log in with email +
+                password on one of these, Kivo tells you to use the provider
+                button instead.
+              </p>
+              <h3 className="doc-h3">Provider badges & the Kivo verified badge
+              </h3>
+              <p>
+                When you sign up or link a provider, your public profile
+                (/u/username) shows a <strong>Google Verified</strong> or
+                <strong>GitHub Verified</strong> chip. Linking <strong>both</strong>
+                providers earns you the native <strong>Kivo Verified</strong> badge
+                automatically — no admin action needed.
+              </p>
+              <h3 className="doc-h3">Link a provider from Settings
+              </h3>
+              <p>
+                If you signed up with a password and later want provider badges,
+                go to Settings → Account verification and click Verify with
+                Google or Verify with GitHub. You are already signed in, so this
+                links the provider to your account rather than creating a new one.
+                You can only link a provider that isn't already attached to another
+                Kivo account.
+              </p>
+              <h3 className="doc-h3">Not built yet
+              </h3>
+              <p>
+                These providers are wired in the backend today: Google and
+                GitHub. Other providers (for example, X or Apple) are not
+                available yet.
+              </p>
 
             <Section id="layout" title="The chat layout">
               <p>After you sign in you see:</p>

@@ -52,6 +52,7 @@
 - 📬 **Mark as unread** — right-click any conversation and re-mark it unread; a "New messages" separator shows where unread hits start.
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, rate limiting on every sensitive route, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
+- 🔑 **OAuth signup & login** — sign up or log in with **Google** or **GitHub** (no password needed); existing accounts with the same email are auto-linked; OAuth-only accounts have no password and continue through the provider; linking both providers earns the native Kivo verified badge automatically.
 
 ---
 
@@ -150,6 +151,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Kivo Plus extras** — custom banner upload (8 MB, `PATCH /users/me/banner`), profile effects (4 presets, `profile-effects.js` / `globals.css`), locked state for free users
 - **Wave & social links** — GitHub/X/Instagram/YouTube/Website fields on profile, `social-links.jsx` chips + brand glyphs, wave ping (`POST /notifications/:id/wave`, 20 s cooldown)
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
+- **OAuth / social login** — Google & GitHub signup/login (`GET/POST /api/v1/auth/oauth/:provider*`), account linking in Settings (Verify with Google/GitHub), provider verification badges (Google Verified, GitHub Verified) on public profiles, native Kivo verified badge earned by linking both providers; OAuth-only accounts have no password and continue via the provider button
 - Animated landing page
 
 ### 🚧 Planned / Not Started
@@ -295,6 +297,8 @@ bun run lint  # biome check
 | `ADMIN_PASSWORD_HASH` | backend | Bcrypt hash of the admin password |
 | `ADMIN_JWT_SECRET` / `ADMIN_JWT_TTL` | backend | Admin JWT signing + lifetime (default 30m) |
 | `ADMIN_COOKIE_NAME` | backend | Admin cookie name (default `admin_token`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | backend | Google OAuth — signup/login + provider verification linking |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_REDIRECT_URI` | backend | GitHub OAuth — signup/login + provider verification linking |
 | `BACKEND_URL` | frontend | Backend origin used by Next.js API rewrites (default `http://localhost:4000`) |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend origin for the Socket.IO connection (default `http://localhost:4000`) |
 
