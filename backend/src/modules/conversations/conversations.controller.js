@@ -159,3 +159,13 @@ export const demoteMember = asyncHandler(async (req, res) => {
   });
   res.status(200).json({ success: true, data: conversation });
 });
+
+// Permanently delete a DM (either participant) or group (admin only).
+// Space channels are rejected — use Space settings instead.
+export const deleteConversation = asyncHandler(async (req, res) => {
+  const result = await conversationsService.deleteConversation({
+    conversationId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: result });
+});

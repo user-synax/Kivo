@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { unauthorized, notFound, conflict, badRequest } from "../../utils/errors.js";
 import User from "../../models/User.js";
 import FriendRequest from "../../models/FriendRequest.js";
+import { emitToUser } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 
 function publicUser(user) {
@@ -177,6 +178,8 @@ export async function listFriends({ userId }) {
 }
 
 // Remove a friendship (or a pending request) initiated either direction.
+// The edge is shared, so deleting it removes the friend from BOTH users'
+// lists at once; the other side is nudged over sockets to refresh live.
 export async function removeFriend({ userId, friendId }) {
   if (!mongoose.Types.ObjectId.isValid(friendId)) {
     throw badRequest("Invalid friend id", "INVALID_FRIEND");
@@ -191,5 +194,6 @@ export async function removeFriend({ userId, friendId }) {
   if (res.deletedCount === 0) {
     throw notFound("Friendship not found", "FRIEND_NOT_FOUND");
   }
+  emitToUser(friendId, "friend:removed", { userId });
   return { removed: true };
 }

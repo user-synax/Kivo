@@ -13,6 +13,7 @@ import {
   Search,
   SearchCode,
   SearchX,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -48,7 +49,7 @@ function EmptyState({ message, icon: Icon = SearchX, actionLabel, onAction }) {
   );
 }
 
-function ConversationItem({ conversation, selected, onSelect, onMarkUnread, index }) {
+function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
   const { name, lastMessage, time, unread, online, type } = conversation;
   const isGroup = type === "group";
   return (
@@ -95,12 +96,18 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, inde
           <Mail className="h-4 w-4" />
           Mark as unread
         </ContextMenuItem>
+        {onRemove && (conversation.type === "dm" || conversation.type === "group") && (
+          <ContextMenuItem tone="destructive" onSelect={() => onRemove?.(conversation)}>
+            <Trash2 className="h-4 w-4" />
+            Remove from list
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
 }
 
-function ChatsList({ items, selectedId, onSelect, onMarkUnread }) {
+function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove }) {
   if (!items.length) return <EmptyState message="No conversations yet" />;
   return (
     <div className="space-y-0.5">
@@ -111,6 +118,7 @@ function ChatsList({ items, selectedId, onSelect, onMarkUnread }) {
           selected={c.id === selectedId}
           onSelect={() => onSelect(c.id)}
           onMarkUnread={onMarkUnread}
+          onRemove={onRemove}
           index={i}
         />
       ))}
@@ -325,6 +333,7 @@ export function NestedSidebar({
   onSearchOpen,
   onSavedOpen,
   onMarkUnread,
+  onRemoveConversation,
   onCompose,
   onNewGroup,
   onCreateSpace,
@@ -517,6 +526,7 @@ export function NestedSidebar({
                     selectedId={selectedId}
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}
+                    onRemove={onRemoveConversation}
                   />
                 )}
               </motion.div>
@@ -547,6 +557,7 @@ export function NestedSidebar({
                     selectedId={selectedId}
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}
+                    onRemove={onRemoveConversation}
                   />
                 )}
               </motion.div>

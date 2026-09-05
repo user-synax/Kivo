@@ -184,6 +184,18 @@ export function FriendsModal({ open, onClose, onStartChat }) {
     loadRequests();
   }, [open]);
 
+  // Live refresh: when someone unfriends us (server fans out
+  // `friend:removed` → shell dispatches this window event), reload so both
+  // sides' lists stay in sync without reopening the modal.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onRemoteRemove = () => {
+      loadFriends();
+    };
+    window.addEventListener("kivo:friend-removed", onRemoteRemove);
+    return () => window.removeEventListener("kivo:friend-removed", onRemoteRemove);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     if (timer.current) clearTimeout(timer.current);

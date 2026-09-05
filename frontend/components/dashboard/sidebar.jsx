@@ -15,6 +15,7 @@ import {
   Search,
   SearchCode,
   SearchX,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -49,7 +50,7 @@ function EmptyState({ message }) {
   );
 }
 
-function ConversationItem({ conversation, selected, onSelect, onMarkUnread, index }) {
+function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
   const { name, lastMessage, time, unread, online, type } = conversation;
   const isGroup = type === "group";
   return (
@@ -103,12 +104,18 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, inde
           <Mail className="h-4 w-4" />
           Mark as unread
         </ContextMenuItem>
+        {onRemove && (conversation.type === "dm" || conversation.type === "group") && (
+          <ContextMenuItem tone="destructive" onSelect={() => onRemove?.(conversation)}>
+            <Trash2 className="h-4 w-4" />
+            Remove from list
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
 }
 
-function ConversationSection({ label, items, selectedId, onSelect, onMarkUnread, baseIndex = 0, collapsed, onNewGroup }) {
+function ConversationSection({ label, items, selectedId, onSelect, onMarkUnread, onRemove, baseIndex = 0, collapsed, onNewGroup }) {
   if (!items.length) return null;
   return (
     <div className="mb-1">
@@ -136,6 +143,7 @@ function ConversationSection({ label, items, selectedId, onSelect, onMarkUnread,
           selected={c.id === selectedId}
           onSelect={() => onSelect(c.id)}
           onMarkUnread={onMarkUnread}
+          onRemove={onRemove}
           index={baseIndex + i}
         />
       ))}
@@ -541,6 +549,7 @@ export function Sidebar({
   onSearchOpen,
   onSavedOpen,
   onMarkUnread,
+  onRemoveConversation,
 }) {
   const isDesktop = useIsDesktop();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -686,6 +695,7 @@ export function Sidebar({
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onMarkUnread={onMarkUnread}
+                onRemove={onRemoveConversation}
                 collapsed={collapsed}
               />
             )}
@@ -696,6 +706,7 @@ export function Sidebar({
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onMarkUnread={onMarkUnread}
+                onRemove={onRemoveConversation}
                 collapsed={collapsed}
               />
             )}

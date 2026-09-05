@@ -593,3 +593,37 @@ export async function demoteMember({ conversationId, userId, targetUserId }) {
   });
   return payload;
 }
+
+// Permanently delete a conversation and all its messages. DMs: either
+// participant (the thread is shared, so both sides lose it — the client
+// confirm modal says so explicitly). Groups: admin only. Space channels are
+// rejected — channels are deleted through Space settings instead.
+export async function deleteConversation({ conversationId, userId }) {
+  const conversation = await assertMembership(conversationId, userId);
+  if (conversation.type === "space_channel") {
+    throw forbidden(
+      "Space channels can only be deleted from Space settings",
+      "NOT_ALLOWED",
+    );
+  }
+  if (conversation.type === "group") {
+    assertAdmin(conversation, userId);
+  }
+
+  const participantIds = (conversation.participants || []).map((p) =>
+    p.toString(),
+  );
+  await Message.deleteMany({ conversationId: conversation._id });
+  await Conversation.deleteOne({ _id: conversation._id });
+
+  // Tell every live client to drop the thread: room members via broadcast,
+  // then kick everyone out of the room so no further events leak in.
+  emitToConversation(conversationId, "conversation:removed", {
+    conversationId,
+  });
+  for (const pid of participantIds) {
+    leaveUserFromRoom(pid, conversationId);
+    emitToUser(pid, "conversation:removed", { conversationId });
+  }
+  return { removed: true, conversationId };
+}

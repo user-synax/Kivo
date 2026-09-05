@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Palette, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
-import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession, getToken, setSession } from "@/lib/auth";
 import {
   formatTime,
@@ -31,8 +31,10 @@ import {
   getCachedConversations,
   getCachedSpaces,
   setCachedConversations,
+  setCachedFriends,
   setCachedSpaces,
 } from "@/lib/cache";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { useOfflineStatus } from "@/lib/hooks/use-offline-status";
 import { SavedMessagesModal } from "@/components/dashboard/saved-messages-modal";
@@ -1121,11 +1123,28 @@ export function DashboardShell() {
       setShowGroupSettings(false);
     };
 
+    // Someone unfriended us: the edge is gone on both sides already —
+    // refresh the cached friend list in the background and nudge any open
+    // friends UI to reload so their list updates without a refresh.
+    const onFriendRemoved = () => {
+      const uid = getSession()?.id;
+      if (uid) {
+        apiGet("/api/v1/friends")
+          .then((list) => {
+            const arr = Array.isArray(list) ? list : [];
+            setCachedFriends(uid, arr).catch(() => {});
+          })
+          .catch(() => {});
+      }
+      window.dispatchEvent(new CustomEvent("kivo:friend-removed"));
+    };
+
     socket.on("conversation:member-added", onMemberAdded);
     socket.on("conversation:member-removed", onMemberRemoved);
     socket.on("conversation:updated", onConversationUpdated);
     socket.on("conversation:admin-changed", onAdminChanged);
     socket.on("conversation:removed", onConversationRemoved);
+    socket.on("friend:removed", onFriendRemoved);
 
     const onSpaceUpdated = ({ space }) => { if (space) upsertSpace(space); };
     const onSpaceChannel = ({ space }) => {
@@ -1187,6 +1206,7 @@ export function DashboardShell() {
       socket.off("conversation:updated", onConversationUpdated);
       socket.off("conversation:admin-changed", onAdminChanged);
       socket.off("conversation:removed", onConversationRemoved);
+      socket.off("friend:removed", onFriendRemoved);
       socket.off("space:updated", onSpaceUpdated);
       socket.off("space:member-added", onSpaceChannel);
       socket.off("space:member-removed", onSpaceChannel);
@@ -1407,6 +1427,42 @@ export function DashboardShell() {
     }
   };
 
+  // Remove-from-list: right-click a DM/group → confirm modal → permanent
+  // delete (mirrors the backend: both sides lose the thread, hence the
+  // explicit warning). Space channels are never offered this action.
+  const [removeTarget, setRemoveTarget] = useState(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState(null);
+
+  const handleRemoveConversation = (conversation) => {
+    if (!conversation || conversation.type === "space_channel") return;
+    setRemoveError(null);
+    setRemoveTarget(conversation);
+  };
+
+  const confirmRemoveConversation = async () => {
+    if (!removeTarget || removeBusy) return;
+    setRemoveBusy(true);
+    setRemoveError(null);
+    try {
+      await apiDelete(`/api/v1/conversations/${removeTarget.id}`);
+      const removedId = removeTarget.id;
+      setConversations((prev) => {
+        const next = prev.filter((c) => c.id !== removedId);
+        const uid = getSession()?.id;
+        if (uid) setCachedConversations(uid, next).catch(() => {});
+        return next;
+      });
+      setSelectedId((id) => (id === removedId ? null : id));
+      setShowGroupSettings(false);
+      setRemoveTarget(null);
+    } catch (e) {
+      setRemoveError(e?.message || "Could not remove this conversation");
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
+
   // Search result handlers
   const handleSearchMessage = useCallback((msg) => {
     if (!msg.conversationId) return;
@@ -1482,6 +1538,42 @@ export function DashboardShell() {
         unreadCount={notifUnread}
       />
     </div>
+  );
+
+  // Shared remove-from-list confirm modal (rendered in both mobile + desktop
+  // branches — deleting is permanent, so the copy names the chat and warns
+  // that both sides lose the history).
+  const removeName = removeTarget
+    ? removeTarget.type === "group"
+      ? removeTarget.name || "this group"
+      : participantName(otherParticipant(removeTarget, currentUser?.id)) ||
+        removeTarget.name ||
+        "this chat"
+    : "";
+  const removeModalNode = (
+    <ConfirmModal
+      open={Boolean(removeTarget)}
+      title={
+        removeTarget?.type === "group"
+          ? `Delete “${removeName}”?`
+          : `Remove “${removeName}”?`
+      }
+      description={
+        removeTarget?.type === "group"
+          ? "This will permanently delete this group and all its messages for every member. This cannot be undone."
+          : "This will permanently delete this conversation and all its messages for both of you. This cannot be undone."
+      }
+      confirmLabel={removeTarget?.type === "group" ? "Delete group" : "Remove"}
+      busy={removeBusy}
+      error={removeError}
+      onConfirm={confirmRemoveConversation}
+      onClose={() => {
+        if (!removeBusy) {
+          setRemoveTarget(null);
+          setRemoveError(null);
+        }
+      }}
+    />
   );
 
   // Mobile: native-like fixed viewport — no rubber-band, no back-area scroll
@@ -1639,6 +1731,7 @@ export function DashboardShell() {
                       onSearchOpen={() => setSearchOpen(true)}
                       onSavedOpen={() => setSavedOpen(true)}
                       onMarkUnread={(id) => handleMarkUnread(id)}
+                      onRemoveConversation={handleRemoveConversation}
                     />
                   </div>
                 )}
@@ -1664,6 +1757,7 @@ export function DashboardShell() {
                       onSearchOpen={() => setSearchOpen(true)}
                       onSavedOpen={() => setSavedOpen(true)}
                       onMarkUnread={(id) => handleMarkUnread(id)}
+                      onRemoveConversation={handleRemoveConversation}
                     />
                   </div>
                 )}
@@ -1718,6 +1812,8 @@ export function DashboardShell() {
         onClose={() => setShowFriends(false)}
         onStartChat={handleStartChat}
       />
+
+      {removeModalNode}
 
       <GroupCreateModal
         open={showGroupCreate}
@@ -1840,6 +1936,7 @@ export function DashboardShell() {
           onSearchOpen={() => setSearchOpen(true)}
           onSavedOpen={() => setSavedOpen(true)}
           onMarkUnread={(id) => handleMarkUnread(id)}
+          onRemoveConversation={handleRemoveConversation}
           onCompose={handleCompose}
           onNewGroup={handleNewGroup}
           onCreateSpace={() => setShowSpaceCreate(true)}
@@ -1984,6 +2081,8 @@ export function DashboardShell() {
           }
         }}
       />
+
+      {removeModalNode}
 
       </div>
     </div>

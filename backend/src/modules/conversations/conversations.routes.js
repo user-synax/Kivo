@@ -34,6 +34,10 @@ router.post("/:id/unread", messagesController.markUnread);
 // Shared chat look for a DM/group (wallpaper + bubble style).
 router.patch("/:id/look", conversationsController.updateLook);
 
+// Permanent delete: DM (either participant) or group (admin only).
+// Space channels are rejected server-side.
+router.delete("/:id", conversationsController.deleteConversation);
+
 // Group management (admin-restricted actions enforced in the service layer).
 router.patch("/:id", conversationsController.updateGroup);
 router.post("/:id/members", conversationsController.addMembers);
