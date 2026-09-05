@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
+import { FounderInviteCard } from "@/components/ui/empty-state";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
@@ -315,7 +316,17 @@ export function FriendsModal({ open, onClose, onStartChat }) {
       )}
       {tab === "friends" && (
         <div className="flex flex-col gap-2">
-          {friends.length === 0 && <EmptyState icon={Users} title="No friends yet" hint="Add someone from the “Add friend” tab." />}
+          {friends.length === 0 && (
+            <>
+              <EmptyState icon={Users} title="No friends yet" hint="Add someone from the “Add friend” tab." />
+              <FounderInviteCard
+                friendsCount={friends.length}
+                onSent={() => {
+                  loadRequests();
+                }}
+              />
+            </>
+          )}
           {friends.map((f) => (
             <PersonRow key={f.id} person={{ ...f, name: fullName(f) }} subtitle={handle(f)}>
               <div className="flex shrink-0 items-center gap-1.5">

@@ -8,11 +8,13 @@ import {
   Layers,
   Mail,
   Megaphone,
+  MessageCircle,
   PanelLeft,
   Pencil,
   Plus,
   Search,
   SearchCode,
+  SearchX,
   UserPlus,
   Users,
   X,
@@ -22,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
+import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
 import { useTheme } from "@/components/theme-provider";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import {
@@ -34,11 +37,15 @@ import {
 // Restrained, no-bounce easing shared across every micro-interaction.
 const EASE = "cubic-bezier(0.22,1,0.36,1)";
 
+// Shared rich empty state lives in components/ui/empty-state.jsx so every
+// list (sidebar, nested rail, saved, threads, search) shares one visual language.
 function EmptyState({ message }) {
   return (
-    <div className="px-4 py-10 text-center">
-      <p className="text-[13px] text-[var(--text-muted)]">{message}</p>
-    </div>
+    <RichEmptyState
+      compact
+      icon={SearchX}
+      title={message}
+    />
   );
 }
 
@@ -176,10 +183,14 @@ function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCr
       </div>
 
       {!spaces?.length ? (
-        <div className="px-3 py-4 text-center">
-          <p className="text-[12px] text-[var(--text-muted)]">No spaces yet</p>
-          <button type="button" onClick={onCreateSpace} className="mt-2 text-[12px] font-medium text-[var(--accent)] hover:underline hover:cursor-pointer">Create a space</button>
-        </div>
+        <RichEmptyState
+          compact
+          icon={Layers}
+          title="No spaces yet"
+          hint="Create a community or discover public ones to join."
+          actionLabel="Create a space"
+          onAction={onCreateSpace}
+        />
       ) : (
         <div className="space-y-1">
           {spaces.map((space) => {
@@ -654,7 +665,16 @@ export function Sidebar({
       {/* Conversation list */}
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5" style={{ overscrollBehavior: "contain" }}>
         {conversations.length === 0 ? (
-          <EmptyState message="No conversations yet" />
+          <>
+            <RichEmptyState
+              icon={MessageCircle}
+              title="No conversations yet"
+              hint="Add a friend to start your first chat — it takes seconds."
+              actionLabel="Find friends"
+              onAction={onCompose}
+            />
+            <FounderInviteCard />
+          </>
         ) : filtered.length === 0 ? (
           <EmptyState message={`No friends match “${query.trim()}”`} />
         ) : (

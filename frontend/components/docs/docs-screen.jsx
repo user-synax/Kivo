@@ -262,13 +262,13 @@ export function DocsScreen() {
                 You can only link a provider that isn't already attached to another
                 Kivo account.
               </p>
-              <h3 className="doc-h3">Not built yet
-              </h3>
+              <h3 className="doc-h3">Not built yet</h3>
               <p>
                 These providers are wired in the backend today: Google and
                 GitHub. Other providers (for example, X or Apple) are not
                 available yet.
               </p>
+            </Section>
 
             <Section id="layout" title="The chat layout">
               <p>After you sign in you see:</p>

@@ -3,6 +3,7 @@
 import { Bookmark, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
+import { RichEmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { formatTime, otherParticipant, participantName } from "@/lib/chat";
@@ -108,16 +109,11 @@ export function SavedMessagesModal({ open, onClose, onJump }) {
               <span className="text-[13px]">Loading…</span>
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
-              <Bookmark className="h-7 w-7 text-[var(--text-muted)]" aria-hidden />
-              <p className="text-[13px] font-medium text-[var(--text-primary)]">
-                Nothing saved yet
-              </p>
-              <p className="max-w-[260px] text-[12px] text-[var(--text-muted)]">
-                Open the menu on any message (right-click / long-press) and pick
-                “Save message” — quotes, links, and files you want to find again.
-              </p>
-            </div>
+            <RichEmptyState
+              icon={Bookmark}
+              title="Nothing saved yet"
+              hint="Open the menu on any message (right-click / long-press) and pick “Save message” — quotes, links, and files you want to find again."
+            />
           ) : (
             <ul className="flex flex-col">
               {items.map(({ message, savedAt }) => {

@@ -9,6 +9,7 @@ import {
     Copy,
     Forward,
     Lock,
+    MessageCircle,
     MessageSquareText,
     Mic,
     MoreVertical,
@@ -40,6 +41,7 @@ import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { ThreadPanel } from "@/components/dashboard/thread-panel";
 import { MentionAutocomplete } from "@/components/mentions/mention-autocomplete";
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
+import { RichEmptyState } from "@/components/ui/empty-state";
 import { useSocket } from "@/components/socket-provider";
 import { useTheme } from "@/components/theme-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
@@ -193,26 +195,12 @@ function StatusText({ online, lastActiveAt }) {
 
 function EmptyState() {
     return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--bg-base)] px-6 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)]">
-                <svg
-                    width="26"
-                    height="26"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    aria-hidden="true"
-                >
-                    <path
-                        d="M4 5h16v11H9l-4 4V5z"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinejoin="round"
-                    />
-                </svg>
-            </div>
-            <p className="text-sm text-[var(--text-muted)]">
-                Select a conversation to start chatting
-            </p>
+        <div className="flex h-full flex-col items-center justify-center bg-[var(--bg-base)] px-6">
+            <RichEmptyState
+                icon={MessageCircle}
+                title="Select a conversation to start chatting"
+                hint="Pick a chat from the list — or find a friend and say hello."
+            />
         </div>
     );
 }

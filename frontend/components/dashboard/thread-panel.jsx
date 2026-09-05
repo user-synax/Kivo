@@ -4,6 +4,7 @@ import { CornerDownLeft, Loader2, MessageSquareText, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
+import { RichEmptyState } from "@/components/ui/empty-state";
 import { useSocket } from "@/components/socket-provider";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
@@ -300,15 +301,12 @@ export function ThreadPanel({
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
           </div>
         ) : replies.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-            <MessageSquareText className="h-7 w-7 text-[var(--text-muted)]" aria-hidden />
-            <p className="text-[13px] font-medium text-[var(--text-primary)]">
-              No replies yet
-            </p>
-            <p className="max-w-[240px] text-[12px] text-[var(--text-muted)]">
-              Reply below to start the discussion. Everyone in the chat can see
-              and join this thread.
-            </p>
+          <div className="flex h-full flex-col items-center justify-center">
+            <RichEmptyState
+              icon={MessageSquareText}
+              title="No replies yet"
+              hint="Reply below to start the discussion. Everyone in the chat can see and join this thread."
+            />
           </div>
         ) : (
           <div className="flex flex-col gap-3">

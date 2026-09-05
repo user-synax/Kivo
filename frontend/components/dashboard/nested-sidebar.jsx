@@ -8,9 +8,11 @@ import {
   Layers,
   Mail,
   Megaphone,
+  MessageCircle,
   Plus,
   Search,
   SearchCode,
+  SearchX,
   UserPlus,
   Users,
   X,
@@ -22,6 +24,7 @@ import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
 import { AppearanceScreen } from "@/components/dashboard/appearance-screen";
 import { IconRail } from "@/components/dashboard/icon-rail";
 import { SettingsPanel } from "@/components/dashboard/settings-panel";
+import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -33,11 +36,15 @@ import {
 const EASE = [0.22, 1, 0.36, 1];
 const EASE_STR = "cubic-bezier(0.22,1,0.36,1)";
 
-function EmptyState({ message }) {
+function EmptyState({ message, icon: Icon = SearchX, actionLabel, onAction }) {
   return (
-    <div className="px-4 py-10 text-center">
-      <p className="text-[13px] text-[var(--text-muted)]">{message}</p>
-    </div>
+    <RichEmptyState
+      compact
+      icon={Icon}
+      title={message}
+      actionLabel={actionLabel}
+      onAction={onAction}
+    />
   );
 }
 
@@ -133,16 +140,14 @@ function SpacesList({ spaces, channels, selectedId, onSelect, onCreateSpace }) {
 
   if (!spaces?.length) {
     return (
-      <div className="px-3 py-10 text-center">
-        <p className="text-[12px] text-[var(--text-muted)]">No spaces yet</p>
-        <button
-          type="button"
-          onClick={onCreateSpace}
-          className="mt-2 text-[12px] font-medium text-[var(--accent)] hover:underline hover:cursor-pointer"
-        >
-          Create a space
-        </button>
-      </div>
+      <RichEmptyState
+        compact
+        icon={Layers}
+        title="No spaces yet"
+        hint="Create a community or discover public ones to join."
+        actionLabel="Create a space"
+        onAction={onCreateSpace}
+      />
     );
   }
 
@@ -494,7 +499,16 @@ export function NestedSidebar({
                 style={{ overscrollBehavior: "contain" }}
               >
                 {conversations.filter((c) => c.type === "dm").length === 0 ? (
-                  <EmptyState message="No chats yet" />
+                  <>
+                    <RichEmptyState
+                      icon={MessageCircle}
+                      title="No chats yet"
+                      hint="Add a friend to start your first chat."
+                      actionLabel="Find friends"
+                      onAction={onCompose}
+                    />
+                    <FounderInviteCard />
+                  </>
                 ) : filteredConversations.length === 0 || chatsItems.length === 0 ? (
                   <EmptyState message={query.trim() ? `No results for “${query.trim()}”` : "No chats yet"} />
                 ) : (
@@ -518,7 +532,13 @@ export function NestedSidebar({
                 style={{ overscrollBehavior: "contain" }}
               >
                 {conversations.filter((c) => c.type === "group").length === 0 ? (
-                  <EmptyState message="No groups yet" />
+                  <RichEmptyState
+                    icon={Users}
+                    title="No groups yet"
+                    hint="Create a group with at least two friends."
+                    actionLabel="New group"
+                    onAction={onNewGroup}
+                  />
                 ) : groupsItems.length === 0 ? (
                   <EmptyState message={query.trim() ? `No results for “${query.trim()}”` : "No groups yet"} />
                 ) : (

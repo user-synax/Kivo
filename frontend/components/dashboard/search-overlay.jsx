@@ -12,6 +12,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
+import { RichEmptyState } from "@/components/ui/empty-state";
 import { apiGet } from "@/lib/api";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -317,15 +318,11 @@ export function SearchOverlay({ open, onClose, onSelectMessage, onSelectUser, on
               {/* Results */}
               <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
                 {!hasSearched && !anyLoading && (
-                  <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
-                    <Search className="h-8 w-8 text-[var(--text-muted)]/40" strokeWidth={1.2} />
-                    <p className="text-[13px] text-[var(--text-muted)]">
-                      Start typing to search…
-                    </p>
-                    <p className="text-[11px] text-[var(--text-muted)]/60">
-                      Messages, people, and spaces
-                    </p>
-                  </div>
+                  <RichEmptyState
+                    icon={Search}
+                    title="Start typing to search…"
+                    hint="Messages, people, and spaces"
+                  />
                 )}
 
                 {anyLoading && !anyResults && (
@@ -336,15 +333,11 @@ export function SearchOverlay({ open, onClose, onSelectMessage, onSelectUser, on
                 )}
 
                 {showEmpty && (
-                  <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
-                    <SearchX className="h-8 w-8 text-[var(--text-muted)]/40" strokeWidth={1.2} />
-                    <p className="text-[13px] text-[var(--text-muted)]">
-                      No results for "{query}"
-                    </p>
-                    <p className="text-[11px] text-[var(--text-muted)]/60">
-                      Try a different search term
-                    </p>
-                  </div>
+                  <RichEmptyState
+                    icon={SearchX}
+                    title={`No results for "${query}"`}
+                    hint="Try a different search term"
+                  />
                 )}
 
                 {anyResults && (
