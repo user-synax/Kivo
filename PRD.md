@@ -2,7 +2,7 @@
 
 **Version:** 2.8
 **Last Updated:** September 4, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Perf Optimizations Complete)
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls Complete)
 
 ---
 
@@ -110,6 +110,7 @@ Kivo
 | **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
 | **Shared Media Drawer** | **Complete** | Per-chat Media/Files/Links gallery (drawer/sheet) with viewer, counts, jump-to-message, rich empty states |
 | **Conversation Delete** | **Complete** | Right-click → Remove from list → confirm modal; `DELETE /conversations/:id` (DM either side, group admin, channels rejected); live `conversation:removed` fan-out |
+| **Voice & Video Calls** | **Complete** | LiveKit Cloud SFU; `POST /api/v1/calls/token` (membership/ban/block-guarded, 6h TTL) + `GET /calls/status` (Join pill); Socket.IO ring (`call:ring/accept/decline/end/missed/failed`, 30s timeout, per-conversation spam guard); incoming overlay + floating call panel (mute/camera/devices/leave, voice→video upgrade, mirrored selfie, group grid + headcount, reconnect banner, iOS audio unlock); full in-chat call history (`📞CALL:` system chips: started/cancelled/declined/missed/ended with duration, rich cards + Call back button) + `missed_call` bell entry |
 | **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
 | **Blocking** | **Complete** | Block from DMs & profiles; **Blocked users manager** (Settings list + one-tap unblock); server-enforced, friendships removed |
 | **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
@@ -524,6 +525,17 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | `message:delivered` | Client → Server | Acknowledge receipt of `message:new` |
 | `message:delivery-updated` | Server → Room | Broadcast updated `deliveredTo` array |
 
+#### 4.3.1 Call Signaling Events (LiveKit ring coordination; media flows via LiveKit Cloud)
+
+| Event | Direction | Description |
+|---|---|---|
+| `call:ring` | Client → Server → Room | Incoming call offer (`callId`, `conversationId`, `kind`, caller profile); membership + block guards server-side; 30s timeout → `call:missed` |
+| `call:accept` | Client → Server → Room | Someone answered (`call:accepted` fan-out; others' overlays dismiss) |
+| `call:declined` | Client → Server → Room | Decline with `reason` (`declined`/`busy`); ends the ring for 1:1, continues for groups |
+| `call:ended` | Client → Server → Room | Hangup (1:1 ends the call; group members stay) |
+| `call:missed` | Server → Room | No answer in 30s (drives the missed-call chip + bell entry) |
+| `call:failed` | Server → Caller | Ring rejected (`CALL_BLOCKED`) |
+
 #### 4.4 Typing Indicators
 
 | Event | Direction | Description |
@@ -818,6 +830,7 @@ End-to-end notification system covering **in-app** delivery and **web push** for
 | `space_invite` | Reserved for a future "invite this person" notification (today's Space invites use rotating link codes) |
 | `mention` | `@mention` in a message (shipped) |
 | `wave` | A user taps **Wave 👋** on your profile (20s per-recipient cooldown) |
+| `missed_call` | Unanswered voice/video call (30s ring timeout) — chip in chat + bell entry, gated on DM/group prefs |
 
 #### 8.2 Delivery Model
 
@@ -850,7 +863,8 @@ Notification {
   recipientId:  ObjectId → User (required, indexed)
   senderId:     ObjectId → User (nullable)
   type:         enum ["dm_message","group_message","space_message",
-                      "friend_request","friend_accept","space_invite","mention","wave"]
+                      "friend_request","friend_accept","space_invite","mention","wave",
+                      "missed_call"]
   conversationId: ObjectId → Conversation (nullable, indexed)
   messageId:    ObjectId → Message (nullable)
   spaceId:      ObjectId → Space (nullable)
@@ -1178,6 +1192,18 @@ Refresh token is sent automatically via httpOnly cookie.
 |---|---|---|---|
 | GET | `/api/v1/link-preview?url=…` | Yes (rate-limited 30/min) | — (returns `{ url, siteName, title, description, image, favicon, domain, cached }`) |
 
+#### Calls (LiveKit voice & video)
+
+Media flows through LiveKit Cloud; the backend mints tokens and coordinates ringing over Socket.IO.
+
+| Method | Path | Auth | Rate Limit | Body |
+|---|---|---|---|---|
+| GET | `/api/v1/calls/config` | Yes | — | — (returns `{ enabled, url }`; `url` is not secret) |
+| POST | `/api/v1/calls/token` | Yes | 20/min | `{ conversationId, kind: "voice"|"video" }` → `{ token, url, roomName, callId, kind }` (6h TTL; membership/ban/block-guarded) |
+| GET | `/api/v1/calls/status?conversationId=` | Yes | — | — (returns `{ active, participantCount }` from LiveKit, for the Join pill) |
+
+Room names are deterministic per conversation (`kivo_<conversationId>`) so late joiners and reconnects land in the same room. Socket ring registry (30s timeout → `call:missed` + missed-call chip + `missed_call` notification) lives in `socket/index.js`.
+
 #### Admin (standalone panel at `/admin`)
 
 Admin auth uses a separate JWT cookie (`admin_token`) — never mixed with user auth.
@@ -1407,7 +1433,8 @@ Each module follows a 4-file pattern:
   recipientId:       ObjectId → User (required, indexed)
   senderId:          ObjectId → User (nullable)
   type:              enum ["dm_message","group_message","space_message",
-                           "friend_request","friend_accept","space_invite","mention"]
+                           "friend_request","friend_accept","space_invite","mention",
+                           "wave","missed_call"]
   conversationId:    ObjectId → Conversation (nullable, indexed)
   messageId:         ObjectId → Message (nullable)
   spaceId:           ObjectId → Space (nullable)
@@ -1616,6 +1643,7 @@ components/
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT`
+- `LIVEKIT_URL` / `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` (voice & video calls via LiveKit Cloud; optional — calls stay hidden until set)
 - `GMAIL_USER` / `GMAIL_APP_PASSWORD` (transactional email — password reset, verification resend)
 - `EMAIL_FROM` (From header for outgoing mail)
 - `FRONTEND_URL` (base URL for email verify/reset links)
@@ -1633,7 +1661,7 @@ Maintain `.env.example` in both frontend and backend.
 ## Out of Scope for MVP
 
 - Slack-style work-management features
-- Full voice channels / video calls / screen sharing (not started — no backend or UI)
+- Voice rooms / screen sharing / call recording (1:1 + group voice/video calls are shipped via LiveKit)
 - End-to-end encryption
 - Bots / webhooks / integrations
 - Marketplace
@@ -1665,11 +1693,10 @@ These may be considered after the core communication experience is stable.
 - **Last online status**, **Mark as unread / New messages separator**, and **reconnect gap-fill**.
 - **Global search (Ctrl+K)**, **admin panel**, **public profiles** (`/u/:username`, badges, GitHub graphs), **blocking**, **notification preferences**, and **rate limiting**.
 
-### Phase 1.5 — Voice Foundations
+### Phase 1.5 — Voice Foundations (Shipped)
 
-- DM & group voice calls (no backend or frontend yet).
-- Voice channel frontend.
-- Automatic verification email at signup / in-app resend banner.
+- DM & group voice + video calls via LiveKit Cloud (token module, ring signaling, incoming overlay, floating call panel, missed-call chips + bell entries).
+- Automatic verification email at signup / in-app resend banner (still pending).
 
 ### Phase 2 — Enhanced Messaging
 

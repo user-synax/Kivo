@@ -16,6 +16,7 @@ import {
     MoreVertical,
     Paperclip,
     Palette,
+    Phone,
     Pin,
     Reply,
     Send,
@@ -24,6 +25,7 @@ import {
     User,
     UserMinus,
     Users,
+    Video,
     X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -44,6 +46,9 @@ import { ThreadPanel } from "@/components/dashboard/thread-panel";
 import { MentionAutocomplete } from "@/components/mentions/mention-autocomplete";
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { RichEmptyState } from "@/components/ui/empty-state";
+import { useCalls } from "@/components/calls/call-provider";
+import { CallChip, parseCallChip } from "@/components/calls/call-chip";
+import { fetchCallStatus } from "@/lib/calls";
 import { useSocket } from "@/components/socket-provider";
 import { useTheme } from "@/components/theme-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
@@ -341,11 +346,16 @@ const MessageRows = React.memo(function MessageRows({
         const showDateDivider =
             i === 0 || dayKey(m.createdAt) !== dayKey(prevMsg?.createdAt);
         if (m.type === "system") {
+            const callChip = parseCallChip(m.content);
             return (
                 <React.Fragment key={m.id}>
                     {showDateDivider && <DateDivider ts={m.createdAt} />}
                     {isFirstUnread && <NewMessagesSeparator />}
-                    <SystemNotice content={m.content} />
+                    {callChip ? (
+                        <CallChip message={m} call={callChip} />
+                    ) : (
+                        <SystemNotice content={m.content} />
+                    )}
                 </React.Fragment>
             );
         }
@@ -708,6 +718,19 @@ export function ChatPanel({
     const [pinBusyId, setPinBusyId] = useState(null);
     const [lookOpen, setLookOpen] = useState(false);
     const [mediaOpen, setMediaOpen] = useState(false);
+    // Ongoing-call Join pill (group late-join / rejoin after drop).
+    const [ongoingCall, setOngoingCall] = useState(null);
+    const callsCtx = useCalls() || {};
+    const {
+        enabled: callsEnabled,
+        session: callSession,
+        outgoing: callOutgoing,
+        incoming: callIncoming,
+        startCall,
+        joinOngoing,
+    } = callsCtx;
+    const inAnyCall = Boolean(callSession || callOutgoing || callIncoming);
+    const inThisCall = Boolean(callSession && callSession.conversationId === convId);
     const [forwardOpen, setForwardOpen] = useState(false);
     const [forwardQueue, setForwardQueue] = useState([]);
     const [forwardConvs, setForwardConvs] = useState([]);
@@ -760,6 +783,7 @@ export function ChatPanel({
         setForwardOpen(false);
         setLookOpen(false);
         setMediaOpen(false);
+        setOngoingCall(null);
         setPinnedMessages([]);
         setThreadRoot(null);
         setThreadSummaries({});
@@ -772,6 +796,42 @@ export function ChatPanel({
         refreshThreadSummaries();
         return undefined;
     }, [convId]);
+
+    // Ongoing-call lookup for the Join pill (late join / rejoin after drop).
+    // Fetched on open + refreshed on call lifecycle events; never for channels.
+    useEffect(() => {
+        if (!convId || isChannel) return undefined;
+        let cancelled = false;
+        fetchCallStatus(convId)
+            .then((s) => {
+                if (!cancelled) setOngoingCall(s?.active ? s : null);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [convId, isChannel]);
+
+    useEffect(() => {
+        if (!socket || !convId) return undefined;
+        const refresh = () => {
+            fetchCallStatus(convId)
+                .then((s) => setOngoingCall(s?.active ? s : null))
+                .catch(() => {});
+        };
+        // accepted/ended cover join/leave; declined/missed cover the rejoin
+        // path after turning down a group ring (overlay gone, pill takes over).
+        socket.on("call:accepted", refresh);
+        socket.on("call:declined", refresh);
+        socket.on("call:missed", refresh);
+        socket.on("call:ended", refresh);
+        return () => {
+            socket.off("call:accepted", refresh);
+            socket.off("call:declined", refresh);
+            socket.off("call:missed", refresh);
+            socket.off("call:ended", refresh);
+        };
+    }, [socket, convId]);
 
     // Leave select mode with Escape.
     useEffect(() => {
@@ -2692,7 +2752,7 @@ export function ChatPanel({
                 />
             )}
             {/* Header — keep visible on mobile when keyboard opens (sticky + bg) */}
-            <div className="relative z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0">
+            <div className="relative z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0 max-md:gap-2 max-md:px-3">
                 {onBack && (
                     <button
                         type="button"
@@ -2732,12 +2792,36 @@ export function ChatPanel({
                         )}
                     </p>
                 </div>
+                {callsEnabled && conversation && !isChannel && !isBlockedByMe && !isBlockedByOther && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => startCall?.(conversation, "voice")}
+                            disabled={inAnyCall || isOffline}
+                            aria-label="Start voice call"
+                            title={inAnyCall ? "Already in a call" : "Voice call"}
+                            className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40"
+                        >
+                            <Phone className="h-5 w-5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => startCall?.(conversation, "video")}
+                            disabled={inAnyCall || isOffline}
+                            aria-label="Start video call"
+                            title={inAnyCall ? "Already in a call" : "Video call"}
+                            className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40"
+                        >
+                            <Video className="h-5 w-5" />
+                        </button>
+                    </>
+                )}
                 {conversation && !isChannel && (
                     <button
                         type="button"
                         onClick={() => setLookOpen(true)}
                         aria-label="Chat look"
-                        className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                        className="max-md:hidden flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                     >
                         <Palette className="h-5 w-5" />
                     </button>
@@ -2748,7 +2832,7 @@ export function ChatPanel({
                         onClick={() => setMediaOpen(true)}
                         aria-label="Shared media"
                         title="Shared media"
-                        className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                        className="max-md:hidden flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                     >
                         <LayoutGrid className="h-5 w-5" />
                     </button>
@@ -2763,7 +2847,7 @@ export function ChatPanel({
                         <Users className="h-5 w-5" />
                     </button>
                 )}
-                {isDm && otherId && isMobile && (
+                {isMobile && (
                     <div ref={moreRef} className="relative">
                         <motion.button
                             type="button"
@@ -2816,59 +2900,108 @@ export function ChatPanel({
                                     }
                                     className="absolute right-0 top-full z-30 mt-2 min-w-48 origin-top-right overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1.5 shadow-xl"
                                 >
-                                    <button
-                                        type="button"
-                                        role="menuitem"
-                                        onClick={() => {
-                                            setShowMore(false);
-                                            setProfileUsername(
-                                                other?.username || otherName,
-                                            );
-                                        }}
-                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)]"
-                                    >
-                                        <User className="h-4 w-4" /> Profile
-                                    </button>
-                                    <div className="mx-3 my-1 h-px bg-[var(--border)]" />
-                                    {isBlockedByMe ? (
+                                    {isDm && otherId && (
                                         <button
                                             type="button"
                                             role="menuitem"
-                                            disabled={blockBusy}
-                                            onClick={handleUnblock}
-                                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)] disabled:opacity-40"
+                                            onClick={() => {
+                                                setShowMore(false);
+                                                setProfileUsername(
+                                                    other?.username || otherName,
+                                                );
+                                            }}
+                                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)]"
                                         >
-                                            <ShieldBan className="h-4 w-4" />{" "}
-                                            Unblock {otherName}
+                                            <User className="h-4 w-4" /> Profile
                                         </button>
-                                    ) : (
+                                    )}
+                                    {!isChannel && (
                                         <button
                                             type="button"
                                             role="menuitem"
-                                            disabled={blockBusy}
-                                            onClick={handleBlock}
-                                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--destructive)] hover:bg-[var(--hover)] disabled:opacity-40"
+                                            onClick={() => {
+                                                setShowMore(false);
+                                                setLookOpen(true);
+                                            }}
+                                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)]"
                                         >
-                                            <Ban className="h-4 w-4" /> Block{" "}
-                                            {otherName}
+                                            <Palette className="h-4 w-4" /> Chat look
                                         </button>
                                     )}
                                     <button
                                         type="button"
                                         role="menuitem"
-                                        disabled={blockBusy}
-                                        onClick={handleRemoveFriend}
-                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--destructive)] disabled:opacity-40"
+                                        onClick={() => {
+                                            setShowMore(false);
+                                            setMediaOpen(true);
+                                        }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)]"
                                     >
-                                        <UserMinus className="h-4 w-4" /> Remove
-                                        friend
+                                        <LayoutGrid className="h-4 w-4" /> Shared media
                                     </button>
+                                    {isDm && otherId && (
+                                        <>
+                                            <div className="mx-3 my-1 h-px bg-[var(--border)]" />
+                                            {isBlockedByMe ? (
+                                                <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    disabled={blockBusy}
+                                                    onClick={handleUnblock}
+                                                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)] disabled:opacity-40"
+                                                >
+                                                    <ShieldBan className="h-4 w-4" />{" "}
+                                                    Unblock {otherName}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    disabled={blockBusy}
+                                                    onClick={handleBlock}
+                                                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--destructive)] hover:bg-[var(--hover)] disabled:opacity-40"
+                                                >
+                                                    <Ban className="h-4 w-4" /> Block{" "}
+                                                    {otherName}
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                disabled={blockBusy}
+                                                onClick={handleRemoveFriend}
+                                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--destructive)] disabled:opacity-40"
+                                            >
+                                                <UserMinus className="h-4 w-4" /> Remove
+                                                friend
+                                            </button>
+                                        </>
+                                    )}
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
                 )}
             </div>
+
+            {/* Ongoing-call Join pill — late join / rejoin after a drop */}
+            {ongoingCall?.active && !inThisCall && (
+                <div className="relative z-10 flex shrink-0 items-center justify-center border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-1.5">
+                    <button
+                        type="button"
+                        onClick={() => joinOngoing?.(conversation)}
+                        disabled={inAnyCall}
+                        className="flex items-center gap-2 rounded-full bg-[#22c55e]/15 px-4 py-1.5 text-[12px] font-semibold text-[#22c55e] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
+                    >
+                        <span className="size-1.5 animate-pulse rounded-full bg-[#22c55e]" />
+                        Ongoing call
+                        {ongoingCall.participantCount > 0 && (
+                            <span>· {ongoingCall.participantCount}</span>
+                        )}
+                        <span className="underline underline-offset-2">Join</span>
+                    </button>
+                </div>
+            )}
 
             {/* Pinned messages banner — newest pins first, jump-to-message on tap */}
             {pinnedMessages.length > 0 && !selectMode && (

@@ -67,7 +67,7 @@ function resolveCategory({ convType, isAnnouncement }) {
   return "directMessages";
 }
 
-function publicNotification(doc) {
+export function publicNotification(doc) {
   const obj = doc.toObject ? doc.toObject() : doc;
   return {
     id: obj._id.toString(),

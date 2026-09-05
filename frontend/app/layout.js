@@ -108,8 +108,8 @@ export default function RootLayout({ children }) {
         {/* JSON-LD is static, built from local constants (no user input). React
             19 renders <script> children verbatim, so no dangerouslySetInnerHTML
             is needed here. */}
-        <script type="application/ld+json">{JSON.stringify(orgJsonLd)}</script>
-        {children}
+          <script type="application/ld+json">{JSON.stringify(orgJsonLd)}</script>
+          {children}
       </body>
     </html>
   );

@@ -153,12 +153,12 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Composer upgrades** — per-conversation drafts in localStorage (debounced, cleared on send), paste-image to attach, ↑-on-empty-composer edits your last message, **mobile swipe-to-reply**
 - **Kivo Plus extras** — custom banner upload (8 MB, `PATCH /users/me/banner`), profile effects (4 presets, `profile-effects.js` / `globals.css`), locked state for free users
 - **Wave & social links** — GitHub/X/Instagram/YouTube/Website fields on profile, `social-links.jsx` chips + brand glyphs, wave ping (`POST /notifications/:id/wave`, 20 s cooldown)
+- **Voice & video calls** — LiveKit Cloud SFU in DMs and groups: incoming overlay with ringtone, floating call panel (mute/camera/devices/leave, voice→video upgrade, group grid), Ongoing-call Join pill, reconnect banner, full in-chat call history (started/declined/missed/ended cards with duration + Call back), missed-call chip + bell entry
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
 - **OAuth / social login** — Google & GitHub signup/login (`GET/POST /api/v1/auth/oauth/:provider*`), account linking in Settings (Verify with Google/GitHub), provider verification badges (Google Verified, GitHub Verified) on public profiles, native Kivo verified badge earned by linking both providers; OAuth-only accounts have no password and continue via the provider button
 - Animated landing page
 
 ### 🚧 Planned / Not Started
-- Voice / video calls (not wired yet — no backend or frontend)
 - Re-sending a verification email automatically at signup (removed with the OTP step)
 
 ---
@@ -289,6 +289,7 @@ bun run lint  # biome check
 | `ACCESS_TOKEN_TTL` / `REFRESH_TOKEN_TTL` | backend | Token lifetimes (default `15m` / `7d`) |
 | `REFRESH_COOKIE_SAMESITE` | backend | `strict` (or `lax` for cross-subdomain) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | backend | Web push (VAPID) keys for offline notifications |
+| `LIVEKIT_URL` / `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | backend | LiveKit Cloud for voice & video calls (optional — call buttons stay hidden until set) |
 | `APPWRITE_ENDPOINT` / `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` | backend | Appwrite credentials (storage) |
 | `APPWRITE_BUCKET_ID` | backend | Appwrite bucket for avatar uploads |
 | `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket for message attachments (separate from avatar bucket) |
@@ -360,6 +361,8 @@ Registration / Login
 | `space:updated` / `space:member-*` / `space:channel-*` | Server → Space | Space, members & channels |
 | `space:deleted` / `space:joined` / `space:removed` | Server → All | Space lifecycle |
 | `notification:new` | Server → User | New in-app notification (fanned out per recipient) |
+| `call:ring` / `call:accepted` / `call:declined` / `call:ended` | Both directions | Call ring coordination (30s timeout → `call:missed`) |
+| `call:missed` / `call:failed` | Server → Room / Caller | No-answer timeout / blocked-call rejection |
 
 > Every connection is **authenticated** via JWT handshake (banned users are rejected at reconnect), and the server verifies conversation/space membership before accepting sensitive events. All socket rooms are joined automatically on connect. After a reconnect the client **gap-fills**: it refetches the conversation list and fetches messages newer than the newest known message in the open chat, so nothing is missed while offline.
 
@@ -510,10 +513,10 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, voice messages, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA |
-| **Phase 1.5** | Voice & video calls |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, voice messages, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA, media gallery, conversation delete |
+| **Phase 1.5** (shipped) | Voice & video calls (LiveKit: DMs + groups, missed calls) |
 | **Phase 2** | Stronger search, video attachments |
-| **Phase 3** | Voice rooms, video calls, screen sharing, bots & webhooks |
+| **Phase 3** | Voice rooms, screen sharing, call recording, bots & webhooks |
 | **Phase 4** | Developer platform, mini-apps, marketplace theme sharing |
 
 ---

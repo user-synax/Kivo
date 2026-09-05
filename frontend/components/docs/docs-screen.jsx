@@ -21,6 +21,7 @@ const TOC = [
   { id: "profile", label: "Profile & themes" },
   { id: "notifications", label: "Notifications & install" },
   { id: "keyboard", label: "Keyboard shortcuts" },
+  { id: "calls", label: "Voice & video calls" },
   { id: "not-yet", label: "Not built yet" },
 ];
 
@@ -793,8 +794,6 @@ export function DocsScreen() {
                 kivo.usersynax.dev yet:
               </p>
               <ul className="mt-4 flex flex-col gap-2">
-                <Bullet>Voice or video calls — no call backend or UI yet
-                </Bullet>
                 <Bullet>Sharing palettes as saved theme templates</Bullet>
 
                 <Bullet>Video attachments (voice messages are built; video is not)</Bullet>
@@ -804,6 +803,23 @@ export function DocsScreen() {
                   and delivered automatically when you're back)
                 </Bullet>
               </ul>
+            </Section>
+
+            <Section id="calls" title="Voice & video calls">
+              <p>
+                Tap the phone (voice) or video button in any DM or group
+                header to call. The other side gets an incoming screen with
+                Accept / Decline; in groups the first to accept joins and
+                everyone else sees an Ongoing call · Join pill. Mid-call you
+                can mute, toggle video, switch mic/camera from Devices, and
+                leave from the floating panel — voice upgrades to video
+                without rejoining. No answer in 30 seconds leaves a
+                missed-call chip plus a bell entry. Every call also leaves a
+                history card in the chat (started, declined, missed,
+                cancelled, or ended with duration) with a Call back button.
+                Calls need mic/camera permission and are unavailable in Space
+                channels and blocked chats.
+              </p>
             </Section>
 
             <section

@@ -917,11 +917,25 @@ What does **not** queue: file/photo attachments (uploads need a live connection)
 
 ---
 
+## 22. Voice & video calls
+
+Kivo calls run on LiveKit Cloud: tap the **phone** (voice) or **video** button in any DM/group header.
+
+1. The other side gets a full-screen incoming call screen (ringtone + vibration on mobile) with **Accept** / **Decline**.
+2. While in a call you get a floating panel: speaking indicators, mute/unmute, camera on/off (voice upgrades to video mid-call without rejoining), a **Devices** button to switch microphone/camera, a live timer, and Leave.
+3. In groups, the first person to accept joins; everyone else sees an **Ongoing call · Join** pill in the chat and can hop in late (the header shows who's in the call). If you're already in a call, new rings auto-decline as **Busy**.
+4. No answer in 30 s → a centered **missed call** chip in the chat plus a **Missed call** bell entry (tap it to reopen the chat). Declined calls show "Call declined" / "User is busy" instead. If the network drops mid-call, a **Reconnecting…** banner shows while LiveKit recovers.
+
+Every call also leaves a **history card in the chat** — who started it, whether it was answered / declined / missed / cancelled, and how long it lasted ("Ended · 4:32"). Missed, declined, cancelled, and ended cards carry a one-tap **Call back** button so you never lose the thread.
+
+Notes: calls need mic (and camera for video) permission — a blocked permission shows a friendly error instead of a dead screen. Calls are unavailable in Space channels and in blocked chats, and need LiveKit keys on the server (`LIVEKIT_URL/KEY/SECRET` — without them the buttons stay hidden).
+
+---
+
 ## What is not in the product yet
 
 Do not expect these in the current MVP:
 
-- **Voice / video calls** — no backend wiring and no call UI
 - Automatic verification email on signup / in-app resend banner (the link-based verify flow remains on the API)
 - Self-serve Stripe/payment for Kivo Plus — Plus is admin-granted only (`free` → `plus`); no checkout UI
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
@@ -974,6 +988,7 @@ Do not expect these in the current MVP:
 | Mark as unread | Right-click conversation → Mark as unread |
 | Remove from list (delete chat) | Right-click DM/group → Remove from list → confirm modal (permanent, both sides) |
 | Shared media gallery | Grid icon in chat header → Media/Files/Links drawer with viewer + jump-to-message |
+| Voice & video calls (DMs + groups) | Phone/video buttons in chat header; incoming overlay; floating call panel (mute/camera/leave); Ongoing-call Join pill; missed-call chip + bell entry |
 | Clickable links + link preview cards | Links open in a new tab; first link unfurls title/description/image (`GET /api/v1/link-preview?url=…`) |
 | Date dividers + big emoji | Day pills across history; 1–3 emoji-only messages render large, bubble-free |
 | Jump-to-latest pill | Floating "N new" / "Latest" button when scrolled up; no auto-scroll yank while reading |

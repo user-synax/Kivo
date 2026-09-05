@@ -26,12 +26,69 @@ const onlineUsers = new Map();
 const PRESENCE_OFFLINE_GRACE_MS = 12_000;
 const pendingOffline = new Map(); // userId -> { timer: Timeout }
 
+// Call ring registry — tracks unanswered rings so a 30s no-answer times out
+// into `call:missed` + a missed-call chip/notification (see calls.service).
+// Media flows through LiveKit Cloud; this only coordinates the ring.
+// Map<callId, { conversationId, callerId, kind, size, timer, answered }>
+const RING_TIMEOUT_MS = 30_000;
+const activeRings = new Map();
+
+// Ring spam guard — one ring per conversation per window. Token mints are
+// rate-limited by REST, but ring broadcasts are socket events; without this a
+// client could strobe everyone's overlay.
+const RING_MIN_INTERVAL_MS = 3_000;
+const lastRingAt = new Map(); // `${userId}:${conversationId}` -> timestamp
+
+function clearRing(callId) {
+  const ring = activeRings.get(callId);
+  if (ring?.timer) clearTimeout(ring.timer);
+  activeRings.delete(callId);
+}
+
+async function onRingTimeout(callId) {
+  const ring = activeRings.get(callId);
+  activeRings.delete(callId);
+  if (!ring || ring.answered || !io) return;
+  io.to(roomName(ring.conversationId)).emit("call:missed", {
+    callId,
+    conversationId: ring.conversationId,
+  });
+  try {
+    // Dynamic import: calls.service statically imports getIO() from this
+    // module, so a static import back would be a cycle.
+    const { recordMissedCall } = await import("../modules/calls/calls.service.js");
+    await recordMissedCall({
+      conversationId: ring.conversationId,
+      callerId: ring.callerId,
+      kind: ring.kind,
+      callId,
+    });
+  } catch (err) {
+    console.error("[socket] missed-call handling failed", err);
+  }
+}
+
+// callIds with at least one accept — distinguishes "cancelled before answer"
+// from "ended after talk" when the hangup arrives. Bounded like the registry.
+const acceptedCallIds = new Set();
+function markCallAccepted(callId) {
+  acceptedCallIds.add(callId);
+  if (acceptedCallIds.size > 1000) {
+    acceptedCallIds.delete(acceptedCallIds.values().next().value);
+  }
+}
+
+// Clamp client-reported call durations (display only) to a sane range.
+function clampDurationSec(raw) {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(n, 24 * 3600);
+}
 // Focused DM tracking — which conversation the user is currently viewing.
 // Used to suppress DM notifications when the recipient is actively looking at
 // that DM (spec: "when user is on the dm do not send them notification").
 // Map<userId, conversationId | null>
 const focusedConversationByUser = new Map();
-
 function setFocusedConversation(userId, conversationId) {
   if (!conversationId) focusedConversationByUser.delete(userId);
   else focusedConversationByUser.set(userId, String(conversationId));
@@ -247,6 +304,166 @@ export function initSocket(server) {
     });
     socket.on("conversation:blur", () => {
       setFocusedConversation(userId, null);
+    });
+
+    // Call ring signaling for LiveKit calls. The caller emits `call:ring`
+    // after fetching a token; everyone else in the conversation room gets the
+    // payload (overlay + ringtone). Accept/decline/end are relayed; a 30s
+    // no-answer times out into `call:missed` + chip/notification.
+    // Sender identity always comes from the handshake JWT — never the payload.
+    socket.on("call:ring", async (data) => {
+      const callId = data?.callId ? String(data.callId) : null;
+      const conversationId = data?.conversationId;
+      const kind = data?.kind;
+      if (!callId || !conversationId || !["voice", "video"].includes(kind)) return;
+      if (activeRings.has(callId)) return;
+      const ringKey = `${userId}:${conversationId}`;
+      const lastRing = lastRingAt.get(ringKey) || 0;
+      if (Date.now() - lastRing < RING_MIN_INTERVAL_MS) return;
+      lastRingAt.set(ringKey, Date.now());
+      try {
+        const conv = await Conversation.findById(conversationId)
+          .select("participants type")
+          .lean();
+        if (!conv || conv.type === "space_channel") return;
+        const ids = (conv.participants || []).map((p) => p.toString());
+        if (!ids.includes(userId)) return;
+        // Blocked DMs never ring (mirrors the token endpoint guard).
+        if (conv.type === "dm") {
+          const otherId = ids.find((id) => id !== userId);
+          if (otherId) {
+            const [me, other] = await Promise.all([
+              User.findById(userId).select("blockedUsers").lean(),
+              User.findById(otherId).select("blockedUsers").lean(),
+            ]);
+            const meBlocked = new Set((me?.blockedUsers || []).map((id) => id.toString()));
+            const themBlocked = new Set((other?.blockedUsers || []).map((id) => id.toString()));
+            if (meBlocked.has(otherId) || themBlocked.has(userId)) {
+              socket.emit("call:failed", { callId, conversationId, code: "CALL_BLOCKED" });
+              return;
+            }
+          }
+        }
+        const caller = await User.findById(userId)
+          .select("displayName username avatarUrl")
+          .lean();
+        socket.to(roomName(conversationId)).emit("call:ring", {
+          callId,
+          conversationId,
+          kind,
+          caller: {
+            id: userId,
+            displayName: caller?.displayName || null,
+            username: caller?.username || null,
+            avatarUrl: caller?.avatarUrl || null,
+          },
+        });
+        if (activeRings.size > 500) {
+          clearRing(activeRings.keys().next().value);
+        }
+        const timer = setTimeout(() => onRingTimeout(callId), RING_TIMEOUT_MS);
+        activeRings.set(callId, {
+          conversationId,
+          callerId: userId,
+          kind,
+          size: ids.length,
+          timer,
+          answered: false,
+        });
+        // History chip: "Ayush started a voice call" (deduped per call).
+        try {
+          const { recordCallStarted } = await import("../modules/calls/calls.service.js");
+          await recordCallStarted({ conversationId, callerId: userId, kind, callId });
+        } catch (err) {
+          console.error("[socket] started-chip failed", err);
+        }
+      } catch (err) {
+        console.error("[socket] call:ring failed", err);
+      }
+    });
+    socket.on("call:accept", (data) => {
+      const callId = data?.callId ? String(data.callId) : null;
+      const conversationId = data?.conversationId;
+      if (!callId || !conversationId) return;
+      const ring = activeRings.get(callId);
+      if (ring) {
+        ring.answered = true;
+        clearRing(callId);
+      }
+      markCallAccepted(callId);
+      io.to(roomName(conversationId)).emit("call:accepted", {
+        callId,
+        conversationId,
+        userId,
+      });
+    });
+    socket.on("call:decline", async (data) => {
+      const callId = data?.callId ? String(data.callId) : null;
+      const conversationId = data?.conversationId;
+      if (!callId || !conversationId) return;
+      const ring = activeRings.get(callId);
+      // Explicit decline ends the ring for 1:1 (no missed chip); in groups
+      // the ring continues for the remaining members.
+      if (ring && ring.size <= 2) {
+        ring.answered = true;
+        clearRing(callId);
+        // History chip: "Ayush declined the call" (deduped per call).
+        try {
+          const { recordCallDeclined } = await import("../modules/calls/calls.service.js");
+          const kind = data?.kind === "video" ? "video" : "voice";
+          await recordCallDeclined({ conversationId, declinerId: userId, kind, callId });
+        } catch (err) {
+          console.error("[socket] declined-chip failed", err);
+        }
+      }
+      socket.to(roomName(conversationId)).emit("call:declined", {
+        callId,
+        conversationId,
+        userId,
+        reason: data?.reason || "declined",
+      });
+    });
+    socket.on("call:end", async (data) => {
+      const callId = data?.callId ? String(data.callId) : null;
+      const conversationId = data?.conversationId;
+      if (!callId || !conversationId) return;
+      const ring = activeRings.get(callId);
+      if (ring) {
+        ring.answered = true;
+        clearRing(callId);
+      }
+      const wasAccepted = acceptedCallIds.has(callId);
+      acceptedCallIds.delete(callId);
+      io.to(roomName(conversationId)).emit("call:ended", {
+        callId,
+        conversationId,
+        userId,
+      });
+      // History chip: "Call ended · 4:32" after a talk, "cancelled" when hung
+      // up before anyone answered. Deduped per call; groups only log once the
+      // room actually empties (checked inside the service).
+      try {
+        const callsService = await import("../modules/calls/calls.service.js");
+        const kind = data?.kind === "video" ? "video" : "voice";
+        if (wasAccepted) {
+          await callsService.recordCallEnded({
+            conversationId,
+            enderId: userId,
+            kind,
+            callId,
+            durationSec: clampDurationSec(data?.durationSec),
+          });
+        } else {
+          await callsService.recordCallCancelled({
+            conversationId,
+            callerId: userId,
+            kind,
+            callId,
+          });
+        }
+      } catch (err) {
+        console.error("[socket] ended-chip failed", err);
+      }
     });
 
     // Delivery receipt. Client acknowledges a received `message:new` with the

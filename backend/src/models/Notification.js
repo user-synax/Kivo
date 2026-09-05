@@ -9,6 +9,7 @@ const NOTIFICATION_TYPES = [
   "space_invite",
   "mention",
   "wave",
+  "missed_call",
 ];
 
 const notificationSchema = new mongoose.Schema(

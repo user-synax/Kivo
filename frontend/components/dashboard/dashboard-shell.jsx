@@ -42,6 +42,9 @@ import { SearchOverlay } from "@/components/dashboard/search-overlay";
 import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { UserPanel } from "./user-panel";
 import { BottomTabBar } from "./bottom-tab-bar";
+import { CallProvider } from "@/components/calls/call-provider";
+import { IncomingCallOverlay } from "@/components/calls/incoming-call-overlay";
+import { ActiveCallView, CallEndedToast } from "@/components/calls/active-call-view";
 import { Avatar } from "./avatar";
 import { ProfileEditModal } from "./profile-edit-modal";
 import { SettingsPanel } from "./settings-panel";
@@ -654,6 +657,17 @@ export function DashboardShell() {
         const pageHidden =
           typeof document !== "undefined" && document.visibilityState !== "visible";
         if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
+      }
+      // A missed call deserves attention — cue it like its conversation type.
+      if (notif.type === "missed_call") {
+        const pageHidden =
+          typeof document !== "undefined" && document.visibilityState !== "visible";
+        if (pageHidden || !notifOpenRef.current) {
+          const conv = (conversationsRef.current || []).find(
+            (c) => c.id === notif.conversationId,
+          );
+          playCue(conv?.type === "group" ? "groupMessages" : "directMessages");
+        }
       }
       if (notif.type === "dm_message" && notif.conversationId === selectedIdRef.current) {
         const cur = conversationsRef.current.find((c) => c.id === selectedIdRef.current);
@@ -1579,6 +1593,7 @@ export function DashboardShell() {
   // Mobile: native-like fixed viewport — no rubber-band, no back-area scroll
   if (!isDesktop) {
     return (
+      <CallProvider conversations={conversations}>
       <div className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none" style={{ overscrollBehavior: "none", touchAction: "none" }}>
         <AnimatePresence initial={false}>
           {selected ? (
@@ -1915,12 +1930,18 @@ export function DashboardShell() {
           }
         }}
       />
+
+      <IncomingCallOverlay />
+      <ActiveCallView />
+      <CallEndedToast />
     </div>
+      </CallProvider>
   );
   }
 
   // Desktop: nested icon-rail + panel sidebar + chat side by side.
   return (
+    <CallProvider conversations={conversations}>
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
       <div className="flex min-h-0 flex-1">
       <div className="hidden h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
@@ -2084,8 +2105,13 @@ export function DashboardShell() {
 
       {removeModalNode}
 
+      <IncomingCallOverlay />
+      <ActiveCallView />
+      <CallEndedToast />
+
       </div>
     </div>
+    </CallProvider>
   );
 }
 

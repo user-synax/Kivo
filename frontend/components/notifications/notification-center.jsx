@@ -138,7 +138,9 @@ export function NotificationCenter({
                                 ? "Wave"
                                 : n.type === "mention"
                                   ? "Mention"
-                                  : n.type}
+                                  : n.type === "missed_call"
+                                    ? "Missed call"
+                                    : n.type}
                   </span>
                 </span>
               </button>

@@ -68,6 +68,14 @@ const env = {
     process.env.GITHUB_REDIRECT_URI ||
     `${process.env.FRONTEND_URL || "http://localhost:3000"}/api/v1/auth/oauth/github/callback`,
 
+  // LiveKit (voice & video calls via LiveKit Cloud). Optional like
+  // Appwrite — the server boots without them; POST /api/v1/calls/token
+  // reports CALLS_NOT_CONFIGURED until they're set. Get keys at
+  // https://cloud.livekit.io (project Settings → Keys).
+  livekitUrl: process.env.LIVEKIT_URL || "",
+  livekitApiKey: process.env.LIVEKIT_API_KEY || "",
+  livekitApiSecret: process.env.LIVEKIT_API_SECRET || "",
+
   // Admin panel — standalone credential pair, NOT a DB user account.
   adminEmail: process.env.ADMIN_EMAIL || "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",
