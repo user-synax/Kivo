@@ -142,7 +142,14 @@ async function fetchGoogleProfile(code) {
     // verified; treat the email as verified (drives isEmailVerified).
     displayName: info.name ? String(info.name).slice(0, 50) : null,
     avatarUrl: info.picture ? String(info.picture) : null,
-    usernameHint: null,
+    // `given_name` ("Ayush") makes the best username hint; fall back to the
+    // first word of the full name. Email prefix is tried separately in the
+    // hints list, so null here just means "skip me".
+    usernameHint: info.given_name
+      ? String(info.given_name)
+      : info.name
+        ? String(info.name).split(/\s+/)[0]
+        : null,
   };
 }
 
@@ -229,6 +236,8 @@ export async function fetchProviderProfile(provider, code) {
 
 // ── Username generation ──────────────────────────────────────────────────
 
+// Returns null when nothing usable remains (caller skips it) — never a
+// placeholder, so a missing hint can never become someone's username.
 function sanitizeUsernameBase(raw) {
   const base = String(raw || "")
     .toLowerCase()
@@ -236,16 +245,21 @@ function sanitizeUsernameBase(raw) {
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 20);
-  return base.length >= 3 ? base : "kivo_user";
+  return base.length >= 3 ? base : null;
 }
 
 async function generateUniqueUsername(hints) {
+  const bases = [];
   for (const hint of hints) {
+    if (hint == null) continue;
     const base = sanitizeUsernameBase(hint);
+    if (base && !bases.includes(base)) bases.push(base);
+  }
+  for (const base of bases) {
     const existing = await User.findOne({ username: base }).select("_id").lean();
     if (!existing) return base;
   }
-  const fallback = sanitizeUsernameBase(hints[0]);
+  const fallback = bases[0] || "kivo_user";
   for (let i = 0; i < 20; i += 1) {
     const suffix = crypto.randomBytes(3).toString("hex").slice(0, 4);
     const candidate = `${fallback.slice(0, 24)}_${suffix}`;
@@ -295,6 +309,9 @@ function applyProviderLink(user, provider, profile) {
   }
   // A provider-verified email is trustworthy — mark the account verified.
   user.isEmailVerified = true;
+  // Backfill the display picture from the provider when the user has none.
+  // Only fills a gap — a custom-uploaded avatar is never overwritten.
+  if (!user.avatarUrl && profile.avatarUrl) user.avatarUrl = profile.avatarUrl;
   recomputeNativeVerified(user);
 }
 
@@ -357,7 +374,6 @@ export async function handleOAuthCallback({ provider, code, state, req }) {
         );
       }
       applyProviderLink(user, provider, profile);
-      if (!user.avatarUrl && profile.avatarUrl) user.avatarUrl = profile.avatarUrl;
       await user.save();
     } else {
       // Brand-new account via OAuth — no password, email pre-verified.
