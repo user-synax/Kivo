@@ -327,7 +327,8 @@ export function DocsScreen() {
               <p>
                 On the Friends tab, click Message. That opens an existing DM or
                 creates one. To remove a friend, open their profile and choose
-                Unfriend — or Block them entirely from any DM or profile.
+                Unfriend — this removes the friendship for both of you at
+                once, live — or Block them entirely from any DM or profile.
                 Everyone you've blocked is listed under Settings → Blocked
                 users, where you can unblock them in one tap.
               </p>
@@ -473,6 +474,13 @@ export function DocsScreen() {
                 marks where your unread messages begin. It clears as you scroll
                 to the latest.
               </p>
+              <h3 className="doc-h3">Remove from list</h3>
+              <p>
+                Right-click (or long-press) a DM or group → Remove from list,
+                then confirm. This permanently deletes the conversation and
+                all its messages for both sides (every member, for groups)
+                and cannot be undone.
+              </p>
             </Section>
 
             <Section id="attachments" title="File, image & voice attachments">
@@ -529,6 +537,13 @@ export function DocsScreen() {
                 PDF, DOC, XLS, PPT, and TXT files show as download cards
                 with an icon, filename, and file size. Click to open or
                 download.
+              </p>
+              <h3 className="doc-h3">Shared media gallery</h3>
+              <p>
+                Click the grid icon in any chat header to open Shared media:
+                every image, file, and link from that chat in one place
+                (Media / Files / Links tabs), with a viewer and a
+                jump-to-message button on each item.
               </p>
             </Section>
 

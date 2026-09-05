@@ -108,6 +108,8 @@ Kivo
 | **Offline Support** | **Complete** | Message cache (IndexedDB), offline indicator, durable send queue (outbox) that flushes queued text on reconnect |
 | **Last Online Status** | **Complete** | "active … ago" labels for offline users (DMs + profiles) |
 | **Mark as Unread** | **Complete** | Context-menu on conversations + "New messages" separator in chat |
+| **Shared Media Drawer** | **Complete** | Per-chat Media/Files/Links gallery (drawer/sheet) with viewer, counts, jump-to-message, rich empty states |
+| **Conversation Delete** | **Complete** | Right-click → Remove from list → confirm modal; `DELETE /conversations/:id` (DM either side, group admin, channels rejected); live `conversation:removed` fan-out |
 | **Notification Preferences** | **Complete** | Per-category toggles (DMs, groups, mentions, friend requests, Space msgs, announcements) |
 | **Blocking** | **Complete** | Block from DMs & profiles; **Blocked users manager** (Settings list + one-tap unblock); server-enforced, friendships removed |
 | **Public Profiles & Verified Badges** | **Complete** | `/u/:username` pages with country flag + GitHub graph; admin-granted `verified`, user-controlled badge |
@@ -166,7 +168,7 @@ Kivo supports signup and login via **Google** and **GitHub** OAuth in addition t
 
 **Flows**
 
-- **Signup via provider:** clicking the button on `/signup` hits `GET /oauth/:provider`, which redirects to the provider. On consent, the backend callback creates a new account (email pre-verified, username generated from profile/email hints, provider avatar used if available) or auto-links to an existing local account with that email. The callback sets the httpOnly refresh cookie and passes the short-lived access token to the frontend `/oauth/callback` page in the URL. Rate limits: `oauth-start`, `oauth-callback`.
+- **Signup via provider:** clicking the button on `/signup` hits `GET /oauth/:provider`, which redirects to the provider. On consent, the backend callback creates a new account (email pre-verified; username from Google first name / GitHub handle → email prefix → display name, empty hints skipped so nobody lands on a placeholder; provider avatar used when available) or auto-links to an existing local account with that email. The callback sets the httpOnly refresh cookie and passes the short-lived access token to the frontend `/oauth/callback` page in the URL. Rate limits: `oauth-start`, `oauth-callback`.
 - **Login via provider:** same start/callback path; if the account has 2FA enabled, the callback redirects to `/login?oauth2fa=1` with a short-lived 2FA ticket in `sessionStorage` so the existing 2FA step can finish the login.
 - **Account linking (Settings):** an authenticated user hits `POST /oauth/:provider/link-url` to get a provider authorization URL whose state embeds their userId. After consent, the callback links the provider to the existing account — no new account is created. Linking **both** Google and GitHub earns the native Kivo `verified` badge automatically (`recomputeNativeVerified`). Rate limit: `oauth-link` (10 per 60 s).
 - **OAuth-only accounts:** accounts created via a provider have `passwordHash: null`. The login endpoint returns `OAUTH_ONLY_ACCOUNT` and tells the user to use the provider button instead. Disabling 2FA on such accounts is allowed (password is optional).
@@ -284,7 +286,7 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | Action | Endpoint |
 |---|---|
 | List friends | `GET /api/v1/friends` |
-| Remove friend | `DELETE /api/v1/friends/:id` |
+| Remove friend | `DELETE /api/v1/friends/:id` | Single shared edge — one delete removes the friendship from **both** users' lists; the other side gets a live `friend:removed` socket event |
 
 #### 2.3 Constraints
 
@@ -516,6 +518,8 @@ Group chats are private multi-person conversations (2+ members) for friends, col
 | `message:new` (thread replies) | Server → Room | Same event as main messages; payload includes `threadId` so clients route to the thread panel / chip refresh |
 | `message:reaction` | Server → Room | Reaction added or removed |
 | `message:read` | Server → Room | Messages marked as read — payload carries the reader + the `upToMessageId`/`upToCreatedAt` anchor and `readAt`, so clients can stamp precise per-message receipts (group "Seen by") |
+| `conversation:removed` | Server → Room + Users | Conversation permanently deleted (or member removed) — clients drop the thread live |
+| `friend:removed` | Server → User | Someone unfriended you — refresh the friend list live |
 | `message:unread` | Server → Room | Conversation marked unread (badge + "New messages" separator) |
 | `message:delivered` | Client → Server | Acknowledge receipt of `message:new` |
 | `message:delivery-updated` | Server → Room | Broadcast updated `deliveredTo` array |
@@ -1089,6 +1093,7 @@ Refresh token is sent automatically via httpOnly cookie.
 | POST | `/api/v1/conversations/:id/messages` | Yes | `{ content?, attachments?, audioDuration?, replyToMessageId?, threadId?, forwardedFromId? }` (content/attachments, `threadId`, or `forwardedFromId` required; forward copies can't add a caption, thread replies can't quote/forward) |
 | PATCH | `/api/v1/conversations/:id/read` | Yes | — |
 | POST | `/api/v1/conversations/:id/unread` | Yes | `{ messageId? }` — mark unread from a message (or latest others') forward |
+| DELETE | `/api/v1/conversations/:id` | Yes | DM: either participant; Group: admin; Space channel: 403 `NOT_ALLOWED` | Permanently deletes the conversation + all its messages for everyone; fans out `conversation:removed` live |
 | PATCH | `/api/v1/conversations/:id/look` | Yes | DM: either participant; Group: admin; Space channel: 403 `NOT_ALLOWED` | `{ wallpaper?, bubbleStyle? }` — per-conversation chat look (`conversationLookSchema`; `null` per field = "Member's own" inheritance; priority conversation > Space > personal via `resolveChatLook`) |
 | PATCH | `/api/v1/conversations/:id` | Group admin | `{ name?, avatar? }` — group name + avatar (routes file also mounts this for group updates) |
 | POST | `/api/v1/conversations/:id/members` | Group admin | `{ userId }` — add members |

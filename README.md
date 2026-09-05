@@ -36,12 +36,14 @@
 - 📋 **Rich message actions** — right-click / long-press any bubble: quick reactions, **copy**, **view profile / block**, **forward with attribution**, **pin to chat**, select mode, and native **Share…** on mobile.
 - ✅ **Read receipts** — tap ticks on your own message for a **Seen by** card (avatar + `Read · time` / `Delivered` per participant — DMs, groups, and Space channels; auto-flips above/below, dismiss on Escape/scroll).
 - 📎 **File & image attachments** — up to 10 images/PDFs/documents per message (30 MB each) in any chat; image lightbox with navigation, inline previews, and download.
+- 🖼️ **Shared media gallery** — grid button in any chat header opens a Media/Files/Links drawer with viewer, counts, and jump-to-message.
+- 🗑️ **Remove from list** — right-click any DM/group → confirm modal → permanently deletes the conversation for everyone (channels excluded).
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status (32 emoji chip + 6 vibe presets: Gaming/Vibing/Away/Studying/Working/Sleepy), bio, banner, avatar uploads & frames, **country flag**, **GitHub contribution graph**, and **social link chips** (GitHub/X/Instagram/YouTube/website) on a public profile page (`/u/username`) — plus a one-tap **Wave 👋** ping (20 s cooldown, `wave` notification that deep-links to the sender's profile), a **Share** sheet with **QR code** for the profile, and the page **wears the owner's theme colors** (`profile-skin.js`).
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
 - 👑 **Kivo Plus (entitlement scaffold)** — admin-granted `free`/`plus` plan (`POST /api/admin/users/:id/plan`; no payments/stripe UI) with Plus-only profile perks: **custom banner uploads** (own GIF/image up to 8 MB, `PATCH /api/v1/users/me/banner`, auto-retires old file) and **profile effects** (`none`/`glow`/`gradient-name`/`aura` — avatar halo + animated name via `profile-effects.js` / `globals.css`). Downgrade resets effects to `none`; free users are server-forced to `none`.
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
-- 🤝 **Complete friends system** — send, accept, decline, **remove**, search, and jump straight into a DM.
+- 🤝 **Complete friends system** — send, accept, decline, **remove** (mutual — both lists update live), search, and jump straight into a DM.
 - 📱 **Mobile-first polish** — a bottom tab bar (Chats / Groups / Spaces / Menu) with Profile, Settings, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
 - 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
@@ -52,7 +54,7 @@
 - 📬 **Mark as unread** — right-click any conversation and re-mark it unread; a "New messages" separator shows where unread hits start.
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, rate limiting on every sensitive route, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
-- 🔑 **OAuth signup & login** — sign up or log in with **Google** or **GitHub** (no password needed); existing accounts with the same email are auto-linked; OAuth-only accounts have no password and continue through the provider; linking both providers earns the native Kivo verified badge automatically.
+- 🔑 **OAuth signup & login** — sign up or log in with **Google** or **GitHub** (no password needed); username comes from your Google first name or GitHub handle and your provider picture becomes your avatar; existing accounts with the same email are auto-linked; OAuth-only accounts have no password and continue through the provider; linking both providers earns the native Kivo verified badge automatically.
 
 ---
 
@@ -113,8 +115,8 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Public profile pages** (`/u/:username`) with verified badge, country flag, GitHub contribution graph, **social link chips**, **Wave 👋** button (20 s cooldown, `wave` notification), **Share sheet + QR code**, and **owner-theme skin** (`profile-skin.js`)
 - **Verification badges** (admin-granted `verified`, visibility toggled by the user in Settings)
 - **Blocking** (block from DMs/profiles; **Blocked users manager in Settings** — list + one-tap unblock; relationships & wave/ping respected server-side)
-- Friends system (request / accept / decline / list / search / **remove**)
-- DM conversations (create, list, history, unread counts — list uses a **single aggregation** for unread badges)
+- Friends system (request / accept / decline / list / search / **remove** — mutual, both sides update live via `friend:removed`)
+- DM conversations (create, list, history, unread counts — list uses a **single aggregation** for unread badges; **Remove from list** permanently deletes a DM/group via confirm modal with live `conversation:removed` fan-out)
 - Text messaging (send, **reply** + **mobile swipe-to-reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, **per-message Seen-by receipts**)
 - **Message actions** — right-click / long-press any bubble: quick-reaction strip, **copy**, **view profile**, **block**, reply, edit/delete (own), **forward**, **pin**, **select mode** (multi-copy/forward/delete), and native **Share…** on mobile; bubble list is **memoized** (`MessageRows`) with O(1) reply map and throttled double-tap like
 - **Forwarding** — resend any message into another conversation with a **"Forwarded from @user"** attribution pill (original author kept)
@@ -137,6 +139,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Mobile UX** (Chats / Groups / Spaces / Menu bottom bar, pushed Settings & Profile screens, full-screen Appearance page, responsive panels, edge-swipe back, safe-area handling)
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
+- **Shared media gallery** (per-chat Media/Files/Links drawer with viewer, counts, jump-to-message, rich empty states)
 - **Voice messages** (hold-to-record in the composer, slide up to cancel, inline play/pause player with progress + duration — recorded in-browser via MediaRecorder, stored as-is, no transcoding)
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
 - **Admin panel** — standalone dashboard with user/group/space management, ban/unban, **Plus plan grant/revoke (`POST /api/admin/users/:id/plan`)**, audit logging

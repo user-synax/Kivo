@@ -43,7 +43,7 @@ UI and interaction · routing · responsive design · API consumption · Socket.
   - `/app` chat dashboard (DashboardShell), `/app/profile`
   - `/u/[username]` **public profiles**
   - `/docs` in-app guide, `/admin` + `/admin/dashboard`
-- `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals), `spaces/`, `notifications/`, `profile/`, `chat/` (attachments), `mentions/`, `ui/`, `motion/` (context menu), `navbar/`, `admin/`, `docs/`
+- `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals, media drawer), `spaces/`, `notifications/`, `profile/`, `chat/` (attachments), `mentions/`, `ui/` (incl. shared `empty-state.jsx`, `confirm-modal.jsx`), `motion/` (context menu), `navbar/`, `admin/`, `docs/`
 - `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `chat-style.js` (wallpaper/bubble-style constants + CSS, `WALLPAPER_OPTIONS`/`BUBBLE_STYLE_OPTIONS`/`resolveChatLook`/`wallpaperCss`), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js` (incl. day-divider helpers), `links.js` (URL extract/normalize), `emoji.js` (grapheme-aware emoji-only detection), `drafts.js` (per-chat composer drafts), `push.js`, `sound.js` (Web Audio sound cues), `last-active.js`, `use-breakpoint.js`, `profile-skin.js` (`ownerSkin`/`profileSkinVars` for public `/u` theming), `profile-effects.js` (`PROFILE_EFFECTS` `glow`/`gradient-name`/`aura`), `social-links.jsx` (`socialLinksFor`/`SocialGlyph`), `outbox.js` (offline queue), hooks, etc.
 - `frontend/Design.md` — visual design system & tokens (Framer dark canvas, `#4ba9e1` blue signal).
 
@@ -96,7 +96,7 @@ Versioned REST APIs under `/api/v1`; the standalone admin API lives under `/api/
 | `/api/v1/auth` | register, login, refresh-token, logout, logout-all, verify-email, resend-verification, forgot/reset-password |
 | `/api/v1/users` | me, profile update/avatar/banner (`PATCH /me/banner` 8 MB Plus), public profile by username, search, blocked list, block/unblock; validation `AVATAR_STYLE_IDS`/`PROFILE_EFFECT_IDS` + `updateMeSchema` (statusEmoji 8, social-link regexes, `appearance` hex + wallpaper/bubble enums) |
 | `/api/v1/friends` | request, accept/decline, list, remove |
-| `/api/v1/conversations` | DMs/groups CRUD, members/admins, read/unread, **conversation look** (`PATCH /:id/look`, `conversationLookSchema`), messages (list/send), pinned list, threads (list + panel feed) |
+| `/api/v1/conversations` | DMs/groups CRUD, members/admins, read/unread, **conversation look** (`PATCH /:id/look`, `conversationLookSchema`), **permanent delete** (`DELETE /:id` — DM either side, group admin, channels 403), messages (list/send), pinned list, threads (list + panel feed) |
 | `/api/v1/messages` | edit, delete, pin/unpin, save/unsave, saved feed, reactions (receipts via `readBy`/`deliveredTo`; "Seen by" card is client `message-bubble.jsx`) |
 | `/api/v1/spaces` | spaces CRUD, discover (public only), join, join-by-invite-code, invite manage (GET/POST/DELETE), members/roles, channels |
 | `/api/v1/notifications` | list, unread-count, mark read, preferences, **wave** (`POST /:id/wave` 20 s cooldown, `WAVE_COOLDOWN`/`WAVE_BLOCKED`, `senderUsername` denormalized, push deep-links to profile) |
@@ -138,7 +138,7 @@ Design notes:
 
 - Socket.IO is the primary realtime layer. All connections authenticate via **JWT handshake**; banned users are rejected at reconnect.
 - On connect, sockets **auto-join** every conversation room (`conversation:<id>`) and space room (`space:<id>`) the user belongs to.
-- Server emits into rooms after DB writes: `message:*` (new/edited/deleted/reaction/**pin-updated**, thread replies reuse `message:new`/`message:edited`/`message:deleted` with `threadId`), `conversation:*` (`member-added`/`member-removed`/`admin-changed`/`removed`/`updated`), `space:*` (`updated`/`member-*`/`channel-*`/`joined`/`removed`/`deleted`), per-user `notification:new` (incl. `wave`).
+- Server emits into rooms after DB writes: `message:*` (new/edited/deleted/reaction/**pin-updated**, thread replies reuse `message:new`/`message:edited`/`message:deleted` with `threadId`), `conversation:*` (`member-added`/`member-removed`/`admin-changed`/`removed`/`updated` — `removed` also fans out per-user on permanent delete so both sides drop the thread live), `space:*` (`updated`/`member-*`/`channel-*`/`joined`/`removed`/`deleted`), per-user `notification:new` (incl. `wave`) and `friend:removed` (unfriend syncs both lists live).
 - Clients emit `typing:start/stop` (re-broadcast), `conversation:focus/blur` (DM notification suppression — checked in `createForMessage` before fan-out), and `message:delivered` (receipt ack).
 - **Presence is in-memory and scoped**: `presence:online/offline` are only fanned out to users who share a conversation or space, with a ~12 s offline grace period to avoid flicker. `presence:snapshot` corrects late joiners. The DM list shows `online` dots; offline labels use `lastActiveAt` → "active X ago" (`last-active.js`, live tick).
 - **Reconnect gap-fill:** after a reconnect the client refetches the conversation list (now via single-aggregation unread counts) and any messages newer than the newest known message (REST `after=`), then merges them into the cache.

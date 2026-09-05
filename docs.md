@@ -70,12 +70,12 @@ You can also create an account (or log in) with **Google** or **GitHub** — no 
 
 1. On `/signup` (or `/login`), click **Sign up with Google** or **Sign up with GitHub**.
 2. You are taken to the provider's consent screen. Authorize Kivo.
-3. If this is a new Kivo account, one is created for you automatically (your email is pre-verified, a username is generated from your profile/email, and your provider avatar is used if available).
+3. If this is a new Kivo account, one is created for you automatically — your email is pre-verified, your username comes from your Google first name or GitHub handle (email prefix as fallback, with a numeric suffix on collision), and your Google/GitHub profile picture becomes your avatar.
 4. You land in `/app` immediately.
 
 **What happens behind the scenes**
 
-- If you already have a Kivo account with that email (local password account or another provider), the provider is **auto-linked** to your existing account — you keep your conversations and friends, and your email becomes verified instantly.
+- If you already have a Kivo account with that email (local password account or another provider), the provider is **auto-linked** to your existing account — you keep your conversations and friends, and your email becomes verified instantly. If you have no avatar yet, the provider picture fills it in (your custom upload is never overwritten).
 - If the same provider account (Google `sub` / GitHub `id`) is already linked to a *different* Kivo account, you get a clear error and cannot double-link.
 - Some accounts are **OAuth-only** — they have no password. If you try to log in with email+password on such an account you are told to continue with the provider instead.
 
@@ -170,6 +170,8 @@ On the **Friends** tab, click **Message**. That opens or creates a 1:1 conversat
 
 Open the person's profile (public page `/u/username` or the in-app profile drawer) and click **Unfriend**.
 
+Friendship is a single shared edge: removing someone deletes it for **both** of you at once, and the other person's friend list updates live (no refresh needed). Your conversation history with them is kept — delete the chat separately with **Remove from list** (see §5) if you want it gone.
+
 ---
 
 ## 5. Direct messages (1:1)
@@ -196,6 +198,10 @@ Click the conversation. On mobile, that replaces the list with the chat panel.
 From the chat header / right-hand profile panel (or any profile page) choose **Block**. Blocking removes the friendship and hides the conversation; the person cannot message you. A blocked conversation shows a clear state instead of the composer.
 
 **Manage who you've blocked:** open **Settings → Blocked users**. Every person you've blocked is listed with their name and avatar; **Unblock** removes them (and re-enables any open DM with them immediately). Unblocking is also possible from the same chat/profile places as blocking.
+
+### Remove a chat from your list
+
+Right-click (or long-press on mobile) a DM or group → **Remove from list**. A confirmation modal names the chat and warns you this is permanent: it deletes the conversation **and all its messages for both sides** (for groups: for every member). This cannot be undone — the modal asks once more before deleting. Space channels can't be removed this way; delete those from Space settings instead.
 
 ---
 
@@ -651,6 +657,16 @@ Voice messages need a connection (they upload like any attachment); while offlin
 - PDF, DOC, XLS, PPT, and TXT files show as **download cards** with an icon, filename, and file size.
 - Click the card to open the file in a new tab (or download it directly from Appwrite).
 
+### Shared media gallery
+
+Click the **grid icon** in any chat header to open the **Shared media** drawer (right panel on desktop, full sheet on mobile):
+
+- **Media** — every image sent in the chat, newest first, with a built-in viewer (arrows, download).
+- **Files** — documents and voice messages with name, size, and sender.
+- **Links** — every URL shared in the chat, grouped by domain.
+
+Every item has a **jump-to-message** button that closes the drawer and scrolls straight to the original message. Empty tabs show a friendly empty state instead of a blank panel.
+
 ---
 
 ## 12. Notifications
@@ -956,6 +972,8 @@ Do not expect these in the current MVP:
 | Forgot / reset password | `/forgot-password` → emailed link → `/reset-password` |
 | Last online status | "active … ago" in DMs & profiles when offline |
 | Mark as unread | Right-click conversation → Mark as unread |
+| Remove from list (delete chat) | Right-click DM/group → Remove from list → confirm modal (permanent, both sides) |
+| Shared media gallery | Grid icon in chat header → Media/Files/Links drawer with viewer + jump-to-message |
 | Clickable links + link preview cards | Links open in a new tab; first link unfurls title/description/image (`GET /api/v1/link-preview?url=…`) |
 | Date dividers + big emoji | Day pills across history; 1–3 emoji-only messages render large, bubble-free |
 | Jump-to-latest pill | Floating "N new" / "Latest" button when scrolled up; no auto-scroll yank while reading |
