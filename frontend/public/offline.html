@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#090909" />
+    <title>Kivo — You are offline</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        background: #090909;
+        color: #fff;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 420px;
+        width: 100%;
+        border: 1px solid #262626;
+        border-radius: 20px;
+        background: #141414;
+        padding: 32px 28px;
+        text-align: center;
+      }
+      .dot-wrap {
+        width: 56px; height: 56px;
+        margin: 0 auto 20px;
+        border-radius: 50%;
+        background: rgba(255, 85, 119, 0.12);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .dot-wrap svg { width: 26px; height: 26px; stroke: #ff5577; }
+      h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+      p { margin-top: 10px; font-size: 14px; line-height: 1.6; color: #999; }
+      .hint { margin-top: 18px; font-size: 12.5px; color: #666; line-height: 1.6; }
+      button {
+        margin-top: 24px;
+        width: 100%;
+        min-height: 44px;
+        border: 0;
+        border-radius: 999px;
+        background: #4ba9e1;
+        color: #06222f;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      button:hover { background: #5fb6ea; }
+      button:active { transform: scale(0.98); }
+      .brand {
+        margin-top: 26px;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #4b4b4b;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .dot-wrap { animation: pulse 2.4s ease-in-out infinite; }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="dot-wrap" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a10 10 0 1 0 10 10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
+      </div>
+      <h1>You are offline</h1>
+      <p>
+        Kivo can't reach the server right now. Your chats are saved locally and
+        anything you wrote while offline will send itself when you reconnect.
+      </p>
+      <p class="hint">
+        Check your connection, then try again.
+      </p>
+      <button type="button" onclick="location.replace('/app')">Try again</button>
+      <div class="brand">Kivo</div>
+    </main>
+  </body>
+</html>
