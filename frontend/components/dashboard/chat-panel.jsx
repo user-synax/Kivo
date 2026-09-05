@@ -8,6 +8,7 @@ import {
     ChevronLeft,
     Copy,
     Forward,
+    LayoutGrid,
     Lock,
     MessageCircle,
     MessageSquareText,
@@ -35,6 +36,7 @@ import React, {
 } from "react";
 import { UploadPreview } from "@/components/chat/attachments";
 import { Avatar } from "@/components/dashboard/avatar";
+import { ChatMediaDrawer } from "@/components/dashboard/chat-media-drawer";
 import { ConversationLookModal } from "@/components/dashboard/conversation-look-modal";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
@@ -705,6 +707,7 @@ export function ChatPanel({
     const [pinnedMessages, setPinnedMessages] = useState([]);
     const [pinBusyId, setPinBusyId] = useState(null);
     const [lookOpen, setLookOpen] = useState(false);
+    const [mediaOpen, setMediaOpen] = useState(false);
     const [forwardOpen, setForwardOpen] = useState(false);
     const [forwardQueue, setForwardQueue] = useState([]);
     const [forwardConvs, setForwardConvs] = useState([]);
@@ -756,6 +759,7 @@ export function ChatPanel({
         setSelectedIds(new Set());
         setForwardOpen(false);
         setLookOpen(false);
+        setMediaOpen(false);
         setPinnedMessages([]);
         setThreadRoot(null);
         setThreadSummaries({});
@@ -2738,6 +2742,17 @@ export function ChatPanel({
                         <Palette className="h-5 w-5" />
                     </button>
                 )}
+                {conversation && (
+                    <button
+                        type="button"
+                        onClick={() => setMediaOpen(true)}
+                        aria-label="Shared media"
+                        title="Shared media"
+                        className="flex size-9 items-center justify-center rounded-nav border border-[var(--border)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                    >
+                        <LayoutGrid className="h-5 w-5" />
+                    </button>
+                )}
                 {(isGroup || isChannel) && onOpenGroupSettings && (
                     <button
                         type="button"
@@ -3681,6 +3696,19 @@ export function ChatPanel({
                     onActivity={refreshThreadSummaries}
                     onForward={(m) => openForwardPicker([m])}
                     onOpenProfile={(username) => setProfileUsername(username)}
+                    isMobile={isMobile}
+                />
+            )}
+
+            {/* Shared media drawer — desktop drawer / mobile sheet over this chat */}
+            {mediaOpen && conversation && (
+                <ChatMediaDrawer
+                    conversation={conversation}
+                    onClose={() => setMediaOpen(false)}
+                    onJumpToMessage={(id) => {
+                        setMediaOpen(false);
+                        scrollToMessageId(id);
+                    }}
                     isMobile={isMobile}
                 />
             )}
