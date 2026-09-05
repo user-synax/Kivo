@@ -879,7 +879,7 @@ Notification {
 #### 9.1 Progressive Web App
 
 - `public/manifest.json` — app name, icons (192/512 + apple-touch-icon), standalone display.
-- `public/sw.js` — service worker handling `push` events and notification click actions (deep-links into the app).
+- `public/sw.js` — service worker with an **offline shell**: precaches static assets (`offline.html`, `manifest.json`, icons) into `kivo-precache-*`; serves content-hashed `/_next/static/*` **cache-first** (`kivo-runtime-*`); other static destinations (icons/fonts/images) **stale-while-revalidate**; answers navigations **network-first** with the last-known-good cached shell (`kivo-pages-*`) and falls back to the precached `offline.html` when nothing is cached. `/api/*` and `/socket.io/*` are never intercepted (chat data uses the app's IndexedDB cache + outbox). Also handles `push` events and notification click actions (deep-links into the app) and exposes a `KIVO_CLEAR_SHELL_CACHE` message for cache purges.
 - Registered via `components/pwa-register.jsx` + `lib/pwa.js` on the app layout.
 
 #### 9.2 Web Push (VAPID)

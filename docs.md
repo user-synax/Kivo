@@ -707,7 +707,7 @@ Kivo is installable:
 - **Android:** Add to Home Screen / Install app.
 - **iOS Safari:** Share → **Add to Home Screen**.
 
-It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker handles push and notification clicks. Kivo caches your conversation, Space, friend, friend-request lists, and the **latest 50 messages per chat** in IndexedDB so they paint instantly on reload — and **text you send while offline is queued** and delivered when you're back (see §20). Full offline history of *older* pages is still not available — those need the network.
+It opens in **standalone** mode starting at `/app`. Icons and name come from `frontend/public/manifest.json`. A service worker provides an **offline shell**: static assets (icons, manifest, the offline page) are precached, content-hashed build files are served from cache, and page navigations try the network first, then fall back to the last-known-good cached page, and finally to a styled **"You are offline"** page when nothing is cached. The service worker also handles push and notification clicks. On top of that, Kivo caches your conversation, Space, friend, friend-request lists, and the **latest 50 messages per chat** in IndexedDB so they paint instantly on reload — and **text you send while offline is queued** and delivered when you're back (see §20). Full offline history of *older* pages is still not available — those need the network.
 
 ---
 

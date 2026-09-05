@@ -25,7 +25,7 @@
 
 - ⚡ **Real-time everything** — messages, typing, presence, and read receipts via Socket.IO (no polling). Missed messages are **gap-filled on reconnect**.
 - 🔔 **Full notification system** — in-app notification center with a bell, per-category **notification preferences**, DM-focused suppression, and web push for offline users.
-- 📱 **Progressive Web App** — installable on any device with a service worker, manifest, and offline push delivery.
+- 📱 **Progressive Web App** — installable on any device with a service worker, manifest, offline push delivery, and a **full offline shell** (app shell + assets cached; navigations fall back to a styled offline page when the network is gone).
 - 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
@@ -469,6 +469,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 
 ### 📱 PWA & Web Push
 - **Installable PWA** — `manifest.json` with icons, standalone display, and a service worker (`sw.js`)
+- **Offline shell** — the service worker precaches static assets (icons, manifest, offline fallback page), serves content-hashed `/_next/static/*` cache-first, and answers navigations network-first with a cached last-known-good shell, falling back to a styled **offline page** when offline; API and Socket.IO traffic is never intercepted (chat data uses the IndexedDB cache + outbox instead)
 - **Web push** powered by VAPID (`web-push`) — offline users receive DMs, group messages, mentions, and friend events as native notifications
 - Permission is opt-in via explicit user action (`requestPermission`); `syncSubscription` only auto-subscribes when permission is already granted
 - Push subscriptions are stored per user; expired/unsubscribed endpoints (404/410) are cleaned up automatically
