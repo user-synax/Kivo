@@ -29,6 +29,7 @@ const COLUMNS = [
     links: [
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
+      { label: "Cookies", href: "/cookie" },
     ],
   },
 ];
@@ -182,6 +183,16 @@ export function SiteFooter() {
               className="kivo-focus rounded-sm font-sans text-[12px] text-ink-muted transition-colors duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink"
             >
               Terms
+            </a>
+            <span
+              aria-hidden="true"
+              className="size-1 rounded-full bg-hairline"
+            />
+            <a
+              href="/cookie"
+              className="kivo-focus rounded-sm font-sans text-[12px] text-ink-muted transition-colors duration-[150ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink"
+            >
+              Cookies
             </a>
           </div>
         </div>

@@ -2,12 +2,13 @@
 
 ## Repository Strategy
 
-Kivo uses one Git repository containing two separate applications:
+Kivo uses one Git repository containing three separate applications:
 
 ```
 kivo/
 ├── frontend/        # Next.js 16 app (App Router, React 19, JavaScript)
 ├── backend/         # Express 5 + Socket.IO + Mongoose (JavaScript)
+├── mobile/          # Expo + React Native + NativeWind (JavaScript, native Android/iOS)
 ├── README.md        # Overview & setup
 ├── docs.md          # Features & how-to-use guide
 ├── PRD.md           # Product requirements & API reference

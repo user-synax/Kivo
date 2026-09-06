@@ -38,14 +38,80 @@ export function isOAuthConfigured(provider) {
 // ── State (CSRF protection) ──────────────────────────────────────────────
 // Short-lived signed JWT proving the callback belongs to a start we issued.
 // Link flows embed the authenticated userId; login flows omit it.
-export function signOAuthState({ provider, mode, userId = null }) {
+// Native flows embed returnTo (validated app deep link) so the callback can
+// finish inside the app instead of on the web callback page.
+export function signOAuthState({ provider, mode, userId = null, returnTo = null, redirectUri = null }) {
   assertProvider(provider);
   const nonce = crypto.randomBytes(16).toString("hex");
   return jwt.sign(
-    { type: "oauth_state", provider, mode, userId, nonce },
+    {
+      type: "oauth_state",
+      provider,
+      mode,
+      userId,
+      returnTo: assertReturnTo(returnTo),
+      // The exact provider redirect_uri used at authorize time — the token
+      // exchange must repeat it verbatim or the provider rejects the code.
+      redirectUri: resolveProviderRedirectUri(provider, redirectUri),
+      nonce,
+    },
     env.accessTokenSecret,
     { expiresIn: OAUTH_STATE_TTL },
   );
+}
+
+// Where OUR callback may redirect after the provider round-trip. Web callers
+// omit it (default = frontend /oauth/callback page). Native callers pass
+// their deep link. Anything else is rejected — no open redirects.
+export function assertReturnTo(value) {
+  if (!value) return null;
+  const s = String(value);
+  const webCallback = `${env.frontendUrl.replace(/\/+$/, "")}/oauth/callback`;
+  if (s === webCallback || s.startsWith(`${webCallback}?`) || s.startsWith(`${webCallback}/`)) {
+    return s;
+  }
+  // Production app deep link (mobile/app.json scheme).
+  if (s === "kivo://oauth/callback") return s;
+  // Expo Go dev client deep link (exp://<lan-ip>:8081/--/oauth/callback).
+  if (/^exp:\/\/[^/]+\/--\/oauth\/callback\/?(\?.*)?$/.test(s)) return s;
+  throw badRequest("Invalid return target", "OAUTH_INVALID_RETURN");
+}
+
+// Resolve the provider redirect_uri for this start. Default = configured
+// server callback. Native callers may pass a device-reachable equivalent
+// (same callback path, loopback/private host or https). The provider itself
+// enforces its registered-URI list, so an unregistered URI fails loudly at
+// Google/GitHub instead of silently misbehaving here.
+export function resolveProviderRedirectUri(provider, requested) {
+  const cfg = providerConfig(provider);
+  if (!requested) return cfg.redirectUri;
+  let url;
+  try {
+    url = new URL(String(requested));
+  } catch {
+    throw badRequest("Invalid redirect URI", "OAUTH_INVALID_REDIRECT_URI");
+  }
+  let configuredPath = "/";
+  try {
+    configuredPath = new URL(cfg.redirectUri).pathname;
+  } catch {}
+  if (url.pathname !== configuredPath) {
+    throw badRequest("Invalid redirect URI", "OAUTH_INVALID_REDIRECT_URI");
+  }
+  const host = url.hostname.toLowerCase();
+  const isLoopback = host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
+  const isPrivate =
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    host.endsWith(".local");
+  if (url.protocol === "http:" && !(isLoopback || isPrivate)) {
+    throw badRequest("Redirect URI must use https", "OAUTH_INVALID_REDIRECT_URI");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw badRequest("Invalid redirect URI", "OAUTH_INVALID_REDIRECT_URI");
+  }
+  return String(requested);
 }
 
 export function verifyOAuthState(state, expectedProvider) {
@@ -73,10 +139,11 @@ export function verifyOAuthState(state, expectedProvider) {
 
 // ── Authorization URLs ───────────────────────────────────────────────────
 
-export function buildAuthorizationUrl(provider, state) {
+export function buildAuthorizationUrl(provider, state, redirectUri = null) {
   assertProvider(provider);
   const cfg = providerConfig(provider);
-  if (!cfg.clientId || !cfg.redirectUri) {
+  const callbackUri = redirectUri || cfg.redirectUri;
+  if (!cfg.clientId || !callbackUri) {
     throw badRequest(
       `${provider === "google" ? "Google" : "GitHub"} sign-in is not configured yet`,
       "OAUTH_NOT_CONFIGURED",
@@ -85,7 +152,7 @@ export function buildAuthorizationUrl(provider, state) {
   if (provider === "google") {
     const params = new URLSearchParams({
       client_id: cfg.clientId,
-      redirect_uri: cfg.redirectUri,
+      redirect_uri: callbackUri,
       response_type: "code",
       scope: "openid email profile",
       state,
@@ -96,7 +163,7 @@ export function buildAuthorizationUrl(provider, state) {
   }
   const params = new URLSearchParams({
     client_id: cfg.clientId,
-    redirect_uri: cfg.redirectUri,
+    redirect_uri: callbackUri,
     scope: "read:user user:email",
     state,
   });
@@ -105,7 +172,7 @@ export function buildAuthorizationUrl(provider, state) {
 
 // ── Provider profile fetch ───────────────────────────────────────────────
 
-async function fetchGoogleProfile(code) {
+async function fetchGoogleProfile(code, redirectUri) {
   const cfg = providerConfig("google");
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -114,7 +181,7 @@ async function fetchGoogleProfile(code) {
       code,
       client_id: cfg.clientId,
       client_secret: cfg.clientSecret,
-      redirect_uri: cfg.redirectUri,
+      redirect_uri: redirectUri || cfg.redirectUri,
       grant_type: "authorization_code",
     }),
   });
@@ -153,7 +220,7 @@ async function fetchGoogleProfile(code) {
   };
 }
 
-async function fetchGithubProfile(code) {
+async function fetchGithubProfile(code, redirectUri) {
   const cfg = providerConfig("github");
   const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
@@ -162,7 +229,7 @@ async function fetchGithubProfile(code) {
       client_id: cfg.clientId,
       client_secret: cfg.clientSecret,
       code,
-      redirect_uri: cfg.redirectUri,
+      redirect_uri: redirectUri || cfg.redirectUri,
     }),
   });
   if (!tokenRes.ok) {
@@ -227,11 +294,11 @@ async function fetchGithubProfile(code) {
   };
 }
 
-export async function fetchProviderProfile(provider, code) {
+export async function fetchProviderProfile(provider, code, redirectUri = null) {
   assertProvider(provider);
   if (!code) throw badRequest("Missing OAuth code", "OAUTH_CODE_MISSING");
-  if (provider === "google") return fetchGoogleProfile(code);
-  return fetchGithubProfile(code);
+  if (provider === "google") return fetchGoogleProfile(code, redirectUri);
+  return fetchGithubProfile(code, redirectUri);
 }
 
 // ── Username generation ──────────────────────────────────────────────────
@@ -325,7 +392,7 @@ export async function handleOAuthCallback({ provider, code, state, req }) {
     );
   }
   const statePayload = verifyOAuthState(state, provider);
-  const profile = await fetchProviderProfile(provider, code);
+  const profile = await fetchProviderProfile(provider, code, statePayload.redirectUri);
 
   // ── Link flow: authenticated user verifying a second provider ──
   if (statePayload.mode === "link") {

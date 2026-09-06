@@ -5,6 +5,7 @@ import {
   parseQuery,
   providerParamSchema,
   callbackQuerySchema,
+  startQuerySchema,
 } from "./oauth.validation.js";
 import * as oauthService from "./oauth.service.js";
 
@@ -36,8 +37,12 @@ export const providers = asyncHandler(async (req, res) => {
 });
 
 // Public start: GET /oauth/:provider -> 302 to Google/GitHub (login/signup).
+// Optional query (used by the native app):
+//   ?redirect_uri=  device-reachable backend callback URL (same callback path)
+//   ?return_to=     app deep link (kivo://oauth/callback) for the final hop
 export const start = asyncHandler(async (req, res) => {
   const { provider } = parseParams(providerParamSchema, req.params);
+  const startQuery = parseQuery(startQuerySchema, req.query);
   if (!oauthService.isOAuthConfigured(provider)) {
     const params = new URLSearchParams({
       oauth_error: "OAUTH_NOT_CONFIGURED",
@@ -45,8 +50,14 @@ export const start = asyncHandler(async (req, res) => {
     });
     return res.redirect(302, `${frontendBase()}/login?${params.toString()}`);
   }
-  const state = oauthService.signOAuthState({ provider, mode: "login" });
-  const url = oauthService.buildAuthorizationUrl(provider, state);
+  const redirectUri = oauthService.resolveProviderRedirectUri(provider, startQuery.redirect_uri);
+  const state = oauthService.signOAuthState({
+    provider,
+    mode: "login",
+    returnTo: startQuery.return_to || null,
+    redirectUri,
+  });
+  const url = oauthService.buildAuthorizationUrl(provider, state, redirectUri);
   return res.redirect(302, url);
 });
 
@@ -72,16 +83,33 @@ export const linkUrl = asyncHandler(async (req, res) => {
 });
 
 // Public callback: GET /oauth/:provider/callback?code=&state=.
-// Always ends in a redirect to the frontend — JSON is never returned here
-// because the request is a top-level browser navigation from the provider.
+// Always ends in a redirect — JSON is never returned here because the request
+// is a top-level browser navigation from the provider. Web flows land on
+// /oauth/callback; native flows land on their return_to deep link
+// (kivo://oauth/callback), which additionally receives the refreshToken
+// because native has no shared cookie jar with the system browser.
 export const callback = asyncHandler(async (req, res) => {
   const { provider } = parseParams(providerParamSchema, req.params);
   const query = parseQuery(callbackQuerySchema, req.query);
-  const base = frontendBase();
+
+  // Prefer the signed returnTo from state (verified below); fall back to web.
+  // An unverifiable state can never yield a trusted returnTo — it stays web.
+  let returnTo = null;
+  if (query.state) {
+    try {
+      const payload = oauthService.verifyOAuthState(query.state, provider);
+      returnTo = payload.returnTo || null;
+    } catch {
+      returnTo = null;
+    }
+  }
+  const isNative = typeof returnTo === "string" && !returnTo.startsWith("http");
+  const base = returnTo || `${frontendBase()}/oauth/callback`;
 
   const redirectError = (code, message) => {
     const params = new URLSearchParams({ oauth_error: code, message: message || code });
-    return res.redirect(302, `${base}/oauth/callback?${params.toString()}`);
+    const sep = base.includes("?") ? "&" : "?";
+    return res.redirect(302, `${base}${sep}${params.toString()}`);
   };
 
   // User denied consent at the provider.
@@ -102,18 +130,24 @@ export const callback = asyncHandler(async (req, res) => {
 
     if (result.kind === "linked") {
       const params = new URLSearchParams({ linked: provider });
-      return res.redirect(302, `${base}/oauth/callback?${params.toString()}`);
+      const sep = base.includes("?") ? "&" : "?";
+      return res.redirect(302, `${base}${sep}${params.toString()}`);
     }
     if (result.kind === "login-2fa") {
       const params = new URLSearchParams({ twoFactor: "1", ticket: result.ticket });
-      return res.redirect(302, `${base}/oauth/callback?${params.toString()}`);
+      const sep = base.includes("?") ? "&" : "?";
+      return res.redirect(302, `${base}${sep}${params.toString()}`);
     }
     // Full login/signup — set the httpOnly refresh cookie, then hand the
     // short-lived access token to the callback page via query (it stores it
     // in memory via setSession and immediately strips it from the URL).
+    // Native also gets the refreshToken in query (SecureStore) since the
+    // system-browser cookie never reaches the app.
     setRefreshCookie(res, result.refreshToken);
     const params = new URLSearchParams({ accessToken: result.accessToken });
-    return res.redirect(302, `${base}/oauth/callback?${params.toString()}`);
+    if (isNative) params.set("refreshToken", result.refreshToken);
+    const sep = base.includes("?") ? "&" : "?";
+    return res.redirect(302, `${base}${sep}${params.toString()}`);
   } catch (e) {
     return redirectError(e?.code || "OAUTH_FAILED", e?.message || "Sign-in failed.");
   }

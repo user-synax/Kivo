@@ -229,6 +229,12 @@ kivo/
 │       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
 │       └── utils/            # errors & async handlers
 │
+├── mobile/                   # Expo SDK 57 + React Native + NativeWind (JS only)
+│   ├── app/                  # Expo Router: index gate, (auth)/login+signup,
+│   │                         #   (tabs)/chats+groups+spaces+menu, chat/[id]
+│   ├── components/           # auth-provider (SecureStore session)
+│   └── lib/                  # config, api, auth, socket, theme (backend reuse)
+│
 ├── README.md                 # This file
 ├── docs.md                   # Full features & how-to-use guide
 ├── PRD.md                    # Product requirements, API reference, schema
