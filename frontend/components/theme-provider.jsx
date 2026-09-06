@@ -11,6 +11,15 @@ import {
   themeOrder,
   themes,
 } from "@/lib/theme";
+import {
+  defaultUiStyleId,
+  isValidUiStyle,
+  SKIN_BODY_VARS,
+  skinVarsFor,
+  UI_STYLE_ORDER,
+  UI_STYLE_STORAGE_KEY,
+  UI_STYLES,
+} from "@/lib/ui-styles";
 
 const ThemeContext = createContext(null);
 
@@ -27,8 +36,14 @@ export function useTheme() {
 // applied via derivePalette(). While the theme studio is being edited, `preview`
 // carries a transient draft so the whole app re-skins live before anything is
 // saved. Logged-in users always get their account colors; guests get presets.
+//
+// Interface style (`uiStyleId`) is orthogonal to color: `default` keeps the
+// Framer geometry, the other skins swap radius/border/shadow language via
+// skinVarsFor() + app/app/ui-skins.css. Persisted in localStorage only (no
+// backend field), scoped to /app via `data-ui` so landing pages never match.
 export function ThemeProvider({ children }) {
   const [themeId, setThemeIdState] = useState(defaultThemeId);
+  const [uiStyleId, setUiStyleIdState] = useState(defaultUiStyleId);
   // Persisted customization: { accent, tint } from the user's account.
   const [custom, setCustom] = useState(null);
   // Transient draft while the studio is open (overrides `custom` until saved
@@ -40,6 +55,8 @@ export function ThemeProvider({ children }) {
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved && themes[saved]) setThemeIdState(saved);
+      const savedUi = localStorage.getItem(UI_STYLE_STORAGE_KEY);
+      if (savedUi && isValidUiStyle(savedUi)) setUiStyleIdState(savedUi);
     } catch {
       // ignore storage failures
     }
@@ -71,6 +88,16 @@ export function ThemeProvider({ children }) {
       }
     };
 
+    const changeUiStyle = (id) => {
+      if (!isValidUiStyle(id)) return;
+      setUiStyleIdState(id);
+      try {
+        localStorage.setItem(UI_STYLE_STORAGE_KEY, id);
+      } catch {
+        // ignore
+      }
+    };
+
     // The theme studio pushes a draft while the user tweaks colors.
     const previewColors = (draft) => {
       const normalized =
@@ -96,6 +123,12 @@ export function ThemeProvider({ children }) {
       theme: themes[themeId],
       themes: themeOrder.map((id) => themes[id]),
       setThemeId: changeTheme,
+      // Interface style (geometry/elevation skin, orthogonal to color).
+      uiStyleId,
+      uiStyles: UI_STYLE_ORDER.map((id) =>
+        UI_STYLES.find((s) => s.id === id),
+      ).filter(Boolean),
+      setUiStyleId: changeUiStyle,
       // Customization state (null = preset colors only).
       custom,
       preview,
@@ -106,12 +139,53 @@ export function ThemeProvider({ children }) {
       colors: palette,
       accentColor: palette.accent,
     };
-  }, [themeId, custom, preview, overrides]);
+  }, [themeId, uiStyleId, custom, preview, overrides]);
+
+  const skinVars = useMemo(
+    () => skinVarsFor(uiStyleId, value.colors),
+    [uiStyleId, value.colors],
+  );
+
+  // Mirror data-ui + skin tokens onto <body> while /app is mounted
+  // so <body>-portaled surfaces (receipts card, context menus, modals) match
+  // the skin. Only /app mounts this provider — landing/marketing never gets
+  // the attribute or the vars. Cleanup removes everything on unmount
+  // (navigation back to marketing), so nothing leaks outside /app.
+  useEffect(() => {
+    try {
+      if (uiStyleId && uiStyleId !== defaultUiStyleId) {
+        document.body.dataset.ui = uiStyleId;
+        for (const name of SKIN_BODY_VARS) {
+          if (skinVars[name])
+            document.body.style.setProperty(name, skinVars[name]);
+        }
+      } else {
+        delete document.body.dataset.ui;
+        for (const name of SKIN_BODY_VARS) {
+          document.body.style.removeProperty(name);
+        }
+      }
+    } catch {
+      // ignore (SSR / storage failures)
+    }
+    return () => {
+      try {
+        delete document.body.dataset.ui;
+        for (const name of SKIN_BODY_VARS) {
+          document.body.style.removeProperty(name);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    // Re-mirror when the softened tokens change (theme / studio draft).
+  }, [uiStyleId, skinVars]);
 
   return (
     <ThemeContext.Provider value={value}>
       <div
-        style={cssVarsForColors(value.colors)}
+        data-ui={uiStyleId}
+        style={{ ...cssVarsForColors(value.colors), ...skinVars }}
         className="flex min-h-screen flex-col bg-[var(--bg-base)] text-[var(--text-primary)]"
       >
         {children}

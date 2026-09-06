@@ -67,6 +67,88 @@ function BaseThemeCard() {
   );
 }
 
+// Interface style: geometry/elevation skin for /app only (default Framer and
+// friends). Orthogonal to color — base theme + studio colors + chat look keep
+// working. Persisted in localStorage via ThemeProvider, scoped with `data-ui`
+// so landing pages are unaffected.
+function InterfaceStyleCard() {
+  const { uiStyleId, uiStyles, setUiStyleId } = useTheme();
+  return (
+    <PageCard>
+      <div className="mb-2">
+        <p className="text-[12px] font-semibold text-[var(--text-primary)]">
+          Interface style
+        </p>
+        <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-muted)]">
+          Reskins the app shell only — landing pages stay the same. Works with
+          any base theme and your colors.
+        </p>
+      </div>
+      <div className="space-y-1">
+        {(uiStyles || []).map((s) => {
+          const active = s.id === uiStyleId;
+          const brutal = s.id === "neo-brutalism";
+          const clay = s.id === "claymorphism";
+          const flat = s.id === "flat-minimal";
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setUiStyleId(s.id)}
+              aria-pressed={active}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] transition-colors duration-150 hover:bg-[var(--hover)]",
+                active
+                  ? "text-[var(--text-primary)]"
+                  : "text-[var(--text-muted)]",
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className="flex size-4 shrink-0 items-center justify-center bg-[var(--accent)]"
+                style={
+                  brutal
+                    ? {
+                        borderRadius: 2,
+                        border:
+                          "1.5px solid color-mix(in srgb, var(--text-primary) 52%, transparent)",
+                        boxShadow:
+                          "2px 2px 0 color-mix(in srgb, var(--text-primary) 30%, transparent)",
+                      }
+                    : clay
+                      ? {
+                          borderRadius: 9999,
+                          border:
+                            "1px solid color-mix(in srgb, var(--text-primary) 14%, transparent)",
+                          boxShadow:
+                            "inset 1px 1px 1px rgba(255, 255, 255, 0.25), 0 3px 8px color-mix(in srgb, var(--text-primary) 22%, transparent)",
+                        }
+                      : flat
+                        ? {
+                            borderRadius: 3,
+                            border: "1px solid var(--border)",
+                            boxShadow: "none",
+                          }
+                        : { borderRadius: 9999 }
+                }
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{s.label}</span>
+                <span className="block truncate text-[11px] text-[var(--text-muted)]">
+                  {s.hint}
+                </span>
+              </span>
+              {active && (
+                <span className="size-2 shrink-0 rounded-full bg-[var(--accent)]" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </PageCard>
+  );
+}
+
 export function AppearanceScreen({ onClose }) {
   const reduce = useReducedMotion();
 
@@ -95,7 +177,8 @@ export function AppearanceScreen({ onClose }) {
             Appearance
           </h1>
           <p className="hidden truncate text-[11px] leading-tight text-[var(--text-muted)] sm:block">
-            Base theme · your colors · chat wallpaper &amp; bubble style
+            Interface style · base theme · your colors · chat wallpaper &amp;
+            bubble style
           </p>
         </div>
         <button
@@ -116,6 +199,7 @@ export function AppearanceScreen({ onClose }) {
         <div className="mx-auto w-full max-w-6xl px-3 py-4 md:px-6 md:py-6">
           <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-3">
+              <InterfaceStyleCard />
               <BaseThemeCard />
               <PageCard>
                 <ThemeStudio />

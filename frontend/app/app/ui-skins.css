@@ -1,0 +1,385 @@
+/* ── Kivo /app interface skins ─────────────────────────────────────────────
+   SCOPE: /app only. ThemeProvider sets `data-ui` on its own wrapper div
+   (inside app/app/layout.jsx) and ui-skins.css is imported ONLY there — never
+   in the root layout. Landing/marketing/docs/public profiles never render
+   that attribute, so no rule below can match them.
+   The single exception is `body[data-ui="..."]`, mirrored by ThemeProvider
+   while /app is mounted (removed on unmount) and scoped to portaled
+   surfaces ONLY ([role="dialog"], [role="menu"], [data-context-menu-portal]).
+   There are no broad `body ... button/card` selectors, so even a stale
+   attribute could not reskin landing content.
+
+   Deliberately UNLAYERED (top-level, outside @layer) so skin rules beat
+   Tailwind v4 utilities — same reason bubble overrides in globals.css sit
+   above every layer. No !important needed: unlayered beats layered.
+
+   neo-brutalism (soft): muted ink lines (52% ink), small hard offsets
+   (2-4px at ~30% ink), squared corners, no blur. Tokens come from
+   skinVarsFor() (--brutal-*) with var(--border)/var(--shadow-*) fallbacks,
+   so base themes + ThemeStudio accent/tint + wallpapers keep working.
+
+   claymorphism: puffy inflated 3D — big radii, barely-there borders (14%
+   ink), pillowy multi-layer shadows (inner light + inner shade + blurred
+   outer glow from --clay-*). Pills stay fully round, translucency is kept.
+
+   flat-minimal: crisp Linear-style flatness — compact radii, palette
+   hairlines, zero elevation. Depth from borders and background steps only.
+   -------------------------------------------------------------------------- */
+
+/* Kill translucency in-app — brutalism is solid, no frosted glass. */
+[data-ui="neo-brutalism"] [class*="backdrop-blur"] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── Radius normalization (in-app only) ────────────────────────────────
+   Pills become chunky rects. Only button/a pills are squared — span/div
+   rounded-full (unread dots, status dots) stay round. Avatars use
+   rounded-lg/xl, unaffected here. */
+[data-ui="neo-brutalism"] button.rounded-full,
+[data-ui="neo-brutalism"] a.rounded-full {
+  border-radius: 8px;
+}
+[data-ui="neo-brutalism"] .rounded-lg {
+  border-radius: 8px;
+}
+[data-ui="neo-brutalism"] .rounded-xl,
+[data-ui="neo-brutalism"] .rounded-2xl {
+  border-radius: 10px;
+}
+[data-ui="neo-brutalism"] .rounded-t-3xl,
+[data-ui="neo-brutalism"] .sm\:rounded-2xl {
+  border-radius: 12px;
+}
+
+/* ── Soft thick borders where a border already exists ──────────────────
+   --border is already remapped to softened ink via skinVarsFor(). */
+[data-ui="neo-brutalism"] div[class*="border"].rounded-xl,
+[data-ui="neo-brutalism"] div[class*="border"].rounded-2xl,
+[data-ui="neo-brutalism"] div[class*="border"].rounded-lg,
+[data-ui="neo-brutalism"] aside[class*="border"],
+[data-ui="neo-brutalism"] section[class*="border"] {
+  border-width: 1.5px;
+}
+[data-ui="neo-brutalism"] input,
+[data-ui="neo-brutalism"] textarea,
+[data-ui="neo-brutalism"] [class*="rounded-inputs"] {
+  border-width: 1.5px;
+  border-color: var(--brutal-border, var(--border));
+}
+
+/* ── Soft hard-shadows for elevated surfaces ─────────────────────────── */
+[data-ui="neo-brutalism"] div[class*="border"].rounded-xl[class*="shadow"],
+[data-ui="neo-brutalism"] div[class*="border"].rounded-2xl,
+[data-ui="neo-brutalism"] div[class*="shadow-[0_24px"],
+[data-ui="neo-brutalism"] aside[class*="border"] {
+  box-shadow: var(--brutal-shadow-md, var(--shadow-md));
+}
+
+/* ── Buttons: soft brutal press ──────────────────────────────────────── */
+[data-ui="neo-brutalism"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"],
+[data-ui="neo-brutalism"] button.rounded-full[class*="border"],
+[data-ui="neo-brutalism"] a.rounded-full[class*="border"],
+[data-ui="neo-brutalism"] button[class*="rounded-full"].bg-accent {
+  border: 1.5px solid var(--brutal-border, var(--border));
+  box-shadow: var(--brutal-shadow-sm, var(--shadow-sm));
+  transition:
+    transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-ui="neo-brutalism"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"]:hover,
+[data-ui="neo-brutalism"] button.rounded-full[class*="border"]:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--brutal-shadow-md, var(--shadow-md));
+}
+[data-ui="neo-brutalism"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"]:active,
+[data-ui="neo-brutalism"] button.rounded-full[class*="border"]:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--brutal-border, var(--border));
+}
+
+/* ── Sidebar selection ───────────────────────────────────────────────── */
+[data-ui="neo-brutalism"] button[aria-current="true"].rounded-xl {
+  border: 1.5px solid var(--brutal-border, var(--border));
+  box-shadow: var(--brutal-shadow-sm, var(--shadow-sm));
+}
+
+/* ── Chat bubbles ────────────────────────────────────────────────────── */
+[data-ui="neo-brutalism"] [data-slot="bubble-content"] {
+  border-radius: 8px;
+  border: 1.5px solid var(--brutal-border, var(--border));
+  box-shadow: var(--brutal-shadow-sm, var(--shadow-sm));
+}
+[data-ui="neo-brutalism"] .t-bubble.is-mine.with-tail,
+[data-ui="neo-brutalism"] .t-bubble.is-other.with-tail {
+  border-top-right-radius: 8px;
+  border-top-left-radius: 8px;
+}
+
+/* ── Tabs / toggles ──────────────────────────────────────────────────── */
+[data-ui="neo-brutalism"] .t-tabs {
+  border: 1.5px solid var(--brutal-border, var(--border));
+  border-radius: 10px;
+  box-shadow: var(--brutal-shadow-sm, var(--shadow-sm));
+}
+[data-ui="neo-brutalism"] .t-tab,
+[data-ui="neo-brutalism"] .t-tabs-pill {
+  border-radius: 6px;
+}
+[data-ui="neo-brutalism"] .t-toggle {
+  border: 1.5px solid var(--brutal-border, var(--border));
+  border-radius: 8px;
+  box-shadow: var(--brutal-shadow-sm, var(--shadow-sm));
+}
+[data-ui="neo-brutalism"] .t-toggle-thumb {
+  border-radius: 4px;
+}
+
+/* ── Header / composer solidity (brutalism only) ─────────────────────────
+   Brutalism never floats translucent bars over content. Clay keeps blur. */
+[data-ui="neo-brutalism"] [class*="supports-[backdrop-filter]"] {
+  background-color: var(--bg-elevated);
+}
+
+/* ══ Claymorphism (soft puffy 3D, in-app only) ═══════════════════════════
+   Inflated cards, pillowy shadows, barely-there borders. Pills stay fully
+   round — clay loves round. No blur killing: translucency stays soft. */
+
+/* ── Puffy radius (pills untouched — already 9999px via --radius-pills) ── */
+[data-ui="claymorphism"] .rounded-lg {
+  border-radius: 16px;
+}
+[data-ui="claymorphism"] .rounded-xl {
+  border-radius: 20px;
+}
+[data-ui="claymorphism"] .rounded-2xl {
+  border-radius: 24px;
+}
+[data-ui="claymorphism"] .rounded-t-3xl,
+[data-ui="claymorphism"] .sm\:rounded-2xl {
+  border-radius: 24px;
+}
+
+/* ── Barely-there borders ──────────────────────────────────────────────── */
+[data-ui="claymorphism"] div[class*="border"].rounded-xl,
+[data-ui="claymorphism"] div[class*="border"].rounded-2xl,
+[data-ui="claymorphism"] div[class*="border"].rounded-lg,
+[data-ui="claymorphism"] aside[class*="border"],
+[data-ui="claymorphism"] section[class*="border"] {
+  border-width: 1px;
+  border-color: var(--clay-border, var(--border));
+}
+[data-ui="claymorphism"] input,
+[data-ui="claymorphism"] textarea,
+[data-ui="claymorphism"] [class*="rounded-inputs"] {
+  border-width: 1px;
+  border-color: var(--clay-border, var(--border));
+}
+
+/* ── Pillowy elevation ─────────────────────────────────────────────────── */
+[data-ui="claymorphism"] div[class*="border"].rounded-xl[class*="shadow"],
+[data-ui="claymorphism"] div[class*="border"].rounded-2xl,
+[data-ui="claymorphism"] div[class*="shadow-[0_24px"],
+[data-ui="claymorphism"] aside[class*="border"] {
+  box-shadow: var(--clay-shadow-md, var(--shadow-md));
+}
+
+/* ── Buttons: puffy lift + squishy press ──────────────────────────────── */
+[data-ui="claymorphism"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"],
+[data-ui="claymorphism"] button.rounded-full[class*="border"],
+[data-ui="claymorphism"] a.rounded-full[class*="border"],
+[data-ui="claymorphism"] button[class*="rounded-full"].bg-accent {
+  border: 1px solid var(--clay-border, var(--border));
+  box-shadow: var(--clay-shadow-sm, var(--shadow-sm));
+  transition:
+    transform 150ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-ui="claymorphism"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"]:hover,
+[data-ui="claymorphism"] button.rounded-full[class*="border"]:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--clay-shadow-md, var(--shadow-md));
+}
+[data-ui="claymorphism"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"]:active,
+[data-ui="claymorphism"] button.rounded-full[class*="border"]:active {
+  transform: translateY(1px);
+  box-shadow: var(--clay-pressed, var(--shadow-sm));
+}
+
+/* ── Sidebar selection ─────────────────────────────────────────────────── */
+[data-ui="claymorphism"] button[aria-current="true"].rounded-xl {
+  border: 1px solid var(--clay-border, var(--border));
+  box-shadow: var(--clay-shadow-sm, var(--shadow-sm));
+}
+
+/* ── Chat bubbles: puffy pills ─────────────────────────────────────────── */
+[data-ui="claymorphism"] [data-slot="bubble-content"] {
+  border-radius: 18px;
+  border: 1px solid var(--clay-border, var(--border));
+  box-shadow: var(--clay-shadow-sm, var(--shadow-sm));
+}
+[data-ui="claymorphism"] .t-bubble.is-mine.with-tail,
+[data-ui="claymorphism"] .t-bubble.is-other.with-tail {
+  border-top-right-radius: 14px;
+  border-top-left-radius: 14px;
+}
+
+/* ── Tabs / toggles: round + inflated ──────────────────────────────────── */
+[data-ui="claymorphism"] .t-tabs {
+  border: 1px solid var(--clay-border, var(--border));
+  border-radius: 9999px;
+  box-shadow: var(--clay-shadow-sm, var(--shadow-sm));
+}
+[data-ui="claymorphism"] .t-tab,
+[data-ui="claymorphism"] .t-tabs-pill {
+  border-radius: 9999px;
+}
+[data-ui="claymorphism"] .t-toggle {
+  border: 1px solid var(--clay-border, var(--border));
+  border-radius: 9999px;
+  box-shadow: var(--clay-shadow-sm, var(--shadow-sm));
+}
+[data-ui="claymorphism"] .t-toggle-thumb {
+  border-radius: 9999px;
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.35),
+    1px 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* ══ Flat Minimal (crisp Linear-style flatness, in-app only) ═════════════
+   Small corners, palette hairlines, zero elevation. Depth comes from
+   borders and background steps only — no shadows anywhere. */
+
+/* ── Compact radius (pills become crisp 8px rects on buttons only) ─────── */
+[data-ui="flat-minimal"] button.rounded-full,
+[data-ui="flat-minimal"] a.rounded-full {
+  border-radius: 8px;
+}
+[data-ui="flat-minimal"] .rounded-lg {
+  border-radius: 6px;
+}
+[data-ui="flat-minimal"] .rounded-xl,
+[data-ui="flat-minimal"] .rounded-2xl {
+  border-radius: 8px;
+}
+[data-ui="flat-minimal"] .rounded-t-3xl,
+[data-ui="flat-minimal"] .sm\:rounded-2xl {
+  border-radius: 10px;
+}
+
+/* ── Zero elevation: cards, modals, dropdowns, asides ──────────────────── */
+[data-ui="flat-minimal"] div[class*="border"].rounded-xl[class*="shadow"],
+[data-ui="flat-minimal"] div[class*="border"].rounded-2xl,
+[data-ui="flat-minimal"] div[class*="shadow-[0_24px"],
+[data-ui="flat-minimal"] aside[class*="border"],
+[data-ui="flat-minimal"] div[class*="shadow-xl"],
+[data-ui="flat-minimal"] div[class*="shadow-lg"] {
+  box-shadow: none;
+}
+
+/* ── Buttons: flat, hairline, no lift ──────────────────────────────────── */
+[data-ui="flat-minimal"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"],
+[data-ui="flat-minimal"] button.rounded-full[class*="border"],
+[data-ui="flat-minimal"] a.rounded-full[class*="border"],
+[data-ui="flat-minimal"] button[class*="rounded-full"].bg-accent {
+  box-shadow: none;
+}
+[data-ui="flat-minimal"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"]:hover,
+[data-ui="flat-minimal"] button.rounded-full[class*="border"]:hover,
+[data-ui="flat-minimal"]
+  button[class*="rounded-full"][class*="bg-[var(--accent)]"]:active,
+[data-ui="flat-minimal"] button.rounded-full[class*="border"]:active {
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Sidebar selection: wash only, no frame ────────────────────────────── */
+[data-ui="flat-minimal"] button[aria-current="true"].rounded-xl {
+  border: none;
+  box-shadow: none;
+}
+
+/* ── Chat bubbles: compact, flat ───────────────────────────────────────── */
+[data-ui="flat-minimal"] [data-slot="bubble-content"] {
+  border-radius: 10px;
+  box-shadow: none;
+}
+[data-ui="flat-minimal"]
+  [data-slot="bubble"][data-align="end"]
+  > [data-slot="bubble-content"] {
+  border: none;
+}
+[data-ui="flat-minimal"]
+  [data-slot="bubble"][data-align="start"]
+  > [data-slot="bubble-content"] {
+  border: 1px solid var(--border);
+}
+[data-ui="flat-minimal"] .t-bubble.is-mine.with-tail,
+[data-ui="flat-minimal"] .t-bubble.is-other.with-tail {
+  border-top-right-radius: 10px;
+  border-top-left-radius: 10px;
+}
+
+/* ── Tabs / toggles: compact, flat ─────────────────────────────────────── */
+[data-ui="flat-minimal"] .t-tabs {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: none;
+}
+[data-ui="flat-minimal"] .t-tab,
+[data-ui="flat-minimal"] .t-tabs-pill {
+  border-radius: 6px;
+  box-shadow: none;
+}
+[data-ui="flat-minimal"] .t-toggle {
+  box-shadow: none;
+}
+
+/* ── Portals ONLY (mirrored body attr, removed on /app unmount) ─────────
+   These nodes render under <body> outside the wrapper, so they need the
+   mirrored tokens (--brutal-* / --clay-* / --border, set inline on body by
+   ThemeProvider). Fallbacks resolve to landing-safe neutrals if the mirror
+   is absent. */
+body[data-ui="neo-brutalism"] [role="dialog"].fixed,
+body[data-ui="neo-brutalism"] [role="menu"],
+body[data-ui="neo-brutalism"] [data-context-menu-portal] [role="menu"] {
+  border: 1.5px solid var(--brutal-border, var(--border));
+  border-radius: 10px;
+  box-shadow: var(--brutal-shadow-lg, var(--shadow-lg));
+}
+body[data-ui="neo-brutalism"]
+  [data-context-menu-portal]
+  [class*="backdrop-blur"] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body[data-ui="claymorphism"] [role="dialog"].fixed,
+body[data-ui="claymorphism"] [role="menu"],
+body[data-ui="claymorphism"] [data-context-menu-portal] [role="menu"] {
+  border: 1px solid var(--clay-border, var(--border));
+  border-radius: 18px;
+  box-shadow: var(--clay-shadow-lg, var(--shadow-lg));
+}
+body[data-ui="flat-minimal"] [role="dialog"].fixed,
+body[data-ui="flat-minimal"] [role="menu"],
+body[data-ui="flat-minimal"] [data-context-menu-portal] [role="menu"] {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui="neo-brutalism"] button,
+  [data-ui="claymorphism"] button {
+    transform: none;
+    transition: none;
+  }
+}

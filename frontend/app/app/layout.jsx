@@ -3,6 +3,7 @@ import { OutboxFlusher } from "@/components/outbox/outbox-flusher";
 import { PwaRegister } from "@/components/pwa-register";
 import { SocketProvider } from "@/components/socket-provider";
 import ThemeProvider from "@/components/theme-provider";
+import "./ui-skins.css";
 
 export const metadata = {
   title: "Kivo — Chat",
