@@ -311,6 +311,7 @@ bun run lint  # biome check
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_REDIRECT_URI` | backend | GitHub OAuth — signup/login + provider verification linking |
 | `BACKEND_URL` | frontend | Backend origin used by Next.js API rewrites (default `http://localhost:4000`) |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend origin for the Socket.IO connection (default `http://localhost:4000`) |
+| `NEXT_PUBLIC_APP_DOWNLOAD_URL` | frontend | Direct mobile-app download link for the landing page "Download App" section (the section stays hidden until set) |
 
 > See `backend/.env.example` for the full list with comments. Never commit real secrets — `*.env` is gitignored.
 

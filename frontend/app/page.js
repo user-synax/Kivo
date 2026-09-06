@@ -7,12 +7,18 @@ import { SiteFooter } from "../components/site-footer";
 import { GuestGate } from "@/components/auth-guard";
 import { Button } from "@/components/ui/button";
 import { RadialButton } from "@/components/ui/radial-button";
+import { Download } from "lucide-react";
 
 const EASE_SMOOTH_OUT = [0.22, 1, 0.36, 1];
 
 /* Drop your hero visual in /public and point this at the file.
    e.g. "/hero-image.png". Until it exists, a placeholder is shown. */
 const HERO_IMAGE = "/hero-image.png";
+
+/* Direct mobile-app download link. Set NEXT_PUBLIC_APP_DOWNLOAD_URL in
+   frontend/.env.local to surface the Download App section — until it is
+   set, the section stays hidden. */
+const APP_DOWNLOAD_URL = process.env.NEXT_PUBLIC_APP_DOWNLOAD_URL;
 
 export default function Home() {
   const reduce = useReducedMotion();
@@ -140,6 +146,8 @@ export default function Home() {
         <SecuritySection />
         <RoadmapSection />
         <FaqSection />
+
+        <DownloadAppSection />
 
         <SiteFooter />
       </main>
@@ -961,5 +969,152 @@ function FaqSection() {
         </motion.div>
       </div>
     </section>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Download app — signature gradient spotlight CTA
+   (renders only when NEXT_PUBLIC_APP_DOWNLOAD_URL is set)
+   ─────────────────────────────────────────────────────────── */
+function DownloadAppSection() {
+  const reduce = useReducedMotion();
+
+  if (!APP_DOWNLOAD_URL) return null;
+
+  const containerVariants = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.08, delayChildren: 0.08 },
+    },
+  };
+  const itemVariants = reduce
+    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+    : {
+        hidden: { opacity: 0, y: 16 },
+        show: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.55, ease: EASE_SMOOTH_OUT },
+        },
+      };
+
+  return (
+    <section
+      id="download"
+      className="scroll-mt-24 border-t border-hairline/60 px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24"
+    >
+      <div className="mx-auto max-w-[1280px]">
+        <motion.div
+          variants={containerVariants}
+          initial={reduce ? false : "hidden"}
+          whileInView="show"
+          viewport={{ once: true, margin: "-80px" }}
+          className="spotlight spotlight-violet"
+        >
+          <div className="relative z-10 grid gap-10 p-8 sm:p-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:gap-6 lg:p-14">
+            {/* Copy + CTA */}
+            <motion.div
+              variants={itemVariants}
+              className="flex flex-col items-start gap-5"
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-pills border border-white/25 bg-white/10 px-3.5 py-1 font-sans text-[12px] font-semibold tracking-[0.02em] text-white">
+                <Download className="size-3.5" aria-hidden="true" />
+                Mobile app
+              </span>
+
+              <h2 className="font-goga text-[34px] font-medium leading-[0.95] tracking-[-0.03em] text-white sm:text-[44px] lg:text-[52px]">
+                Kivo, in your pocket.
+              </h2>
+
+              <p className="max-w-[520px] font-sans text-[15px] leading-[1.6] text-white/80 sm:text-[16px]">
+                Take your DMs, groups, and Spaces on the go — the native app
+                keeps you connected wherever you are.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <motion.a
+                  whileHover={reduce ? undefined : { scale: 1.02 }}
+                  whileTap={reduce ? undefined : { scale: 0.97 }}
+                  transition={{ duration: 0.2, ease: EASE_SMOOTH_OUT }}
+                  href={APP_DOWNLOAD_URL}
+                  className="kivo-cta kivo-focus inline-flex items-center gap-2 rounded-pills px-6 py-3 text-[15px] font-semibold leading-none shadow-[0_14px_34px_-10px_rgba(0,0,0,0.55)]"
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Download App
+                </motion.a>
+                <span className="font-sans text-[13px] font-medium text-white/70">
+                  Free · direct download
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Phone preview */}
+            <motion.div
+              variants={itemVariants}
+              className="hidden justify-center lg:flex"
+            >
+              <PhoneMockup />
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* Mini CSS phone preview — no image assets needed */
+function PhoneMockup() {
+  return (
+    <div className="relative w-[250px]">
+      <div
+        className="absolute -inset-10 rounded-full bg-white/20 blur-3xl"
+        aria-hidden="true"
+      />
+      <div className="relative rounded-[38px] border border-white/25 bg-[#0d0d13] p-2.5 shadow-[0_35px_70px_-24px_rgba(0,0,0,0.65)]">
+        <div className="flex flex-col gap-2.5 overflow-hidden rounded-[30px] bg-canvas p-4">
+          {/* Status row */}
+          <div className="flex items-center justify-between px-1 pt-1">
+            <span className="font-sans text-[10px] font-semibold text-ink-muted">
+              9:41
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="size-1 rounded-full bg-accent-blue" />
+              <span className="font-sans text-[10px] font-semibold text-ink-muted">
+                Kivo
+              </span>
+            </span>
+          </div>
+
+          {/* Chat header */}
+          <div className="flex items-center gap-2.5 border-b border-hairline/70 pb-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/12 font-goga text-[13px] font-medium text-white">
+              K
+            </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate font-sans text-[12px] font-semibold text-ink">
+                Kivo Space
+              </span>
+              <span className="flex items-center gap-1 font-sans text-[10px] text-ink-muted">
+                <span className="size-1 rounded-full bg-semantic-success" />
+                online
+              </span>
+            </div>
+          </div>
+
+          {/* Chat bubbles */}
+          <div className="flex flex-col gap-1.5 pt-1">
+            <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-white/12 px-3 py-2 font-sans text-[11px] leading-[1.45] text-white">
+              Hey — chat from anywhere ✨
+            </div>
+            <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-white px-3 py-2 font-sans text-[11px] font-medium leading-[1.45] text-black">
+              Just downloaded the app 🚀
+            </div>
+            <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-white/12 px-3 py-2 font-sans text-[11px] leading-[1.45] text-white">
+              See you in the Space 👋
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

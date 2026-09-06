@@ -12,6 +12,8 @@ bun run build   # production build
 bun run lint    # biome check
 ```
 
+Optional: `NEXT_PUBLIC_APP_DOWNLOAD_URL` in `.env.local` shows the landing-page **Download App** section and points its button at your mobile-app download link. The section is hidden until that variable is set.
+
 REST calls use relative `/api/*` paths — `next.config.mjs` rewrites them to the backend (`BACKEND_URL`, default `http://localhost:4000`). Socket.IO connects directly to `NEXT_PUBLIC_API_URL` (Next rewrites do not proxy WebSocket upgrades).
 
 ## Layout
