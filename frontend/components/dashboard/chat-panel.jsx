@@ -1075,6 +1075,39 @@ export function ChatPanel({
     const scrollRef = useRef(null);
     const typingTimer = useRef(null);
     const bottomRef = useRef(null);
+    const needsInitialScrollRef = useRef(false);
+    const initialScrollTimerRef = useRef(null);
+
+    const scrollToBottomInstant = () => {
+        const el = scrollRef.current;
+        if (!el) {
+            bottomRef.current?.scrollIntoView({ block: "end" });
+            return;
+        }
+        el.scrollTop = el.scrollHeight;
+    };
+
+    const scheduleInitialScroll = () => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                scrollToBottomInstant();
+            });
+        });
+        if (initialScrollTimerRef.current) {
+            clearTimeout(initialScrollTimerRef.current);
+        }
+        initialScrollTimerRef.current = setTimeout(() => {
+            if (needsInitialScrollRef.current) scrollToBottomInstant();
+        }, 120);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (initialScrollTimerRef.current) {
+                clearTimeout(initialScrollTimerRef.current);
+            }
+        };
+    }, []);
 
     // Sync presence set when conversation changes
     useEffect(() => {
@@ -1241,14 +1274,16 @@ export function ChatPanel({
     }, [onHighlightCleared]);
 
     // Load message history when the conversation changes — stale-while-revalidate.
-    // Render cached messages instantly, then silently revalidate via REST.
+    // Render IndexedDB-cached messages instantly, then silently revalidate via REST.
     // If highlightMessageId is set, use the anchor-based fetch (around=) instead.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: scroll helpers are stable; convId + highlight drive reloads.
     useEffect(() => {
         if (!convId) {
             setMessages([]);
             setNextCursor(null);
             setHasMore(false);
             setReplyingTo(null);
+            needsInitialScrollRef.current = false;
             return undefined;
         }
         let active = true;
@@ -1259,7 +1294,10 @@ export function ChatPanel({
         // the bottom. If the conversation changed mid-session, drop the stale flag
         // so the new conversation loads normally.
         if (!highlightMessageId && wasAnchorSessionRef.current) {
-            if (anchorConvRef.current === convId) return undefined;
+            if (anchorConvRef.current === convId) {
+                needsInitialScrollRef.current = false;
+                return undefined;
+            }
             wasAnchorSessionRef.current = false;
             anchorConvRef.current = null;
         }
@@ -1267,6 +1305,21 @@ export function ChatPanel({
         if (highlightMessageId) anchorConvRef.current = convId;
 
         const useAnchor = highlightMessageId && convId;
+
+        // Drop previous rows so the new chat never flashes stale content, and
+        // arm pin-to-bottom for the IndexedDB + REST paints (anchor sessions
+        // keep their position instead).
+        setMessages([]);
+        setNextCursor(null);
+        setHasMore(false);
+        setLoadingHistory(true);
+        needsInitialScrollRef.current = !useAnchor;
+        if (!useAnchor) {
+            requestAnimationFrame(() => {
+                const el = scrollRef.current;
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        }
 
         if (useAnchor) {
             // Anchor-based fetch: jump to the specific message
@@ -1290,7 +1343,7 @@ export function ChatPanel({
                 });
         } else {
             // Normal fetch: stale-while-revalidate
-            // 1) Hydrate from IndexedDB cache immediately
+            // 1) Hydrate from IndexedDB cache immediately, then pin to bottom.
             getCachedMessages(convId)
                 .then((cached) => {
                     if (!active || !cached) return;
@@ -1303,12 +1356,14 @@ export function ChatPanel({
                             setNextCursor(cached.nextCursor);
                             setHasMore(true);
                         }
+                        if (needsInitialScrollRef.current) {
+                            scheduleInitialScroll();
+                        }
                     }
                 })
                 .catch(() => {});
 
-            // 2) Revalidate from REST in the background
-            setLoadingHistory(true);
+            // 2) Revalidate from REST in the background, then pin to bottom.
             apiGet(`/api/v1/conversations/${convId}/messages?limit=50`)
                 .then((data) => {
                     if (!active) return;
@@ -1316,13 +1371,19 @@ export function ChatPanel({
                     setMessages(msgs);
                     setNextCursor(data?.nextCursor || null);
                     setHasMore(Boolean(data?.nextCursor));
+                    if (needsInitialScrollRef.current) {
+                        scheduleInitialScroll();
+                        setTimeout(() => {
+                            needsInitialScrollRef.current = false;
+                        }, 150);
+                    }
                     setCachedMessages(convId, msgs, {
                         nextCursor: data?.nextCursor || null,
                         hasMore: Boolean(data?.nextCursor),
                     }).catch(() => {});
                 })
                 .catch(() => {
-                    // Network failed — keep whatever was in cache (or empty)
+                    needsInitialScrollRef.current = false;
                 })
                 .finally(() => {
                     if (active) setLoadingHistory(false);
@@ -1358,6 +1419,25 @@ export function ChatPanel({
         });
     };
 
+    // Mobile keyboard open/close resizes the dvh viewport: if the user was
+    // already at the live edge, stay pinned so the newest messages remain
+    // visible instead of jumping mid-list.
+    useEffect(() => {
+        const vv = typeof window !== "undefined" ? window.visualViewport : null;
+        if (!vv) return undefined;
+        let wasNear = true;
+        const onResize = () => {
+            const el = scrollRef.current;
+            if (!el) return;
+            if (wasNear) {
+                el.scrollTop = el.scrollHeight;
+            }
+            wasNear = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+        };
+        vv.addEventListener("resize", onResize);
+        return () => vv.removeEventListener("resize", onResize);
+    }, []);
+
     // Unread others' messages — drives the pill's "N new" label.
     const unreadCount = useMemo(() => {
         if (!userId) return 0;
@@ -1385,20 +1465,25 @@ export function ChatPanel({
     // once that jump session ends, consume the flag WITHOUT scrolling — the page
     // is already anchored where the user wants to be.
     const prevConvForPinRef = useRef(null);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: scroll helpers are stable; length + conv + typing drive pinning.
     useEffect(() => {
         if (highlightMessageId) return;
         if (wasAnchorSessionRef.current && anchorConvRef.current === convId) {
             wasAnchorSessionRef.current = false;
             anchorConvRef.current = null;
+            needsInitialScrollRef.current = false;
             return;
         }
         wasAnchorSessionRef.current = false;
         void typing;
         const convChanged = prevConvForPinRef.current !== convId;
         prevConvForPinRef.current = convId;
-        if (convChanged) {
+        if (convChanged || needsInitialScrollRef.current) {
             setShowJumpPill(false);
-            bottomRef.current?.scrollIntoView({ block: "end" });
+            scrollToBottomInstant();
+            requestAnimationFrame(() => {
+                scrollToBottomInstant();
+            });
             return;
         }
         const last = messages[messages.length - 1];
@@ -1408,7 +1493,7 @@ export function ChatPanel({
         } else {
             setShowJumpPill(true);
         }
-    }, [messages.length, typing, highlightMessageId, convId]);
+    }, [messages.length, messages, typing, highlightMessageId, convId]);
 
     // Jump-to-message highlight: when highlightMessageId is set, scroll to it
     // and apply a brief background flash once the messages are loaded.
@@ -1834,6 +1919,18 @@ export function ChatPanel({
         });
     };
 
+    const keepComposerFocus = () => {
+        requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (!el) return;
+            try {
+                el.focus({ preventScroll: true });
+            } catch {
+                el.focus();
+            }
+        });
+    };
+
     const send = async () => {
         const content = text.trim();
         const hasFiles = pendingFiles.some((f) => f.status === "pending");
@@ -1884,6 +1981,7 @@ export function ChatPanel({
             clearDraft(draftsKey(userId), convId);
             clearAll();
             setMentionOpen(false);
+            keepComposerFocus();
             if (typingTimer.current) clearTimeout(typingTimer.current);
             if (socket) socket.emit("typing:stop", { conversationId: convId });
             return;
@@ -1923,6 +2021,7 @@ export function ChatPanel({
         clearDraft(draftsKey(userId), convId);
         clearAll();
         setMentionOpen(false);
+        keepComposerFocus();
         if (typingTimer.current) clearTimeout(typingTimer.current);
         if (socket) socket.emit("typing:stop", { conversationId: convId });
         try {
@@ -3657,6 +3756,7 @@ export function ChatPanel({
                                                 placeholder="Type a message…"
                                                 aria-label="Message"
                                                 rows={1}
+                                                enterKeyHint="send"
                                                 className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
                                             />
                                             {isOffline && (
@@ -3668,6 +3768,12 @@ export function ChatPanel({
                                             <motion.button
                                                 type="button"
                                                 onClick={send}
+                                                onPointerDown={(e) => {
+                                                    e.preventDefault();
+                                                }}
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                }}
                                                 disabled={
                                                     !text.trim() &&
                                                     !pendingFiles.some(
