@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dev.usersynax.kivo.twa",
+      "sha256_cert_fingerprints": [
+        "31:EF:80:D7:40:A6:F3:C5:DD:D0:90:CE:A1:91:B2:85:C2:6D:B1:46:7F:20:E2:A7:EE:03:E0:0C:13:B0:9B:96"
+      ]
+    }
+  }
+]
