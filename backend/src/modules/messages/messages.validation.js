@@ -11,10 +11,10 @@ const attachmentSchema = z.object({
 });
 
 export const createMessageSchema = z.object({
-  content: z.string().trim().max(4000, "Message too long").optional(),
+  content: z.string().trim().max(8000, "Message too long").optional(),
   replyToMessageId: z.string().optional(),
   threadId: z.string().optional(),
-  attachments: z.array(attachmentSchema).max(10).optional(),
+  attachments: z.array(attachmentSchema).max(20).optional(),
   audioDuration: z.number().min(0).max(3600).optional(),
   forwardedFromId: z.string().optional(),
 }).refine(
@@ -29,7 +29,7 @@ export const createMessageSchema = z.object({
 );
 
 export const updateMessageSchema = z.object({
-  content: z.string().trim().min(1, "Message cannot be empty").max(4000, "Message too long"),
+  content: z.string().trim().min(1, "Message cannot be empty").max(8000, "Message too long"),
 });
 
 export const reactionSchema = z.object({

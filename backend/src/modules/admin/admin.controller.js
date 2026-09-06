@@ -85,10 +85,11 @@ export const unbanUser = asyncHandler(async (req, res) => {
 });
 
 export const setUserPlan = asyncHandler(async (req, res) => {
-  const { plan } = req.body || {};
+  const { plan, expiresAt } = req.body || {};
   const data = await adminService.setUserPlan({
     userId: req.params.id,
     plan,
+    expiresAt: expiresAt || null,
     ip: getClientIp(req),
   });
   res.status(200).json({ success: true, data });

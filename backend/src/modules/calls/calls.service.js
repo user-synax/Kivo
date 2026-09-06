@@ -10,6 +10,7 @@ import Notification from "../../models/Notification.js";
 import { getIO } from "../../socket/index.js";
 import { emitToConversation, emitToUser } from "../../socket/io.js";
 import { getPreferences, publicNotification } from "../notifications/notifications.service.js";
+import { getRequesterPlan } from "../../lib/plus.js";
 import { publicMessage } from "../messages/messages.service.js";
 
 // LiveKit Cloud credentials. Optional like Appwrite — the server boots without
@@ -62,6 +63,23 @@ async function assertCallAllowed(conversationId, userId) {
       if (themBlocked.has(userId)) {
         throw forbidden("You can't call this user", "CALL_BLOCKED");
       }
+    }
+  }
+  // Group call size is tiered: free up to 5 participants, Plus up to 25.
+  // 1:1 DMs are unlimited on both tiers.
+  if (conversation.type === "group") {
+    const { plan, limits } = await getRequesterPlan(User, userId);
+    if (participantIds.length > limits.groupCallMaxParticipants) {
+      if (plan !== "plus") {
+        throw forbidden(
+          `Free group calls support up to ${limits.groupCallMaxParticipants} participants — upgrade to Kivo Plus for up to 25`,
+          "PLUS_REQUIRED",
+        );
+      }
+      throw forbidden(
+        `Group calls support up to ${limits.groupCallMaxParticipants} participants`,
+        "CALL_TOO_LARGE",
+      );
     }
   }
   return { conversation, me, participantIds };

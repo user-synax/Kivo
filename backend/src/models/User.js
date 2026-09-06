@@ -113,14 +113,29 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    // Account tier: "free" (default) or "plus" (admin-granted entitlement for
-    // premium profile perks — custom banner uploads, profile effects). Users
-    // can never self-grant; the admin panel manages it. Payments are out of
-    // scope, so "plus" is a grant, not a purchase.
+    // Account tier: "free" (default) or "plus" (entitlement for premium
+    // perks — custom banner uploads, profile effects, higher limits). Users
+    // can never self-grant; the admin panel or billing webhooks manage it.
+    // `plan` stays the source of truth; `planExpiresAt` drives expiry for
+    // paid subscriptions (null = lifetime/manual grant, never expires).
     plan: {
       type: String,
       enum: ["free", "plus"],
       default: "free",
+    },
+    // When the Plus entitlement lapses (Razorpay subscription end). Null =
+    // no expiry (manual/admin grant). Expired Plus is treated as free by
+    // `lib/plus.js` without needing an immediate DB write.
+    planExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    // Razorpay customer id for billing linkage. Server-only, never sent to
+    // clients (select: false like avatarFileId).
+    razorpayCustomerId: {
+      type: String,
+      default: null,
+      select: false,
     },
     // Profile-effect id (Kivo Plus): "none" (default), "glow" (avatar halo),
     // "gradient-name" (animated name), or "aura" (both). Rendered only on

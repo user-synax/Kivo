@@ -16,11 +16,14 @@ const uploadLimiter = rateLimiter({
 });
 
 // Memory storage — files live in buffers, written to Appwrite directly.
+// Multer caps at the PLUS maximum (100MB × 20); the controller then enforces
+// the per-plan limit server-side (free is lower), so free users get a clean
+// PLUS_REQUIRED-style error instead of a raw multer rejection.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 30 * 1024 * 1024, files: 10 },
+  limits: { fileSize: 100 * 1024 * 1024, files: 20 },
 });
 
-router.post("/upload", uploadLimiter, upload.array("files", 10), attachmentsController.uploadFiles);
+router.post("/upload", uploadLimiter, upload.array("files", 20), attachmentsController.uploadFiles);
 
 export default router;

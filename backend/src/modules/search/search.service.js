@@ -2,6 +2,7 @@ import Conversation from "../../models/Conversation.js";
 import MessageModel from "../../models/Message.js";
 import User from "../../models/User.js";
 import Space from "../../models/Space.js";
+import { getRequesterPlan } from "../../lib/plus.js";
 import { publicMessage } from "../messages/messages.service.js";
 
 /**
@@ -167,12 +168,19 @@ async function searchSpaces(userId, query, limit) {
 /**
  * Unified search across messages, users, and spaces.
  * All three categories run in parallel and resolve independently.
+ * The per-category limit is clamped to the caller's tier server-side
+ * (free 5, Plus 20) — the client is never trusted.
  */
 export async function globalSearch({ userId, q, limit }) {
+  const { limits } = await getRequesterPlan(User, userId);
+  const effectiveLimit = Math.min(
+    Number(limit) || limits.searchLimitPerCategory,
+    limits.searchLimitPerCategory,
+  );
   const [messages, users, spaces] = await Promise.all([
-    searchMessages(userId, q, limit),
-    searchUsers(userId, q, limit),
-    searchSpaces(userId, q, limit),
+    searchMessages(userId, q, effectiveLimit),
+    searchUsers(userId, q, effectiveLimit),
+    searchSpaces(userId, q, effectiveLimit),
   ]);
 
   return { messages, users, spaces };

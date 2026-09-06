@@ -78,7 +78,7 @@ export async function listUsers({ page = 1, limit = 20, q, banned }) {
   const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
   const [users, total] = await Promise.all([
     User.find(filter)
-      .select("displayName username email avatarUrl isBanned bannedAt bannedReason plan createdAt")
+      .select("displayName username email avatarUrl isBanned bannedAt bannedReason plan planExpiresAt createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
@@ -97,6 +97,7 @@ export async function listUsers({ page = 1, limit = 20, q, banned }) {
       bannedAt: u.bannedAt || null,
       bannedReason: u.bannedReason || null,
       plan: u.plan || "free",
+      planExpiresAt: u.planExpiresAt ? new Date(u.planExpiresAt).toISOString() : null,
       createdAt: u.createdAt,
     })),
     total,
@@ -111,7 +112,7 @@ export async function getUserDetail(userId) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(userId)
-    .select("displayName username email avatarUrl bio status isBanned bannedAt bannedReason plan profileEffect twoFactorEnabled createdAt")
+    .select("displayName username email avatarUrl bio status isBanned bannedAt bannedReason plan planExpiresAt profileEffect twoFactorEnabled createdAt")
     .lean();
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -144,6 +145,7 @@ export async function getUserDetail(userId) {
     bannedAt: user.bannedAt || null,
     bannedReason: user.bannedReason || null,
     plan: user.plan || "free",
+    planExpiresAt: user.planExpiresAt ? new Date(user.planExpiresAt).toISOString() : null,
     profileEffect: user.profileEffect || "none",
     twoFactorEnabled: Boolean(user.twoFactorEnabled),
     createdAt: user.createdAt,
@@ -224,9 +226,10 @@ export async function unbanUser({ userId, ip }) {
   return { unbanned: true };
 }
 
-// Grant or revoke the Kivo Plus plan (admin-only entitlement; there is no
-// self-serve payment flow yet, so a grant is the only way to become plus).
-export async function setUserPlan({ userId, plan, ip }) {
+// Grant or revoke the Kivo Plus plan (admin-only entitlement; billing webhooks
+// will call the same update path when Razorpay lands). Accepts an optional
+// `expiresAt` for time-boxed grants — null means no expiry (lifetime grant).
+export async function setUserPlan({ userId, plan, expiresAt = null, ip }) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
@@ -239,7 +242,13 @@ export async function setUserPlan({ userId, plan, ip }) {
     throw badRequest(`User is already on the ${plan} plan`, "ALREADY_PLAN");
   }
 
-  await User.findByIdAndUpdate(userId, { plan });
+  const update = { plan };
+  if (plan === "plus") {
+    update.planExpiresAt = expiresAt ? new Date(expiresAt) : null;
+  } else {
+    update.planExpiresAt = null;
+  }
+  await User.findByIdAndUpdate(userId, update);
   // Downgrading also clears any Plus-only profile effect.
   if (plan === "free") {
     await User.findByIdAndUpdate(userId, { profileEffect: "none" });
@@ -254,7 +263,12 @@ export async function setUserPlan({ userId, plan, ip }) {
     ip,
   });
 
-  return { plan };
+  return {
+    plan,
+    planExpiresAt: update.planExpiresAt
+      ? new Date(update.planExpiresAt).toISOString()
+      : null,
+  };
 }
 
 // ── Groups Management ───────────────────────────────────────────────────────

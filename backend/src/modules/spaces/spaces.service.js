@@ -6,6 +6,7 @@ import Conversation from "../../models/Conversation.js";
 import Message from "../../models/Message.js";
 import User from "../../models/User.js";
 import { uploadAvatar } from "../../lib/appwrite.js";
+import { getRequesterPlan, getEffectivePlan, getLimitsForPlan } from "../../lib/plus.js";
 import { getIO } from "../../socket/index.js";
 import { emitToConversation, joinUserToRoom, leaveUserFromRoom, emitToUser, emitToSpace, joinUserToSpace, leaveUserFromSpace } from "../../socket/io.js";
 
@@ -115,9 +116,57 @@ function slugFromName(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+// Member/channel caps are governed by the SPACE OWNER's tier (like a boost):
+// a Plus-owned Space holds more members/channels regardless of who joins.
+async function assertSpaceHasHeadroom(space, { forMembers = 0, forChannels = 0 } = {}) {
+  const ownerDoc = await User.findById(space.owner)
+    .select("plan planExpiresAt")
+    .lean();
+  const ownerLimits = getLimitsForPlan(getEffectivePlan(ownerDoc));
+  const ownerIsPlus = getEffectivePlan(ownerDoc) === "plus";
+  if (forMembers > 0 && space.members.length + forMembers > ownerLimits.spaceMembersMax) {
+    if (!ownerIsPlus) {
+      throw forbidden(
+        `This Space is full for the free plan (${ownerLimits.spaceMembersMax} members) — the owner can upgrade to Kivo Plus for larger communities`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `This Space holds up to ${ownerLimits.spaceMembersMax} members`,
+      "SPACE_FULL",
+    );
+  }
+  if (forChannels > 0 && space.channels.length + forChannels > ownerLimits.channelsPerSpaceMax) {
+    if (!ownerIsPlus) {
+      throw forbidden(
+        `Free Spaces hold up to ${ownerLimits.channelsPerSpaceMax} channels — the owner can upgrade to Kivo Plus for more`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `This Space holds up to ${ownerLimits.channelsPerSpaceMax} channels`,
+      "CHANNEL_LIMIT",
+    );
+  }
+}
+
 // ── Space CRUD ────────────────────────────────────────────────────────
 
 export async function createSpace({ userId, name, description, category, banner, avatar }) {
+  const { plan, limits } = await getRequesterPlan(User, userId);
+  const ownedCount = await Space.countDocuments({ owner: userId });
+  if (ownedCount >= limits.spacesOwnedMax) {
+    if (plan !== "plus") {
+      throw forbidden(
+        `Free plan allows ${limits.spacesOwnedMax} owned Spaces — upgrade to Kivo Plus for more`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `You own the maximum ${limits.spacesOwnedMax} Spaces`,
+      "SPACE_LIMIT",
+    );
+  }
   const slug = generateSlug(name);
 
   let avatarUrl = null;
@@ -327,6 +376,7 @@ export async function addMember({ spaceId, userId, targetUserId }) {
   if (!mongoose.Types.ObjectId.isValid(targetUserId)) throw badRequest("Invalid user id", "INVALID_ID");
   const exists = space.members.some((m) => m.userId.toString() === targetUserId);
   if (exists) throw badRequest("User is already a member", "ALREADY_MEMBER");
+  await assertSpaceHasHeadroom(space, { forMembers: 1 });
   const user = await User.findById(targetUserId).select("_id");
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   space.members.push({ userId: targetUserId, role: "member", joinedAt: new Date() });
@@ -422,6 +472,7 @@ export async function updateMemberRole({ spaceId, userId, targetUserId, role }) 
 async function addMemberAndJoin(space, userId) {
   const exists = space.members.some((m) => m.userId.toString() === userId);
   if (exists) throw badRequest("Already a member", "ALREADY_MEMBER");
+  await assertSpaceHasHeadroom(space, { forMembers: 1 });
   space.members.push({ userId, role: "member", joinedAt: new Date() });
   await space.save();
   const convs = await Conversation.find({ spaceId: space._id, type: "space_channel" });
@@ -515,6 +566,7 @@ export async function revokeInvite({ spaceId, userId }) {
 
 export async function createChannel({ spaceId, userId, name, description, type }) {
   const { space } = await assertSpace(spaceId, userId, { requireMember: true, requireRole: "admin" });
+  await assertSpaceHasHeadroom(space, { forChannels: 1 });
   const slug = slugFromName(name);
   if (space.channels.some((c) => c.slug === slug)) throw conflict("Channel already exists", "CHANNEL_EXISTS");
   const channelId = new mongoose.Types.ObjectId();

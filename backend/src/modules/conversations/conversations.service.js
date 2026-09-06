@@ -3,6 +3,7 @@ import { notFound, badRequest, forbidden } from "../../utils/errors.js";
 import Conversation from "../../models/Conversation.js";
 import Message from "../../models/Message.js";
 import User from "../../models/User.js";
+import { getRequesterPlan } from "../../lib/plus.js";
 import { uploadAvatar } from "../../lib/appwrite.js";
 import { publicMessage } from "../messages/messages.service.js";
 import { getIO } from "../../socket/index.js";
@@ -264,6 +265,7 @@ async function resolveUsers(userIds) {
 
 // Create a group conversation. The creator is auto-added as a participant and
 // the sole admin. Requires at least 2 other participants (3 total).
+// Per-plan caps: free owns up to 5 groups / 20 members; Plus 20 / 100.
 export async function createGroup({ userId, name, participantIds, avatar }) {
   if (!Array.isArray(participantIds) || participantIds.length < 2) {
     throw badRequest("A group needs at least 2 other members", "TOO_FEW_MEMBERS");
@@ -271,6 +273,35 @@ export async function createGroup({ userId, name, participantIds, avatar }) {
   const allIds = [...new Set([userId, ...participantIds])];
   if (allIds.length < 3) {
     throw badRequest("A group needs at least 2 other members", "TOO_FEW_MEMBERS");
+  }
+  const { plan, limits } = await getRequesterPlan(User, userId);
+  if (allIds.length > limits.groupMembersMax) {
+    if (plan !== "plus") {
+      throw forbidden(
+        `Free groups hold up to ${limits.groupMembersMax} members — upgrade to Kivo Plus for ${limits.groupMembersMax + 80}`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `A group holds up to ${limits.groupMembersMax} members`,
+      "TOO_MANY_MEMBERS",
+    );
+  }
+  const ownedCount = await Conversation.countDocuments({
+    type: "group",
+    createdBy: userId,
+  });
+  if (ownedCount >= limits.groupsOwnedMax) {
+    if (plan !== "plus") {
+      throw forbidden(
+        `Free plan allows ${limits.groupsOwnedMax} owned groups — upgrade to Kivo Plus for more`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `You own the maximum ${limits.groupsOwnedMax} groups`,
+      "GROUP_LIMIT",
+    );
   }
   for (const id of participantIds) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -411,6 +442,23 @@ export async function addMembers({ conversationId, userId, memberIds }) {
     throw badRequest("User is already a member", "ALREADY_MEMBER");
   }
   await resolveUsers(toAdd);
+  // Per-plan member cap enforced on the acting admin's tier.
+  const { plan: adderPlan, limits: adderLimits } = await getRequesterPlan(
+    User,
+    userId,
+  );
+  if (existing.size + toAdd.length > adderLimits.groupMembersMax) {
+    if (adderPlan !== "plus") {
+      throw forbidden(
+        `Free groups hold up to ${adderLimits.groupMembersMax} members — upgrade to Kivo Plus for larger groups`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `A group holds up to ${adderLimits.groupMembersMax} members`,
+      "TOO_MANY_MEMBERS",
+    );
+  }
 
   const updated = await Conversation.findByIdAndUpdate(
     conversationId,

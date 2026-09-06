@@ -4,6 +4,7 @@ import Conversation from "../../models/Conversation.js";
 import Message from "../../models/Message.js";
 import User from "../../models/User.js";
 import Space from "../../models/Space.js";
+import { getRequesterPlan } from "../../lib/plus.js";
 import { emitToConversation, roomName } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 
@@ -232,6 +233,39 @@ export async function createMessage({
   const conversation = await assertMembership(conversationId, userId);
   await assertDmNotBlocked(conversation, userId);
 
+  // Per-plan send caps (server-side; zod allows the Plus max, we clamp here).
+  const { plan: senderPlan, limits: senderLimits } = await getRequesterPlan(
+    User,
+    userId,
+  );
+  if (content && content.length > senderLimits.messageMaxLength) {
+    if (senderPlan !== "plus") {
+      throw forbidden(
+        `Free messages hold up to ${senderLimits.messageMaxLength} characters — upgrade to Kivo Plus for ${senderLimits.messageMaxLength + 4000}`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `Message too long (max ${senderLimits.messageMaxLength} characters)`,
+      "MESSAGE_TOO_LONG",
+    );
+  }
+  if (
+    attachments &&
+    attachments.length > senderLimits.attachmentsPerMessage
+  ) {
+    if (senderPlan !== "plus") {
+      throw forbidden(
+        `Free plan allows up to ${senderLimits.attachmentsPerMessage} attachments per message — upgrade to Kivo Plus for more`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `Maximum ${senderLimits.attachmentsPerMessage} attachments per message`,
+      "TOO_MANY_FILES",
+    );
+  }
+
   // Announcement channels: only owner/admin can post in the channel itself,
   // but ANY member can reply inside a thread under an announcement.
   const inThread = Boolean(threadId);
@@ -375,6 +409,33 @@ export async function editMessage({ messageId, userId, content }) {
     throw badRequest("Cannot edit a deleted message", "ALREADY_DELETED");
   }
 
+  const { plan: editorPlan, limits: editorLimits } = await getRequesterPlan(
+    User,
+    userId,
+  );
+  if (content && content.length > editorLimits.messageMaxLength) {
+    if (editorPlan !== "plus") {
+      throw forbidden(
+        `Free messages hold up to ${editorLimits.messageMaxLength} characters — upgrade to Kivo Plus for longer messages`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `Message too long (max ${editorLimits.messageMaxLength} characters)`,
+      "MESSAGE_TOO_LONG",
+    );
+  }
+  // Free edit window (15 min); Plus edits never expire.
+  if (editorLimits.messageEditWindowMs != null && message.createdAt) {
+    const age = Date.now() - new Date(message.createdAt).getTime();
+    if (age > editorLimits.messageEditWindowMs) {
+      throw forbidden(
+        "Free edits close 15 minutes after sending — upgrade to Kivo Plus for unlimited edits",
+        "PLUS_REQUIRED",
+      );
+    }
+  }
+
   const mentionIds = await resolveMentions(content, conversation.participants);
 
   message.content = content;
@@ -412,6 +473,7 @@ export async function deleteMessage({ messageId, userId }) {
 
 // Pin/unpin a message (any member). Emits `message:pin-updated` so open chats
 // can refresh their pinned banner and the message's own pin state.
+// Per-plan cap: free 10 pins/conversation, Plus 50.
 export async function pinMessage({ messageId, userId, pinned }) {
   if (!mongoose.Types.ObjectId.isValid(messageId)) {
     throw badRequest("Invalid message id", "INVALID_ID");
@@ -425,6 +487,28 @@ export async function pinMessage({ messageId, userId, pinned }) {
   }
   await assertMembership(message.conversationId.toString(), userId);
 
+  if (pinned && !message.pinnedAt) {
+    const { plan, limits } = await getRequesterPlan(User, userId);
+    const pinCount = await Message.countDocuments({
+      conversationId: message.conversationId,
+      threadId: null,
+      pinnedAt: { $ne: null },
+      isDeleted: false,
+    });
+    if (pinCount >= limits.pinsPerConversation) {
+      if (plan !== "plus") {
+        throw forbidden(
+          `Free chats hold ${limits.pinsPerConversation} pins — upgrade to Kivo Plus for ${limits.pinsPerConversation + 40}`,
+          "PLUS_REQUIRED",
+        );
+      }
+      throw badRequest(
+        `This chat holds up to ${limits.pinsPerConversation} pins`,
+        "PIN_LIMIT",
+      );
+    }
+  }
+
   message.pinnedAt = pinned ? new Date() : null;
   message.pinnedBy = pinned ? userId : null;
   await message.save();
@@ -437,12 +521,14 @@ export async function pinMessage({ messageId, userId, pinned }) {
   return payload;
 }
 
-// Pinned messages for the conversation banner, newest pin first (max 10).
+// Pinned messages for the conversation banner, newest pin first.
+// Cap follows the viewer's tier (free 10, Plus 50).
 export async function listPinned({ conversationId, userId }) {
   if (!mongoose.Types.ObjectId.isValid(conversationId)) {
     throw badRequest("Invalid conversation id", "INVALID_ID");
   }
   await assertMembership(conversationId, userId);
+  const { limits } = await getRequesterPlan(User, userId);
   const docs = await Message.find({
     conversationId,
     threadId: null,
@@ -450,7 +536,7 @@ export async function listPinned({ conversationId, userId }) {
     isDeleted: false,
   })
     .sort({ pinnedAt: -1 })
-    .limit(10)
+    .limit(limits.pinsPerConversation)
     .lean();
   return docs.map((m) => publicMessage(m, userId));
 }
@@ -474,7 +560,26 @@ export async function toggleSave({ messageId, userId, saved }) {
   const uid = new mongoose.Types.ObjectId(userId);
   if (saved) {
     const already = message.savedBy.some((s) => s.userId.toString() === userId);
-    if (!already) message.savedBy.push({ userId: uid });
+    if (!already) {
+      const { plan, limits } = await getRequesterPlan(User, userId);
+      const savedCount = await Message.countDocuments({
+        "savedBy.userId": uid,
+        isDeleted: false,
+      });
+      if (savedCount >= limits.savedMax) {
+        if (plan !== "plus") {
+          throw forbidden(
+            `Free plan holds ${limits.savedMax} saved messages — upgrade to Kivo Plus for ${limits.savedMax + 800}`,
+            "PLUS_REQUIRED",
+          );
+        }
+        throw badRequest(
+          `You hold the maximum ${limits.savedMax} saved messages`,
+          "SAVE_LIMIT",
+        );
+      }
+      message.savedBy.push({ userId: uid });
+    }
   } else {
     message.savedBy = message.savedBy.filter(
       (s) => s.userId.toString() !== userId,
@@ -486,8 +591,7 @@ export async function toggleSave({ messageId, userId, saved }) {
 }
 
 // The current user's Saved messages across every conversation they're still in,
-// newest save first. The client joins conversation labels/avatars from its own
-// conversation list, so the payload stays flat: { message, savedAt }.
+// newest save first. Cap follows the viewer's tier (free 200, Plus 1000).
 export async function listSaved({ userId }) {
   const conversations = await Conversation.find({ participants: userId })
     .select("_id")
@@ -495,6 +599,7 @@ export async function listSaved({ userId }) {
   if (!conversations.length) return [];
   const convIds = conversations.map((c) => c._id);
   const uid = new mongoose.Types.ObjectId(userId);
+  const { limits } = await getRequesterPlan(User, userId);
 
   const docs = await Message.find({
     conversationId: { $in: convIds },
@@ -502,7 +607,7 @@ export async function listSaved({ userId }) {
     "savedBy.userId": uid,
   })
     .sort({ createdAt: -1 })
-    .limit(400)
+    .limit(limits.savedMax)
     .lean();
 
   const items = docs
@@ -519,7 +624,7 @@ export async function listSaved({ userId }) {
     })
     .filter(Boolean)
     .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
-    .slice(0, 200);
+    .slice(0, limits.savedMax);
 
   return items;
 }

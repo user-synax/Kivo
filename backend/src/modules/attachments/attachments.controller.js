@@ -1,7 +1,9 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { badRequest, forbidden, notFound } from "../../utils/errors.js";
 import Conversation from "../../models/Conversation.js";
-import { uploadAttachment, ALLOWED_MIMES, MAX_FILE_SIZE } from "../../lib/attachments.js";
+import User from "../../models/User.js";
+import { getRequesterPlan } from "../../lib/plus.js";
+import { uploadAttachment, ALLOWED_MIMES } from "../../lib/attachments.js";
 
 /**
  * POST /api/v1/attachments/upload
@@ -28,8 +30,20 @@ export const uploadFiles = asyncHandler(async (req, res) => {
   if (!files || files.length === 0) {
     throw badRequest("At least one file is required", "NO_FILES");
   }
-  if (files.length > 10) {
-    throw badRequest("Maximum 10 files per message", "TOO_MANY_FILES");
+  // Per-plan caps (server-side, never trust the client). Free keeps today's
+  // 30MB × 10 behavior; Plus gets 100MB × 20.
+  const { plan, limits } = await getRequesterPlan(User, req.user.userId);
+  if (files.length > limits.attachmentsPerMessage) {
+    if (plan !== "plus") {
+      throw forbidden(
+        `Free plan allows up to ${limits.attachmentsPerMessage} files per message — upgrade to Kivo Plus for ${limits.attachmentsPerMessage} (Plus: 20)`,
+        "PLUS_REQUIRED",
+      );
+    }
+    throw badRequest(
+      `Maximum ${limits.attachmentsPerMessage} files per message`,
+      "TOO_MANY_FILES",
+    );
   }
 
   const results = [];
@@ -41,10 +55,16 @@ export const uploadFiles = asyncHandler(async (req, res) => {
         "INVALID_FILE_TYPE",
       );
     }
-    // Validate size
-    if (file.size > MAX_FILE_SIZE) {
+    // Validate size against the caller's plan (multer already caps at Plus max).
+    if (file.size > limits.attachmentMaxBytes) {
+      if (plan !== "plus") {
+        throw forbidden(
+          `File "${file.originalname}" exceeds the free ${(limits.attachmentMaxBytes / 1024 / 1024).toFixed(0)}MB limit — upgrade to Kivo Plus for 100MB uploads`,
+          "PLUS_REQUIRED",
+        );
+      }
       throw badRequest(
-        `File "${file.originalname}" exceeds 30MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+        `File "${file.originalname}" exceeds ${(limits.attachmentMaxBytes / 1024 / 1024).toFixed(0)}MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
         "FILE_TOO_LARGE",
       );
     }

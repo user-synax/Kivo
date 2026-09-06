@@ -5,6 +5,7 @@ import FriendRequest from "../../models/FriendRequest.js";
 import Conversation from "../../models/Conversation.js";
 import { uploadAvatar, getStorageSafe } from "../../lib/appwrite.js";
 import env from "../../config/env.js";
+import { getEffectivePlan } from "../../lib/plus.js";
 import { emitToUser } from "../../socket/io.js";
 import { getIO } from "../../socket/index.js";
 
@@ -86,9 +87,12 @@ function selfUser(user) {
   const u = user.toObject ? user.toObject() : user;
   return {
     ...base,
-    plan: user.plan || "free",
+    plan: getEffectivePlan(u),
+    planExpiresAt: u.planExpiresAt
+      ? new Date(u.planExpiresAt).toISOString()
+      : null,
     // Lets the editor show a "custom upload" affordance and clean removal.
-    bannerUploaded: Boolean(user.bannerFileId),
+    bannerUploaded: Boolean(user.bannerFileId || u.bannerFileId),
     // Own linked provider emails (Settings shows which account is linked).
     googleEmail: u.googleEmail || null,
     githubEmail: u.githubEmail || null,
@@ -136,7 +140,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan profileEffect appearance bannerFileId createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect appearance bannerFileId createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);
@@ -247,9 +251,9 @@ export async function updateAvatar({ userId, buffer, contentType }) {
 // bucket like display pictures; switching away later (curated/none) retires
 // the file through the updateMe banner branch.
 export async function updateBanner({ userId, buffer, contentType }) {
-  const user = await User.findById(userId).select("plan banner bannerFileId");
+  const user = await User.findById(userId).select("plan planExpiresAt banner bannerFileId");
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
-  if (user.plan !== "plus") {
+  if (getEffectivePlan(user) !== "plus") {
     throw forbidden(
       "Custom banners are a Kivo Plus perk",
       "PLUS_REQUIRED",
@@ -455,10 +459,10 @@ export async function updateMe({ userId, data }) {
     }
   }
   if (data.profileEffect !== undefined) {
-    // Plus-only field; a free user trying to set it is downgraded to none.
-    const me = await User.findById(userId).select("plan").lean();
+    // Plus-only field; a free/expired user trying to set it is downgraded to none.
+    const me = await User.findById(userId).select("plan planExpiresAt").lean();
     update.profileEffect =
-      me?.plan === "plus" ? data.profileEffect || "none" : "none";
+      getEffectivePlan(me) === "plus" ? data.profileEffect || "none" : "none";
   }
   if (data.country !== undefined) {
     update.country = data.country || null;
@@ -492,7 +496,7 @@ export async function updateMe({ userId, data }) {
     new: true,
     runValidators: true,
   }).select(
-    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan profileEffect appearance bannerFileId createdAt",
+    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect appearance bannerFileId createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);

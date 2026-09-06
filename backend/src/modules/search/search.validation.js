@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const searchQuerySchema = z.object({
   q: z.string().trim().min(2, "Query must be at least 2 characters").max(100),
-  limit: z.coerce.number().int().min(1).max(10).default(5),
+  limit: z.coerce.number().int().min(1).max(20).default(5),
 });
 
 // Convenience parser that throws a VALIDATION_ERROR on failure.

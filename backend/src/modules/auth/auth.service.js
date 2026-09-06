@@ -6,6 +6,7 @@ import env, { refreshTtlSeconds } from "../../config/env.js";
 import { unauthorized, conflict, notFound, badRequest } from "../../utils/errors.js";
 import User from "../../models/User.js";
 import Session from "../../models/Session.js";
+import { getEffectivePlan } from "../../lib/plus.js";
 import { sendEmail } from "../../lib/email.js";
 import {
   buildProvisioningUri,
@@ -146,6 +147,12 @@ export function publicUser(user) {
     role: user.role,
     verified: Boolean(user.verified),
     showBadge: user.showBadge !== false,
+    // Entitlement (expiry-aware) so the client can render Plus gates
+    // immediately after login without an extra /users/me round-trip.
+    plan: getEffectivePlan(user),
+    planExpiresAt: user.planExpiresAt
+      ? new Date(user.planExpiresAt).toISOString()
+      : null,
     // Provider verification badges (public profile chips + Settings state).
     googleVerified: Boolean(user.googleVerified),
     githubVerified: Boolean(user.githubVerified),
