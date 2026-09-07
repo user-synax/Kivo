@@ -35,9 +35,9 @@ export function BottomTabBar({ active, onChange, unread }) {
             aria-label={tab.label}
             onClick={() => onChange?.(tab.id)}
             className={cn(
-              "relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-medium transition-colors duration-200",
+              "relative flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-medium transition-colors duration-200",
               isActive
-                ? "text-[#a3e635]"
+                ? "text-[var(--accent)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             )}
           >
@@ -53,7 +53,7 @@ export function BottomTabBar({ active, onChange, unread }) {
               <Icon
                 className={cn(
                   "h-5 w-5 transition-colors",
-                  isActive ? "text-[#a3e635]" : "text-[var(--text-muted)]"
+                  isActive ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
                 )}
                 strokeWidth={isActive ? 2.2 : 1.8}
               />
@@ -61,7 +61,7 @@ export function BottomTabBar({ active, onChange, unread }) {
                 <span className="absolute -right-1 -top-0.5 size-2.5 rounded-full bg-[#ff3b30] ring-2 ring-[var(--bg-elevated)]" aria-hidden="true" />
               )}
             </span>
-            <span className={cn("relative z-10", isActive ? "text-[#a3e635]" : "")}>{tab.label}</span>
+            <span className={cn("relative z-10", isActive ? "text-[var(--accent)]" : "")}>{tab.label}</span>
           </button>
         );
       })}

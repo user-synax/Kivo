@@ -34,7 +34,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => onTabChange?.(item.id)}
                 className={cn(
-                  "relative flex size-10 hover:cursor-pointer items-center justify-center rounded-xl transition-colors duration-200",
+                  "relative flex size-12 min-h-12 min-w-12 hover:cursor-pointer items-center justify-center rounded-xl transition-colors duration-200",
                   isActive
                     ? "text-[var(--accent)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
@@ -65,7 +65,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
             type="button"
             aria-label="Profile"
             onClick={onProfileClick}
-            className="flex size-10 items-center justify-center rounded-xl transition-colors duration-200 hover:bg-[var(--hover)]"
+            className="flex size-11 min-h-11 min-w-11 items-center justify-center rounded-xl transition-colors duration-200 hover:bg-[var(--hover)]"
           >
             <Avatar
               name={profileLabel}

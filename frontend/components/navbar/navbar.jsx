@@ -214,7 +214,7 @@ export function Navbar() {
                         aria-expanded={open}
                         aria-controls="kivo-mobile-menu"
                         onClick={() => setOpen((v) => !v)}
-                        className="kivo-focus flex h-10 w-10 items-center justify-center rounded-pills text-ink-black md:hidden"
+                        className="kivo-focus flex size-11 min-h-11 min-w-11 items-center justify-center rounded-pills text-ink-black md:hidden"
                     >
                         <MenuIcon open={open} reduce={reduce} />
                     </motion.button>
