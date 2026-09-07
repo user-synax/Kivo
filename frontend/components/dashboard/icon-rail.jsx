@@ -1,12 +1,13 @@
 "use client";
 
-import { Layers, MessageCircle, Settings, Users } from "lucide-react";
+import { CircleDashed, Layers, MessageCircle, Settings, Users } from "lucide-react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { cn } from "@/lib/utils";
 import { isPlusUser } from "@/lib/plus";
 
 const RAIL_ITEMS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
+  { id: "status", label: "Status", icon: CircleDashed },
   { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
   { id: "settings", label: "Settings", icon: Settings },

@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Menu, MessageCircle, Users } from "lucide-react";
+import { CircleDashed, Layers, Menu, MessageCircle, Users } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 // hamburger “Menu” tab so the bar stays to four primary destinations.
 const TABS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
+  { id: "status", label: "Status", icon: CircleDashed },
   { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
   { id: "menu", label: "Menu", icon: Menu },

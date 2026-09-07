@@ -26,6 +26,7 @@ import { AppearanceScreen } from "@/components/dashboard/appearance-screen";
 import { IconRail } from "@/components/dashboard/icon-rail";
 import { SettingsPanel } from "@/components/dashboard/settings-panel";
 import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
+import { StatusTab } from "@/components/status/status-tab";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -340,6 +341,11 @@ export function NestedSidebar({
   onCreateSpace,
   onDiscoverSpaces,
   unread = {},
+  statusFeed = [],
+  myStatuses = [],
+  onStatusCreate,
+  onStatusViewUser,
+  onStatusViewMy,
 }) {
   const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState("chats");
@@ -384,6 +390,7 @@ export function NestedSidebar({
     groups: "Search groups",
     spaces: "Search spaces",
     settings: "Search settings",
+    status: "Search status",
   };
 
   return (
@@ -461,31 +468,42 @@ export function NestedSidebar({
                   </button>
                 </>
               )}
+              {activeTab === "status" && (
+                <button
+                  type="button"
+                  onClick={onStatusCreate}
+                  className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90"
+                >
+                  + New status
+                </button>
+              )}
             </div>
           </div>
 
           {/* Search bar — scoped to active tab. Keep as-is styling. */}
-          <label className="flex items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
-            <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" strokeWidth={1.6} aria-hidden="true" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={placeholderByTab[activeTab] || "Search"}
-              aria-label={placeholderByTab[activeTab] || "Search"}
-              className="w-full min-w-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-              >
-                <X className="h-3 w-3" strokeWidth={2} />
-              </button>
-            )}
-          </label>
+          {activeTab !== "status" && (
+            <label className="flex items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
+              <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" strokeWidth={1.6} aria-hidden="true" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={placeholderByTab[activeTab] || "Search"}
+                aria-label={placeholderByTab[activeTab] || "Search"}
+                className="w-full min-w-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                >
+                  <X className="h-3 w-3" strokeWidth={2} />
+                </button>
+              )}
+            </label>
+          )}
 
           {isOffline && (
             <div className="flex items-center gap-2 rounded-lg border border-[var(--destructive)]/20 bg-[var(--destructive)]/8 px-3 py-2">
@@ -598,6 +616,26 @@ export function NestedSidebar({
               >
                 {/* Skip search for settings if filtered — but keep panel consistent */}
                 <SettingsPanel onOpenAppearance={() => setAppearanceOpen(true)} />
+              </motion.div>
+            )}
+            {activeTab === "status" && (
+              <motion.div
+                key="status"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
+                className="h-full overflow-hidden"
+                style={{ overscrollBehavior: "contain" }}
+              >
+                <StatusTab
+                  myStatuses={myStatuses}
+                  feed={statusFeed}
+                  currentUser={currentUser}
+                  onCreate={onStatusCreate}
+                  onViewUser={onStatusViewUser}
+                  onViewMy={onStatusViewMy}
+                />
               </motion.div>
             )}
           </AnimatePresence>

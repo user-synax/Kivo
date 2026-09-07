@@ -49,6 +49,10 @@ import { Avatar } from "./avatar";
 import { ProfileEditModal } from "./profile-edit-modal";
 import { SettingsPanel } from "./settings-panel";
 import { useTheme } from "@/components/theme-provider";
+import { StatusTab } from "@/components/status/status-tab";
+import { StatusCreateModal } from "@/components/status/status-create-modal";
+import { StatusViewer } from "@/components/status/status-viewer";
+import { createStatus, fetchStatusFeed, fetchMyStatuses, viewStatus as viewStatusApi, deleteStatus as deleteStatusApi } from "@/lib/status";
 
 function isPlusUser(user) {
   if (!user || user.plan !== "plus") return false;
@@ -538,6 +542,14 @@ export function DashboardShell() {
   const [currentUser, setCurrentUser] = useState(() => getSession());
   const refreshUser = useCallback(() => setCurrentUser(getSession()), []);
 
+  // ── Status (WhatsApp desktop-style vertical list) ──────────────────────────
+  const [statusFeed, setStatusFeed] = useState([]);
+  const [myStatuses, setMyStatuses] = useState([]);
+  const [statusCreateOpen, setStatusCreateOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerStatuses, setViewerStatuses] = useState([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
   // The localStorage session may be stale (e.g. created before avatarUrl was
   // added to the auth response, or before the first avatar upload). Re-fetch the
   // authoritative current-user profile so the sidebar/avatar always reflect the
@@ -581,6 +593,75 @@ export function DashboardShell() {
     syncSubscription().catch(() => {});
   }, [currentUser]);
 
+  // Status feed + mine (WhatsApp desktop tab). Refresh on mount and on reconnect.
+  useEffect(() => {
+    if (!currentUser) return;
+    let active = true;
+    const load = () => {
+      fetchStatusFeed()
+        .then((d) => {
+          if (!active) return;
+          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          setStatusFeed(arr);
+        })
+        .catch(() => {});
+      fetchMyStatuses()
+        .then((d) => {
+          if (!active) return;
+          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          setMyStatuses(arr);
+        })
+        .catch(() => {});
+    };
+    load();
+    return () => { active = false; };
+  }, [currentUser, reconnectNonce]);
+
+  // Live status updates
+  useEffect(() => {
+    if (!socket) return;
+    const onNew = () => {
+      fetchStatusFeed()
+        .then((d) => {
+          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          setStatusFeed(arr);
+        })
+        .catch(() => {});
+      fetchMyStatuses()
+        .then((d) => {
+          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          setMyStatuses(arr);
+        })
+        .catch(() => {});
+    };
+    const onDel = ({ statusId, userId }) => {
+      if (!statusId) return;
+      if (String(userId) === String(currentUser?.id)) {
+        setMyStatuses((prev) => prev.filter((s) => String(s.id || s._id) !== String(statusId)));
+      }
+      setStatusFeed((prev) =>
+        prev
+          .map((g) => ({ ...g, statuses: g.statuses.filter((s) => String(s.id || s._id) !== String(statusId)) }))
+          .filter((g) => g.statuses.length > 0)
+      );
+    };
+    const onViewed = ({ statusId, viewerId }) => {
+      if (String(viewerId) === String(currentUser?.id)) return;
+      setMyStatuses((prev) =>
+        prev.map((s) =>
+          String(s.id || s._id) === String(statusId) ? { ...s, viewers: [...(s.viewers || []), { userId: viewerId }] } : s
+        )
+      );
+    };
+    socket.on("status:new", onNew);
+    socket.on("status:deleted", onDel);
+    socket.on("status:viewed", onViewed);
+    return () => {
+      socket.off("status:new", onNew);
+      socket.off("status:deleted", onDel);
+      socket.off("status:viewed", onViewed);
+    };
+  }, [socket, currentUser?.id]);
 
   // Service-worker push click → navigate to conversation while app is open in another tab.
   useEffect(() => {
@@ -1446,6 +1527,58 @@ export function DashboardShell() {
     });
   };
 
+  // Status handlers (WhatsApp desktop vertical list)
+  const handleCreateStatus = async ({ text, background }) => {
+    try {
+      const res = await createStatus({ text, background });
+      const created = res?.data || res;
+      setStatusCreateOpen(false);
+      // optimistic append to mine; feed will also refresh via socket
+      if (created?.id) setMyStatuses((prev) => [...prev, created]);
+      else {
+        fetchMyStatuses().then((d) => {
+          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          setMyStatuses(arr);
+        }).catch(() => {});
+      }
+    } catch (e) {
+      window.alert(e?.message || "Could not create status");
+    }
+  };
+  const handleViewUser = (group) => {
+    if (!group?.statuses?.length) return;
+    setViewerStatuses(group.statuses);
+    setViewerIndex(0);
+    setViewerOpen(true);
+  };
+  const handleViewMy = () => {
+    if (!myStatuses.length) { setStatusCreateOpen(true); return; }
+    setViewerStatuses(myStatuses);
+    setViewerIndex(0);
+    setViewerOpen(true);
+  };
+  const handleViewed = (id) => {
+    if (!id) return;
+    viewStatusApi(id).catch(() => {});
+    // mark as viewed locally in feed
+    setStatusFeed((prev) =>
+      prev.map((g) => ({
+        ...g,
+        statuses: g.statuses.map((s) => String(s.id || s._id) === String(id) ? { ...s, isViewed: true } : s),
+      }))
+    );
+  };
+  const handleDeleteStatus = async (id) => {
+    if (!id) return;
+    try {
+      await deleteStatusApi(id);
+      setViewerOpen(false);
+      setMyStatuses((prev) => prev.filter((s) => String(s.id || s._id) !== String(id)));
+    } catch (e) {
+      window.alert(e?.message || "Could not delete status");
+    }
+  };
+
   // Selecting any conversation closes an open group-settings drawer.
   const handleSelect = (id) => {
     setShowGroupSettings(false);
@@ -1548,6 +1681,7 @@ export function DashboardShell() {
     chats: conversations.some((c) => c.type === "dm" && (c.unreadCount || 0) > 0),
     groups: conversations.some((c) => c.type === "group" && (c.unreadCount || 0) > 0),
     spaces: conversations.some((c) => c.type === "space_channel" && (c.unreadCount || 0) > 0),
+    status: statusFeed.some((g) => g.statuses?.some((s) => !s.isViewed)),
     settings: false,
     profile: false,
   };
@@ -1830,6 +1964,18 @@ export function DashboardShell() {
                 {mobileTab === "settings" && (
                   <MobileSettingsTab onBack={() => setMobileTab("menu")} />
                 )}
+                {mobileTab === "status" && (
+                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                    <StatusTab
+                      myStatuses={myStatuses}
+                      feed={statusFeed}
+                      currentUser={currentUser}
+                      onCreate={() => setStatusCreateOpen(true)}
+                      onViewUser={handleViewUser}
+                      onViewMy={handleViewMy}
+                    />
+                  </div>
+                )}
                 {mobileTab === "profile" && (
                   <MobileProfileTab
                     currentUser={currentUser}
@@ -1839,6 +1985,7 @@ export function DashboardShell() {
                 )}
               </div>
               {(mobileTab === "chats" ||
+                mobileTab === "status" ||
                 mobileTab === "groups" ||
                 mobileTab === "spaces" ||
                 mobileTab === "menu") && (
@@ -1965,6 +2112,9 @@ export function DashboardShell() {
         }}
       />
 
+      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} />
+      <StatusViewer open={viewerOpen} statuses={viewerStatuses} initialIndex={viewerIndex} currentUserId={currentUser?.id} onClose={() => setViewerOpen(false)} onDelete={handleDeleteStatus} onViewed={handleViewed} />
+
       <IncomingCallOverlay />
       <ActiveCallView />
       <CallEndedToast />
@@ -1997,6 +2147,11 @@ export function DashboardShell() {
           onCreateSpace={() => setShowSpaceCreate(true)}
           onDiscoverSpaces={() => setShowDiscover(true)}
           unread={tabUnread}
+          statusFeed={statusFeed}
+          myStatuses={myStatuses}
+          onStatusCreate={() => setStatusCreateOpen(true)}
+          onStatusViewUser={handleViewUser}
+          onStatusViewMy={handleViewMy}
         />
       </div>
 
@@ -2136,6 +2291,9 @@ export function DashboardShell() {
           }
         }}
       />
+
+      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} />
+      <StatusViewer open={viewerOpen} statuses={viewerStatuses} initialIndex={viewerIndex} currentUserId={currentUser?.id} onClose={() => setViewerOpen(false)} onDelete={handleDeleteStatus} onViewed={handleViewed} />
 
       {removeModalNode}
 
