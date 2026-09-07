@@ -105,7 +105,7 @@ async function searchUsers(userId, query, limit) {
     _id: { $ne: userId },
     $or: orClause,
   })
-    .select("displayName username email avatarStyle avatarUrl")
+    .select("displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt")
     .limit(limit)
     .lean();
 
@@ -117,7 +117,7 @@ async function searchUsers(userId, query, limit) {
       _id: { $ne: userId },
       $or: [{ username: substringRegex }, { displayName: substringRegex }],
     })
-      .select("displayName username email avatarStyle avatarUrl")
+      .select("displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt")
       .limit(limit * 2)
       .lean();
     for (const u of more) {
@@ -128,13 +128,23 @@ async function searchUsers(userId, query, limit) {
     }
   }
 
-  return results.map((u) => ({
-    id: u._id.toString(),
-    displayName: u.displayName || null,
-    username: u.username || null,
-    avatarStyle: u.avatarStyle || null,
-    avatarUrl: u.avatarUrl || null,
-  }));
+  return results.map((u) => {
+    const isPlus = (() => {
+      if (!u || u.plan !== "plus") return false;
+      const exp = u.planExpiresAt ? new Date(u.planExpiresAt).getTime() : null;
+      if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+      return true;
+    })();
+    return {
+      id: u._id.toString(),
+      displayName: u.displayName || null,
+      username: u.username || null,
+      avatarStyle: u.avatarStyle || null,
+      avatarUrl: u.avatarUrl || null,
+      usernameColor: isPlus ? u.usernameColor || null : null,
+      isPlus,
+    };
+  });
 }
 
 /**

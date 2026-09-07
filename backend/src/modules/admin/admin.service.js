@@ -252,9 +252,9 @@ export async function setUserPlan({ userId, plan, expiresAt = null, ip }) {
     update.planExpiresAt = null;
   }
   await User.findByIdAndUpdate(userId, update);
-  // Downgrading also clears any Plus-only profile effect.
+  // Downgrading also clears any Plus-only perks.
   if (plan === "free") {
-    await User.findByIdAndUpdate(userId, { profileEffect: "none" });
+    await User.findByIdAndUpdate(userId, { profileEffect: "none", usernameColor: null });
   }
 
   await logAction({

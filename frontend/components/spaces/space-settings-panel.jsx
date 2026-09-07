@@ -5,6 +5,10 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { participantName } from "@/lib/chat";
+import {
+  usernameColorClass,
+  usernameColorStyle,
+} from "@/lib/username-colors";
 import { BANNER_OPTIONS } from "@/lib/banners";
 import { SPACE_CATEGORIES } from "@/lib/space-categories";
 import { apiPostForm } from "@/lib/api";
@@ -160,11 +164,18 @@ export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLef
             const isSelf = m.userId === userId;
             const canManage = canEdit && !isSelf && m.role !== "owner";
             const displayName = m.displayName || m.username || m.email || `User ${m.userId.slice(0,6)}`;
+            const nameStyle = usernameColorStyle(m);
+            const nameClass = usernameColorClass(m);
             return (
               <div key={m.userId} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5">
                 <Avatar name={displayName} avatarStyle={m.avatarStyle} url={m.avatarUrl} size="sm" isPlus={Boolean(m.isPlus)} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[var(--text-primary)]">{displayName} {isSelf && "(You)"}</p>
+                  <p
+                    style={nameStyle}
+                    className={`truncate text-sm font-medium ${nameClass ? nameClass : nameStyle.color ? "" : m?.isPlus ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+                  >
+                    {displayName} {isSelf && "(You)"}
+                  </p>
                   <div className="flex items-center gap-1.5">
                     {m.username && <span className="truncate text-[11px] text-[var(--text-muted)]">@{m.username}</span>}
                     <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent)]">{m.role === "owner" && <Crown className="h-3 w-3" />} {m.role}</span>

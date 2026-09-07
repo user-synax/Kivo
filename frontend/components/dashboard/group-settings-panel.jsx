@@ -6,6 +6,10 @@ import { Avatar } from "@/components/dashboard/avatar";
 import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { participantName } from "@/lib/chat";
+import {
+  usernameColorClass,
+  usernameColorStyle,
+} from "@/lib/username-colors";
 
 // Reuse the button hierarchy from the friends modal for visual consistency.
 const btnPrimary =
@@ -25,6 +29,8 @@ function MemberRow({
   onRemove,
   busy,
 }) {
+    const nameStyle = usernameColorStyle(member);
+    const nameClass = usernameColorClass(member);
     return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5">
       <Avatar
@@ -36,7 +42,10 @@ function MemberRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+          <p
+            style={nameStyle}
+            className={`truncate text-sm font-semibold ${nameClass ? nameClass : nameStyle.color ? "" : member?.isPlus ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+          >
             {participantName(member)}
             {isSelf ? " (You)" : ""}
           </p>
@@ -354,7 +363,10 @@ export function GroupSettingsPanel({
               Add friends
             </p>
             <div className="flex flex-col gap-2">
-              {candidateFriends.map((f) => (
+              {candidateFriends.map((f) => {
+                const fStyle = usernameColorStyle(f);
+                const fClass = usernameColorClass(f);
+                return (
                 <div
                   key={f.id}
                   className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5"
@@ -366,7 +378,10 @@ export function GroupSettingsPanel({
                     size="sm"
                     isPlus={Boolean(f.isPlus)}
                   />
-                  <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+                  <p
+                    style={fStyle}
+                    className={`min-w-0 flex-1 truncate text-sm font-semibold ${fClass ? fClass : fStyle.color ? "" : f?.isPlus ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+                  >
                     {participantName(f)}
                   </p>
                   <button
@@ -379,7 +394,8 @@ export function GroupSettingsPanel({
                     Add
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

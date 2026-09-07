@@ -38,11 +38,12 @@ async function enrichMembers(members) {
   if (!members || !members.length) return [];
   const ids = members.map((m) => m.userId);
   const users = await User.find({ _id: { $in: ids } })
-    .select("displayName username email avatarUrl avatarStyle plan planExpiresAt")
+    .select("displayName username email avatarUrl avatarStyle usernameColor plan planExpiresAt")
     .lean();
   const map = new Map(users.map((u) => [u._id.toString(), u]));
   return members.map((m) => {
     const u = map.get(m.userId.toString());
+    const isPlus = isPlusEffective(u);
     return {
       userId: m.userId.toString(),
       role: m.role,
@@ -52,7 +53,8 @@ async function enrichMembers(members) {
       email: u?.email || null,
       avatarUrl: u?.avatarUrl || null,
       avatarStyle: u?.avatarStyle || null,
-      isPlus: isPlusEffective(u),
+      usernameColor: isPlus ? u?.usernameColor || null : null,
+      isPlus,
     };
   });
 }

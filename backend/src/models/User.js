@@ -145,6 +145,19 @@ const userSchema = new mongoose.Schema(
       enum: ["none", "glow", "gradient-name", "aura"],
       default: "none",
     },
+    // Custom username color for chat name pills (Kivo Plus). Hex like "#ff5500"
+    // or null for default (free = text-muted, Plus = gradient). Validated
+    // server-side; free users are forced to null.
+    usernameColor: {
+      type: String,
+      default: null,
+      validate: {
+        validator(v) {
+          return v == null || /^#[0-9a-fA-F]{6}$/.test(v);
+        },
+        message: "usernameColor must be a 6-digit hex code",
+      },
+    },
     // Appwrite file id backing avatarUrl. Server-only (never sent to clients)
     // so the previous file can be deleted on re-upload.
     avatarFileId: {

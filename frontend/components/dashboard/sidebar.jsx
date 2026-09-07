@@ -37,6 +37,10 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/motion/context-menu";
+import {
+  usernameColorClass,
+  usernameColorStyle,
+} from "@/lib/username-colors";
 
 // Restrained, no-bounce easing shared across every micro-interaction.
 const EASE = "cubic-bezier(0.22,1,0.36,1)";
@@ -54,8 +58,10 @@ function EmptyState({ message }) {
 }
 
 function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
-  const { name, lastMessage, time, unread, online, type, isPlus } = conversation;
+  const { name, lastMessage, time, unread, online, type, isPlus, usernameColor } = conversation;
   const isGroup = type === "group";
+  const dmStyle = !isGroup ? usernameColorStyle({ usernameColor, isPlus }) : {};
+  const dmClass = !isGroup ? usernameColorClass({ usernameColor, isPlus }) : "";
   return (
     <ContextMenu>
       <ContextMenuTrigger>
@@ -81,7 +87,10 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+          <span
+            style={isGroup ? undefined : dmStyle}
+            className={`truncate text-sm font-medium ${isGroup ? "text-[var(--text-primary)]" : dmClass ? dmClass : dmStyle.color ? "" : isPlus ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]"}`}
+          >
             {name}
           </span>
           {time && (

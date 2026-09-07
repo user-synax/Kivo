@@ -53,6 +53,12 @@ export const updateMeSchema = z.object({
     .or(z.literal("")),
   avatarStyle: z.enum(AVATAR_STYLE_IDS).nullable().optional(),
   profileEffect: z.enum(PROFILE_EFFECT_IDS).nullable().optional(),
+  usernameColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a 6-digit hex code (e.g. #ff5500)")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
   // `plan` is deliberately NOT accepted here — tiers are admin-granted only.
   banner: z.string().trim().max(2000).nullable().optional().or(z.literal("")),
   country: z

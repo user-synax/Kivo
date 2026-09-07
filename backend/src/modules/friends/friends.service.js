@@ -14,6 +14,7 @@ function isPlusEffective(u) {
 
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
+  const isPlus = isPlusEffective(u);
   return {
     id: u._id.toString(),
     displayName: u.displayName || null,
@@ -21,7 +22,8 @@ function publicUser(user) {
     email: u.email,
     avatarStyle: u.avatarStyle || null,
     avatarUrl: u.avatarUrl || null,
-    isPlus: isPlusEffective(u),
+    usernameColor: isPlus ? u.usernameColor || null : null,
+    isPlus,
   };
 }
 
@@ -180,7 +182,7 @@ export async function listFriends({ userId }) {
   if (friendIds.length === 0) return [];
 
   const users = await User.find({ _id: { $in: friendIds } })
-    .select("displayName username email avatarStyle avatarUrl plan planExpiresAt")
+    .select("displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt")
     .lean();
   return users.map((u) => publicUser(u));
 }

@@ -451,6 +451,7 @@ function toListItem(c, currentUser, spaces) {
     avatarUrl = space?.avatarUrl || null;
   }
   const isPlus = Boolean(other?.isPlus);
+  const usernameColor = other?.usernameColor || null;
   return {
     id: c.id,
     name,
@@ -464,6 +465,7 @@ function toListItem(c, currentUser, spaces) {
     avatarStyle: isGroup || isChannel ? null : other?.avatarStyle || null,
     avatarUrl,
     isPlus: isGroup || isChannel ? false : isPlus,
+    usernameColor: isGroup || isChannel ? null : usernameColor,
   };
 }
 

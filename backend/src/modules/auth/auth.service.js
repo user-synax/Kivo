@@ -135,6 +135,8 @@ export async function issueSession(userId, deviceInfo) {
 }
 
 export function publicUser(user) {
+  const plan = getEffectivePlan(user);
+  const isPlus = plan === "plus";
   return {
     id: user.id || user._id?.toString(),
     email: user.email,
@@ -149,10 +151,11 @@ export function publicUser(user) {
     showBadge: user.showBadge !== false,
     // Entitlement (expiry-aware) so the client can render Plus gates
     // immediately after login without an extra /users/me round-trip.
-    plan: getEffectivePlan(user),
+    plan,
     planExpiresAt: user.planExpiresAt
       ? new Date(user.planExpiresAt).toISOString()
       : null,
+    usernameColor: isPlus ? user.usernameColor || null : null,
     // Provider verification badges (public profile chips + Settings state).
     googleVerified: Boolean(user.googleVerified),
     githubVerified: Boolean(user.githubVerified),

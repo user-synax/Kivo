@@ -83,6 +83,10 @@ import {
 } from "@/lib/chat-style";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { uploadSingleFileObject, useFileUpload } from "@/lib/use-file-upload";
+import {
+  usernameColorClass,
+  usernameColorStyle,
+} from "@/lib/username-colors";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -399,6 +403,9 @@ const MessageRows = React.memo(function MessageRows({
         const showSender = (isGroup || isChannel) && !grouped && !mine;
         const sAvatar = senderAvatar(m.senderId);
         const senderLabel = senderName(m.senderId);
+        const senderUser = a.membersById[m.senderId] || null;
+        const senderStyle = usernameColorStyle(senderUser);
+        const senderPillClass = usernameColorClass(senderUser);
         const hasCopy =
             !m.isDeleted && Boolean(m.content || m.attachments?.length);
         const realMessage = Boolean(m.id && !m.tempId);
@@ -420,7 +427,8 @@ const MessageRows = React.memo(function MessageRows({
                 >
                     {showSender && (
                         <span
-                            className={`mb-1 text-[12px] font-medium text-[var(--text-primary)] ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}
+                            style={senderStyle}
+                            className={`mb-1 text-[12px] font-medium ${senderPillClass ? senderPillClass : senderStyle.color ? "" : senderUser?.isPlus ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"} ${mine ? "self-end mr-1" : "self-start ml-8 sm:ml-9"}`}
                         >
                             {senderLabel}
                         </span>
@@ -2876,9 +2884,19 @@ export function ChatPanel({
                     isPlus={Boolean(headerAvatar.isPlus)}
                 />
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                        {headerName}
-                    </p>
+                    {(() => {
+                        const isDmHeader = !isGroup && !isChannel;
+                        const hStyle = isDmHeader ? usernameColorStyle(other) : {};
+                        const hClass = isDmHeader ? usernameColorClass(other) : "";
+                        return (
+                            <p
+                                style={isDmHeader ? hStyle : undefined}
+                                className={`truncate text-sm font-medium ${isDmHeader && hClass ? hClass : isDmHeader && hStyle.color ? "" : "text-[var(--text-primary)]"}`}
+                            >
+                                {headerName}
+                            </p>
+                        );
+                    })()}
                     <p className="truncate text-[12px] text-[var(--text-muted)]">
                         {isGroup || isChannel ? (
                             <span>

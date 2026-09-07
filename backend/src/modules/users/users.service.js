@@ -14,6 +14,7 @@ function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
   const io = getIO();
   const online = io?.isUserOnline ? io.isUserOnline(u._id.toString()) : false;
+  const isPlus = getEffectivePlan(u) === "plus";
   return {
     id: u._id.toString(),
     displayName: u.displayName || null,
@@ -39,7 +40,10 @@ function publicUser(user) {
     // Plus profile effect ("none" | "glow" | "gradient-name" | "aura") —
     // public so any visitor renders the user's chosen effect on their profile.
     profileEffect: u.profileEffect || "none",
-    isPlus: getEffectivePlan(u) === "plus",
+    // Plus username color for chat name pills — hex or null. Free users never
+    // expose a color (server clamps to null).
+    usernameColor: isPlus ? u.usernameColor || null : null,
+    isPlus,
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
     lastActiveAt: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
     online,
@@ -125,7 +129,7 @@ export async function searchUsers({ userId, q }) {
     _id: { $ne: userId },
     $or: [{ username: regex }, { email: regex }, { displayName: regex }],
   })
-    .select("displayName username email verified showBadge googleVerified githubVerified lastActiveAt plan planExpiresAt")
+    .select("displayName username email verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt")
     .limit(20)
     .lean();
 
@@ -141,7 +145,7 @@ export async function searchUsers({ userId, q }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect appearance bannerFileId createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);
@@ -153,7 +157,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect plan planExpiresAt createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect usernameColor plan planExpiresAt createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -165,6 +169,7 @@ function publicProfile(user) {
   const u = user.toObject ? user.toObject() : user;
   const io = getIO();
   const online = io?.isUserOnline ? io.isUserOnline(u._id.toString()) : false;
+  const isPlus = getEffectivePlan(u) === "plus";
   return {
     id: u._id.toString(),
     username: u.username || null,
@@ -183,7 +188,8 @@ function publicProfile(user) {
     googleVerified: Boolean(u.googleVerified),
     githubVerified: Boolean(u.githubVerified),
     profileEffect: u.profileEffect || "none",
-    isPlus: getEffectivePlan(u) === "plus",
+    usernameColor: isPlus ? u.usernameColor || null : null,
+    isPlus,
     // The owner's colors/look — public so their /u/username page can render
     // in *their* theme (accent + canvas tint). Colors only; never plan/tier.
     appearance: flatAppearance(u.appearance),
@@ -198,7 +204,7 @@ function publicProfile(user) {
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect plan planExpiresAt createdAt blockedUsers lastActiveAt",
+    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect usernameColor plan planExpiresAt createdAt blockedUsers lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -294,7 +300,7 @@ export async function deleteAvatar({ userId }) {
 
 async function emitBlockSync({ blockerId, blockedId }) {
   const dms = await Conversation.find({ type: "dm", participants: { $all: [blockerId, blockedId] } })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt")
     .lean();
   if (dms.length === 0) return;
   // Fetch fresh blockedUsers for both to compute flags
@@ -320,6 +326,9 @@ async function emitBlockSync({ blockerId, blockedId }) {
 function normalizeParticipantForBlock(p) {
   const id = typeof p === "string" ? p : p?._id?.toString?.() || p?.toString?.();
   const populated = p && typeof p === "object" && (p.displayName !== undefined || p.username !== undefined);
+  const isPlus = populated
+    ? getEffectivePlan(p) === "plus"
+    : false;
   return {
     id,
     displayName: populated ? (p.displayName ?? null) : null,
@@ -327,6 +336,8 @@ function normalizeParticipantForBlock(p) {
     email: populated ? (p.email ?? null) : null,
     avatarStyle: populated ? (p.avatarStyle ?? null) : null,
     avatarUrl: populated ? (p.avatarUrl ?? null) : null,
+    usernameColor: populated && isPlus ? p.usernameColor || null : null,
+    isPlus: populated ? isPlus : false,
   };
 }
 function toIdForBlock(v) {
@@ -363,16 +374,21 @@ function buildPublicConversationForEmit(conversation, viewerId, viewerHasBlocked
 }
 
 export async function listBlockedUsers({ userId }) {
-  const user = await User.findById(userId).populate("blockedUsers", "displayName username email avatarStyle avatarUrl").lean();
+  const user = await User.findById(userId).populate("blockedUsers", "displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt").lean();
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
-  return (user.blockedUsers || []).map((u) => ({
-    id: u._id.toString(),
-    displayName: u.displayName || null,
-    username: u.username || null,
-    email: u.email,
-    avatarStyle: u.avatarStyle || null,
-    avatarUrl: u.avatarUrl || null,
-  }));
+  return (user.blockedUsers || []).map((u) => {
+    const isPlus = getEffectivePlan(u) === "plus";
+    return {
+      id: u._id.toString(),
+      displayName: u.displayName || null,
+      username: u.username || null,
+      email: u.email,
+      avatarStyle: u.avatarStyle || null,
+      avatarUrl: u.avatarUrl || null,
+      usernameColor: isPlus ? u.usernameColor || null : null,
+      isPlus,
+    };
+  });
 }
 
 export async function blockUser({ userId, targetId }) {
@@ -466,6 +482,15 @@ export async function updateMe({ userId, data }) {
     update.profileEffect =
       getEffectivePlan(me) === "plus" ? data.profileEffect || "none" : "none";
   }
+  if (data.usernameColor !== undefined) {
+    const raw = data.usernameColor ? String(data.usernameColor).trim() : "";
+    const me = await User.findById(userId).select("plan planExpiresAt").lean();
+    if (getEffectivePlan(me) !== "plus") {
+      update.usernameColor = null;
+    } else {
+      update.usernameColor = raw ? raw : null;
+    }
+  }
   if (data.country !== undefined) {
     update.country = data.country || null;
   }
@@ -498,7 +523,7 @@ export async function updateMe({ userId, data }) {
     new: true,
     runValidators: true,
   }).select(
-    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect appearance bannerFileId createdAt",
+    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);

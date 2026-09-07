@@ -16,6 +16,12 @@ import {
   effectNameClass,
   PROFILE_EFFECTS,
 } from "@/lib/profile-effects";
+import {
+  USERNAME_COLOR_PRESETS,
+  isValidHex,
+  usernameColorClass,
+  usernameColorStyle,
+} from "@/lib/username-colors";
 
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 
@@ -103,6 +109,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [showStatusEmojis, setShowStatusEmojis] = useState(false);
     const [avatarStyle, setAvatarStyle] = useState("default");
     const [profileEffect, setProfileEffect] = useState("none");
+    const [usernameColor, setUsernameColor] = useState(null);
     const [banner, setBanner] = useState("");
     const [country, setCountry] = useState(null);
     const [githubUsername, setGithubUsername] = useState("");
@@ -212,6 +219,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             setStatusEmoji(me?.statusEmoji || "");
             setAvatarStyle(me?.avatarStyle || "default");
             setProfileEffect(me?.profileEffect || "none");
+            setUsernameColor(me?.usernameColor || null);
             setBanner(me?.banner || "");
             setCountry(
                 me?.country
@@ -248,6 +256,12 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const close = () => onClose();
 
     const handleSave = async () => {
+        // Validate custom hex before sending (presets are always valid).
+        if (usernameColor && !isValidHex(usernameColor)) {
+            setError("Name color must be a 6-digit hex like #ff5500, or pick Default.");
+            setSaving(false);
+            return;
+        }
         setSaving(true);
         setError(null);
         try {
@@ -259,6 +273,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                 statusEmoji: statusEmoji.trim(),
                 avatarStyle,
                 profileEffect,
+                usernameColor: isValidHex(usernameColor) ? usernameColor.toLowerCase() : null,
                 banner,
                 country: country?.code || "",
                 githubUsername: githubUsername.trim(),
@@ -901,6 +916,107 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                 around your avatar and an animated gradient
                                 name unlock with Kivo Plus.
                             </p>
+                        )}
+                    </Section>
+
+                    <Section label="Name color" delay={180}>
+                        <p className="-mt-1 text-[11px] leading-snug text-[var(--text-muted)]">
+                            Color of your name in group chats & member lists —
+                            like Discord Nitro. Free = muted, Plus = color.
+                        </p>
+                        {isPlus ? (
+                            <div className="space-y-3">
+                                {/* Live preview */}
+                                <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2.5">
+                                    <span className="text-[11px] text-[var(--text-muted)]">Preview</span>
+                                    <span
+                                        style={usernameColorStyle({ usernameColor, isPlus: true }, true)}
+                                        className={`text-[13px] font-semibold ${usernameColorClass({ usernameColor, isPlus: true }, true) ? usernameColorClass({ usernameColor, isPlus: true }, true) : ""}`}
+                                    >
+                                        {displayName || currentUser?.displayName || "Your name"}
+                                    </span>
+                                    {!usernameColor && (
+                                        <span className="ml-auto text-[11px] text-[var(--text-muted)]">gradient default</span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+                                    <button
+                                        type="button"
+                                        onClick={() => setUsernameColor(null)}
+                                        aria-pressed={!usernameColor}
+                                        title="Default gradient"
+                                        className={`group relative flex h-9 items-center justify-center rounded-xl border text-[11px] font-medium transition-[border-color,background-color,transform] duration-200 ${EASE} active:scale-[0.95] ${!usernameColor ? "border-[var(--accent)] bg-[var(--hover)]" : "border-[var(--border)] bg-[var(--bg-base)] hover:bg-[var(--hover)]"}`}
+                                    >
+                                        <span className="kivo-username-gradient text-[11px] font-bold">Aa</span>
+                                        {!usernameColor && (
+                                            <span className="t-badge-pop absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] ring-2 ring-[var(--bg-surface)]">
+                                                <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                                            </span>
+                                        )}
+                                    </button>
+                                    {USERNAME_COLOR_PRESETS.map((hex) => {
+                                        const active = usernameColor?.toLowerCase() === hex.toLowerCase();
+                                        return (
+                                            <button
+                                                key={hex}
+                                                type="button"
+                                                onClick={() => setUsernameColor(hex)}
+                                                aria-pressed={active}
+                                                title={hex}
+                                                className={`group relative flex h-9 items-center justify-center rounded-xl border transition-[border-color,transform] duration-200 ${EASE} active:scale-[0.93] ${active ? "border-[var(--accent)] ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-surface)]" : "border-[var(--border)] hover:brightness-110"}`}
+                                                style={{ background: hex }}
+                                            >
+                                                {active && (
+                                                    <span className="flex size-5 items-center justify-center rounded-full bg-white/95 text-black shadow">
+                                                        <Check className="h-3 w-3" strokeWidth={3} />
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            value={usernameColor || ""}
+                                            onChange={(e) => {
+                                                const v = e.target.value.trim();
+                                                if (!v) { setUsernameColor(null); return; }
+                                                // allow typing "#ff5500" progressively
+                                                if (/^#[0-9a-fA-F]{0,6}$/.test(v)) {
+                                                    if (v.length === 7) setUsernameColor(v.toLowerCase());
+                                                    else if (v.length < 7) setUsernameColor(v);
+                                                }
+                                            }}
+                                            placeholder="#ff5500 or default"
+                                            maxLength={7}
+                                            spellCheck={false}
+                                            className={`${inputCls} pr-10 font-mono text-[13px]`}
+                                        />
+                                        {usernameColor && (
+                                            <span
+                                                className="pointer-events-none absolute right-2 top-1/2 size-6 -translate-y-1/2 rounded-full border border-[var(--border)] shadow-sm"
+                                                style={{ background: usernameColor }}
+                                                aria-hidden
+                                            />
+                                        )}
+                                    </div>
+                                    {usernameColor && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setUsernameColor(null)}
+                                            className={`shrink-0 rounded-xl border border-[var(--border)] px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] ${EASE}`}
+                                        >
+                                            Reset
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-base)] px-3 py-2.5 text-[11px] leading-snug text-[var(--text-muted)]">
+                                <Crown className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                                <span>Custom name colors are a Kivo Plus perk — your name stays muted on free. <button type="button" onClick={() => router.push("/plus")} className="font-semibold text-[var(--accent)] hover:underline">Upgrade</button></span>
+                            </div>
                         )}
                     </Section>
 
