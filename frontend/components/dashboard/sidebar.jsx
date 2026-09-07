@@ -4,6 +4,7 @@ import {
   Bookmark,
   ChevronDown,
   Compass,
+  Crown,
   Hash,
   Layers,
   Mail,
@@ -15,6 +16,7 @@ import {
   Search,
   SearchCode,
   SearchX,
+  Sparkles,
   Trash2,
   UserPlus,
   Users,
@@ -28,6 +30,7 @@ import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
 import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
 import { useTheme } from "@/components/theme-provider";
 import { useIsDesktop } from "@/lib/use-breakpoint";
+import { MovingBorder } from "@/components/velora/moving-border";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -436,6 +439,55 @@ function ThemeSwitcher({ collapsed }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function UpgradeToProBadge({ currentUser, collapsed }) {
+  const router = useRouter();
+  if (isPlusUser(currentUser)) return null;
+  if (collapsed) {
+    return (
+      <div className="flex justify-center border-t border-[var(--border)] p-2">
+        <button
+          type="button"
+          onClick={() => router.push("/plus")}
+          aria-label="Upgrade to Pro"
+          title="Upgrade to Pro — ₹49/mo"
+          className="kivo-focus flex size-8 items-center justify-center rounded-full bg-[#a78bfa]/15 text-[#a78bfa] transition-colors duration-200 hover:bg-[#a78bfa]/20"
+        >
+          <Crown className="h-4 w-4" strokeWidth={2} />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="border-t border-[var(--border)] px-3 py-2">
+      <MovingBorder
+        radius={14}
+        duration={3.5}
+        onClick={() => router.push("/plus")}
+        aria-label="Upgrade to Pro"
+        className="w-full !h-auto !p-px text-left [&>span:last-child]:!justify-start [&>span:last-child]:!bg-[var(--bg-surface)] [&>span:last-child]:!px-4 [&>span:last-child]:!py-3"
+      >
+        <span className="flex w-full items-center gap-3 text-left">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#a78bfa]/15 text-[#a78bfa]">
+            <Crown className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold leading-tight text-[var(--text-primary)]">
+              Upgrade to Pro
+              <span className="rounded-full bg-[#a78bfa] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                ₹49/mo
+              </span>
+            </span>
+            <span className="block text-[11px] leading-tight text-[var(--text-muted)]">
+              Unlock Plus — custom banners, effects & more
+            </span>
+          </span>
+          <Sparkles className="h-4 w-4 shrink-0 text-[#a78bfa]" strokeWidth={1.8} />
+        </span>
+      </MovingBorder>
     </div>
   );
 }
