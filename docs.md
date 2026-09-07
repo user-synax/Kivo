@@ -418,6 +418,28 @@ Open the group, then click **Group settings** in the chat header. On wide screen
 
 ---
 
+## 7a. Status — 24h ephemeral updates (WhatsApp-style)
+
+A **Status** is a short text update (280 chars) with a background, visible to **friends only** for **24 hours**, then auto-deleted. Inspired by WhatsApp Desktop.
+
+**Where:** New **Status** tab — desktop icon rail (CircleDashed between Chats/Groups) + mobile bottom bar (Chats · **Status** · Groups · Spaces · Menu). Inside, a vertical list like WhatsApp Desktop: **My status** row on top, then friends' updates grouped by user (newest first). Unseen = green ring + dot, seen = grey ring.
+
+### Create a status
+1. Open **Status** tab → **+ New** (or **+ New status** header button).
+2. Type up to **280** characters, pick one of 6 backgrounds: `default`, `accent`, `sunset`, `ocean`, `forest`, `midnight` (live preview).
+3. **Share** — appears instantly for friends; your own row shows `N updates • X ago`.
+
+Limit: **10 per 24h** (`status-create` rate limit). Friends blocked in either direction are excluded; only accepted friends can see it. Expired rows are removed by Mongo TTL (`expireAfterSeconds:0`) without extra cleanup.
+
+### View a status
+1. Tap a friend row — opens the **Status Viewer** (fullscreen, dark backdrop, rounded card with the background).
+2. Multi-update users auto-advance every **3s** with progress dots on top; tap outside or **X** to close, **Delete** (for your own) removes it live.
+3. Viewing marks it `isViewed` (green → grey). Owner's viewer count increments live via `status:viewed`.
+
+**Realtime:** `status:new` / `status:deleted` / `status:viewed` keep the vertical list in sync. Text-only in Phase 1; image/video uploads come next and will reuse Appwrite storage buckets.
+
+---
+
 ## 8. Spaces and channels
 
 Spaces are community containers (like Discord servers). Each Space has channels. Each channel is its own message thread.

@@ -34,7 +34,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => onTabChange?.(item.id)}
                 className={cn(
-                  "relative flex size-10 items-center justify-center rounded-xl transition-colors duration-200",
+                  "relative flex size-10 hover:cursor-pointer items-center justify-center rounded-xl transition-colors duration-200",
                   isActive
                     ? "text-[var(--accent)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
@@ -48,7 +48,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
               {/* hover tooltip — icons only in rail, label on hover */}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] opacity-0 shadow-md transition-opacity duration-0 group-hover:opacity-100 group-focus-within:opacity-100"
                 role="tooltip"
               >
                 {item.label}

@@ -44,8 +44,8 @@ UI and interaction · routing · responsive design · API consumption · Socket.
   - `/app` chat dashboard (DashboardShell), `/app/profile`
   - `/u/[username]` **public profiles**
   - `/docs` in-app guide, `/admin` + `/admin/dashboard`
-- `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals, media drawer), `spaces/`, `notifications/`, `profile/`, `calls/` (LiveKit provider, incoming overlay, active call view), `chat/` (attachments), `mentions/`, `ui/` (incl. shared `empty-state.jsx`, `confirm-modal.jsx`), `motion/` (context menu), `navbar/`, `admin/`, `docs/`
-- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `chat-style.js` (wallpaper/bubble-style constants + CSS, `WALLPAPER_OPTIONS`/`BUBBLE_STYLE_OPTIONS`/`resolveChatLook`/`wallpaperCss`), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js` (incl. day-divider helpers), `links.js` (URL extract/normalize), `emoji.js` (grapheme-aware emoji-only detection), `drafts.js` (per-chat composer drafts), `push.js`, `sound.js` (Web Audio sound cues), `last-active.js`, `use-breakpoint.js`, `profile-skin.js` (`ownerSkin`/`profileSkinVars` for public `/u` theming), `profile-effects.js` (`PROFILE_EFFECTS` `glow`/`gradient-name`/`aura`), `social-links.jsx` (`socialLinksFor`/`SocialGlyph`), `outbox.js` (offline queue), `calls.js` (call token/status fetch + Web Audio ringtones), hooks, etc.
+- `frontend/components/` — `dashboard/` (shell, chat panel, message bubbles, sidebar, settings, modals, media drawer, `nested-sidebar.jsx` + `icon-rail.jsx`), `spaces/`, `notifications/`, `profile/`, `calls/` (LiveKit provider, incoming overlay, active call view), `chat/` (attachments), `status/` (`status-tab.jsx` vertical feed WhatsApp-desktop, `status-ring.jsx`, `status-create-modal.jsx`, `status-viewer.jsx`), `mentions/`, `ui/` (incl. shared `empty-state.jsx`, `confirm-modal.jsx`), `motion/` (context menu), `navbar/`, `admin/`, `docs/`
+- `frontend/lib/` — `api.js` (fetch wrapper + auto refresh), `auth.js` (session store), `cache.js` (IndexedDB), `theme.js` (themes source of truth), `chat-style.js` (wallpaper/bubble-style constants + CSS, `WALLPAPER_OPTIONS`/`BUBBLE_STYLE_OPTIONS`/`resolveChatLook`/`wallpaperCss`), `avatar-styles.js`, `banners.js`, `countries.js`, `chat.js` (incl. day-divider helpers), `links.js` (URL extract/normalize), `emoji.js` (grapheme-aware emoji-only detection), `drafts.js` (per-chat composer drafts), `status.js` (`createStatus/fetchStatusFeed/fetchMyStatuses/viewStatus/deleteStatus`), `push.js`, `sound.js` (Web Audio sound cues), `last-active.js`, `use-breakpoint.js`, `profile-skin.js` (`ownerSkin`/`profileSkinVars` for public `/u` theming), `profile-effects.js` (`PROFILE_EFFECTS` `glow`/`gradient-name`/`aura`), `social-links.jsx` (`socialLinksFor`/`SocialGlyph`), `outbox.js` (offline queue), `calls.js` (call token/status fetch + Web Audio ringtones), hooks, etc.
 - `frontend/Design.md` — visual design system & tokens (Framer dark canvas, `#4ba9e1` blue signal).
 
 ### Networking
@@ -79,9 +79,9 @@ backend/src/
 ├── lib/                 # appwrite (storage client), attachments (uploads), email (nodemailer SMTP)
 ├── middleware/          # auth (JWT bearer), adminAuth (admin cookie), rateLimiter, errorHandler
 ├── models/              # User, Session, Conversation, Message, FriendRequest, Space,
-│                        #   Notification, PushSubscription, AdminActionLog
+│                        #   Notification, PushSubscription, AdminActionLog, Status (24h TTL)
 ├── modules/             # auth, users, friends, conversations, messages, spaces,
-│                        #   notifications, push, attachments, search, link-preview, calls, admin
+│                        #   notifications, push, attachments, search, link-preview, calls, admin, status (text 280 + background, friends-only feed)
 ├── socket/              # index.js (init, JWT handshake, presence, rooms), io.js (emit helpers)
 └── utils/               # errors, asyncHandler
 ```
@@ -106,6 +106,7 @@ Versioned REST APIs under `/api/v1`; the standalone admin API lives under `/api/
 | `/api/v1/search` | unified global search |
 | `/api/v1/link-preview` | server-side og unfurl (`?url=`) with SSRF guard + 1h cache |
 | `/api/v1/calls` | LiveKit voice/video: token mint (`POST /token`, guarded, 20/min), capability flag (`GET /config`), ongoing lookup (`GET /status`) |
+| `/api/v1/status` | Status 24h (text): `POST /` 10/day, `GET /feed` (friends grouped) 30/min, `GET /me`, `POST /:id/view` 60/min, `DELETE /:id` — friends+blocked filtered, TTL `expireAfterSeconds:0`, `status:new/deleted/viewed` |
 | `/api/admin` | admin login, stats, users (ban/unban/**plan** `POST /users/:id/plan` Plus grant/revoke, detail), groups & spaces (delete) |
 
 `GET /health` returns `{ success: true, data: { status: "ok" } }` for uptime checks.
@@ -125,6 +126,7 @@ MongoDB is the canonical source of truth. Core collections:
 | `FriendRequest` | directed `from`/`to` + status (`pending/accepted/declined`); accepted rows are the friendship edge |
 | `Space` | members (embedded: userId + role `owner/admin/moderator/member`), channels (embedded: text/announcement), category, slug, **appearance** (`{accent,tint}` palette + `wallpaper`/`bubbleStyle` chat look — the "Space look"; owner/admin-editable via Space settings, read by every member's client to scope the channel view), **visibility** (`public`/`private` — private hidden from Discover, joinable only by invite code), `inviteCode` + `inviteExpiresAt` (single rotating 7-day invite per Space, owner/admin-managed; codes are never included in Space payloads) |
 | `Notification` | recipient/sender/**senderUsername** (denormalized for wave deep-link), type (`dm_message`, `group_message`, `space_message`, `mention`, `friend_request`, `friend_accept`, `space_invite` reserved, **`wave`** — per-recipient 20 s cooldown, `WAVE_COOLDOWN_SECONDS`), delivery flags (`inAppDelivered`/`pushDelivered`/`pushError`, bulk `insertMany` + async `persistPushState`) |
+| `Status` | `userId` + `text` 280 + `background` enum 6 + `viewers[{userId, viewedAt}]` + `expiresAt` TTL 24h (`expireAfterSeconds:0`), indexes `userId+expiresAt`, `createdAt -1`, `viewers.userId` — friends+blocked both-ways filtered in `listFeed` |
 | `PushSubscription` | per-user VAPID endpoint + keys (unique endpoint, `{userId, endpoint}` unique) |
 | `AdminActionLog` | audit trail: `ban_user`/`unban_user`/`grant_plus`/`revoke_plus`/`delete_group`/`delete_space` + IP + timestamp |
 
@@ -140,7 +142,7 @@ Design notes:
 
 - Socket.IO is the primary realtime layer. All connections authenticate via **JWT handshake**; banned users are rejected at reconnect.
 - On connect, sockets **auto-join** every conversation room (`conversation:<id>`) and space room (`space:<id>`) the user belongs to.
-- Server emits into rooms after DB writes: `message:*` (new/edited/deleted/reaction/**pin-updated**, thread replies reuse `message:new`/`message:edited`/`message:deleted` with `threadId`), `conversation:*` (`member-added`/`member-removed`/`admin-changed`/`removed`/`updated` — `removed` also fans out per-user on permanent delete so both sides drop the thread live), `space:*` (`updated`/`member-*`/`channel-*`/`joined`/`removed`/`deleted`), per-user `notification:new` (incl. `wave`) and `friend:removed` (unfriend syncs both lists live).
+- Server emits into rooms after DB writes: `message:*` (new/edited/deleted/reaction/**pin-updated**, thread replies reuse `message:new`/`message:edited`/`message:deleted` with `threadId`), `conversation:*` (`member-added`/`member-removed`/`admin-changed`/`removed`/`updated` — `removed` also fans out per-user on permanent delete so both sides drop the thread live), `space:*` (`updated`/`member-*`/`channel-*`/`joined`/`removed`/`deleted`), `status:new/deleted/viewed` (friends-only vertical feed keep-alive, 24h TTL), per-user `notification:new` (incl. `wave`) and `friend:removed` (unfriend syncs both lists live).
 - Clients emit `typing:start/stop` (re-broadcast), `conversation:focus/blur` (DM notification suppression — checked in `createForMessage` before fan-out), `message:delivered` (receipt ack), and call signaling `call:ring/accept/decline/end` (relayed with membership + block guards; 30s ring registry → `call:missed`).
 - **Presence is in-memory and scoped**: `presence:online/offline` are only fanned out to users who share a conversation or space, with a ~12 s offline grace period to avoid flicker. `presence:snapshot` corrects late joiners. The DM list shows `online` dots; offline labels use `lastActiveAt` → "active X ago" (`last-active.js`, live tick).
 - **Reconnect gap-fill:** after a reconnect the client refetches the conversation list (now via single-aggregation unread counts) and any messages newer than the newest known message (REST `after=`), then merges them into the cache.
@@ -160,7 +162,7 @@ Redis is **not** currently a dependency. Rate limiting is an **in-memory fixed-w
 
 ### Rate limiting (current)
 
-Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, login-2FA code step `10/5min/IP`, 2FA setup `5/5min`, 2FA code verification `5/60s`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, link-preview `30/min`, call-token `20/min`, admin login `5/15min`.
+Per-user by default with IP fallback, `X-RateLimit-*` + `Retry-After` headers. Notable limits: register `5/hour/IP`, login `10/15min`, login-2FA code step `10/5min/IP`, 2FA setup `5/5min`, 2FA code verification `5/60s`, refresh `30/60s`, forgot/reset password `5/5min` & `10/5min`, resend-verification `1/min`, message send `40/min`, edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min` (30 MB × 10 files each), search `30/min`, link-preview `30/min`, call-token `20/min`, status-create `10/day` + status-feed `30/min` + status-view `60/min`, admin login `5/15min`.
 
 ### Appwrite Storage
 
@@ -251,6 +253,7 @@ Public browser variables are explicitly prefixed and contain no secrets. `.env.e
 - **Kivo Plus is an entitlement flag, not a checkout**: `User.plan` (`free`/`plus`) never leaves the session payload for other users, is validated only via `POST /api/admin/users/:id/plan` (admin JWT), and plus-only fields (`banner` custom upload, `profileEffect` glow/gradient/aura) are clamped server-side. The client previews effects via `profile-effects.js` (`effectAvatarClass`/`effectNameClass`) and skin-aware banners; the public profile re-skins via `profile-skin.js` `ownerSkin`.
 - **Wave is a tiny notification, not a chat message**: `POST /notifications/:id/wave` creates a `wave` notification (`senderUsername` denormalized, 20 s per-recipient cooldown `WAVE_COOLDOWN_SECONDS`, blocked/self guards `WAVE_BLOCKED`/`SELF_WAVE`), fans out through the same `notification:new` + VAPID push pipeline, and deep-links to `/u/username` from the center. No message row, no unread badge spam.
 - **Receipts are derived from `readBy`/`deliveredTo` + `participants`**: the client groups other participants into Read vs Delivered via `buildReceiptPeers`; the "Seen by" card (`ReceiptsPanel`) is portaled to `<body>` so overflow never clips it, flips above/below based on viewport, and captures theme vars (`THEME_VARS`) because the theme lives on a wrapper, not `:root`.
+- **Status is friends-only, TTL-driven, status-tab first**: `Status` TTL `expireAfterSeconds:0` auto-deletes 24h without cron; `listFeed` groups by `userId` for WhatsApp Desktop vertical feed, `isViewed` per `viewers.userId`, blocked both-ways filtered via `User.blockedUsers`; creation `10/day`, viewer tracks only once, `status:new/deleted/viewed` keep `NestedSidebar` `activeTab==="status"` + mobile `BottomTabBar` in sync with green/grey `StatusRing` (ring ` #25D366`/`var(--border)`).
 - **Chat panel is memoized for the hot path**: `MessageRows` (`React.memo`) only re-renders on `messages`/`threadSummaries`/`firstUnreadId`/`editingId`/`selectedIds` etc.; handlers travel via a mutated `rowsCtx` ref to keep memo identity stable. Reply lookups are O(1) `Map`, swipe-to-reply is a direction-locked touch gesture, and like animation timers are cleaned up on unmount.
 - Build only features supported by the current PRD; keep the UI fast and polished; reuse design tokens from `frontend/Design.md`.
 - TypeScript is intentionally out of scope for this project.
