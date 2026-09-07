@@ -79,7 +79,7 @@ function formatElapsed(ms) {
   return hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-function ParticipantTile({ participant, displayName, avatarUrl, isLocal }) {
+function ParticipantTile({ participant, displayName, avatarUrl, avatarStyle, isPlus, isLocal }) {
   const camPub = participant?.getTrackPublication?.("camera");
   const camTrack = camPub?.isSubscribed ? camPub.track : camPub?.track;
   const hasVideo = Boolean(camTrack && !camPub?.isMuted);
@@ -109,7 +109,7 @@ function ParticipantTile({ participant, displayName, avatarUrl, isLocal }) {
         />
       ) : (
         <span className="grid place-items-center py-4" aria-hidden="true">
-          <Avatar name={displayName} url={avatarUrl} />
+          <Avatar name={displayName} url={avatarUrl} avatarStyle={avatarStyle} isPlus={Boolean(isPlus)} />
         </span>
       )}
       <span
@@ -449,6 +449,8 @@ export function ActiveCallView() {
                 participant={p}
                 displayName={nameOf(p, isLocal ? "You" : undefined)}
                 avatarUrl={prof?.avatarUrl}
+                avatarStyle={prof?.avatarStyle}
+                isPlus={Boolean(prof?.isPlus)}
                 isLocal={isLocal}
               />
             );

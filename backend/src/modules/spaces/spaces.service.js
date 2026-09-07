@@ -27,11 +27,18 @@ function generateInviteCode() {
   return crypto.randomBytes(6).toString("hex"); // 12 chars
 }
 
+function isPlusEffective(u) {
+  if (!u || u.plan !== "plus") return false;
+  const exp = u.planExpiresAt ? new Date(u.planExpiresAt).getTime() : null;
+  if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+  return true;
+}
+
 async function enrichMembers(members) {
   if (!members || !members.length) return [];
   const ids = members.map((m) => m.userId);
   const users = await User.find({ _id: { $in: ids } })
-    .select("displayName username email avatarUrl avatarStyle")
+    .select("displayName username email avatarUrl avatarStyle plan planExpiresAt")
     .lean();
   const map = new Map(users.map((u) => [u._id.toString(), u]));
   return members.map((m) => {
@@ -45,6 +52,7 @@ async function enrichMembers(members) {
       email: u?.email || null,
       avatarUrl: u?.avatarUrl || null,
       avatarStyle: u?.avatarStyle || null,
+      isPlus: isPlusEffective(u),
     };
   });
 }

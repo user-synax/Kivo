@@ -32,6 +32,7 @@ export function IncomingCallOverlay() {
             name={callerName}
             avatarStyle={incoming.caller?.avatarStyle}
             url={incoming.caller?.avatarUrl}
+            isPlus={Boolean(incoming.caller?.isPlus)}
           />
         </span>
         <div className="min-w-0">

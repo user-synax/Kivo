@@ -48,6 +48,7 @@ function PersonRow({ person, subtitle, children }) {
         name={person.name}
         avatarStyle={person.avatarStyle}
         url={person.avatarUrl}
+        isPlus={Boolean(person.isPlus)}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-[var(--text-primary)]">

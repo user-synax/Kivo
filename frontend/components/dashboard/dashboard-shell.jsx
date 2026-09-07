@@ -50,6 +50,13 @@ import { ProfileEditModal } from "./profile-edit-modal";
 import { SettingsPanel } from "./settings-panel";
 import { useTheme } from "@/components/theme-provider";
 
+function isPlusUser(user) {
+  if (!user || user.plan !== "plus") return false;
+  const exp = user.planExpiresAt ? new Date(user.planExpiresAt).getTime() : null;
+  if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+  return true;
+}
+
 // Restrained easing — matches the rest of the app (no bounce).
 const EASE = [0.22, 1, 0.36, 1];
 const COLLAPSE_KEY = "kivo:sidebar-collapsed";
@@ -315,7 +322,7 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
         ) : null}
 
         <div className="mt-6 flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
-          <Avatar name={user.displayName || user.email || "?"} avatarStyle={user.avatarStyle} url={user.avatarUrl} size="lg" />
+          <Avatar name={user.displayName || user.email || "?"} avatarStyle={user.avatarStyle} url={user.avatarUrl} size="lg" isPlus={isPlusUser(user)} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-medium text-[var(--text-primary)]">{user.displayName || "—"}</p>
             <p className="truncate text-[13px] text-[var(--text-muted)]">{user.status || user.email}</p>
@@ -375,7 +382,7 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
             onClick={onOpenProfile}
             className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
           >
-            <Avatar name={displayName} avatarStyle={currentUser?.avatarStyle} url={currentUser?.avatarUrl} size="sm" />
+            <Avatar name={displayName} avatarStyle={currentUser?.avatarStyle} url={currentUser?.avatarUrl} size="sm" isPlus={isPlusUser(currentUser)} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">
                 {currentUser?.displayName || currentUser?.username || "Profile"}
@@ -443,6 +450,7 @@ function toListItem(c, currentUser, spaces) {
     name = space ? `${space.name} / #${c.name}` : `#${c.name}`;
     avatarUrl = space?.avatarUrl || null;
   }
+  const isPlus = Boolean(other?.isPlus);
   return {
     id: c.id,
     name,
@@ -455,6 +463,7 @@ function toListItem(c, currentUser, spaces) {
     online,
     avatarStyle: isGroup || isChannel ? null : other?.avatarStyle || null,
     avatarUrl,
+    isPlus: isGroup || isChannel ? false : isPlus,
   };
 }
 
@@ -668,6 +677,18 @@ export function DashboardShell() {
           );
           playCue(conv?.type === "group" ? "groupMessages" : "directMessages");
         }
+      }
+      if (notif.type === "plus_granted") {
+        const pageHidden =
+          typeof document !== "undefined" && document.visibilityState !== "visible";
+        if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
+        // Refresh the session user so the Plus avatar border appears immediately.
+        apiGet("/api/v1/users/me")
+          .then((me) => {
+            setCurrentUser((prev) => ({ ...(prev || {}), ...me }));
+            setSession(me, getToken());
+          })
+          .catch(() => {});
       }
       if (notif.type === "dm_message" && notif.conversationId === selectedIdRef.current) {
         const cur = conversationsRef.current.find((c) => c.id === selectedIdRef.current);
@@ -1314,6 +1335,17 @@ export function DashboardShell() {
     }
     setNotifOpen(false);
     const t = notif.type;
+    if (t === "plus_granted") {
+      // Plus activation — no conversation to open, just ensure the Plus avatar
+      // border is refreshed if the live push hasn't already.
+      apiGet("/api/v1/users/me")
+        .then((me) => {
+          setCurrentUser((prev) => ({ ...(prev || {}), ...me }));
+          setSession(me, getToken());
+        })
+        .catch(() => {});
+      return;
+    }
     if (t === "friend_request" || t === "friend_accept") {
       setShowFriends(true);
       return;

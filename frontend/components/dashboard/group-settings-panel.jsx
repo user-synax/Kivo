@@ -25,13 +25,14 @@ function MemberRow({
   onRemove,
   busy,
 }) {
-  return (
+    return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5">
       <Avatar
         name={participantName(member)}
         avatarStyle={member.avatarStyle}
         url={member.avatarUrl}
         size="sm"
+        isPlus={Boolean(member.isPlus)}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
@@ -363,6 +364,7 @@ export function GroupSettingsPanel({
                     avatarStyle={f.avatarStyle}
                     url={f.avatarUrl}
                     size="sm"
+                    isPlus={Boolean(f.isPlus)}
                   />
                   <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
                     {participantName(f)}

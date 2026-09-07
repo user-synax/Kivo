@@ -5,6 +5,13 @@ import FriendRequest from "../../models/FriendRequest.js";
 import { emitToUser } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 
+function isPlusEffective(u) {
+  if (!u || u.plan !== "plus") return false;
+  const exp = u.planExpiresAt ? new Date(u.planExpiresAt).getTime() : null;
+  if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+  return true;
+}
+
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
   return {
@@ -14,6 +21,7 @@ function publicUser(user) {
     email: u.email,
     avatarStyle: u.avatarStyle || null,
     avatarUrl: u.avatarUrl || null,
+    isPlus: isPlusEffective(u),
   };
 }
 
@@ -172,7 +180,7 @@ export async function listFriends({ userId }) {
   if (friendIds.length === 0) return [];
 
   const users = await User.find({ _id: { $in: friendIds } })
-    .select("displayName username email")
+    .select("displayName username email avatarStyle avatarUrl plan planExpiresAt")
     .lean();
   return users.map((u) => publicUser(u));
 }

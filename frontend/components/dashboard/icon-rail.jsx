@@ -3,6 +3,7 @@
 import { Layers, MessageCircle, Settings, Users } from "lucide-react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { cn } from "@/lib/utils";
+import { isPlusUser } from "@/lib/plus";
 
 const RAIL_ITEMS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
@@ -70,6 +71,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
               avatarStyle={currentUser?.avatarStyle}
               url={currentUser?.avatarUrl}
               size="sm"
+              isPlus={isPlusUser(currentUser)}
             />
           </button>
           <span

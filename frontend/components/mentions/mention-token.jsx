@@ -151,6 +151,7 @@ export function MentionToken({ username, user, isOnline = false, onOpenProfile }
                     avatarStyle={user?.avatarStyle}
                     url={user?.avatarUrl}
                     size="lg"
+                    isPlus={Boolean(user?.isPlus)}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-[var(--text-primary)]">

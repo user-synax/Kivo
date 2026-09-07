@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { apiGet } from "@/lib/api";
 import { clearSession, getSession, getToken, setSession } from "@/lib/auth";
+import { isPlusUser } from "@/lib/plus";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -98,6 +99,7 @@ export default function ProfilePage() {
             avatarStyle={user?.avatarStyle}
             url={user?.avatarUrl}
             size="lg"
+            isPlus={isPlusUser(user)}
           />
           <div className="min-w-0">
             <p className="truncate text-lg font-medium text-[var(--text-primary)]">

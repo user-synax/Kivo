@@ -104,7 +104,7 @@ export function NotificationCenter({
                 )}
               >
                 <span className="relative mt-0.5 shrink-0">
-                  <Avatar name={n.title || "Kivo"} url={n.avatarUrl} size="sm" />
+                  <Avatar name={n.title || "Kivo"} url={n.avatarUrl} avatarStyle={n.avatarStyle || null} size="sm" isPlus={Boolean(n.isPlus)} />
                   {!n.read && (
                     <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg-surface)]" aria-hidden="true" />
                   )}
@@ -123,7 +123,7 @@ export function NotificationCenter({
                       {n.body}
                     </span>
                   ) : null}
-                  <span className="mt-1 inline-flex rounded-full bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] border border-[var(--border)]">
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] border border-[var(--border)]">
                     {n.type === "dm_message"
                       ? "DM"
                       : n.type === "group_message"
@@ -140,7 +140,9 @@ export function NotificationCenter({
                                   ? "Mention"
                                   : n.type === "missed_call"
                                     ? "Missed call"
-                                    : n.type}
+                                    : n.type === "plus_granted"
+                                      ? "Plus"
+                                      : n.type}
                   </span>
                 </span>
               </button>

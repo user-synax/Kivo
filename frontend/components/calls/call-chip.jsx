@@ -153,8 +153,8 @@ export function CallChip({ message, call }) {
 }
 
 // Compact avatar variant for group tiles — reserved for future use.
-export function CallChipAvatar({ name, url }) {
-  return <Avatar name={name} url={url} size="sm" />;
+export function CallChipAvatar({ name, url, avatarStyle, isPlus }) {
+  return <Avatar name={name} url={url} avatarStyle={avatarStyle} size="sm" isPlus={Boolean(isPlus)} />;
 }
 
 export default CallChip;

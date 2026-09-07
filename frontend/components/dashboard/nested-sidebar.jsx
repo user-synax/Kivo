@@ -50,7 +50,7 @@ function EmptyState({ message, icon: Icon = SearchX, actionLabel, onAction }) {
 }
 
 function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
-  const { name, lastMessage, time, unread, online, type } = conversation;
+  const { name, lastMessage, time, unread, online, type, isPlus } = conversation;
   const isGroup = type === "group";
   return (
     <ContextMenu>
@@ -71,6 +71,7 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
               online={online && !isGroup}
               avatarStyle={conversation.avatarStyle}
               url={conversation.avatarUrl}
+              isPlus={Boolean(isPlus)}
             />
           </div>
           <div className="min-w-0 flex-1">

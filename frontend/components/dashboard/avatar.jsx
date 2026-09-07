@@ -149,6 +149,7 @@ export function Avatar({
   url,
   badge,
   decoration,
+  isPlus = false,
 }) {
   const config = SIZE[size] || SIZE.md;
   const style = getAvatarStyle(avatarStyle);
@@ -196,13 +197,48 @@ export function Avatar({
     />
   ) : null;
 
+  // Plus moving border — wraps the avatar surface with the same light that laps
+  // the velora button border (offset-path). Keeps the avatar's own radius so
+  // the ring stays crisp at every size. Motion is disabled under
+  // prefers-reduced-motion via the utility on the light span.
+  const MB_RADIUS_PX = { xs: "8px", sm: "8px", md: "12px", lg: "16px", xl: "12px" };
+  const mbRadius = MB_RADIUS_PX[size] || "12px";
+  const surfaceWithPlus = isPlus ? (
+    <span
+      className="relative inline-flex shrink-0 overflow-hidden p-[2px]"
+      style={{
+        borderRadius: mbRadius,
+        "--mb-radius": mbRadius,
+        "--mb-duration": "2.2s",
+        "--mb-size": "110px",
+      }}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 motion-reduce:hidden"
+      >
+        <span
+          className="absolute aspect-square w-[var(--mb-size)] animate-moving-border bg-[radial-gradient(circle,var(--brand-via)_0%,var(--brand-to)_28%,transparent_68%)] opacity-90"
+          style={{
+            offsetPath: "rect(0 auto auto 0 round var(--mb-radius))",
+          }}
+        />
+      </span>
+      <span className="relative z-10 rounded-[inherit] bg-[var(--bg-elevated)]">
+        {surface}
+      </span>
+    </span>
+  ) : (
+    surface
+  );
+
   /* No premium decoration/badge and no presence dot — return the bare avatar
      (keeps the existing DOM shape / spacing identical for current callers). */
-  if (!badge && !decoration && !dot) return surface;
+  if (!badge && !decoration && !dot && !isPlus) return surface;
 
   return (
     <div className={clsx("relative inline-flex shrink-0", decoration)}>
-      {surface}
+      {surfaceWithPlus}
       {dot}
       {badge ? (
         <span className={clsx("absolute z-10", config.badgeOffset)}>

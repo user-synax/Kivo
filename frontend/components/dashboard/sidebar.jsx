@@ -51,7 +51,7 @@ function EmptyState({ message }) {
 }
 
 function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
-  const { name, lastMessage, time, unread, online, type } = conversation;
+  const { name, lastMessage, time, unread, online, type, isPlus } = conversation;
   const isGroup = type === "group";
   return (
     <ContextMenu>
@@ -72,6 +72,7 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
           online={online && !isGroup}
           avatarStyle={conversation.avatarStyle}
           url={conversation.avatarUrl}
+          isPlus={Boolean(isPlus)}
         />
       </div>
 
@@ -267,9 +268,17 @@ function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCr
   );
 }
 
+function isPlusUser(user) {
+  if (!user || user.plan !== "plus") return false;
+  const exp = user.planExpiresAt ? new Date(user.planExpiresAt).getTime() : null;
+  if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+  return true;
+}
+
 function ProfileNav({ currentUser, onEditProfile, collapsed }) {
   if (!currentUser) return null;
   const label = currentUser.displayName || currentUser.email || "Account";
+  const isPlus = isPlusUser(currentUser);
 
   if (collapsed) {
     return (
@@ -283,6 +292,7 @@ function ProfileNav({ currentUser, onEditProfile, collapsed }) {
           name={label}
           avatarStyle={currentUser.avatarStyle}
           url={currentUser.avatarUrl}
+          isPlus={isPlus}
         />
       </button>
     );
@@ -299,6 +309,7 @@ function ProfileNav({ currentUser, onEditProfile, collapsed }) {
         name={label}
         avatarStyle={currentUser.avatarStyle}
         url={currentUser.avatarUrl}
+        isPlus={isPlus}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--text-primary)]">
@@ -724,10 +735,11 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Footer — theme + profile (hidden on mobile; lives in Profile tab) */}
+      {/* Footer — theme + upgrade + profile (hidden on mobile; lives in Profile tab) */}
       {isDesktop && (
         <>
           <ThemeSwitcher collapsed={collapsed} />
+          <UpgradeToProBadge currentUser={currentUser} collapsed={collapsed} />
           <ProfileNav
             currentUser={currentUser}
             onEditProfile={() => setProfileOpen(true)}

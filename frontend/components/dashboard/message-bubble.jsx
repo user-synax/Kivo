@@ -240,6 +240,7 @@ function buildReceiptPeers(message, participants, viewerId) {
       avatarName: participantAvatarName(p),
       avatarStyle: p?.avatarStyle || null,
       avatarUrl: p?.avatarUrl || null,
+      isPlus: p?.isPlus || false,
     };
     if (entry) read.push({ ...row, readAt: entry.readAt });
     else if (delivered.has(pid)) deliveredList.push(row);
@@ -338,6 +339,7 @@ function ReceiptsPanel({ vars, anchor, read, delivered, others, onClose }) {
               avatarStyle={row.avatarStyle}
               url={row.avatarUrl}
               size="xs"
+              isPlus={Boolean(row.isPlus)}
             />
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">
               {row.name}
@@ -363,6 +365,7 @@ function ReceiptsPanel({ vars, anchor, read, delivered, others, onClose }) {
               avatarStyle={row.avatarStyle}
               url={row.avatarUrl}
               size="xs"
+              isPlus={Boolean(row.isPlus)}
             />
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">
               {row.name}

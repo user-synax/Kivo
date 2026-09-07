@@ -10,6 +10,7 @@ const NOTIFICATION_TYPES = [
   "mention",
   "wave",
   "missed_call",
+  "plus_granted",
 ];
 
 const notificationSchema = new mongoose.Schema(

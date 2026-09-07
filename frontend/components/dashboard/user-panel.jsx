@@ -186,6 +186,7 @@ export function UserPanel({
                             avatarStyle={profile?.avatarStyle}
                             url={profile?.avatarUrl}
                             size="xl"
+                            isPlus={Boolean(profile?.isPlus)}
                         />
                     </div>
                     <h2 className="mt-3 text-[18px] font-semibold leading-tight text-[var(--text-primary)]">

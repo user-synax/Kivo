@@ -67,7 +67,9 @@ function MessageResult({ item, onClick }) {
       <Avatar
         name={item.senderName}
         url={item.senderAvatarUrl}
+        avatarStyle={item.senderAvatarStyle || null}
         size="sm"
+        isPlus={Boolean(item.senderIsPlus)}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -99,6 +101,7 @@ function UserResult({ item, onClick }) {
         name={name}
         avatarStyle={item.avatarStyle}
         url={item.avatarUrl}
+        isPlus={Boolean(item.isPlus)}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">

@@ -18,6 +18,7 @@ import attachmentRoutes from "./modules/attachments/attachments.routes.js";
 import searchRoutes from "./modules/search/search.routes.js";
 import linkPreviewRoutes from "./modules/link-preview/link-preview.routes.js";
 import callsRoutes from "./modules/calls/calls.routes.js";
+import plusRoutes from "./modules/plus/plus.routes.js";
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api/v1/attachments", attachmentRoutes);
 app.use("/api/v1/search", searchRoutes);
 app.use("/api/v1/link-preview", linkPreviewRoutes);
 app.use("/api/v1/calls", callsRoutes);
+app.use("/api/v1/plus", plusRoutes);
 
 // 404 + centralized error handler (must be registered last).
 app.use(notFoundHandler);

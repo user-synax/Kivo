@@ -53,8 +53,8 @@ export function ThreadPanel({
   const senderAvatar = (senderId) => {
     const s = membersById[senderId];
     return s
-      ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl }
-      : { avatarStyle: null, avatarUrl: null };
+      ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl, isPlus: s.isPlus }
+      : { avatarStyle: null, avatarUrl: null, isPlus: false };
   };
 
   const rootAuthor = senderName(root?.senderId);
@@ -263,6 +263,7 @@ export function ThreadPanel({
             avatarStyle={senderAvatar(root?.senderId).avatarStyle}
             url={senderAvatar(root?.senderId).avatarUrl}
             size="sm"
+            isPlus={Boolean(senderAvatar(root?.senderId).isPlus)}
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -324,6 +325,7 @@ export function ThreadPanel({
                       avatarStyle={av.avatarStyle}
                       url={av.avatarUrl}
                       size="sm"
+                      isPlus={Boolean(av.isPlus)}
                     />
                   )}
                   <div

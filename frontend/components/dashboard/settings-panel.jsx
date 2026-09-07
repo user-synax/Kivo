@@ -4,23 +4,28 @@ import {
   Bell,
   Check,
   ChevronRight,
+  Crown,
   Eye,
   EyeOff,
   Loader2,
   Palette,
   Play,
   ShieldBan,
+  Sparkles,
   Trash2,
   Undo2,
   UserCheck,
   Volume2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "@/components/theme-provider";
 import { Switch } from "@/components/ui/switch";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { MovingBorder } from "@/components/velora/moving-border";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
+import { isPlusUser as isPlusUserLib } from "@/lib/plus";
 import { BubbleStylePicker, WallpaperPicker } from "./chat-style-picker";
 import {
   getSoundPrefs,
@@ -848,6 +853,7 @@ function BlockedUsersSection() {
                 avatarStyle={u.avatarStyle}
                 url={u.avatarUrl}
                 size="sm"
+                isPlus={Boolean(u.isPlus)}
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
@@ -883,11 +889,62 @@ function BlockedUsersSection() {
   );
 }
 
+function isPlusUser(user) {
+  if (typeof isPlusUserLib === "function") return isPlusUserLib(user);
+  if (!user || user.plan !== "plus") return false;
+  const exp = user.planExpiresAt ? new Date(user.planExpiresAt).getTime() : null;
+  if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+  return true;
+}
+
+function UpgradeToProCard() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    setUser(getSession());
+    const onStorage = () => setUser(getSession());
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  if (isPlusUser(user)) return null;
+
+  return (
+    <MovingBorder
+      radius={14}
+      duration={3.5}
+      onClick={() => router.push("/plus")}
+      aria-label="Upgrade to Pro"
+      className="w-full !h-auto !p-px text-left [&>span:last-child]:!justify-start [&>span:last-child]:!bg-[var(--bg-surface)] [&>span:last-child]:!px-4 [&>span:last-child]:!py-3"
+    >
+      <span className="flex w-full items-center gap-3 text-left">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#a78bfa]/15 text-[#a78bfa]">
+          <Crown className="h-4 w-4" strokeWidth={2} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-[13px] font-semibold leading-tight text-[var(--text-primary)]">
+            Upgrade to Pro
+            <span className="rounded-full bg-[#a78bfa] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+              ₹49/mo
+            </span>
+          </span>
+          <span className="block text-[11px] leading-tight text-[var(--text-muted)]">
+            Unlock Plus — custom banners, effects & more
+          </span>
+        </span>
+        <Sparkles className="h-4 w-4 shrink-0 text-[#a78bfa]" strokeWidth={1.8} />
+      </span>
+    </MovingBorder>
+  );
+}
+
 export function SettingsPanel({ onOpenAppearance }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-3">
+          <UpgradeToProCard />
           {onOpenAppearance ? (
             <AppearanceLinkCard onOpenAppearance={onOpenAppearance} />
           ) : null}

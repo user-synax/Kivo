@@ -64,6 +64,7 @@ export function MentionAutocomplete({
               avatarStyle={p.avatarStyle}
               url={p.avatarUrl}
               size="sm"
+              isPlus={Boolean(p.isPlus)}
             />
             <div className="min-w-0 flex-1 truncate">
               <span className="font-medium text-current">

@@ -32,6 +32,11 @@ router.post("/users/:id/ban", adminController.banUser);
 router.post("/users/:id/unban", adminController.unbanUser);
 router.post("/users/:id/plan", adminController.setUserPlan);
 
+// Plus claims (manual-UPI review queue)
+router.get("/plus-requests", adminController.listPlusRequests);
+router.post("/plus-requests/:claimId/approve", adminController.approvePlusRequest);
+router.post("/plus-requests/:claimId/reject", adminController.rejectPlusRequest);
+
 // Groups
 router.get("/groups", adminController.listGroups);
 router.delete("/groups/:id", adminController.deleteGroup);

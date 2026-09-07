@@ -187,6 +187,10 @@
     --morph-open-dur: 250ms;
     --morph-close-dur: 200ms;
     --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --brand: oklch(0.546 0.245 263);
+    --brand-from: oklch(0.546 0.245 263);
+    --brand-via: oklch(0.623 0.214 260);
+    --brand-to: oklch(0.685 0.169 237);
 }
 
 /* Dark mode == the only mode. Keep .dark defined so `dark:` variants resolve. */
@@ -231,6 +235,10 @@
     --shadow-xl:
         inset 0 1px 0 rgba(255, 255, 255, 0.1),
         0 30px 70px -16px rgba(0, 0, 0, 0.8);
+    --brand: oklch(0.623 0.214 260);
+    --brand-from: oklch(0.623 0.214 260);
+    --brand-via: oklch(0.707 0.165 255);
+    --brand-to: oklch(0.746 0.16 233);
 }
 
 @theme inline {
@@ -277,6 +285,19 @@
     --radius-2xl: var(--radius-2xl);
     --radius-3xl: var(--radius-3xl);
     --radius-4xl: 40px;
+    --color-brand: var(--brand);
+    --color-brand-from: var(--brand-from);
+    --color-brand-via: var(--brand-via);
+    --color-brand-to: var(--brand-to);
+    --animate-moving-border: moving-border var(--mb-duration, 4s) linear infinite;
+  @keyframes moving-border {
+  from {
+    offset-distance: 0%;
+        }
+  to {
+    offset-distance: 100%;
+        }
+    }
 }
 
 @theme {

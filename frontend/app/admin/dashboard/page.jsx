@@ -665,11 +665,238 @@ function SpacesTab() {
   );
 }
 
+// ── Plus Claims Tab (manual-UPI review queue) ───────────────────────────────
+
+function timeLeft(expiresAt) {
+  if (!expiresAt) return "—";
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return "overdue";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}m left`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h left`;
+  return `${Math.floor(hours / 24)}d left`;
+}
+
+function PlusTab() {
+  const [requests, setRequests] = useState([]);
+  const [status, setStatus] = useState("pending");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState(null);
+
+  const load = useCallback(
+    (s = status, p = page) => {
+      setLoading(true);
+      const params = new URLSearchParams({
+        status: s,
+        page: String(p),
+        limit: "20",
+      });
+      adminFetch(`/api/admin/plus-requests?${params}`)
+        .then((data) => {
+          setRequests(data.requests || []);
+          setTotalPages(data.totalPages || 1);
+          setPage(data.page || 1);
+          setPendingCount(data.pendingCount || 0);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    },
+    [status, page],
+  );
+
+  useEffect(() => {
+    load("pending", 1);
+  }, []);
+
+  const handleStatus = (s) => {
+    setStatus(s);
+    setPage(1);
+    load(s, 1);
+  };
+
+  const handleApprove = async (r) => {
+    const who =
+      r.user?.displayName || r.user?.username || r.user?.email || r.id;
+    if (
+      !window.confirm(
+        `Grant Plus (30 days) to ${who} for UTR ${r.utr}? Make sure ₹49 landed in your UPI history.`,
+      )
+    )
+      return;
+    setActionBusy(r.id);
+    try {
+      await adminFetch(`/api/admin/plus-requests/${r.id}/approve`, {
+        method: "POST",
+      });
+      load(status, page);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleReject = async (r) => {
+    const note = window.prompt(
+      "Rejection reason (shown to the user, optional):",
+      "",
+    );
+    if (note === null) return;
+    setActionBusy(r.id);
+    try {
+      await adminFetch(`/api/admin/plus-requests/${r.id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ note: note || undefined }),
+      });
+      load(status, page);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {["pending", "approved", "rejected", "expired"].map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => handleStatus(s)}
+            className={`rounded-lg px-3 py-1.5 text-[13px] font-medium capitalize transition-colors ${
+              status === s
+                ? "bg-[#1c1c1c] text-white"
+                : "text-[#999] hover:bg-[#1c1c1c]/50 hover:text-white"
+            }`}
+          >
+            {s}
+            {s === "pending" && pendingCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-[#a78bfa]/20 px-1.5 py-0.5 text-[11px] font-semibold text-[#c4b5fd]">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-5 w-5 animate-spin text-[#999]" />
+        </div>
+      ) : requests.length === 0 ? (
+        <p className="py-12 text-center text-[14px] text-[#666]">
+          {status === "pending"
+            ? "Queue is clear — no payments waiting"
+            : `No ${status} requests`}
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-[#262626]">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#262626] bg-[#141414]">
+                <th className="px-4 py-3 font-medium text-[#999]">User</th>
+                <th className="px-4 py-3 font-medium text-[#999]">UTR</th>
+                <th className="hidden px-4 py-3 font-medium text-[#999] sm:table-cell">
+                  Filed
+                </th>
+                <th className="px-4 py-3 font-medium text-[#999]">Review by</th>
+                <th className="px-4 py-3 font-medium text-[#999]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((r) => (
+                <tr
+                  key={r.id}
+                  className={`border-b border-[#262626]/50 last:border-0 hover:bg-[#1c1c1c]/50 ${actionBusy === r.id ? "opacity-40 pointer-events-none" : ""}`}
+                >
+                  <td className="px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-white">
+                        {r.user?.displayName || r.user?.username || "—"}
+                      </p>
+                      <p className="truncate text-[12px] text-[#666]">
+                        {r.user?.username ? `@${r.user.username} · ` : ""}
+                        {r.user?.email || ""}
+                      </p>
+                      {r.reviewNote && (
+                        <p className="mt-1 text-[12px] text-[#999]">
+                          Note: {r.reviewNote}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-white">
+                    {r.utr}
+                  </td>
+                  <td className="hidden px-4 py-3 text-[13px] text-[#999] sm:table-cell">
+                    {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-[#999]">
+                    {r.status === "pending" ? (
+                      <span
+                        className={
+                          timeLeft(r.expiresAt) === "overdue"
+                            ? "font-medium text-[#ff5577]"
+                            : ""
+                        }
+                      >
+                        {timeLeft(r.expiresAt)}
+                      </span>
+                    ) : (
+                      <span className="capitalize text-[#666]">{r.status}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {actionBusy === r.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-[#999]" />
+                    ) : r.status === "pending" ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(r)}
+                          className="rounded-lg bg-[#22c55e]/15 px-3 py-1.5 text-[12px] font-medium text-[#22c55e] hover:bg-[#22c55e]/25"
+                        >
+                          Approve · 30d
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReject(r)}
+                          className="rounded-lg bg-[#ff5577]/15 px-3 py-1.5 text-[12px] font-medium text-[#ff5577] hover:bg-[#ff5577]/25"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-[#666]">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={(p) => load(status, p)}
+      />
+    </div>
+  );
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────────
 
 const TABS = [
   { id: "overview", label: "Overview", icon: BarChart3 },
   { id: "users", label: "Users", icon: Users },
+  { id: "plus", label: "Plus", icon: Crown },
   { id: "groups", label: "Groups", icon: FileText },
   { id: "spaces", label: "Spaces", icon: Database },
 ];
@@ -757,6 +984,7 @@ export default function AdminDashboardPage() {
           <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             {tab === "overview" && <OverviewTab />}
             {tab === "users" && <UsersTab />}
+            {tab === "plus" && <PlusTab />}
             {tab === "groups" && <GroupsTab />}
             {tab === "spaces" && <SpacesTab />}
           </main>

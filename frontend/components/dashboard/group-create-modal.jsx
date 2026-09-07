@@ -132,7 +132,7 @@ export function GroupCreateModal({ open, onClose, onCreated }) {
         <div className="mt-4 flex flex-wrap gap-2">
           {selectedFriends.map((f) => (
             <span key={f.id} className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] py-1 pl-1.5 pr-2 text-[12px] text-[var(--text-primary)]">
-              <Avatar name={participantName(f)} avatarStyle={f.avatarStyle} url={f.avatarUrl} size="sm" />
+              <Avatar name={participantName(f)} avatarStyle={f.avatarStyle} url={f.avatarUrl} size="sm" isPlus={Boolean(f.isPlus)} />
               {participantName(f)}
               <button type="button" onClick={() => toggle(f.id)} aria-label={`Remove ${participantName(f)}`} className="ml-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X className="h-3 w-3" />
@@ -154,7 +154,7 @@ export function GroupCreateModal({ open, onClose, onCreated }) {
           const picked = selected.has(f.id);
           return (
             <button key={f.id} type="button" onClick={() => toggle(f.id)} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5 text-left transition-colors duration-150 hover:bg-[var(--hover)]">
-              <Avatar name={participantName(f)} avatarStyle={f.avatarStyle} url={f.avatarUrl} size="sm" />
+              <Avatar name={participantName(f)} avatarStyle={f.avatarStyle} url={f.avatarUrl} size="sm" isPlus={Boolean(f.isPlus)} />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">{participantName(f)}</span>
               <span className={`flex size-6 items-center justify-center rounded-full border ${picked ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)]" : "border-[var(--border)] text-transparent"}`}>
                 <Check className="h-3.5 w-3.5" strokeWidth={2.5} />

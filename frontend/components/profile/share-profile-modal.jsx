@@ -130,7 +130,9 @@ export function ShareProfileModal({ username, profile, open, onClose }) {
                     profile?.displayName || profile?.username || username || "?"
                   }
                   url={profile?.avatarUrl}
+                  avatarStyle={profile?.avatarStyle || null}
                   size="xs"
+                  isPlus={Boolean(profile?.isPlus)}
                 />
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold text-[var(--ink)]">

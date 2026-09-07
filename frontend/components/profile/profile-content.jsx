@@ -466,6 +466,7 @@ export function ProfileContent({
                   avatarStyle={profile.avatarStyle}
                   url={profile.avatarUrl}
                   size="lg"
+                  isPlus={Boolean(profile.isPlus)}
                 />
               </span>
             </motion.span>

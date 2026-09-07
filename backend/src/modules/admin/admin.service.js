@@ -8,8 +8,11 @@ import Conversation from "../../models/Conversation.js";
 import Space from "../../models/Space.js";
 import Message from "../../models/Message.js";
 import Session from "../../models/Session.js";
+import PlusRequest from "../../models/PlusRequest.js";
 import AdminActionLog from "../../models/AdminActionLog.js";
 import { getIO } from "../../socket/index.js";
+import { PLUS_DURATION_MS, getEffectivePlan } from "../../lib/plus.js";
+import { createPlusGrantedNotification } from "../notifications/notifications.service.js";
 
 // ── Admin Auth ──────────────────────────────────────────────────────────────
 
@@ -263,12 +266,165 @@ export async function setUserPlan({ userId, plan, expiresAt = null, ip }) {
     ip,
   });
 
+  if (plan === "plus") {
+    // Fire-and-forget: notification delivery must never block the admin response.
+    createPlusGrantedNotification({ recipientId: userId }).catch((err) =>
+      console.error("[plus] grant notification failed:", err?.message || err),
+    );
+  }
+
   return {
     plan,
     planExpiresAt: update.planExpiresAt
       ? new Date(update.planExpiresAt).toISOString()
       : null,
   };
+}
+
+// ── Plus Claims (manual-UPI review queue) ──────────────────────────────────
+
+function publicPlusClaim(doc, user) {
+  const c = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: c._id.toString(),
+    utr: c.utr,
+    amountPaise: c.amountPaise,
+    status: c.status,
+    expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString() : null,
+    reviewNote: c.reviewNote || null,
+    reviewedAt: c.reviewedAt ? new Date(c.reviewedAt).toISOString() : null,
+    createdAt: c.createdAt,
+    user: user
+      ? {
+          id: user._id.toString(),
+          displayName: user.displayName || null,
+          username: user.username || null,
+          email: user.email,
+        }
+      : null,
+  };
+}
+
+// Pending-first queue for the admin panel. Pending sorts oldest-first so the
+// tightest 24h deadline is always on top.
+export async function listPlusRequests({ status = "pending", page = 1, limit = 20 }) {
+  if (!["pending", "approved", "rejected", "expired"].includes(status)) {
+    throw badRequest("Invalid status", "INVALID_STATUS");
+  }
+  const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
+  const sort = status === "pending" ? { createdAt: 1 } : { createdAt: -1 };
+  const [claims, total, pendingCount] = await Promise.all([
+    PlusRequest.find({ status }).sort(sort).skip(skip).limit(Number(limit)).lean(),
+    PlusRequest.countDocuments({ status }),
+    PlusRequest.countDocuments({ status: "pending" }),
+  ]);
+  const userIds = [...new Set(claims.map((c) => c.userId.toString()))];
+  const users = userIds.length
+    ? await User.find({ _id: { $in: userIds } })
+        .select("displayName username email")
+        .lean()
+    : [];
+  const byId = new Map(users.map((u) => [u._id.toString(), u]));
+  return {
+    requests: claims.map((c) => publicPlusClaim(c, byId.get(c.userId.toString()))),
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / Number(limit)),
+    pendingCount,
+  };
+}
+
+// Approve a claim: grants Plus for 30 days from now (reuses setUserPlan so the
+// grant_plus audit entry is identical to a manual grant), then marks approved.
+export async function approvePlusRequest({ claimId, ip }) {
+  if (!mongoose.Types.ObjectId.isValid(claimId)) {
+    throw badRequest("Invalid claim id", "INVALID_ID");
+  }
+  const claim = await PlusRequest.findById(claimId);
+  if (!claim) throw notFound("Claim not found", "CLAIM_NOT_FOUND");
+  if (claim.status !== "pending") {
+    throw badRequest(`Claim is already ${claim.status}`, "CLAIM_CLOSED");
+  }
+  if (claim.expiresAt && claim.expiresAt.getTime() < Date.now()) {
+    claim.status = "expired";
+    await claim.save();
+    throw badRequest("Claim expired — ask the user to file a fresh claim", "CLAIM_EXPIRED");
+  }
+
+  const user = await User.findById(claim.userId).select("displayName username plan planExpiresAt");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+
+  // Effective (expiry-aware) check: a lapsed Plus reads as free and still gets
+  // a fresh 30-day grant. setUserPlan compares the raw field, so bypass the
+  // ALREADY_PLAN guard via direct update when the raw value is already "plus".
+  if (getEffectivePlan(user) !== "plus") {
+    if (user.plan !== "plus") {
+      await setUserPlan({
+        userId: user._id.toString(),
+        plan: "plus",
+        expiresAt: new Date(Date.now() + PLUS_DURATION_MS),
+        ip,
+      });
+    } else {
+      await User.findByIdAndUpdate(user._id, {
+        plan: "plus",
+        planExpiresAt: new Date(Date.now() + PLUS_DURATION_MS),
+      });
+      await logAction({
+        action: "grant_plus",
+        targetType: "user",
+        targetId: user._id,
+        targetName: user.displayName || user.username || user._id.toString(),
+        reason: `UPI claim ${claim.utr} (renewal after lapse)`,
+        ip,
+      });
+      createPlusGrantedNotification({ recipientId: user._id.toString() }).catch(
+        (err) =>
+          console.error("[plus] grant notification failed:", err?.message || err),
+      );
+    }
+  }
+  claim.status = "approved";
+  claim.reviewedAt = new Date();
+  await claim.save();
+  await logAction({
+    action: "approve_plus_claim",
+    targetType: "user",
+    targetId: user._id,
+    targetName: user.displayName || user.username || user._id.toString(),
+    reason: `UTR ${claim.utr} · ₹${(claim.amountPaise / 100).toFixed(0)}`,
+    ip,
+  });
+  return { approved: true, claimId: claim._id.toString() };
+}
+
+// Reject a claim: no tier change; the note (if any) is shown to the user so
+// they know what to fix before filing again.
+export async function rejectPlusRequest({ claimId, note, ip }) {
+  if (!mongoose.Types.ObjectId.isValid(claimId)) {
+    throw badRequest("Invalid claim id", "INVALID_ID");
+  }
+  const claim = await PlusRequest.findById(claimId);
+  if (!claim) throw notFound("Claim not found", "CLAIM_NOT_FOUND");
+  if (claim.status !== "pending") {
+    throw badRequest(`Claim is already ${claim.status}`, "CLAIM_CLOSED");
+  }
+  claim.status = "rejected";
+  claim.reviewedAt = new Date();
+  claim.reviewNote = (note || "").trim().slice(0, 500) || null;
+  await claim.save();
+
+  const user = await User.findById(claim.userId).select("displayName username").lean();
+  await logAction({
+    action: "reject_plus_claim",
+    targetType: "user",
+    targetId: claim.userId,
+    targetName: user?.displayName || user?.username || claim.userId.toString(),
+    reason: claim.reviewNote || `UTR ${claim.utr}`,
+    ip,
+  });
+  return { rejected: true, claimId: claim._id.toString() };
 }
 
 // ── Groups Management ───────────────────────────────────────────────────────

@@ -335,8 +335,8 @@ const MessageRows = React.memo(function MessageRows({
     const senderAvatar = (senderId) => {
         const s = a.membersById[senderId];
         return s
-            ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl }
-            : { avatarStyle: null, avatarUrl: null };
+            ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl, isPlus: s.isPlus }
+            : { avatarStyle: null, avatarUrl: null, isPlus: false };
     };
 
     return messages.map((m, i) => {
@@ -441,6 +441,7 @@ const MessageRows = React.memo(function MessageRows({
                                         avatarStyle={sAvatar.avatarStyle}
                                         url={sAvatar.avatarUrl}
                                         size="sm"
+                                        isPlus={Boolean(sAvatar.isPlus)}
                                     />
                                 </span>
                             )
@@ -453,6 +454,7 @@ const MessageRows = React.memo(function MessageRows({
                                     avatarStyle={sAvatar.avatarStyle}
                                     url={sAvatar.avatarUrl}
                                     size="sm"
+                                    isPlus={Boolean(sAvatar.isPlus)}
                                 />
                             </span>
                         ) : null}
@@ -657,8 +659,8 @@ export function ChatPanel({
     const senderAvatar = (senderId) => {
         const s = membersById[senderId];
         return s
-            ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl }
-            : { avatarStyle: null, avatarUrl: null };
+            ? { avatarStyle: s.avatarStyle, avatarUrl: s.avatarUrl, isPlus: s.isPlus }
+            : { avatarStyle: null, avatarUrl: null, isPlus: false };
     };
 
     const [messages, setMessages] = useState([]);
@@ -2741,17 +2743,20 @@ export function ChatPanel({
               name: `#${conversation.name || "general"}`,
               avatarStyle: null,
               avatarUrl: conversation.avatarUrl || null,
+              isPlus: false,
           }
         : isGroup
           ? {
                 name: conversation.name || "Group",
                 avatarStyle: null,
                 avatarUrl: conversation.avatarUrl,
+                isPlus: false,
             }
           : {
                 name: participantAvatarName(other),
                 avatarStyle: other?.avatarStyle,
                 avatarUrl: other?.avatarUrl,
+                isPlus: other?.isPlus,
             };
 
     // Per-Space palette: while a Space channel is open, scope the Space's colors
@@ -2868,6 +2873,7 @@ export function ChatPanel({
                     avatarStyle={headerAvatar.avatarStyle}
                     url={headerAvatar.avatarUrl}
                     size="xl"
+                    isPlus={Boolean(headerAvatar.isPlus)}
                 />
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
@@ -3865,15 +3871,14 @@ export function ChatPanel({
                             ) : forwardError ? null : (
                                 <ul className="flex flex-col gap-0.5 p-2">
                                     {forwardConvs.map((c) => {
+                                        const otherP = c.type === "dm" ? otherParticipant(c, userId) : null;
                                         const label =
                                             c.type === "dm"
-                                                ? participantName(
-                                                      otherParticipant(
-                                                          c,
-                                                          userId,
-                                                      ),
-                                                  )
+                                                ? participantName(otherP)
                                                 : c.name || c.type;
+                                        const fIsPlus = c.type === "dm" ? Boolean(otherP?.isPlus) : false;
+                                        const fAvatarStyle = c.type === "dm" ? otherP?.avatarStyle || null : null;
+                                        const fAvatarUrl = c.type === "dm" ? otherP?.avatarUrl || c.avatarUrl : c.avatarUrl;
                                         return (
                                             <li key={c.id}>
                                                 <button
@@ -3888,8 +3893,10 @@ export function ChatPanel({
                                                 >
                                                     <Avatar
                                                         name={label}
-                                                        url={c.avatarUrl}
+                                                        avatarStyle={fAvatarStyle}
+                                                        url={fAvatarUrl}
                                                         size="sm"
+                                                        isPlus={fIsPlus}
                                                     />
                                                     <span className="min-w-0 flex-1">
                                                         <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">

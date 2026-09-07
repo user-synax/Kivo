@@ -95,6 +95,35 @@ export const setUserPlan = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+// ── Plus Claims (manual-UPI review queue) ───────────────────────────────────
+
+export const listPlusRequests = asyncHandler(async (req, res) => {
+  const data = await adminService.listPlusRequests({
+    status: req.query.status,
+    page: req.query.page,
+    limit: req.query.limit,
+  });
+  res.status(200).json({ success: true, data });
+});
+
+export const approvePlusRequest = asyncHandler(async (req, res) => {
+  const data = await adminService.approvePlusRequest({
+    claimId: req.params.claimId,
+    ip: getClientIp(req),
+  });
+  res.status(200).json({ success: true, data });
+});
+
+export const rejectPlusRequest = asyncHandler(async (req, res) => {
+  const { note } = req.body || {};
+  const data = await adminService.rejectPlusRequest({
+    claimId: req.params.claimId,
+    note,
+    ip: getClientIp(req),
+  });
+  res.status(200).json({ success: true, data });
+});
+
 // ── Groups ──────────────────────────────────────────────────────────────────
 
 export const listGroups = asyncHandler(async (req, res) => {

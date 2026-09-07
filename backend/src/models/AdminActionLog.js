@@ -13,6 +13,10 @@ const adminActionLogSchema = new mongoose.Schema(
         "force_logout",
         "delete_group",
         "delete_space",
+        "grant_plus",
+        "revoke_plus",
+        "approve_plus_claim",
+        "reject_plus_claim",
       ],
     },
     targetType: {

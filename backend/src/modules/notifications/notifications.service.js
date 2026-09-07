@@ -429,6 +429,62 @@ const WAVE_COOLDOWN_SECONDS = 20;
  * Returns { notification, cooldownSeconds, lastWaveAt } so the client can show
  * the right button state ("Waved" with a live lockout).
  */
+/**
+ * Notify a user that their Kivo Plus subscription was activated. Bypasses
+ * preference checks — this is a system-level entitlement notice that always
+ * appears in the bell.
+ */
+export async function createPlusGrantedNotification({ recipientId }) {
+  const rid = String(recipientId);
+  if (!mongoose.Types.ObjectId.isValid(rid)) return null;
+
+  const doc = await Notification.create({
+    recipientId: rid,
+    senderId: null,
+    senderUsername: null,
+    type: "plus_granted",
+    conversationId: null,
+    messageId: null,
+    spaceId: null,
+    title: "Your Plus is granted",
+    body: "Welcome to Kivo Plus — your 30 days are live. Enjoy premium features!",
+    avatarUrl: null,
+    read: false,
+    seen: false,
+    delivery: {
+      inAppDelivered: false,
+      pushDelivered: false,
+      pushError: null,
+    },
+  });
+
+  const io = getIO();
+  const isOnline = io && io.isUserOnline && io.isUserOnline(rid);
+  if (isOnline) {
+    try {
+      emitToUser(rid, "notification:new", publicNotification(doc));
+      doc.delivery.inAppDelivered = true;
+      await doc.save();
+    } catch {}
+  } else {
+    const pushPayload = {
+      title: doc.title,
+      body: doc.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: {
+        notificationId: doc._id.toString(),
+        type: doc.type,
+      },
+    };
+    try {
+      await sendWebPushToUser(rid, pushPayload, doc._id);
+    } catch {}
+  }
+
+  return publicNotification(doc);
+}
+
 export async function sendWave({ userId, targetId }) {
   const senderId = String(userId);
   const recipientId = String(targetId);

@@ -8,6 +8,7 @@ import { CountryPicker } from "@/components/profile/country-picker";
 import { apiDelete, apiPatch, apiUpload } from "@/lib/api";
 import { getSession, getToken, setSession } from "@/lib/auth";
 import { AVATAR_STYLES } from "@/lib/avatar-styles";
+import { isPlusUser } from "@/lib/plus";
 import { BANNER_OPTIONS } from "@/lib/banners";
 import { COUNTRIES } from "@/lib/countries";
 import {
@@ -121,7 +122,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [bannerUploading, setBannerUploading] = useState(false);
     const bannerFileRef = useRef(null);
 
-    const isPlus = (currentUser || getSession())?.plan === "plus";
+    const isPlus = isPlusUser(currentUser || getSession());
 
     const handleBannerUpload = async (e) => {
         const file = e.target.files?.[0];
@@ -288,6 +289,7 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             avatarStyle={avatarStyle}
             url={previewUrl || currentUser?.avatarUrl}
             size={size}
+            isPlus={isPlus}
         />
     );
 
@@ -682,31 +684,45 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                             <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                                 {AVATAR_STYLES.map((preset) => {
                                     const active = preset.id === avatarStyle;
+                                    const locked = preset.plus && !isPlus;
                                     return (
                                         <button
                                             key={preset.id}
                                             type="button"
-                                            onClick={() =>
-                                                setAvatarStyle(preset.id)
-                                            }
+                                            onClick={() => {
+                                                if (locked) {
+                                                    router.push("/plus");
+                                                    return;
+                                                }
+                                                setAvatarStyle(preset.id);
+                                            }}
                                             aria-pressed={active}
-                                            title={preset.label}
+                                            title={locked ? `${preset.label} — Plus only` : preset.label}
                                             className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-[border-color,background-color,transform] duration-200 ${EASE} active:scale-[0.95] ${
-                                                active
-                                                    ? "border-[var(--accent)] bg-[var(--hover)]"
-                                                    : "border-[var(--border)] hover:bg-[var(--hover)]"
+                                                locked
+                                                    ? "border-[var(--border)] opacity-60"
+                                                    : active
+                                                      ? "border-[var(--accent)] bg-[var(--hover)]"
+                                                      : "border-[var(--border)] hover:bg-[var(--hover)]"
                                             }`}
                                         >
-                                            <Avatar
-                                                name={
-                                                    displayName ||
-                                                    currentUser?.displayName ||
-                                                    "?"
-                                                }
-                                                avatarStyle={preset.id}
-                                                size="sm"
-                                            />
-                                            {active && (
+                                            <span className="relative">
+                                                <Avatar
+                                                    name={
+                                                        displayName ||
+                                                        currentUser?.displayName ||
+                                                        "?"
+                                                    }
+                                                    avatarStyle={preset.id}
+                                                    size="sm"
+                                                />
+                                                {locked && (
+                                                    <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#a78bfa] text-white ring-2 ring-[var(--bg-surface)]">
+                                                        <Crown className="h-2.5 w-2.5" strokeWidth={2.2} />
+                                                    </span>
+                                                )}
+                                            </span>
+                                            {active && !locked && (
                                                 <span className="t-badge-pop absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] ring-2 ring-[var(--bg-surface)]">
                                                     <Check
                                                         className="h-2.5 w-2.5"
@@ -714,8 +730,9 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                                     />
                                                 </span>
                                             )}
-                                            <span className="text-[10px] leading-none text-[var(--text-muted)]">
+                                            <span className="flex items-center gap-1 text-[10px] leading-none text-[var(--text-muted)]">
                                                 {preset.label}
+                                                {locked && <Crown className="h-3 w-3 text-[#a78bfa]" strokeWidth={2} />}
                                             </span>
                                         </button>
                                     );

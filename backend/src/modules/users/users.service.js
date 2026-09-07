@@ -39,6 +39,7 @@ function publicUser(user) {
     // Plus profile effect ("none" | "glow" | "gradient-name" | "aura") —
     // public so any visitor renders the user's chosen effect on their profile.
     profileEffect: u.profileEffect || "none",
+    isPlus: getEffectivePlan(u) === "plus",
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
     lastActiveAt: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
     online,
@@ -124,7 +125,7 @@ export async function searchUsers({ userId, q }) {
     _id: { $ne: userId },
     $or: [{ username: regex }, { email: regex }, { displayName: regex }],
   })
-    .select("displayName username email verified showBadge googleVerified githubVerified lastActiveAt")
+    .select("displayName username email verified showBadge googleVerified githubVerified lastActiveAt plan planExpiresAt")
     .limit(20)
     .lean();
 
@@ -152,7 +153,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect plan planExpiresAt createdAt lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -182,6 +183,7 @@ function publicProfile(user) {
     googleVerified: Boolean(u.googleVerified),
     githubVerified: Boolean(u.githubVerified),
     profileEffect: u.profileEffect || "none",
+    isPlus: getEffectivePlan(u) === "plus",
     // The owner's colors/look — public so their /u/username page can render
     // in *their* theme (accent + canvas tint). Colors only; never plan/tier.
     appearance: flatAppearance(u.appearance),
@@ -196,7 +198,7 @@ function publicProfile(user) {
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect createdAt blockedUsers lastActiveAt",
+    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect plan planExpiresAt createdAt blockedUsers lastActiveAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 

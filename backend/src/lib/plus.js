@@ -9,6 +9,13 @@
 
 export const PLANS = Object.freeze({ FREE: "free", PLUS: "plus" });
 
+// Manual-UPI Plus sale: fixed price, fixed duration, fixed review window.
+// Single source of truth — the claim flow, the /plus page copy, and the
+// expiry sweep all derive from these (never hardcode ₹49 / 30d / 24h).
+export const PLUS_PRICE_PAISA = 4900; // ₹49 for one month
+export const PLUS_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days per grant
+export const PLUS_REVIEW_WINDOW_MS = 24 * 60 * 60 * 1000; // admin grants within 24h
+
 // Per-plan caps. Free values preserve today's behavior (no downgrade);
 // Plus values are strictly headroom + expression.
 export const PLAN_LIMITS = Object.freeze({

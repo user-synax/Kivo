@@ -166,6 +166,7 @@ export function FounderInviteCard({ className, onSent, friendsCount }) {
           name={founder?.displayName || "Ayush"}
           avatarStyle={founder?.avatarStyle}
           url={founder?.avatarUrl}
+          isPlus={Boolean(founder?.isPlus)}
         />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--text-primary)]">

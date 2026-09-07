@@ -57,8 +57,8 @@ export function SavedMessagesModal({ open, onClose, onJump }) {
     if (!c) return { label: "Unknown chat", avatar: null, sub: null };
     const dmOther = c.type === "dm" ? otherParticipant(c, userId) : null;
     const avatar = dmOther
-      ? { url: dmOther.avatarUrl, style: dmOther.avatarStyle }
-      : { url: c.avatarUrl, style: null };
+      ? { url: dmOther.avatarUrl, style: dmOther.avatarStyle, isPlus: dmOther.isPlus }
+      : { url: c.avatarUrl, style: null, isPlus: false };
     return {
       label: participantName(dmOther || c) || c.name || "Chat",
       avatar,
@@ -135,6 +135,7 @@ export function SavedMessagesModal({ open, onClose, onJump }) {
                           url={info.avatar?.url}
                           avatarStyle={info.avatar?.style}
                           size="sm"
+                          isPlus={Boolean(info.avatar?.isPlus)}
                         />
                       </span>
                       <span className="min-w-0 flex-1">

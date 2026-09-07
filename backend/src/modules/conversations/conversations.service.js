@@ -14,6 +14,14 @@ import {
   emitToUser,
 } from "../../socket/io.js";
 
+// Expiry-aware Plus check for populated user docs (mirrors lib/plus.js).
+function isPlusEffective(u) {
+  if (!u || u.plan !== "plus") return false;
+  const exp = u.planExpiresAt ? new Date(u.planExpiresAt).getTime() : null;
+  if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
+  return true;
+}
+
 // Public representation of a conversation for the current user. Strips internal
 // fields and leaves participants populated enough for the client to render a DM
 // title (the "other" participant) or a group name + member list.
@@ -33,6 +41,7 @@ function normalizeParticipant(p) {
     avatarStyle: populated ? (p.avatarStyle ?? null) : null,
     avatarUrl: populated ? (p.avatarUrl ?? null) : null,
     lastActiveAt: populated && p.lastActiveAt ? new Date(p.lastActiveAt).toISOString() : null,
+    isPlus: populated ? isPlusEffective(p) : false,
   };
 }
 
@@ -137,7 +146,7 @@ export async function createOrGetDm({ userId, participantId }) {
   const existing = await Conversation.findOne({
     type: "dm",
     participants: { $all: [userId, participantId] },
-  }).populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt");
+  }).populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt");
   if (existing) {
     return publicConversation(existing, userId, onlineSnapshot(), blockFlags);
   }
@@ -184,7 +193,7 @@ async function unreadCountsByConversation(conversationIds, userId) {
 export async function listConversations({ userId }) {
   const conversations = await Conversation.find({ participants: userId })
     .sort({ lastMessageAt: -1, createdAt: -1 })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
@@ -374,7 +383,7 @@ export async function updateGroup({ conversationId, userId, name, avatar }) {
   const updated = await Conversation.findByIdAndUpdate(conversationId, update, {
     new: true,
   })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
@@ -412,7 +421,7 @@ export async function updateConversationLook({ conversationId, userId, wallpaper
   const updated = await Conversation.findByIdAndUpdate(conversationId, update, {
     new: true,
   })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
@@ -465,7 +474,7 @@ export async function addMembers({ conversationId, userId, memberIds }) {
     { $addToSet: { participants: { $each: toAdd } } },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
@@ -533,7 +542,7 @@ export async function removeMember({ conversationId, userId, targetUserId }) {
     },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
@@ -593,7 +602,7 @@ export async function promoteMember({ conversationId, userId, targetUserId }) {
     { $addToSet: { admins: targetUserId } },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
@@ -627,7 +636,7 @@ export async function demoteMember({ conversationId, userId, targetUserId }) {
     { $pull: { admins: targetUserId } },
     { new: true },
   )
-    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt")
+    .populate("participants", "id displayName username email avatarStyle avatarUrl lastActiveAt plan planExpiresAt")
     .populate("admins", "id")
     .lean();
 
