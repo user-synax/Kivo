@@ -59,7 +59,7 @@ Kivo
 | **Push Subscription** | Per-user VAPID subscription for offline delivery | ✅ Complete |
 | **Attachment** | Image/document/voice file attached to a message | ✅ Complete |
 | **Thread** | Message-level side discussion in a dedicated panel | ✅ Complete |
-| **Status** | 24h ephemeral text updates (WhatsApp Desktop: vertical Status tab, My status on top, friends grouped) | ✅ Complete (text-only; media uploads next) |
+| **Status** | 24h ephemeral text + photo updates (WhatsApp Desktop: vertical Status tab, My status on top, friends grouped) | ✅ Complete |
 
 ---
 
@@ -123,7 +123,7 @@ Kivo
 | **Date Dividers + Big Emoji** | **Complete** | Today/Yesterday/weekday/date pills across history (grouping breaks across days); 1–3 emoji-only messages render large and chromeless (`lib/emoji.js`, grapheme-aware) |
 | **Jump-to-Latest Pill** | **Complete** | Floating "N new"/"Latest" button when scrolled off the live edge; auto-scroll only pins at the bottom (or for own sends) — history reading never yanked |
 | **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits last message; **mobile swipe-to-reply** (right swipe ~45 px with direction lock, haptics) |
-| **Status (24h text)** | **Complete** | `Status` model `text 280` + `background` 6 + `viewers[]` + `expiresAt` TTL 24h (`expireAfterSeconds:0`); friends-only feed `GET /api/v1/status/feed` (grouped by user, `isViewed` per viewer, blocked both-ways filtered) + `GET /me` + `POST /` 10/day + `POST /:id/view` 60/min + `DELETE /:id`; WhatsApp Desktop vertical tab (`StatusTab` + `StatusRing` green/grey) + mobile `BottomTabBar` 5th item, `StatusCreateModal` 6 backgrounds, `StatusViewer` 3s auto-advance + live `status:new/deleted/viewed` |
+| **Status (24h text+photo)** | **Complete** | `Status` model `text 280` + `background` 6 + `media{fileId,bucketId,url,kind:image,mimeType,size,fileName}` nullable + `viewers[]` + `expiresAt` 24h (indexed, hourly `cleanupExpiredStatuses()` deletes Appwrite file then doc — no orphaned bucket files); friends-only feed `GET /api/v1/status/feed` (grouped by user, `isViewed`, blocked both-ways) + `GET /me` + `POST /` multipart `media` 10/day (`STATUS_ALLOWED_MIMES` image 30MB, `uploadAttachment` to `APPWRITE_ATTACHMENTS_BUCKET_ID`, caption=`text`) + `POST /:id/view` 60/min + `DELETE /:id` (Appwrite delete); WhatsApp Desktop vertical tab (`StatusTab` Photo label + `StatusRing` green/grey) + mobile `BottomTabBar` 5th item, `StatusCreateModal` 6 backgrounds + Photo picker with preview, `StatusViewer` image 5s auto-advance + caption overlay + live `status:new/deleted/viewed` |
 | Voice / Video Calls | **Not started** | No voice/call backend or UI |
 
 ---

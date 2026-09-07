@@ -50,13 +50,19 @@ async function request(path, options = {}, { retry } = { retry: true }) {
   }
 
   const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
+  let json = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    // Non-JSON response (e.g. HTML error page, proxy 500) — fallback to raw text so callers see "Internal Server Error" instead of SyntaxError
+    json = { error: { message: text.slice(0, 500) || `Request failed (${res.status})`, code: "UNKNOWN" } };
+  }
   if (!res.ok) {
     const err = new ApiError(
-      json?.error?.message || `Request failed (${res.status})`,
+      json?.error?.message || json?.message || text.slice(0, 500) || `Request failed (${res.status})`,
       {
         status: res.status,
-        code: json?.error?.code,
+        code: json?.error?.code || json?.code,
       },
     );
     throw err;

@@ -425,18 +425,18 @@ A **Status** is a short text update (280 chars) with a background, visible to **
 **Where:** New **Status** tab — desktop icon rail (CircleDashed between Chats/Groups) + mobile bottom bar (Chats · **Status** · Groups · Spaces · Menu). Inside, a vertical list like WhatsApp Desktop: **My status** row on top, then friends' updates grouped by user (newest first). Unseen = green ring + dot, seen = grey ring.
 
 ### Create a status
-1. Open **Status** tab → **+ New** (or **+ New status** header button).
-2. Type up to **280** characters, pick one of 6 backgrounds: `default`, `accent`, `sunset`, `ocean`, `forest`, `midnight` (live preview).
-3. **Share** — appears instantly for friends; your own row shows `N updates • X ago`.
+1. Open **Status** tab → **+ New**.
+2. **Text status:** Type up to **280** characters, pick one of 6 backgrounds: `default`, `accent`, `sunset`, `ocean`, `forest`, `midnight` (live preview). **Photo status:** Click **Photo**, pick `jpg/png/webp/gif` (≤30 MB, 1 file/status), add an optional caption (280) — background is ignored and caption overlays the preview. One status = one file; multiple items = multiple statuses.
+3. **Share** — appears instantly for friends; your own row shows `N updates • Photo • X ago`. Media is stored in Appwrite (`APPWRITE_ATTACHMENTS_BUCKET_ID`) via `InputFile.fromBuffer` and served via `preview` (images).
 
-Limit: **10 per 24h** (`status-create` rate limit). Friends blocked in either direction are excluded; only accepted friends can see it. Expired rows are removed by Mongo TTL (`expireAfterSeconds:0`) without extra cleanup.
+Limit: **10 per 24h** (`status-create` rate limit). Friends blocked in either direction are excluded; only accepted friends can see it. Expired rows **and their Appwrite files** are removed hourly by `cleanupExpiredStatuses()` (`Status.expiresAt` indexed, no TTL — 60 min sweep in `server.js` deletes files then docs).
 
 ### View a status
-1. Tap a friend row — opens the **Status Viewer** (fullscreen, dark backdrop, rounded card with the background).
-2. Multi-update users auto-advance every **3s** with progress dots on top; tap outside or **X** to close, **Delete** (for your own) removes it live.
-3. Viewing marks it `isViewed` (green → grey). Owner's viewer count increments live via `status:viewed`.
+1. Tap a friend row — opens the **Status Viewer** (fullscreen `bg-black/90`).
+2. Text shows the background card; **photo** shows `object-contain` image and auto-advances after **5s**, with progress dots on top; tap outside or **X** to close, **Delete** (for your own) removes live and deletes the Appwrite file.
+3. Viewing marks it `isViewed` (green `#25D366` → grey) and increments owner's live `viewers` via `status:viewed`. Caption (if any) overlays bottom gradient.
 
-**Realtime:** `status:new` / `status:deleted` / `status:viewed` keep the vertical list in sync. Text-only in Phase 1; image/video uploads come next and will reuse Appwrite storage buckets.
+**Realtime:** `status:new` / `status:deleted` / `status:viewed` keep the vertical list in sync. Works on desktop `IconRail` + mobile `BottomTabBar` (5th item).
 
 ---
 

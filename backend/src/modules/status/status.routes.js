@@ -1,13 +1,20 @@
 import { Router } from "express";
+import multer from "multer";
 import { authenticate } from "../../middleware/auth.js";
 import { rateLimiter } from "../../middleware/rateLimiter.js";
 import * as ctrl from "./status.controller.js";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 30 * 1024 * 1024, files: 1 },
+});
 
 const router = Router();
 router.use(authenticate);
 router.post(
   "/",
   rateLimiter({ windowSeconds: 24 * 60 * 60, max: 10, keyPrefix: "status-create" }),
+  upload.single("media"),
   ctrl.create,
 );
 router.get(

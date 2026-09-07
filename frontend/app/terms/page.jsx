@@ -79,7 +79,7 @@ const SECTIONS = [
     title: "Availability & changes",
     paragraphs: [
       "Kivo aims to be fast and realtime, but it comes with no uptime promise. Single-instance realtime state, in-memory rate limiting, and IndexedDB caches mean brief disconnects, reconnect gap-fills, and queued offline sends are normal parts of the design — not guarantees of perfect delivery.",
-      "Features on the roadmap (threads, calls, pins) are plans, not commitments, and shipped behavior is documented in the Docs rather than promised here.",
+      "Features on the roadmap (calls) are plans, not commitments, and shipped behavior is documented in the Docs rather than promised here.",
     ],
   },
   {

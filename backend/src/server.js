@@ -4,6 +4,7 @@ import env from "./config/env.js";
 import { connectDb } from "./config/db.js";
 import { initSocket } from "./socket/index.js";
 import { sweepPlus } from "./modules/plus/plus.service.js";
+import { cleanupExpiredStatuses } from "./modules/status/status.service.js";
 import "./config/webpush.js";
 
 // Hourly sweep (plus a run at boot): lapse Plus claims past their 24h review
@@ -28,6 +29,19 @@ function startPlusSweep() {
   if (typeof timer.unref === "function") timer.unref();
 }
 
+function startStatusSweep() {
+  const run = async () => {
+    try {
+      await cleanupExpiredStatuses();
+    } catch (err) {
+      console.error("[status] sweep failed:", err?.message || err);
+    }
+  };
+  run();
+  const timer = setInterval(run, 60 * 60 * 1000);
+  if (typeof timer.unref === "function") timer.unref();
+}
+
 async function start() {
   await connectDb();
 
@@ -37,6 +51,7 @@ async function start() {
   initSocket(server);
 
   startPlusSweep();
+  startStatusSweep();
 
   server.listen(env.port, () => {
     console.log(`[server] listening on http://localhost:${env.port} (${env.nodeEnv})`);

@@ -5,6 +5,15 @@ import env from "../config/env.js";
 // Always responds with { success: false, error: { code, message } }.
 // Never leaks stack traces or internal error detail in production.
 export function errorHandler(err, req, res, next) {
+  // Multer file-size / file-count errors should be 400, not 500 — map them before the generic 500 path
+  if (err.code === "LIMIT_FILE_SIZE") {
+    err.statusCode = 400;
+    err.code = "FILE_TOO_LARGE";
+    err.message = `File exceeds ${(30)}MB limit`;
+  } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+    err.statusCode = 400;
+    err.code = "TOO_MANY_FILES";
+  }
   const statusCode = err.statusCode || 500;
   let code = err.code || ErrorCodes.INTERNAL_ERROR;
 

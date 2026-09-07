@@ -44,7 +44,7 @@
 - 👑 **Kivo Plus (entitlement scaffold)** — admin-granted `free`/`plus` plan (`POST /api/admin/users/:id/plan`; no payments/stripe UI) with Plus-only profile perks: **custom banner uploads** (own GIF/image up to 8 MB, `PATCH /api/v1/users/me/banner`, auto-retires old file) and **profile effects** (`none`/`glow`/`gradient-name`/`aura` — avatar halo + animated name via `profile-effects.js` / `globals.css`). Downgrade resets effects to `none`; free users are server-forced to `none`.
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
 - 🤝 **Complete friends system** — send, accept, decline, **remove** (mutual — both lists update live), search, and jump straight into a DM.
-- 🟢 **Status (WhatsApp-style, 24h)** — text statuses with 6 backgrounds, friends-only vertical feed (My status on top), green/grey rings, viewer with auto-advance + live view count, 10/day limit, TTL auto-delete, live `status:new/deleted/viewed` (media uploads Appwrite-backed next)
+- 🟢 **Status (WhatsApp-style, 24h)** — text (6 backgrounds) **or photo** (jpg/png/webp/gif ≤30 MB, 1 per status, caption 280) — friends-only vertical feed (My status on top), green/grey rings, viewer with auto-advance (photo 5s) + caption overlay, 10/day limit, hourly Appwrite file cleanup, live `status:new/deleted/viewed`
 - 📱 **Mobile-first polish** — a bottom tab bar (Chats / **Status** / Groups / Spaces / Menu) with Profile, Settings, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
 - 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
@@ -157,12 +157,12 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Voice & video calls** — LiveKit Cloud SFU in DMs and groups: incoming overlay with ringtone, floating call panel (mute/camera/devices/leave, voice→video upgrade, group grid), Ongoing-call Join pill, reconnect banner, full in-chat call history (started/declined/missed/ended cards with duration + Call back), missed-call chip + bell entry
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
 - **OAuth / social login** — Google & GitHub signup/login (`GET/POST /api/v1/auth/oauth/:provider*`), account linking in Settings (Verify with Google/GitHub), provider verification badges (Google Verified, GitHub Verified) on public profiles, native Kivo verified badge earned by linking both providers; OAuth-only accounts have no password and continue via the provider button
-- **Status (24h)** — WhatsApp Desktop-style vertical tab (My status on top + friends grouped), 6 backgrounds, friends+block filtered, `Status` TTL model `expireAfterSeconds:0`, `GET/POST /api/v1/status*` + `status:new/deleted/viewed`, unread dot, 10/day limit
+- **Status (24h) — text + photo** — WhatsApp Desktop-style vertical tab (My status on top + friends grouped), 6 text backgrounds **or photo (Appwrite `APPWRITE_ATTACHMENTS_BUCKET_ID`, `STATUS_ALLOWED_MIMES` image, 30MB)**, friends+block filtered, `Status` model `{text,background,media{fileId,bucketId,url,kind,size}}` + `expiresAt` hourly sweep (file delete then doc), `POST /` multipart `media` 10/day + `GET /feed` + `status:new/deleted/viewed`, viewer photo 5s auto-advance, unread dot
 - Animated landing page
 
 ### 🚧 Planned / Not Started
 - Re-sending a verification email automatically at signup (removed with the OTP step)
-- Status **media** (image/video via Appwrite) — text-only shipped first, media reuses attachments bucket pipeline
+- Status caption edits / privacy scopes (close friends)
 
 ---
 

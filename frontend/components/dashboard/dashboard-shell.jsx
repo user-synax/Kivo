@@ -546,6 +546,7 @@ export function DashboardShell() {
   const [statusFeed, setStatusFeed] = useState([]);
   const [myStatuses, setMyStatuses] = useState([]);
   const [statusCreateOpen, setStatusCreateOpen] = useState(false);
+  const [statusUploading, setStatusUploading] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerStatuses, setViewerStatuses] = useState([]);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -1528,9 +1529,10 @@ export function DashboardShell() {
   };
 
   // Status handlers (WhatsApp desktop vertical list)
-  const handleCreateStatus = async ({ text, background }) => {
+  const handleCreateStatus = async ({ text, background, file }) => {
+    setStatusUploading(true);
     try {
-      const res = await createStatus({ text, background });
+      const res = await createStatus({ text, background, file });
       const created = res?.data || res;
       setStatusCreateOpen(false);
       // optimistic append to mine; feed will also refresh via socket
@@ -1543,6 +1545,8 @@ export function DashboardShell() {
       }
     } catch (e) {
       window.alert(e?.message || "Could not create status");
+    } finally {
+      setStatusUploading(false);
     }
   };
   const handleViewUser = (group) => {
@@ -1973,6 +1977,7 @@ export function DashboardShell() {
                       onCreate={() => setStatusCreateOpen(true)}
                       onViewUser={handleViewUser}
                       onViewMy={handleViewMy}
+                      uploading={statusUploading}
                     />
                   </div>
                 )}
@@ -2112,7 +2117,7 @@ export function DashboardShell() {
         }}
       />
 
-      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} />
+      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} uploading={statusUploading} />
       <StatusViewer open={viewerOpen} statuses={viewerStatuses} initialIndex={viewerIndex} currentUserId={currentUser?.id} onClose={() => setViewerOpen(false)} onDelete={handleDeleteStatus} onViewed={handleViewed} />
 
       <IncomingCallOverlay />
@@ -2152,6 +2157,7 @@ export function DashboardShell() {
           onStatusCreate={() => setStatusCreateOpen(true)}
           onStatusViewUser={handleViewUser}
           onStatusViewMy={handleViewMy}
+          statusUploading={statusUploading}
         />
       </div>
 
@@ -2292,7 +2298,7 @@ export function DashboardShell() {
         }}
       />
 
-      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} />
+      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} uploading={statusUploading} />
       <StatusViewer open={viewerOpen} statuses={viewerStatuses} initialIndex={viewerIndex} currentUserId={currentUser?.id} onClose={() => setViewerOpen(false)} onDelete={handleDeleteStatus} onViewed={handleViewed} />
 
       {removeModalNode}

@@ -346,6 +346,7 @@ export function NestedSidebar({
   onStatusCreate,
   onStatusViewUser,
   onStatusViewMy,
+  statusUploading = false,
 }) {
   const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState("chats");
@@ -467,15 +468,6 @@ export function NestedSidebar({
                     New
                   </button>
                 </>
-              )}
-              {activeTab === "status" && (
-                <button
-                  type="button"
-                  onClick={onStatusCreate}
-                  className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90"
-                >
-                  + New status
-                </button>
               )}
             </div>
           </div>
@@ -635,6 +627,7 @@ export function NestedSidebar({
                   onCreate={onStatusCreate}
                   onViewUser={onStatusViewUser}
                   onViewMy={onStatusViewMy}
+                  uploading={statusUploading}
                 />
               </motion.div>
             )}

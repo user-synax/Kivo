@@ -2,6 +2,7 @@ import { Status, STATUS_TTL_MS } from "../../models/Status.js";
 import FriendRequest from "../../models/FriendRequest.js";
 import User from "../../models/User.js";
 import { badRequest, notFound, forbidden } from "../../utils/errors.js";
+import { getStorageSafe } from "../../lib/appwrite.js";
 
 async function getFriendIds(userId) {
   const accepted = await FriendRequest.find({ $or: [{ from: userId, status: "accepted" }, { to: userId, status: "accepted" }] }).select("from to").lean();
@@ -13,9 +14,18 @@ async function getFriendIds(userId) {
   return [...ids];
 }
 
-export async function createStatus({ userId, text, background }) {
+export async function createStatus({ userId, text, background, media }) {
+  const normalizedText = (text || "").trim();
+  if (!normalizedText && !media) throw badRequest("Status cannot be empty — add text or media", "EMPTY_STATUS");
   const now = new Date();
-  const doc = await Status.create({ userId, text, background: background || "default", expiresAt: new Date(now.getTime() + STATUS_TTL_MS), viewers: [] });
+  const doc = await Status.create({
+    userId,
+    text: normalizedText,
+    background: media ? "default" : background || "default",
+    media: media || null,
+    expiresAt: new Date(now.getTime() + STATUS_TTL_MS),
+    viewers: [],
+  });
   return doc;
 }
 
@@ -63,8 +73,35 @@ export async function deleteStatus({ currentUserId, statusId }) {
   const st = await Status.findById(statusId);
   if (!st) throw notFound("Status not found");
   if (String(st.userId) !== String(currentUserId)) throw forbidden("Not your status");
+  // delete Appwrite file if media exists
+  if (st.media?.fileId && st.media?.bucketId) {
+    try {
+      const store = getStorageSafe();
+      if (store) await store.deleteFile(st.media.bucketId, st.media.fileId);
+    } catch (e) {
+      console.warn("[status] file delete failed", e?.message);
+    }
+  }
   await st.deleteOne();
   return true;
+}
+
+export async function cleanupExpiredStatuses() {
+  const now = new Date();
+  const expired = await Status.find({ expiresAt: { $lte: now } }).select("media").lean();
+  for (const doc of expired) {
+    if (doc.media?.fileId && doc.media?.bucketId) {
+      try {
+        const store = getStorageSafe();
+        if (store) await store.deleteFile(doc.media.bucketId, doc.media.fileId);
+      } catch (e) {
+        console.warn("[status] cleanup file delete failed", e?.message);
+      }
+    }
+  }
+  const res = await Status.deleteMany({ expiresAt: { $lte: now } });
+  if (res.deletedCount) console.log(`[status] cleaned ${res.deletedCount} expired`);
+  return res.deletedCount;
 }
 
 export async function viewedBy({ statusId }) {

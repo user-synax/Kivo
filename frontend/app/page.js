@@ -603,13 +603,17 @@ function RoadmapSection() {
     "Notifications — in-app bell + VAPID web push",
     "Attachments — images & documents",
     "Public profiles, blocking & global search",
+    "Status — WhatsApp-style 24h photo updates",
+    "DM & group voice / video calls",
+    "Custom user themes",
+    "Friend requests & friends list",
   ];
   const next = [
-    "DM & group voice / video calls",
-    "Message threads",
-    "2FA — second-factor authentication",
-    "Pinned & saved messages",
-    "Custom user themes",
+    "Reaction on Status",
+    "Close Friends",
+    "Status for close friends",
+    "Onboarding for spaces",
+    "10+ More"
   ];
 
   return (
@@ -851,7 +855,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What isn't in Kivo yet?",
-    a: "Threads, voice/video calls, and pinned or saved messages are not built yet — see the roadmap above for what shipped versus what is coming next. The Docs page documents exactly what works today.",
+    a: "Voice and video calls are not built yet — see the roadmap above for what shipped versus what is coming next. The Docs page documents exactly what works today.",
   },
 ];
 

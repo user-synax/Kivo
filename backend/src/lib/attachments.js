@@ -4,6 +4,7 @@ import env from "../config/env.js";
 
 // Allowed MIME types
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska"]);
 const DOC_TYPES = new Set([
   "application/pdf",
   "application/msword",
@@ -31,10 +32,13 @@ export const ALLOWED_MIMES = new Set([
   ...DOC_TYPES,
   ...AUDIO_TYPES,
 ]);
+export const STATUS_ALLOWED_MIMES = new Set([...IMAGE_TYPES]);
 export const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
+export const STATUS_MAX_FILE_SIZE = 30 * 1024 * 1024;
 
 export function fileKind(mimeType) {
   if (IMAGE_TYPES.has(mimeType)) return "image";
+  if (VIDEO_TYPES.has(mimeType)) return "video";
   if (AUDIO_TYPES.has(mimeType)) return "audio";
   return "document";
 }
