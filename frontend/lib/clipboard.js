@@ -30,6 +30,10 @@ export async function copyText(text) {
 // Best-effort text summary of a message for Copy / Share / selection exports.
 export function messageText(message) {
   if (!message) return "";
+  if (message.poll?.question) {
+    const opts = (message.poll.options || []).map((o) => `• ${o.text}`).join("\n");
+    return `${message.poll.question}${opts ? `\n${opts}` : ""}`;
+  }
   if (message.content) return message.content;
   const files = message.attachments || [];
   if (files.length === 1) {

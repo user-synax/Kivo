@@ -4,6 +4,7 @@ import {
     ArrowDown,
     ArrowUp,
     Ban,
+    BarChart3,
     CheckCheck,
     ChevronLeft,
     Copy,
@@ -18,6 +19,7 @@ import {
     Palette,
     Phone,
     Pin,
+    Plus,
     Reply,
     Send,
     ShieldBan,
@@ -40,6 +42,7 @@ import { UploadPreview } from "@/components/chat/attachments";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ChatMediaDrawer } from "@/components/dashboard/chat-media-drawer";
 import { ConversationLookModal } from "@/components/dashboard/conversation-look-modal";
+import { PollCreateModal } from "@/components/polls/poll-create-modal";
 import { EmojiPicker } from "@/components/dashboard/emoji-picker";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { ThreadPanel } from "@/components/dashboard/thread-panel";
@@ -514,7 +517,7 @@ const MessageRows = React.memo(function MessageRows({
                                             : undefined
                                     }
                                     onForward={
-                                        realMessage
+                                        realMessage && m.type !== "poll"
                                             ? () => a.openForwardPicker([m])
                                             : undefined
                                     }
@@ -536,7 +539,8 @@ const MessageRows = React.memo(function MessageRows({
                                     onThread={
                                         realMessage &&
                                         !m.isDeleted &&
-                                        m.type !== "system"
+                                        m.type !== "system" &&
+                                        m.type !== "poll"
                                             ? () => a.openThread(m)
                                             : undefined
                                     }
@@ -562,6 +566,22 @@ const MessageRows = React.memo(function MessageRows({
                                     onSelectToggle={
                                         selectMode && realMessage && !m.isDeleted
                                             ? () => a.toggleSelected(m.id)
+                                            : undefined
+                                    }
+                                    pollBusy={a.pollVoteBusyId === m.id}
+                                    onPollVote={
+                                        m.type === "poll" && !m.isDeleted
+                                            ? (ids) => a.handlePollVote(m, ids)
+                                            : undefined
+                                    }
+                                    onPollRetract={
+                                        m.type === "poll" && !m.isDeleted
+                                            ? () => a.handlePollRetract(m)
+                                            : undefined
+                                    }
+                                    onPollEnd={
+                                        m.type === "poll" && !m.isDeleted
+                                            ? () => a.handlePollEnd(m)
                                             : undefined
                                     }
                                     className="!max-w-full"
@@ -750,6 +770,12 @@ export function ChatPanel({
     const noticeTimerRef = useRef(null);
     const [selectMode, setSelectMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(() => new Set());
+    const [pollOpen, setPollOpen] = useState(false);
+    const [pollBusy, setPollBusy] = useState(false);
+    const [pollVoteBusyId, setPollVoteBusyId] = useState(null);
+    const [composerMenuOpen, setComposerMenuOpen] = useState(false);
+    const composerMenuRef = useRef(null);
+    const plusBtnRef = useRef(null);
 
     // Threads: the currently open thread's root message + per-root summaries so
     // chips under root bubbles show live reply counts/participants.
@@ -784,6 +810,70 @@ export function ChatPanel({
         noticeTimerRef.current = setTimeout(() => setNotice(null), 2000);
     };
 
+    const handleCreatePoll = async ({ question, options, allowMultiple, anonymous, expiresAt }) => {
+        if (!convId) return;
+        setPollBusy(true);
+        try {
+            const data = await apiPost(`/api/v1/conversations/${convId}/messages`, {
+                poll: { question, options, allowMultiple, anonymous, expiresAt },
+            });
+            setMessages((prev) => {
+                if (prev.some((m) => m.id === data.id)) return prev;
+                return [...prev, { ...data, status: "sent" }];
+            });
+            mergeCachedMessage(convId, data).catch(() => {});
+            clearDraft(draftsKey(userId), convId);
+            setPollOpen(false);
+            setText("");
+        } catch (e) {
+            setSendError(e.message || "Could not create poll");
+            showNotice(e.message || "Could not create poll");
+        } finally {
+            setPollBusy(false);
+        }
+    };
+
+    const handlePollVote = async (message, optionIds) => {
+        if (!message?.id) return;
+        setPollVoteBusyId(message.id);
+        try {
+            const updated = await apiPost(`/api/v1/messages/${message.id}/poll/vote`, { optionIds });
+            setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+            mergeCachedMessage(convId, updated).catch(() => {});
+        } catch (e) {
+            showNotice(e.message || "Vote failed");
+        } finally {
+            setPollVoteBusyId(null);
+        }
+    };
+    const handlePollRetract = async (message) => {
+        if (!message?.id) return;
+        setPollVoteBusyId(message.id);
+        try {
+            const updated = await apiDelete(`/api/v1/messages/${message.id}/poll/vote`);
+            setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+            mergeCachedMessage(convId, updated).catch(() => {});
+        } catch (e) {
+            showNotice(e.message || "Could not retract vote");
+        } finally {
+            setPollVoteBusyId(null);
+        }
+    };
+    const handlePollEnd = async (message) => {
+        if (!message?.id) return;
+        if (!window.confirm("End this poll now? Votes will be frozen.")) return;
+        setPollVoteBusyId(message.id);
+        try {
+            const updated = await apiPost(`/api/v1/messages/${message.id}/poll/end`, {});
+            setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+            mergeCachedMessage(convId, updated).catch(() => {});
+        } catch (e) {
+            showNotice(e.message || "Could not end poll");
+        } finally {
+            setPollVoteBusyId(null);
+        }
+    };
+
     // Reset per-conversation action state and load the pinned banner when the
     // open conversation changes.
     // biome-ignore lint/correctness/useExhaustiveDependencies: helper reads convId from closure; convId is the only real trigger.
@@ -793,6 +883,9 @@ export function ChatPanel({
         setForwardOpen(false);
         setLookOpen(false);
         setMediaOpen(false);
+        setPollOpen(false);
+        setPollVoteBusyId(null);
+        setComposerMenuOpen(false);
         setOngoingCall(null);
         setPinnedMessages([]);
         setThreadRoot(null);
@@ -842,6 +935,48 @@ export function ChatPanel({
             socket.off("call:ended", refresh);
         };
     }, [socket, convId]);
+
+    // Poll live updates — vote changes and expiry/end fan out as poll:updated/ended so every tab sees tallies without polling.
+    useEffect(() => {
+        if (!socket || !convId) return undefined;
+        const onPollUpdate = (payload) => {
+            if (!payload || !payload.id) return;
+            setMessages((prev) => {
+                const idx = prev.findIndex((m) => m.id === payload.id);
+                if (idx < 0) return prev;
+                const next = [...prev];
+                next[idx] = { ...prev[idx], ...payload };
+                return next;
+            });
+            mergeCachedMessage(convId, payload).catch(() => {});
+        };
+        socket.on("poll:updated", onPollUpdate);
+        socket.on("poll:ended", onPollUpdate);
+        return () => {
+            socket.off("poll:updated", onPollUpdate);
+            socket.off("poll:ended", onPollUpdate);
+        };
+    }, [socket, convId]);
+
+    // Composer + menu — close on outside click / Escape, reset per conversation
+    useEffect(() => {
+        if (!composerMenuOpen) return undefined;
+        const onDoc = (e) => {
+            const t = e.target;
+            if (composerMenuRef.current?.contains(t)) return;
+            if (plusBtnRef.current?.contains(t)) return;
+            setComposerMenuOpen(false);
+        };
+        const onKey = (e) => {
+            if (e.key === "Escape") setComposerMenuOpen(false);
+        };
+        document.addEventListener("mousedown", onDoc);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onDoc);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, [composerMenuOpen]);
 
     // Leave select mode with Escape.
     useEffect(() => {
@@ -2846,6 +2981,10 @@ export function ChatPanel({
         handleUnblock,
         handleBlock,
         toggleSelected,
+        handlePollVote,
+        handlePollRetract,
+        handlePollEnd,
+        pollVoteBusyId,
     };
 
     return (
@@ -3558,16 +3697,22 @@ export function ChatPanel({
                                                     }
                                                 />
                                             )}
-                                            <button
-                                                type="button"
-                                                aria-label="Attach file"
-                                                onClick={() =>
-                                                    fileInputRef.current?.click()
-                                                }
-                                                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-                                            >
-                                                <Paperclip className="h-5 w-5" />
-                                            </button>
+                                            <div className="relative flex shrink-0 items-center">
+                                                <button
+                                                    ref={plusBtnRef}
+                                                    type="button"
+                                                    aria-label="More actions"
+                                                    aria-expanded={composerMenuOpen}
+                                                    aria-haspopup="dialog"
+                                                    onClick={() => setComposerMenuOpen((v) => !v)}
+                                                    disabled={!canPost}
+                                                    className={`flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${composerMenuOpen ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
+                                                >
+                                                    <Plus
+                                                        className={`h-5 w-5 transition-transform duration-200 ${composerMenuOpen ? "rotate-45" : "rotate-0"}`}
+                                                    />
+                                                </button>
+                                            </div>
 
                                             <button
                                                 ref={micBtnRef}
@@ -3840,6 +3985,85 @@ export function ChatPanel({
                         onConversationUpdate(conv);
                 }}
             />
+
+            <PollCreateModal open={pollOpen} onClose={() => setPollOpen(false)} onCreate={handleCreatePoll} busy={pollBusy} me={currentUser} />
+
+            {/* Composer + action drawer — default drawer style, file + poll */}
+            <AnimatePresence>
+                {composerMenuOpen && (
+                    <div className="fixed inset-0 z-[65] flex items-end justify-center sm:items-center">
+                        <motion.button
+                            type="button"
+                            aria-label="Close composer menu"
+                            onClick={() => setComposerMenuOpen(false)}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] sm:bg-black/30"
+                        />
+                        <motion.div
+                            ref={composerMenuRef}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Attach or poll"
+                            initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.96, y: 8 }}
+                            animate={isMobile ? { y: "0%" } : { opacity: 1, scale: 1, y: 0 }}
+                            exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.96, y: 8 }}
+                            transition={isMobile ? { type: "spring", damping: 28, stiffness: 380 } : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                            className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] sm:rounded-2xl"
+                        >
+                            <div className="hidden h-1.5 w-9 self-center rounded-full bg-[var(--border)] max-sm:mt-2 max-sm:block" aria-hidden />
+                            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+                                <h3 className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">Add to message</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setComposerMenuOpen(false)}
+                                    className="flex size-8 items-center justify-center rounded-full hover:bg-[var(--hover)]"
+                                    aria-label="Close"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 p-4 sm:gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setComposerMenuOpen(false);
+                                        if (!canPost || uploadBusy) return;
+                                        fileInputRef.current?.click();
+                                    }}
+                                    disabled={!canPost || uploadBusy}
+                                    className="group flex flex-col items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-5 text-center transition-colors hover:border-[var(--accent)]/30 hover:bg-[var(--hover)] disabled:opacity-40"
+                                >
+                                    <span className="flex size-12 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)] transition-colors group-hover:bg-[var(--accent)] group-hover:text-white">
+                                        <Paperclip className="h-6 w-6" />
+                                    </span>
+                                    <span className="text-sm font-medium text-[var(--text-primary)]">Attach files</span>
+                                    <span className="text-[11px] leading-tight text-[var(--text-muted)]">Images, docs, up to 10</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setComposerMenuOpen(false);
+                                        if (!canPost || isOffline) return;
+                                        setPollOpen(true);
+                                    }}
+                                    disabled={!canPost || isOffline}
+                                    className="group flex flex-col items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-5 text-center transition-colors hover:border-[var(--accent)]/30 hover:bg-[var(--hover)] disabled:opacity-40"
+                                >
+                                    <span className="flex size-12 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)] transition-colors group-hover:bg-[var(--accent)] group-hover:text-white">
+                                        <BarChart3 className="h-6 w-6" />
+                                    </span>
+                                    <span className="text-sm font-medium text-[var(--text-primary)]">Create poll</span>
+                                    <span className="text-[11px] leading-tight text-[var(--text-muted)]">2–8 options, live votes</span>
+                                </button>
+                            </div>
+                            <p className="px-4 pb-3 text-center text-[11px] text-[var(--text-muted)]">Polls work in DMs, groups & Space channels</p>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Forward picker — choose a conversation for the queued message(s) */}
             {forwardOpen && (

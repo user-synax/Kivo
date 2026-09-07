@@ -8,6 +8,15 @@ import { getRequesterPlan } from "../../lib/plus.js";
 import { emitToConversation, roomName } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 
+function genPollOptionId() {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function isPollExpired(poll) {
+  if (!poll || !poll.expiresAt) return false;
+  return new Date(poll.expiresAt).getTime() < Date.now();
+}
+
 // Public message shape returned to clients and used as the socket payload base.
 // When a viewer id is supplied the per-user `saved` flag (Saved messages) is
 // resolved from savedBy — used by conversation-scoped list endpoints so bubble
@@ -20,12 +29,20 @@ export function publicMessage(message, viewerId = null) {
           (s) => (s.userId || s).toString() === viewerId.toString(),
         )
       : false;
+  // compute viewer's vote selections for poll (even if anonymous, viewer sees own picks)
+  let viewerVotes = [];
+  if (obj.poll && viewerId) {
+    for (const opt of obj.poll.options || []) {
+      if ((opt.voters || []).some((v) => v.toString() === viewerId.toString())) viewerVotes.push(opt.id);
+    }
+  }
+  const isDeleted = !!obj.isDeleted;
   const base = {
     id: obj._id.toString(),
     conversationId: obj.conversationId.toString(),
     senderId: obj.senderId.toString(),
     type: obj.type || "text",
-    content: obj.isDeleted ? "" : obj.content,
+    content: isDeleted ? "" : obj.content,
     replyToMessageId: obj.replyToMessageId ? obj.replyToMessageId.toString() : null,
     threadId: obj.threadId ? obj.threadId.toString() : null,
     reactions: (obj.reactions || []).map((r) => ({
@@ -58,6 +75,25 @@ export function publicMessage(message, viewerId = null) {
     isDeleted: obj.isDeleted,
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
+    poll: !isDeleted && obj.poll
+      ? {
+          question: obj.poll.question,
+          options: (obj.poll.options || []).map((o) => ({
+            id: o.id,
+            text: o.text,
+            count: (o.voters || []).length,
+            voters: obj.poll.anonymous ? [] : (o.voters || []).map((v) => v.toString()),
+          })),
+          allowMultiple: !!obj.poll.allowMultiple,
+          anonymous: !!obj.poll.anonymous,
+          expiresAt: obj.poll.expiresAt ? new Date(obj.poll.expiresAt).toISOString() : null,
+          isClosed: !!obj.poll.isClosed,
+          totalVotes: obj.poll.totalVotes || 0,
+          createdBy: obj.poll.createdBy ? obj.poll.createdBy.toString() : null,
+          viewerVotes,
+          isExpired: obj.poll.expiresAt ? new Date(obj.poll.expiresAt).getTime() < Date.now() : false,
+        }
+      : null,
   };
   return base;
 }
@@ -229,9 +265,104 @@ export async function createMessage({
   attachments,
   audioDuration,
   forwardedFromId,
+  poll,
 }) {
   const conversation = await assertMembership(conversationId, userId);
   await assertDmNotBlocked(conversation, userId);
+
+  // Poll handling — polls are exclusive: no content/attachments/forward/thread/reply mix (enforced by Zod, re-checked)
+  if (poll) {
+    if (replyToMessageId || threadId || forwardedFromId || (attachments && attachments.length)) {
+      throw badRequest("Poll messages cannot carry attachments, forwards, threads or replies", "POLL_INVALID");
+    }
+    const { plan: senderPlan, limits: senderLimits } = await getRequesterPlan(User, userId);
+    if (poll.options.length > senderLimits.pollOptionsMax) {
+      if (senderPlan !== "plus") {
+        throw forbidden(
+          `Free polls allow up to ${senderLimits.pollOptionsMax} options — upgrade to Plus for ${senderLimits.pollOptionsMax + 3}`,
+          "PLUS_REQUIRED",
+        );
+      }
+      throw badRequest(`Too many options (max ${senderLimits.pollOptionsMax})`, "POLL_TOO_MANY_OPTIONS");
+    }
+    if (poll.allowMultiple && !senderLimits.pollAllowMultiple) {
+      throw forbidden("Multiple-choice polls are Plus only", "PLUS_REQUIRED");
+    }
+    if (poll.anonymous && !senderLimits.pollAllowAnonymous) {
+      throw forbidden("Anonymous polls are Plus only", "PLUS_REQUIRED");
+    }
+    let expiresAt = poll.expiresAt ? new Date(poll.expiresAt) : null;
+    if (expiresAt) {
+      if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+        throw badRequest("Invalid expiry", "POLL_BAD_EXPIRY");
+      }
+      const maxMs = senderLimits.pollDurationMaxMs;
+      if (expiresAt.getTime() - Date.now() > maxMs) {
+        if (senderPlan !== "plus") {
+          throw forbidden("Free polls last up to 24h — Plus allows 7 days", "PLUS_REQUIRED");
+        }
+        throw badRequest("Expiry too far", "POLL_BAD_EXPIRY");
+      }
+    }
+    // announcement guard: polls follow same rule as text posts
+    if (conversation.type === "space_channel" && conversation.spaceId && conversation.channelId) {
+      const space = await Space.findById(conversation.spaceId).select("members channels");
+      if (space) {
+        const ch = space.channels.id(conversation.channelId);
+        if (ch && ch.type === "announcement") {
+          const member = space.members.find((m) => m.userId.toString() === userId);
+          if (!member || !["owner", "admin"].includes(member.role)) {
+            throw forbidden("Only admins can post in announcement channels", "ANNOUNCEMENT_ONLY_ADMIN");
+          }
+        }
+      }
+    }
+    // active poll cap per conversation
+    const activePolls = await Message.countDocuments({
+      conversationId,
+      type: "poll",
+      isDeleted: false,
+      "poll.isClosed": false,
+      $or: [{ "poll.expiresAt": null }, { "poll.expiresAt": { $gt: new Date() } }],
+    });
+    if (activePolls >= senderLimits.pollsPerConversationActive) {
+      if (senderPlan !== "plus") {
+        throw forbidden(`Free chats hold ${senderLimits.pollsPerConversationActive} active polls — upgrade to Plus`, "PLUS_REQUIRED");
+      }
+      throw badRequest("Too many active polls", "POLL_LIMIT");
+    }
+    const pollDoc = {
+      question: poll.question.trim(),
+      options: poll.options.map((t) => ({ id: genPollOptionId(), text: t.trim(), voters: [] })),
+      allowMultiple: !!poll.allowMultiple,
+      anonymous: !!poll.anonymous,
+      expiresAt,
+      isClosed: false,
+      totalVotes: 0,
+      createdBy: new mongoose.Types.ObjectId(userId),
+    };
+    const message = await Message.create({
+      conversationId,
+      senderId: userId,
+      content: pollDoc.question,
+      type: "poll",
+      poll: pollDoc,
+      replyToMessageId: null,
+      threadId: null,
+      mentions: [],
+      attachments: [],
+      audioDuration: null,
+      forwardedFromId: null,
+      forwardedFromName: null,
+    });
+    await Conversation.findByIdAndUpdate(conversationId, { lastMessageAt: message.createdAt });
+    const payload = publicMessage(message, userId);
+    emitToConversation(conversationId, "message:new", payload);
+    notificationsService
+      .createForMessage({ message, conversation, inThread: false })
+      .catch((err) => console.error("[notifications] createForMessage failed:", err?.message || err));
+    return payload;
+  }
 
   // Per-plan send caps (server-side; zod allows the Plus max, we clamp here).
   const { plan: senderPlan, limits: senderLimits } = await getRequesterPlan(
@@ -332,10 +463,13 @@ export async function createMessage({
       throw badRequest("Invalid forwardedFromId", "INVALID_FORWARD");
     }
     const source = await Message.findById(forwardedFromId).select(
-      "conversationId senderId content attachments audioDuration isDeleted",
+      "conversationId senderId content attachments audioDuration isDeleted type poll",
     );
     if (!source || source.isDeleted) {
       throw notFound("Original message not found", "MESSAGE_NOT_FOUND");
+    }
+    if (source.type === "poll") {
+      throw badRequest("Polls can't be forwarded yet", "POLL_FORWARD");
     }
     const sourceConv = await Conversation.findById(source.conversationId).select("participants");
     const sourceParticipants = (sourceConv?.participants || []).map((p) => p.toString());
@@ -399,6 +533,7 @@ export async function createMessage({
 export async function editMessage({ messageId, userId, content }) {
   const message = await Message.findById(messageId);
   if (!message) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+  if (message.type === "poll") throw badRequest("Polls can't be edited", "POLL_EDIT");
   const conversation = await assertMembership(message.conversationId.toString(), userId);
   await assertDmNotBlocked(conversation, userId);
 
@@ -768,6 +903,9 @@ export async function toggleReaction({ messageId, userId, emoji }) {
   if (message.isDeleted) {
     throw badRequest("Cannot react to a deleted message", "ALREADY_DELETED");
   }
+  if (message.type === "poll") {
+    throw badRequest("Polls can't be reacted to", "POLL_REACTION");
+  }
 
   const existing = message.reactions.find(
     (r) => r.userId.toString() === userId && r.emoji === emoji
@@ -919,4 +1057,113 @@ export async function markUnread({ conversationId, userId, messageId }) {
   // Also push an updated conversation-type event so sidebar badge updates live
   // (listConversations will count correctly on next fetch, but live push is nicer)
   return payload;
+}
+
+export async function votePoll({ messageId, userId, optionIds }) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) throw badRequest("Invalid message id", "INVALID_ID");
+  const message = await Message.findById(messageId);
+  if (!message || message.isDeleted) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+  if (message.type !== "poll" || !message.poll) throw badRequest("Not a poll", "NOT_POLL");
+  await assertMembership(message.conversationId.toString(), userId);
+  const conv = await Conversation.findById(message.conversationId).select("type participants");
+  await assertDmNotBlocked(conv, userId);
+  if (message.poll.isClosed) throw badRequest("Poll is closed", "POLL_CLOSED");
+  if (isPollExpired(message.poll)) {
+    message.poll.isClosed = true;
+    message.markModified("poll");
+    await message.save();
+    throw badRequest("Poll has expired", "POLL_EXPIRED");
+  }
+  const { limits } = await getRequesterPlan(User, userId);
+  const validIds = new Set(message.poll.options.map((o) => o.id));
+  const deduped = [...new Set(optionIds)];
+  for (const id of deduped) if (!validIds.has(id)) throw badRequest("Invalid option", "POLL_BAD_OPTION");
+  if (!message.poll.allowMultiple && deduped.length !== 1) throw badRequest("Pick exactly one option", "POLL_SINGLE_CHOICE");
+  if (deduped.length > 1 && !limits.pollAllowMultiple) throw forbidden("Multiple-choice is Plus only", "PLUS_REQUIRED");
+  // remove existing votes for this user across all options
+  let totalVotes = message.poll.totalVotes || 0;
+  for (const opt of message.poll.options) {
+    const had = opt.voters.some((v) => v.toString() === userId.toString());
+    if (had) {
+      opt.voters = opt.voters.filter((v) => v.toString() !== userId.toString());
+      totalVotes -= 1;
+    }
+  }
+  // add new votes
+  for (const id of deduped) {
+    const opt = message.poll.options.find((o) => o.id === id);
+    opt.voters.push(new mongoose.Types.ObjectId(userId));
+    totalVotes += 1;
+  }
+  message.poll.totalVotes = totalVotes;
+  message.markModified("poll");
+  await message.save();
+  const payload = publicMessage(message);
+  emitToConversation(message.conversationId.toString(), "poll:updated", payload);
+  return payload;
+}
+
+export async function retractVote({ messageId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) throw badRequest("Invalid message id", "INVALID_ID");
+  const message = await Message.findById(messageId);
+  if (!message || message.isDeleted) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+  if (message.type !== "poll" || !message.poll) throw badRequest("Not a poll", "NOT_POLL");
+  await assertMembership(message.conversationId.toString(), userId);
+  if (message.poll.isClosed || isPollExpired(message.poll)) throw badRequest("Poll is closed", "POLL_CLOSED");
+  let removed = 0;
+  for (const opt of message.poll.options) {
+    const before = opt.voters.length;
+    opt.voters = opt.voters.filter((v) => v.toString() !== userId.toString());
+    removed += before - opt.voters.length;
+  }
+  message.poll.totalVotes = Math.max(0, (message.poll.totalVotes || 0) - removed);
+  message.markModified("poll");
+  await message.save();
+  const payload = publicMessage(message);
+  emitToConversation(message.conversationId.toString(), "poll:updated", payload);
+  return payload;
+}
+
+export async function endPoll({ messageId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) throw badRequest("Invalid message id", "INVALID_ID");
+  const message = await Message.findById(messageId);
+  if (!message || message.isDeleted) throw notFound("Message not found", "MESSAGE_NOT_FOUND");
+  if (message.type !== "poll" || !message.poll) throw badRequest("Not a poll", "NOT_POLL");
+  await assertMembership(message.conversationId.toString(), userId);
+  const isCreator = message.senderId.toString() === userId.toString();
+  let isAdmin = false;
+  const conv = await Conversation.findById(message.conversationId).select(
+    "type admins createdBy spaceId channelId participants",
+  );
+  if (conv.type === "group") isAdmin = conv.admins.some((a) => a.toString() === userId.toString());
+  if (conv.type === "space_channel" && conv.spaceId) {
+    const space = await Space.findById(conv.spaceId).select("members");
+    const member = space?.members.find((m) => m.userId.toString() === userId.toString());
+    if (member && ["owner", "admin"].includes(member.role)) isAdmin = true;
+  }
+  if (!isCreator && !isAdmin) throw forbidden("Only the poll creator or an admin can end it", "NOT_ALLOWED");
+  if (message.poll.isClosed) return publicMessage(message, userId);
+  message.poll.isClosed = true;
+  message.markModified("poll");
+  await message.save();
+  const payload = publicMessage(message);
+  emitToConversation(message.conversationId.toString(), "poll:ended", payload);
+  return payload;
+}
+
+export async function closeExpiredPolls() {
+  const now = new Date();
+  const expired = await Message.find({
+    type: "poll",
+    isDeleted: false,
+    "poll.isClosed": false,
+    "poll.expiresAt": { $ne: null, $lte: now },
+  }).limit(100);
+  for (const msg of expired) {
+    msg.poll.isClosed = true;
+    msg.markModified("poll");
+    await msg.save();
+    emitToConversation(msg.conversationId.toString(), "poll:ended", publicMessage(msg));
+  }
+  return expired.length;
 }

@@ -58,7 +58,7 @@ async function searchMessages(userId, query, limit) {
     conversationId: { $in: convIds },
     content: regex,
     isDeleted: false,
-    type: "text",
+    type: { $in: ["text", "poll"] },
     threadId: null, // thread replies aren't in the main timeline to jump to
   })
     .sort({ createdAt: -1 })

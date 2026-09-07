@@ -33,6 +33,11 @@ export const PLAN_LIMITS = Object.freeze({
     channelsPerSpaceMax: 10,
     groupCallMaxParticipants: 5,
     searchLimitPerCategory: 5,
+    pollsPerConversationActive: 5,
+    pollOptionsMax: 5,
+    pollDurationMaxMs: 24 * 60 * 60 * 1000, // 1 day
+    pollAllowMultiple: false,
+    pollAllowAnonymous: false,
   }),
   plus: Object.freeze({
     messageMaxLength: 8000,
@@ -48,6 +53,11 @@ export const PLAN_LIMITS = Object.freeze({
     channelsPerSpaceMax: 30,
     groupCallMaxParticipants: 25,
     searchLimitPerCategory: 20,
+    pollsPerConversationActive: 20,
+    pollOptionsMax: 8,
+    pollDurationMaxMs: 7 * 24 * 60 * 60 * 1000, // 7 days
+    pollAllowMultiple: true,
+    pollAllowAnonymous: true,
   }),
 });
 

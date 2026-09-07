@@ -54,6 +54,7 @@ import { MentionToken } from "@/components/mentions/mention-token";
 import { firstUrl, normalizeUrl } from "@/lib/links";
 import { emojiCount } from "@/lib/emoji";
 import { Avatar } from "@/components/dashboard/avatar";
+import { PollCard } from "@/components/polls/poll-card";
 
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?'\"`>]+$/;
@@ -428,6 +429,10 @@ export function MessageBubble({
   selectMode = false,
   selected = false,
   onSelectToggle,
+  pollBusy = false,
+  onPollVote,
+  onPollRetract,
+  onPollEnd,
 }) {
   const pinned = Boolean(message?.pinnedAt);
   const canShare = isMobile && typeof navigator !== "undefined" && !!navigator.share;
@@ -508,8 +513,9 @@ export function MessageBubble({
     };
   }, []);
 
+  const isPollForLike = message.type === "poll";
   const triggerLike = useCallback(() => {
-    if (deleted || isEditing || selectMode) return;
+    if (deleted || isEditing || selectMode || isPollForLike) return;
     const now = Date.now();
     // throttle: ignore if liked < 500ms ago (spam / accidental triple tap)
     if (now - likeCooldownRef.current < 500) return;
@@ -523,7 +529,7 @@ export function MessageBubble({
     animTimerRef.current = setTimeout(() => setLikeAnimKey(0), 850);
 
     onReact?.("❤️");
-  }, [deleted, isEditing, selectMode, onReact]);
+  }, [deleted, isEditing, selectMode, isPollForLike, onReact]);
 
   const handleDoubleClick = useCallback(
     (e) => {
@@ -580,10 +586,12 @@ export function MessageBubble({
     [deleted, isEditing, selectMode, triggerLike],
   );
 
+  // Polls never render big emoji or link previews
+  const isPoll = message.type === "poll" && !!message.poll;
   // WhatsApp-style big emoji: 1-3 emoji, no text/attachments/quote/forward.
   // Renders chromeless (ghost) at large size instead of inside a bubble.
   const bigEmojiCount =
-    !deleted && !isEditing && message.content && !replyTo
+    !deleted && !isEditing && !isPoll && message.content && !replyTo
       ? emojiCount(message.content)
       : 0;
   const isBigEmoji =
@@ -660,6 +668,15 @@ export function MessageBubble({
               <span className="opacity-20 bg-transparent bg-red-800">
                 This message was deleted
               </span>
+            ) : isPoll ? (
+              <PollCard
+                poll={message.poll}
+                mine={mine}
+                busy={pollBusy}
+                onVote={(ids) => onPollVote?.(ids)}
+                onRetract={() => onPollRetract?.()}
+                onEnd={() => onPollEnd?.()}
+              />
             ) : (
               <>
                 {message.forwardedFromName && (
@@ -777,20 +794,22 @@ export function MessageBubble({
       </ContextMenuTrigger>
 
       <ContextMenuContent ariaLabel="Message actions">
-        {/* One-tap quick reactions — no extra tap to open the picker */}
-        <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
-          {REACTION_EMOJIS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              aria-label={`React ${e}`}
-              onClick={() => onReact?.(e)}
-              className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
-            >
-              {e}
-            </button>
-          ))}
-        </div>
+        {/* One-tap quick reactions — no extra tap to open the picker (hidden for polls) */}
+        {message.type !== "poll" && (
+          <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
+            {REACTION_EMOJIS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                aria-label={`React ${e}`}
+                onClick={() => onReact?.(e)}
+                className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        )}
         {onCopy && (
           <ContextMenuItem onSelect={() => onCopy?.()}>
             <Copy className="h-4 w-4" />
@@ -807,22 +826,26 @@ export function MessageBubble({
             {message?.saved ? "Unsave" : "Save message"}
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={() => onReply?.(message)}>
-          <Reply className="h-4 w-4" />
-          Reply
-        </ContextMenuItem>
-        {onThread && (
+        {message.type !== "poll" && (
+          <ContextMenuItem onSelect={() => onReply?.(message)}>
+            <Reply className="h-4 w-4" />
+            Reply
+          </ContextMenuItem>
+        )}
+        {onThread && message.type !== "poll" && (
           <ContextMenuItem onSelect={() => onThread?.(message)}>
             <MessageSquare className="h-4 w-4" />
             Thread
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
-          <FaceGrinning className="h-4 w-4" />
-          More reactions
-        </ContextMenuItem>
+        {message.type !== "poll" && (
+          <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
+            <FaceGrinning className="h-4 w-4" />
+            More reactions
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
-        {onForward && (
+        {onForward && message.type !== "poll" && (
           <ContextMenuItem onSelect={() => onForward?.(message)}>
             <Forward className="h-4 w-4" />
             Forward
@@ -882,7 +905,7 @@ export function MessageBubble({
             )}
           </>
         )}
-        {mine && (
+        {mine && message.type !== "poll" && (
           <>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={() => onEdit?.()}>
@@ -895,11 +918,20 @@ export function MessageBubble({
             </ContextMenuItem>
           </>
         )}
+        {mine && message.type === "poll" && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem tone="destructive" onSelect={() => onDelete?.()}>
+              <Trash className="h-4 w-4" />
+              Delete poll
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
 
       {/* Reaction chips — in normal flow under the bubble, aligned to its side
-          so they never overlap the corner. */}
-      {message.reactions && message.reactions.length > 0 && (
+          so they never overlap the corner. Hidden for polls */}
+      {message.reactions && message.reactions.length > 0 && message.type !== "poll" && (
         <div
           className={cn(
             "mt-1 flex max-w-[78%] flex-wrap gap-1",

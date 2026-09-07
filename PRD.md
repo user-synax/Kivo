@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.8
-**Last Updated:** September 4, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls Complete)
+**Version:** 2.9
+**Last Updated:** September 7, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls Complete)
 
 ---
 
@@ -47,6 +47,7 @@ Kivo
         └── Messages
             └── Attachments (images, docs & voice) ✅
             └── Threads (side-panel replies) ✅
+            └── Polls (interactive vote) ✅
 ```
 
 | Concept | Description | Scope |
@@ -124,6 +125,7 @@ Kivo
 | **Jump-to-Latest Pill** | **Complete** | Floating "N new"/"Latest" button when scrolled off the live edge; auto-scroll only pins at the bottom (or for own sends) — history reading never yanked |
 | **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits last message; **mobile swipe-to-reply** (right swipe ~45 px with direction lock, haptics) |
 | **Status (24h text+photo)** | **Complete** | `Status` model `text 280` + `background` 6 + `media{fileId,bucketId,url,kind:image,mimeType,size,fileName}` nullable + `viewers[]` + `expiresAt` 24h (indexed, hourly `cleanupExpiredStatuses()` deletes Appwrite file then doc — no orphaned bucket files); friends-only feed `GET /api/v1/status/feed` (grouped by user, `isViewed`, blocked both-ways) + `GET /me` + `POST /` multipart `media` 10/day (`STATUS_ALLOWED_MIMES` image 30MB, `uploadAttachment` to `APPWRITE_ATTACHMENTS_BUCKET_ID`, caption=`text`) + `POST /:id/view` 60/min + `DELETE /:id` (Appwrite delete); WhatsApp Desktop vertical tab (`StatusTab` Photo label + `StatusRing` green/grey) + mobile `BottomTabBar` 5th item, `StatusCreateModal` 6 backgrounds + Photo picker with preview, `StatusViewer` image 5s auto-advance + caption overlay + live `status:new/deleted/viewed` |
+| **Polls** | **Complete** | Interactive polls in any DM/group/Space channel: `Message.type poll` + `poll{question, options[]{id,text,voters}, allowMultiple, anonymous, expiresAt, isClosed, totalVotes}`; free 5 opts/24h/single, Plus 8/7d/multi+anon; `POST /conversations/:id/messages {poll}` + `POST /messages/:id/poll/vote`/`DELETE` retract + `POST /poll/end`; `poll:updated`/`poll:ended` realtime, 60s `closeExpiredPolls()` sweep; search includes polls |
 | Voice / Video Calls | **Not started** | No voice/call backend or UI |
 
 ---

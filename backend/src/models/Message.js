@@ -30,6 +30,42 @@ const savedBySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Poll — lives inside a Message with type "poll". No separate collection.
+const pollOptionSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    text: { type: String, required: true, trim: true, maxlength: 60 },
+    voters: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+const pollSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: true, trim: true, maxlength: 140 },
+    options: {
+      type: [pollOptionSchema],
+      required: true,
+      validate: {
+        validator(v) {
+          return Array.isArray(v) && v.length >= 2 && v.length <= 8;
+        },
+        message: "Poll needs 2-8 options",
+      },
+    },
+    allowMultiple: { type: Boolean, default: false },
+    anonymous: { type: Boolean, default: false },
+    expiresAt: { type: Date, default: null },
+    isClosed: { type: Boolean, default: false },
+    totalVotes: { type: Number, default: 0 },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  },
+  { _id: false }
+);
+
 // A single chat message. Messages are stored in their own collection (not
 // embedded in the Conversation) and referenced by conversationId so a thread can
 // grow without bloating the conversation document.
@@ -56,7 +92,8 @@ const messageSchema = new mongoose.Schema(
     // "text" for normal chat messages; "system" for centered info notices
     // (e.g. a member was removed from a group). System messages render as a
     // non-interactive chip and never bump unread counts.
-    type: { type: String, enum: ["text", "system"], default: "text" },
+    // "poll" for interactive voting messages — poll payload holds question/options.
+    type: { type: String, enum: ["text", "system", "poll"], default: "text" },
 
     // Optional reference to the message this one replies to with an inline
     // quote (rendered flat in the main timeline). Distinct from threads.
@@ -146,6 +183,9 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+
+    // Poll payload — only when type === "poll"
+    poll: { type: pollSchema, default: null },
   },
   { timestamps: true }
 );
@@ -160,6 +200,10 @@ messageSchema.index({ conversationId: 1, pinnedAt: -1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });
 // Saved feed per user: "messages this user saved, newest save first".
 messageSchema.index({ "savedBy.userId": 1, "savedBy.savedAt": -1 });
+
+// Poll indexes
+messageSchema.index({ type: 1, "poll.expiresAt": 1 });
+messageSchema.index({ type: 1, "poll.isClosed": 1 });
 
 // Text index for full-text search on message content.
 messageSchema.index({ content: "text" }, { weights: { content: 1 } });

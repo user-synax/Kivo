@@ -5,6 +5,7 @@ import { connectDb } from "./config/db.js";
 import { initSocket } from "./socket/index.js";
 import { sweepPlus } from "./modules/plus/plus.service.js";
 import { cleanupExpiredStatuses } from "./modules/status/status.service.js";
+import { closeExpiredPolls } from "./modules/messages/messages.service.js";
 import "./config/webpush.js";
 
 // Hourly sweep (plus a run at boot): lapse Plus claims past their 24h review
@@ -42,6 +43,19 @@ function startStatusSweep() {
   if (typeof timer.unref === "function") timer.unref();
 }
 
+function startPollSweep() {
+  const run = async () => {
+    try {
+      const n = await closeExpiredPolls();
+      if (n > 0) console.log(`[poll] closed ${n} expired poll(s)`);
+    } catch (err) {
+      console.error("[poll] sweep failed:", err?.message || err);
+    }
+  };
+  const timer = setInterval(run, 60 * 1000);
+  if (typeof timer.unref === "function") timer.unref();
+}
+
 async function start() {
   await connectDb();
 
@@ -52,6 +66,7 @@ async function start() {
 
   startPlusSweep();
   startStatusSweep();
+  startPollSweep();
 
   server.listen(env.port, () => {
     console.log(`[server] listening on http://localhost:${env.port} (${env.nodeEnv})`);

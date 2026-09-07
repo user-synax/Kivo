@@ -31,4 +31,9 @@ router.post("/:id/pin", messagesController.pinMessage);
 router.post("/:id/reactions", reactionLimiter, messagesController.addReaction);
 router.delete("/:id/reactions/:reactionId", reactionLimiter, messagesController.removeReaction);
 
+const pollLimiter = rateLimiter({ keyPrefix: "poll-vote", windowSeconds: 60, max: 60 });
+router.post("/:id/poll/vote", pollLimiter, messagesController.votePoll);
+router.delete("/:id/poll/vote", pollLimiter, messagesController.retractVote);
+router.post("/:id/poll/end", messagesController.endPoll);
+
 export default router;

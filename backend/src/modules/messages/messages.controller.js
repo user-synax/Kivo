@@ -9,6 +9,7 @@ import {
   saveSchema,
   listMessagesQuerySchema,
   markUnreadSchema,
+  pollVoteSchema,
 } from "./messages.validation.js";
 import * as messagesService from "./messages.service.js";
 
@@ -26,7 +27,7 @@ export const listMessages = asyncHandler(async (req, res) => {
 });
 
 export const createMessage = asyncHandler(async (req, res) => {
-  const { content, replyToMessageId, threadId, attachments, audioDuration, forwardedFromId } = parseBody(createMessageSchema, req.body);
+  const { content, replyToMessageId, threadId, attachments, audioDuration, forwardedFromId, poll } = parseBody(createMessageSchema, req.body);
   const message = await messagesService.createMessage({
     conversationId: req.params.id,
     userId: req.user.userId,
@@ -36,6 +37,7 @@ export const createMessage = asyncHandler(async (req, res) => {
     attachments,
     audioDuration,
     forwardedFromId,
+    poll,
   });
   res.status(201).json({ success: true, data: message });
 });
@@ -146,4 +148,30 @@ export const markUnread = asyncHandler(async (req, res) => {
     messageId,
   });
   res.status(200).json({ success: true, data: result });
+});
+
+export const votePoll = asyncHandler(async (req, res) => {
+  const { optionIds } = parseBody(pollVoteSchema, req.body);
+  const message = await messagesService.votePoll({
+    messageId: req.params.id,
+    userId: req.user.userId,
+    optionIds,
+  });
+  res.status(200).json({ success: true, data: message });
+});
+
+export const retractVote = asyncHandler(async (req, res) => {
+  const message = await messagesService.retractVote({
+    messageId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: message });
+});
+
+export const endPoll = asyncHandler(async (req, res) => {
+  const message = await messagesService.endPoll({
+    messageId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: message });
 });
