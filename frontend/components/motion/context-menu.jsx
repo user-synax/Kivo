@@ -209,6 +209,7 @@ export function ContextMenuTrigger({ children, disabled = false, className }) {
         const origin = { x: event.clientX, y: event.clientY };
         touchOrigin.current = origin;
         longPressTimer.current = setTimeout(() => {
+            if (navigator.vibrate) try { navigator.vibrate(20); } catch {}
             context.openAt(origin, "touch");
             longPressTimer.current = null;
             touchOrigin.current = null;

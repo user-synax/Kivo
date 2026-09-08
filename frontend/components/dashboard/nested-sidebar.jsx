@@ -53,6 +53,57 @@ function EmptyState({ message, icon: Icon = SearchX, actionLabel, onAction }) {
 function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
   const { name, lastMessage, time, unread, online, type, isPlus } = conversation;
   const isGroup = type === "group";
+  const [isPressing, setIsPressing] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
+  const holdTimer = useRef(null);
+  const pressOrigin = useRef(null);
+  const clearHold = () => {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+  };
+  useEffect(() => () => clearHold(), []);
+  const handlePointerDown = (e) => {
+    if (e.pointerType === "touch" || e.pointerType === "pen") {
+      pressOrigin.current = { x: e.clientX, y: e.clientY };
+      setIsPressing(true);
+      setIsHolding(false);
+      clearHold();
+      holdTimer.current = setTimeout(() => {
+        setIsHolding(true);
+        setIsPressing(false);
+      }, 380);
+    }
+  };
+  const handlePointerMove = (e) => {
+    if (!pressOrigin.current || (e.pointerType !== "touch" && e.pointerType !== "pen")) return;
+    const dx = e.clientX - pressOrigin.current.x;
+    const dy = e.clientY - pressOrigin.current.y;
+    if (Math.hypot(dx, dy) > 12) {
+      setIsPressing(false);
+      setIsHolding(false);
+      clearHold();
+      pressOrigin.current = null;
+    }
+  };
+  const handlePointerUp = () => {
+    const wasHolding = isHolding;
+    setIsPressing(false);
+    clearHold();
+    pressOrigin.current = null;
+    if (wasHolding) {
+      // keep holding highlight briefly while menu animates open (aria-expanded will take over)
+      setTimeout(() => setIsHolding(false), 800);
+    } else {
+      setIsHolding(false);
+    }
+  };
+  const handlePointerCancel = () => {
+    setIsPressing(false);
+    setIsHolding(false);
+    clearHold();
+    pressOrigin.current = null;
+  };
+  const pressBg = isHolding ? "bg-[var(--accent-soft)]" : isPressing ? "bg-[var(--hover)]" : "";
+  const pressScale = isPressing ? "scale-[0.98]" : isHolding ? "scale-[0.992]" : "";
   return (
     <ContextMenu>
       <ContextMenuTrigger>
@@ -60,8 +111,13 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
           type="button"
           onClick={onSelect}
           aria-current={selected ? "true" : undefined}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onPointerLeave={handlePointerCancel}
           style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}
-          className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-200 ease-[${EASE_STR}] motion-reduce:animate-none animate-[t-item-in_0.4s_${EASE_STR}_both] hover:cursor-pointer ${
+          className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left select-none touch-manipulation [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] will-change-transform transition-[transform,background-color] duration-150 ease-[${EASE_STR}] motion-reduce:animate-none animate-[t-item-in_0.4s_${EASE_STR}_both] hover:cursor-pointer active:bg-[var(--hover)] active:scale-[0.98] aria-expanded:bg-[var(--accent-soft)] aria-expanded:scale-[0.992] ${pressBg} ${pressScale} ${
             selected ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
           }`}
         >
