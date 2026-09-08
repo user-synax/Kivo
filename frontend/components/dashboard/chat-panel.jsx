@@ -22,6 +22,7 @@ import {
   Pin,
   Plus,
   Reply,
+  Search,
   Send,
   ShieldBan,
   Trash,
@@ -314,6 +315,8 @@ const MessageRows = React.memo(function MessageRows({
   blockBusy,
   isMobile,
   ctx,
+  searchQuery,
+  activeSearchId,
 }) {
   const a = ctx.current;
   const { userId, otherId, isGroup, isChannel, isDm } = a;
@@ -404,6 +407,20 @@ const MessageRows = React.memo(function MessageRows({
     const hasCopy = !m.isDeleted && Boolean(m.content || m.attachments?.length);
     const realMessage = Boolean(m.id && !m.tempId);
     const senderUsername = a.membersById[m.senderId]?.username || null;
+    const searchActive = Boolean(searchQuery && String(searchQuery).trim());
+    const searchHaystack = searchActive
+      ? [
+          m.content || "",
+          m.poll?.question || "",
+          Array.isArray(m.poll?.options) ? m.poll.options.map((o) => o.text).join(" ") : "",
+          Array.isArray(m.attachments) ? m.attachments.map((a) => a.fileName || "").join(" ") : "",
+          m.forwardedFromName || "",
+        ]
+          .join(" ")
+          .toLowerCase()
+      : "";
+    const isSearchMatch = searchActive && searchHaystack.includes(String(searchQuery).trim().toLowerCase());
+    const isActiveSearch = activeSearchId && m.id === activeSearchId;
 
     return (
       <React.Fragment key={m.id}>
@@ -413,7 +430,9 @@ const MessageRows = React.memo(function MessageRows({
           id={`msg-${m.id}`}
           className={`t-msg-in group flex w-full flex-col ${mine ? "items-end" : "items-start"} ${
             i === 0 ? "" : grouped ? "mt-0.5" : "mt-2"
-          }`}
+          } ${isActiveSearch ? "rounded-xl ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-base)]" : ""} ${searchActive && !isSearchMatch ? "opacity-40" : ""}`}
+          data-search-match={isSearchMatch ? "true" : undefined}
+          data-active-search={isActiveSearch ? "true" : undefined}
         >
           {showSender && (
             <span
@@ -559,6 +578,8 @@ const MessageRows = React.memo(function MessageRows({
                   className="!max-w-full"
                   contentClassName="max-w-full"
                   isMobile={isMobile}
+                  searchQuery={searchQuery}
+                  isActiveSearch={isActiveSearch}
                 />
               </SwipeToReply>
             </div>
@@ -744,6 +765,11 @@ export function ChatPanel({
   const [showScheduledList, setShowScheduledList] = useState(false);
   const composerMenuRef = useRef(null);
   const plusBtnRef = useRef(null);
+  // In-chat search (Ctrl+F scoped to this conversation)
+  const [inChatSearchOpen, setInChatSearchOpen] = useState(false);
+  const [inChatQuery, setInChatQuery] = useState("");
+  const [inChatCurrentIdx, setInChatCurrentIdx] = useState(0);
+  const inChatSearchInputRef = useRef(null);
 
   // Threads: the currently open thread's root message + per-root summaries so
   // chips under root bubbles show live reply counts/participants.
@@ -769,6 +795,96 @@ export function ChatPanel({
     setThreadRoot(null);
     refreshThreadSummaries();
   };
+
+  // ── In-chat search (Ctrl+F scoped) ──────────────────────────────────────
+  const getMessageSearchText = (m) => {
+    if (!m || m.isDeleted) return "";
+    const parts = [];
+    if (m.content) parts.push(m.content);
+    if (m.poll?.question) parts.push(m.poll.question);
+    if (Array.isArray(m.poll?.options)) parts.push(m.poll.options.map((o) => o.text).join(" "));
+    if (Array.isArray(m.attachments)) parts.push(m.attachments.map((a) => a.fileName || "").join(" "));
+    if (m.forwardedFromName) parts.push(m.forwardedFromName);
+    return parts.join(" ");
+  };
+
+  const inChatMatches = useMemo(() => {
+    const q = inChatQuery.trim().toLowerCase();
+    if (!q) return [];
+    const out = [];
+    messages.forEach((m, idx) => {
+      if (m.type === "system") return;
+      const hay = getMessageSearchText(m).toLowerCase();
+      if (hay.includes(q)) out.push({ id: m.id, index: idx });
+    });
+    return out;
+  }, [messages, inChatQuery]);
+
+  const activeInChatId = inChatMatches[inChatCurrentIdx]?.id || null;
+
+  const openInChatSearch = () => {
+    setInChatSearchOpen(true);
+    setInChatCurrentIdx(0);
+    requestAnimationFrame(() => inChatSearchInputRef.current?.focus?.());
+    requestAnimationFrame(() => inChatSearchInputRef.current?.select?.());
+  };
+  const closeInChatSearch = () => {
+    setInChatSearchOpen(false);
+    setInChatQuery("");
+    setInChatCurrentIdx(0);
+  };
+  const stepInChat = (dir) => {
+    if (!inChatMatches.length) return;
+    setInChatCurrentIdx((prev) => {
+      const n = inChatMatches.length;
+      const next = (prev + dir + n) % n;
+      const targetId = inChatMatches[next]?.id;
+      if (targetId) {
+        const el = document.getElementById(`msg-${targetId}`);
+        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      return next;
+    });
+  };
+
+  // Auto-scroll to first match when query changes
+  useEffect(() => {
+    if (!inChatSearchOpen) return;
+    setInChatCurrentIdx(0);
+    if (inChatMatches.length) {
+      const firstId = inChatMatches[0].id;
+      requestAnimationFrame(() => {
+        document.getElementById(`msg-${firstId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+  }, [inChatQuery, inChatSearchOpen, inChatMatches.length]);
+
+  // Ctrl/Cmd+F → open in-chat search when a conversation is open
+  useEffect(() => {
+    if (!convId) return undefined;
+    const onKey = (e) => {
+      const isF = e.key === "f" || e.key === "F";
+      if ((e.ctrlKey || e.metaKey) && isF && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        if (inChatSearchOpen) {
+          inChatSearchInputRef.current?.focus?.();
+          inChatSearchInputRef.current?.select?.();
+        } else {
+          openInChatSearch();
+        }
+      } else if (e.key === "Escape" && inChatSearchOpen) {
+        e.preventDefault();
+        closeInChatSearch();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [convId, inChatSearchOpen]);
+
+  // Close search when conversation changes
+  useEffect(() => {
+    closeInChatSearch();
+  }, [convId]);
 
   const showNotice = (text) => {
     setNotice(text);
@@ -3074,6 +3190,18 @@ export function ChatPanel({
             <LayoutGrid className="h-5 w-5" />
           </button>
         )}
+        {conversation && (
+          <button
+            type="button"
+            onClick={openInChatSearch}
+            aria-label="Search in conversation"
+            title="Search in conversation (Ctrl+F)"
+            aria-pressed={inChatSearchOpen}
+            className={`max-md:hidden flex size-9 items-center justify-center rounded-nav border transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)] ${inChatSearchOpen ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] text-[var(--text-muted)]"}`}
+          >
+            <Search className="h-5 w-5" />
+          </button>
+        )}
         {(isGroup || isChannel) && onOpenGroupSettings && (
           <button
             type="button"
@@ -3174,6 +3302,17 @@ export function ChatPanel({
                   >
                     <LayoutGrid className="h-4 w-4" /> Shared media
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMore(false);
+                      openInChatSearch();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--hover)]"
+                  >
+                    <Search className="h-4 w-4" /> Search in conversation
+                  </button>
                   {isDm && otherId && (
                     <>
                       <div className="mx-3 my-1 h-px bg-[var(--border)]" />
@@ -3215,6 +3354,95 @@ export function ChatPanel({
           </div>
         )}
       </div>
+
+      {/* In-chat search — Ctrl+F scoped, highlight inside MessageRows without leaving panel */}
+      <AnimatePresence>
+        {inChatSearchOpen && (
+          <motion.div
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 flex shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2"
+            role="search"
+            aria-label="Search in conversation"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-base)] px-3 py-1.5 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]">
+              <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
+              <input
+                ref={inChatSearchInputRef}
+                value={inChatQuery}
+                onChange={(e) => setInChatQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (e.shiftKey) stepInChat(-1);
+                    else stepInChat(1);
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    stepInChat(-1);
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    stepInChat(1);
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeInChatSearch();
+                  } else if (e.key === "F" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                  }
+                }}
+                placeholder="Search in conversation…"
+                aria-label="Search in conversation"
+                className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+              />
+              {inChatQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setInChatQuery("")}
+                  aria-label="Clear search"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <span
+              aria-live="polite"
+              className={`hidden shrink-0 text-[12px] tabular-nums sm:inline ${inChatQuery && inChatMatches.length === 0 ? "text-[var(--destructive)]" : "text-[var(--text-muted)]"}`}
+            >
+              {inChatQuery ? (inChatMatches.length ? `${inChatCurrentIdx + 1} / ${inChatMatches.length}` : "No matches") : `${messages.filter((m) => m.type !== "system" && !m.isDeleted).length} messages`}
+            </span>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => stepInChat(-1)}
+                disabled={!inChatMatches.length}
+                aria-label="Previous match (Shift+Enter)"
+                className="flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => stepInChat(1)}
+                disabled={!inChatMatches.length}
+                aria-label="Next match (Enter)"
+                className="flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={closeInChatSearch}
+                aria-label="Close search (Escape)"
+                className="flex size-8 items-center justify-center rounded-full border border-transparent bg-[var(--bg-base)] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Ongoing-call Join pill — late join / rejoin after a drop */}
       {ongoingCall?.active && !inThisCall && (
@@ -3300,6 +3528,8 @@ export function ChatPanel({
             blockBusy={blockBusy}
             isMobile={isMobile}
             ctx={rowsCtx}
+            searchQuery={inChatQuery}
+            activeSearchId={activeInChatId}
           />
           {typing && (
             <div className="flex items-center gap-2 px-1 text-[12px] text-[var(--text-muted)]">

@@ -59,6 +59,38 @@ import { firstUrl, normalizeUrl } from "@/lib/links";
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?'"`>]+$/;
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+export function highlightTextNodes(text, query, isActive) {
+  if (!query || !text || typeof text !== "string") return text;
+  const q = String(query).trim();
+  if (!q) return text;
+  const re = new RegExp(`(${escapeRegExp(q)})`, "gi");
+  const parts = text.split(re);
+  if (parts.length <= 1) return text;
+  return parts.map((part, i) => {
+    if (part.toLowerCase() === q.toLowerCase()) {
+      return isActive ? (
+        <mark
+          key={`hl-${i}`}
+          className="rounded-[4px] bg-[var(--accent)] px-0.5 py-0 text-[var(--on-accent,white)]"
+        >
+          {part}
+        </mark>
+      ) : (
+        <mark
+          key={`hl-${i}`}
+          className="rounded-[4px] bg-[var(--accent)]/25 px-0.5 py-0 text-[var(--accent)]"
+        >
+          {part}
+        </mark>
+      );
+    }
+    return <span key={`hl-${i}`}>{part}</span>;
+  });
+}
+
 function LinkToken({ href, label }) {
   return (
     <a
@@ -133,6 +165,8 @@ function MessageContent({
   participants = [],
   isUserOnline,
   onOpenProfile,
+  searchQuery,
+  isActiveSearch,
 }) {
   if (!content) return null;
 
@@ -194,15 +228,17 @@ function MessageContent({
 
   return (
     <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-      {parts.map((p, i) =>
-        typeof p === "string" ? (
-          <span key={`t-${i}`}>{p}</span>
-        ) : (
+      {parts.map((p, i) => {
+        if (typeof p === "string") {
+          const h = highlightTextNodes(p, searchQuery, isActiveSearch);
+          return <span key={`t-${i}`}>{h}</span>;
+        }
+        return (
           <span key={`n-${i}`} className="contents">
             {p}
           </span>
-        ),
-      )}
+        );
+      })}
     </span>
   );
 }
@@ -434,6 +470,8 @@ export function MessageBubble({
   onPollRetract,
   onPollEnd,
   onViewHistory,
+  searchQuery,
+  isActiveSearch,
 }) {
   const pinned = Boolean(message?.pinnedAt);
   const canShare =
@@ -617,7 +655,8 @@ export function MessageBubble({
             pressing && !selectMode && "scale-[0.98]",
             isReplying && "border-l-2 border-[var(--accent)]",
             selected && "ring-2 ring-[var(--accent)]",
-            message?.isFrequentlyForwarded && !selected && "ring-1 ring-amber-500/40",
+            isActiveSearch && "ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg-base)] shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]",
+            message?.isFrequentlyForwarded && !selected && !isActiveSearch && "ring-1 ring-amber-500/40",
             selectMode && "cursor-pointer",
             className,
           )}
@@ -679,6 +718,8 @@ export function MessageBubble({
                 onVote={(ids) => onPollVote?.(ids)}
                 onRetract={() => onPollRetract?.()}
                 onEnd={() => onPollEnd?.()}
+                searchQuery={searchQuery}
+                isActiveSearch={isActiveSearch}
               />
             ) : (
               <>
@@ -706,6 +747,8 @@ export function MessageBubble({
                   participants={participants}
                   isUserOnline={isUserOnline}
                   onOpenProfile={onOpenProfile}
+                  searchQuery={searchQuery}
+                  isActiveSearch={isActiveSearch}
                 />
                 {!deleted && !isEditing && !isBigEmoji && message.content ? (
                   <LinkPreview url={firstUrl(message.content)} />

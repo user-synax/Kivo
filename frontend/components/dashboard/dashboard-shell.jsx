@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Palette, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Palette, Search, Settings } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
@@ -369,7 +369,7 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
 
 // Mobile hamburger tab: the bottom bar stays to Chats / Groups / Spaces / Menu;
 // Profile, Appearance and Settings open as pushed screens from here.
-function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings }) {
+function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch }) {
   const displayName =
     currentUser?.displayName || currentUser?.username || currentUser?.email || "Account";
   return (
@@ -395,6 +395,21 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
               <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
                 {currentUser?.username ? `@${currentUser.username}` : "Your public profile"}
               </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white">
+              <Search className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Search</span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Messages, people & spaces</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>
@@ -2102,6 +2117,7 @@ export function DashboardShell() {
                     onOpenProfile={() => setMobileTab("profile")}
                     onOpenAppearance={() => setMobileTab("appearance")}
                     onOpenSettings={() => setMobileTab("settings")}
+                    onOpenSearch={() => setSearchOpen(true)}
                   />
                 )}
                 {mobileTab === "settings" && (

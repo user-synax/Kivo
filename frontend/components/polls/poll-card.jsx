@@ -8,7 +8,35 @@ import {
   pollTotalVotes,
 } from "@/lib/polls";
 
-export function PollCard({ poll, mine, onVote, onRetract, onEnd, busy }) {
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function hl(text, query, isActive) {
+  if (!query || !text) return text;
+  const q = String(query).trim();
+  if (!q) return text;
+  const re = new RegExp(`(${escapeRegExp(q)})`, "gi");
+  const parts = String(text).split(re);
+  if (parts.length <= 1) return text;
+  return parts.map((p, i) =>
+    p.toLowerCase() === q.toLowerCase() ? (
+      <mark
+        key={i}
+        className={
+          isActive
+            ? "rounded-[4px] bg-[var(--accent)] px-0.5 text-[var(--on-accent,white)]"
+            : "rounded-[4px] bg-[var(--accent)]/25 px-0.5 text-[var(--accent)]"
+        }
+      >
+        {p}
+      </mark>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
+  );
+}
+
+export function PollCard({ poll, mine, onVote, onRetract, onEnd, busy, searchQuery, isActiveSearch }) {
   const [pending, setPending] = useState(null);
   if (!poll) return null;
   const total = pollTotalVotes(poll);
@@ -52,7 +80,7 @@ export function PollCard({ poll, mine, onVote, onRetract, onEnd, busy }) {
       <div className="p-3 pb-2">
         <div className="flex items-start justify-between gap-2">
           <p className="break-words text-sm font-semibold leading-snug text-[var(--text-primary)] [overflow-wrap:anywhere]">
-            {poll.question}
+            {hl(poll.question, searchQuery, isActiveSearch)}
           </p>
           {poll.anonymous && (
             <span className="flex shrink-0 items-center gap-1 text-[10px] text-[var(--text-muted)]">
@@ -101,7 +129,7 @@ export function PollCard({ poll, mine, onVote, onRetract, onEnd, busy }) {
                     {selected && <Check className="h-3 w-3" />}
                   </span>
                   <span className="break-words [overflow-wrap:anywhere]">
-                    {opt.text}
+                    {hl(opt.text, searchQuery, isActiveSearch)}
                   </span>
                 </span>
                 <span className="shrink-0 text-[11px] font-medium text-[var(--text-muted)]">
