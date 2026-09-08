@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Palette, Settings } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession, getToken, setSession } from "@/lib/auth";
@@ -541,6 +541,114 @@ export function DashboardShell() {
   // re-renders after the user saves a new avatar style in the edit modal.
   const [currentUser, setCurrentUser] = useState(() => getSession());
   const refreshUser = useCallback(() => setCurrentUser(getSession()), []);
+
+  // ── Pinned / Muted conversation prefs (per-user, localStorage — WhatsApp-style) ──
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const uid = getSession()?.id;
+      if (!uid) return new Set();
+      const raw = localStorage.getItem(`kivo:pinned:${uid}`);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+  });
+  const [mutedIds, setMutedIds] = useState(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const uid = getSession()?.id;
+      if (!uid) return new Set();
+      const raw = localStorage.getItem(`kivo:muted:${uid}`);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+  });
+  // reload when user switches
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    try {
+      const p = localStorage.getItem(`kivo:pinned:${currentUser.id}`);
+      setPinnedIds(new Set(p ? JSON.parse(p) : []));
+      const m = localStorage.getItem(`kivo:muted:${currentUser.id}`);
+      setMutedIds(new Set(m ? JSON.parse(m) : []));
+    } catch {}
+  }, [currentUser?.id]);
+
+  const handlePin = useCallback((conversationId) => {
+    if (!conversationId) return;
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(conversationId)) next.delete(conversationId);
+      else next.add(conversationId);
+      try {
+        const uid = currentUser?.id || getSession()?.id;
+        if (uid) localStorage.setItem(`kivo:pinned:${uid}`, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  }, [currentUser?.id]);
+
+  const handleMute = useCallback((conversationId) => {
+    if (!conversationId) return;
+    setMutedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(conversationId)) next.delete(conversationId);
+      else next.add(conversationId);
+      try {
+        const uid = currentUser?.id || getSession()?.id;
+        if (uid) localStorage.setItem(`kivo:muted:${uid}`, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  }, [currentUser?.id]);
+
+  const handleViewInfo = useCallback((conversation) => {
+    if (!conversation) return;
+    if (conversation.type === "dm") {
+      const other = otherParticipant(conversation, currentUser?.id);
+      const username = other?.username;
+      if (username) {
+        setProfileUsernameSearch(username);
+      } else {
+        const otherId = other?.id || other?._id;
+        if (otherId) {
+          apiGet(`/api/v1/users/${otherId}`).then((u) => {
+            if (u?.username) setProfileUsernameSearch(u.username);
+          }).catch(() => {});
+        }
+      }
+    } else if (conversation.type === "group") {
+      setSelectedId(conversation.id);
+      setShowGroupSettings(true);
+    }
+  }, [currentUser?.id]);
+
+  const handleBlockFromList = useCallback(async (conversation) => {
+    if (!conversation || conversation.type !== "dm") return;
+    const other = otherParticipant(conversation, currentUser?.id);
+    const otherId = other?.id || other?._id || other;
+    const otherName = participantName(other);
+    if (!otherId) return;
+    const isBlocked = Boolean(conversation.isBlockedByMe);
+    const confirmMsg = isBlocked
+      ? `Unblock ${otherName}? You will again receive messages from them.`
+      : `Block ${otherName}? You won't receive messages from them and they won't see your status.`;
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      if (isBlocked) {
+        await apiPost(`/api/v1/users/${otherId}/unblock`, {});
+      } else {
+        await apiPost(`/api/v1/users/${otherId}/block`, {});
+      }
+      setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, isBlockedByMe: !isBlocked } : c));
+    } catch (e) {
+      window.alert(e?.message || `Could not ${isBlocked ? 'unblock' : 'block'} user`);
+    }
+  }, [currentUser?.id]);
+
+  // keep refs for socket handlers (avoid stale closure)
+  const pinnedIdsRef = useRef(pinnedIds);
+  const mutedIdsRef = useRef(mutedIds);
+  useEffect(() => { pinnedIdsRef.current = pinnedIds; }, [pinnedIds]);
+  useEffect(() => { mutedIdsRef.current = mutedIds; }, [mutedIds]);
 
   // ── Status (WhatsApp desktop-style vertical list) ──────────────────────────
   const [statusFeed, setStatusFeed] = useState([]);
@@ -1093,18 +1201,23 @@ export function DashboardShell() {
       // (e.g. "you are now friends") never chime.
       try {
         if (msg.senderId !== currentUser?.id && msg.type !== "system") {
-          const conv = conversationsRef.current.find((c) => c.id === msg.conversationId);
-          const convType = conv ? conv.type : "dm"; // brand-new conv assumed dm
-          const isVisible = typeof document !== "undefined" ? document.visibilityState === "visible" : true;
-          const isFocused = msg.conversationId === selectedIdRef.current;
-          const mentioned = (msg.mentions || []).includes(currentUser?.id);
-          if (convType === "dm") {
-            if (!isVisible || !isFocused) playCue("directMessages");
-          } else if (mentioned) {
-            if (!isVisible || !isFocused) playCue("mentions");
-          } else if (!isVisible && !isFocused) {
-            if (convType === "group") playCue("groupMessages");
-            else if (convType === "space_channel") playCue("spaceMessages");
+          // muted conversations never chime (WhatsApp-style) — unless it's a direct mention and user wants it, keep muted silent for now
+          if (mutedIdsRef.current.has(msg.conversationId)) {
+            // skip cue
+          } else {
+            const conv = conversationsRef.current.find((c) => c.id === msg.conversationId);
+            const convType = conv ? conv.type : "dm"; // brand-new conv assumed dm
+            const isVisible = typeof document !== "undefined" ? document.visibilityState === "visible" : true;
+            const isFocused = msg.conversationId === selectedIdRef.current;
+            const mentioned = (msg.mentions || []).includes(currentUser?.id);
+            if (convType === "dm") {
+              if (!isVisible || !isFocused) playCue("directMessages");
+            } else if (mentioned) {
+              if (!isVisible || !isFocused) playCue("mentions");
+            } else if (!isVisible && !isFocused) {
+              if (convType === "group") playCue("groupMessages");
+              else if (convType === "space_channel") playCue("spaceMessages");
+            }
           }
         }
       } catch {}
@@ -1680,7 +1793,24 @@ export function DashboardShell() {
 
   const selected = conversations.find((c) => c.id === selectedId) || null;
   const selectedSpace = selected?.type === "space_channel" ? spaces.find((s) => s.id === selected.spaceId) || null : null;
-  const listItems = conversations.map((c) => toListItem(c, currentUser, spaces));
+  const listItems = useMemo(() => {
+    const items = conversations.map((c) => {
+      const base = toListItem(c, currentUser, spaces);
+      return {
+        ...base,
+        pinned: pinnedIds.has(c.id),
+        muted: mutedIds.has(c.id),
+        isBlockedByMe: c.isBlockedByMe,
+        participants: c.participants,
+      };
+    });
+    // pinned first, preserve original order otherwise (stable sort)
+    return [...items].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return 0;
+    });
+  }, [conversations, currentUser, spaces, pinnedIds, mutedIds]);
   const tabUnread = {
     chats: conversations.some((c) => c.type === "dm" && (c.unreadCount || 0) > 0),
     groups: conversations.some((c) => c.type === "group" && (c.unreadCount || 0) > 0),
@@ -1919,6 +2049,10 @@ export function DashboardShell() {
                       onSavedOpen={() => setSavedOpen(true)}
                       onMarkUnread={(id) => handleMarkUnread(id)}
                       onRemoveConversation={handleRemoveConversation}
+                      onPin={handlePin}
+                      onMute={handleMute}
+                      onViewInfo={handleViewInfo}
+                      onBlock={handleBlockFromList}
                     />
                   </div>
                 )}
@@ -1945,6 +2079,10 @@ export function DashboardShell() {
                       onSavedOpen={() => setSavedOpen(true)}
                       onMarkUnread={(id) => handleMarkUnread(id)}
                       onRemoveConversation={handleRemoveConversation}
+                      onPin={handlePin}
+                      onMute={handleMute}
+                      onViewInfo={handleViewInfo}
+                      onBlock={handleBlockFromList}
                     />
                   </div>
                 )}
@@ -2147,6 +2285,10 @@ export function DashboardShell() {
           onSavedOpen={() => setSavedOpen(true)}
           onMarkUnread={(id) => handleMarkUnread(id)}
           onRemoveConversation={handleRemoveConversation}
+          onPin={handlePin}
+          onMute={handleMute}
+          onViewInfo={handleViewInfo}
+          onBlock={handleBlockFromList}
           onCompose={handleCompose}
           onNewGroup={handleNewGroup}
           onCreateSpace={() => setShowSpaceCreate(true)}

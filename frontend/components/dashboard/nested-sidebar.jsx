@@ -1,19 +1,27 @@
 "use client";
 
 import {
+  Bell,
+  BellOff,
   Bookmark,
   ChevronDown,
   Compass,
+  Flag,
   Hash,
+  Info,
   Layers,
   Mail,
   Megaphone,
   MessageCircle,
+  Pin,
+  PinOff,
   Plus,
   Search,
   SearchCode,
   SearchX,
+  ShieldBan,
   Trash2,
+  User,
   UserPlus,
   Users,
   X,
@@ -50,9 +58,12 @@ function EmptyState({ message, icon: Icon = SearchX, actionLabel, onAction }) {
   );
 }
 
-function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, index }) {
+function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRemove, onPin, onMute, onViewInfo, onBlock, index }) {
   const { name, lastMessage, time, unread, online, type, isPlus } = conversation;
   const isGroup = type === "group";
+  const isPinned = Boolean(conversation.pinned);
+  const isMuted = Boolean(conversation.muted);
+  const isBlocked = Boolean(conversation.isBlockedByMe);
   const [isPressing, setIsPressing] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
   const holdTimer = useRef(null);
@@ -90,7 +101,6 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
     clearHold();
     pressOrigin.current = null;
     if (wasHolding) {
-      // keep holding highlight briefly while menu animates open (aria-expanded will take over)
       setTimeout(() => setIsHolding(false), 800);
     } else {
       setIsHolding(false);
@@ -130,30 +140,59 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
               url={conversation.avatarUrl}
               isPlus={Boolean(isPlus)}
             />
+            {isPinned && (
+              <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] shadow-sm ring-2 ring-[var(--bg-elevated)]">
+                <Pin className="h-2.5 w-2.5" strokeWidth={2.5} />
+              </span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-sm font-medium text-[var(--text-primary)]">{name}</span>
-              {time && <span className="shrink-0 text-[11px] text-[var(--text-muted)]">{time}</span>}
+              <span className="flex shrink-0 items-center gap-1">
+                {isPinned && <Pin className="h-3 w-3 text-[var(--text-muted)]" strokeWidth={2} />}
+                {isMuted && <BellOff className="h-3 w-3 text-[var(--text-muted)]" strokeWidth={2} />}
+                {time && <span className="text-[11px] text-[var(--text-muted)]">{time}</span>}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-[13px] text-[var(--text-muted)]">
                 {lastMessage || (isGroup ? "Group conversation" : "")}
               </span>
-              {unread > 0 && (
+              {unread > 0 ? (
                 <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[11px] font-semibold text-[var(--on-accent)]">
                   {unread}
                 </span>
-              )}
+              ) : isMuted ? (
+                <BellOff className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)] opacity-60" />
+              ) : null}
             </div>
           </div>
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent ariaLabel="Conversation actions">
+        <ContextMenuItem onSelect={() => onPin?.(conversation.id)}>
+          {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+          {isPinned ? "Unpin" : "Pin to top"}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onMute?.(conversation.id)}>
+          {isMuted ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+          {isMuted ? "Unmute" : "Mute"}
+        </ContextMenuItem>
         <ContextMenuItem onSelect={() => onMarkUnread?.(conversation.id)}>
           <Mail className="h-4 w-4" />
           Mark as unread
         </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onViewInfo?.(conversation)}>
+          {isGroup ? <Info className="h-4 w-4" /> : <User className="h-4 w-4" />}
+          {isGroup ? "Group info" : "View profile"}
+        </ContextMenuItem>
+        {conversation.type === "dm" && onBlock && (
+          <ContextMenuItem tone={isBlocked ? "default" : "destructive"} onSelect={() => onBlock?.(conversation)}>
+            <ShieldBan className="h-4 w-4" />
+            {isBlocked ? "Unblock" : "Block"}
+          </ContextMenuItem>
+        )}
         {onRemove && (conversation.type === "dm" || conversation.type === "group") && (
           <ContextMenuItem tone="destructive" onSelect={() => onRemove?.(conversation)}>
             <Trash2 className="h-4 w-4" />
@@ -165,7 +204,7 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
   );
 }
 
-function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove }) {
+function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove, onPin, onMute, onViewInfo, onBlock }) {
   if (!items.length) return <EmptyState message="No conversations yet" />;
   return (
     <div className="w-full min-w-0 space-y-0.5">
@@ -177,6 +216,10 @@ function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove }) {
           onSelect={() => onSelect(c.id)}
           onMarkUnread={onMarkUnread}
           onRemove={onRemove}
+          onPin={onPin}
+          onMute={onMute}
+          onViewInfo={onViewInfo}
+          onBlock={onBlock}
           index={i}
         />
       ))}
@@ -392,6 +435,10 @@ export function NestedSidebar({
   onSavedOpen,
   onMarkUnread,
   onRemoveConversation,
+  onPin,
+  onMute,
+  onViewInfo,
+  onBlock,
   onCompose,
   onNewGroup,
   onCreateSpace,
@@ -594,6 +641,10 @@ export function NestedSidebar({
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}
                     onRemove={onRemoveConversation}
+                    onPin={onPin}
+                    onMute={onMute}
+                    onViewInfo={onViewInfo}
+                    onBlock={onBlock}
                   />
                 )}
               </motion.div>
@@ -625,6 +676,10 @@ export function NestedSidebar({
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}
                     onRemove={onRemoveConversation}
+                    onPin={onPin}
+                    onMute={onMute}
+                    onViewInfo={onViewInfo}
+                    onBlock={onBlock}
                   />
                 )}
               </motion.div>
