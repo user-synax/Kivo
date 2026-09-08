@@ -963,6 +963,7 @@ Do not expect these in the current MVP:
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
 - Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
 - Video attachments (voice messages are built; video is not)
+- **Disappearing messages (24h/7d auto-delete)** — **removed 2026-09-08** from frontend & backend (`disappearingDuration`/`expireAt`/`message:expired`/`conversation:disappearing` deleted) — messages now persist until soft-deleted by sender
 
 ---
 

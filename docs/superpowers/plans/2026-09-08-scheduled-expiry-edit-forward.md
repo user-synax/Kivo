@@ -1,10 +1,12 @@
 # Scheduled + Expiry + Edit History + Forward Limit Implementation Plan
 
+> **⚠️ REMOVED 2026-09-08: Per-chat disappearing messages have been fully removed from Kivo — `Conversation.disappearingDuration`, `Message.expireAt`, `message:expired`, `conversation:disappearing`, `expiredMessages` job, and all UI controls (timer menu/select) were deleted from frontend & backend. This plan remains for historical reference. The remaining three enhancements (scheduled send, edit-history viewer, forward-count/limit) are still valid and shipped.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship four chat enhancements - scheduled send, per-chat disappearing messages, edit-history viewer, and forward-count/limit indicator - using existing Message/Conversation patterns without breaking realtime flow.
+**Goal:** Ship four chat enhancements - scheduled send, ~~per-chat disappearing messages~~ **[REMOVED]**, edit-history viewer, and forward-count/limit indicator - using existing Message/Conversation patterns without breaking realtime flow.
 
-**Architecture:** Extend `Message` with `scheduledAt`/`status`/`expireAt`/`editHistory`/`forwardCount`, `Conversation` with `disappearingDuration`; add zod validation + service methods + cron TTL jobs + socket events (`message:scheduled`, `message:expired`, `message:edit-history`), reuse `chat-panel.jsx` composer + `message-bubble.jsx` for UI.
+**Architecture:** Extend `Message` with `scheduledAt`/`status`/`editHistory`/`forwardCount` ~~+ `expireAt`~~, `Conversation` ~~with `disappearingDuration`~~ **[REMOVED]**; add zod validation + service methods + ~~cron TTL jobs~~ scheduled job + socket events (`message:scheduled`, ~~`message:expired`~~, `message:edit-history`), reuse `chat-panel.jsx` composer + `message-bubble.jsx` for UI.
 
 **Tech Stack:** Node 20 + Express + Mongoose 8 + Zod + Socket.IO, Next.js 16 (Turbopack) + motion/react + lucide-react + Tailwind 4
 
@@ -211,14 +213,11 @@ git add backend/src/modules/messages/* backend/src/jobs/scheduledMessages.js bac
 git commit -m "feat: scheduled messages service/controller/job"
 ```
 
-### Task 3: Message Expiry (Disappearing 24h/7d)
+### Task 3: Message Expiry (Disappearing 24h/7d) — **REMOVED 2026-09-08 — do not implement**
 
-**Files:**
-- Modify: `backend/src/models/Conversation.js:70`
-- Modify: `backend/src/modules/conversations/*` (validation/service/controller/routes)
-- Modify: `backend/src/modules/messages/messages.service.js:135`
-- Create: `backend/src/jobs/expiredMessages.js`
-- Modify: `backend/src/server.js`
+> Entire task deleted with feature. `disappearingDuration`, `expireAt`, `sweepExpired`, `PATCH /conversations/:id/disappearing`, `conversation:disappearing`/`message:expired` removed from codebase.
+
+**Files:** ~~(deleted)~~
 
 - [ ] **Step 1: Write test for disappearingDuration**
 ```js

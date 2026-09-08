@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 2.9
-**Last Updated:** September 7, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls Complete)
+**Version:** 3.0
+**Last Updated:** September 8, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls Complete · Disappearing Messages Removed)
 
 ---
 
@@ -359,11 +359,17 @@ Message {
   pinnedAt: Date (nullable) — set when pinned
   pinnedBy: ObjectId (nullable) — who pinned it
   isEdited: Boolean
+  editHistory: [{ content, editedAt, editedBy }] (cap 10)
+  scheduledAt: Date (nullable, indexed) — future send time
+  status: String enum ["sent","scheduled"] (indexed) — delivery state
+  forwardCount: Number — times forwarded
   isDeleted: Boolean
   createdAt: Date
   updatedAt: Date
 }
 ```
+
+> **Removed 2026-09-08:** `Message.expireAt` + `Conversation.disappearingDuration` (24h/7d auto-delete), `status: "expired"`, `PATCH /conversations/:id/disappearing`, and `message:expired` / `conversation:disappearing` events were fully deleted from frontend & backend. No auto-expiry remains; messages persist until soft-deleted by sender.
 
 **Indexes:**
 - `{ conversationId: 1, createdAt: -1 }` — primary message query (main timeline filters `threadId: null`)

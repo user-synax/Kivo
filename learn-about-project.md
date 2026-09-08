@@ -273,7 +273,7 @@ For web push, generate keys with `npx web-push generate-vapid-keys`. For calls, 
 
 ## 🚧 What's *not* in Kivo (yet)
 
-Honesty is part of the design docs, so: no payments (Plus is admin-granted), no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). The roadmap in the [README](README.md) tracks everything.
+Honesty is part of the design docs, so: no payments (Plus is admin-granted), no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. The roadmap in the [README](README.md) tracks everything.
 
 ---
 
