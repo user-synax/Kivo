@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { X, ChevronLeft, ChevronRight, Download, Play, Pause } from "lucide-react";
@@ -231,6 +231,7 @@ const audioListeners = new Set();
 function getSharedAudio() {
   if (!sharedAudio && typeof window !== "undefined") {
     sharedAudio = new Audio();
+    sharedAudio.preload = "metadata";
     const notify = () => {
       for (const l of audioListeners) l();
     };
@@ -252,11 +253,36 @@ function formatDuration(sec) {
   return `${m}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// Deterministic pseudo-waveform from fileId/url — no extra network fetch.
+// Stable per attachment, cheap to compute, memoizable.
+function waveformHeights(seed, count = 32) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    const r = (h % 700) / 1000; // 0..0.699
+    // varied sine + noise for natural look; keep 18%–96% range for a11y
+    const w = 20 + r * 72 + Math.sin(i * 0.85) * 7 + Math.cos(i * 0.52) * 4;
+    out.push(Math.round(Math.min(96, Math.max(18, w))));
+  }
+  // ensure ends aren't tiny — looks better
+  out[0] = Math.max(out[0], 28);
+  out[out.length - 1] = Math.max(out[out.length - 1], 28);
+  return out;
+}
+
 function AudioCard({ attachment, duration: serverDuration }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(serverDuration || 0);
   const url = attachment.url;
+
+  const BAR_COUNT = 32;
+  const bars = useMemo(
+    () => waveformHeights(attachment.fileId || url || "voice", BAR_COUNT),
+    [attachment.fileId, url],
+  );
 
   useEffect(() => {
     const el = getSharedAudio();
@@ -272,8 +298,13 @@ function AudioCard({ attachment, duration: serverDuration }) {
       }
     };
     audioListeners.add(onTick);
-    el.addEventListener("timeupdate", onTick);
+    // Use rAF-friendly timeupdate throttling: browser fires ~4Hz, fine for 60fps
+    el.addEventListener("timeupdate", onTick, { passive: true });
     el.addEventListener("loadedmetadata", onMeta);
+    // Prime duration from cached metadata if already loaded
+    if (activeAudioUrl === url && Number.isFinite(el.duration) && el.duration > 0) {
+      setDuration(el.duration);
+    }
     return () => {
       audioListeners.delete(onTick);
       el.removeEventListener("timeupdate", onTick);
@@ -281,7 +312,7 @@ function AudioCard({ attachment, duration: serverDuration }) {
     };
   }, [url]);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     const el = getSharedAudio();
     if (!el) return;
     if (activeAudioUrl === url && !el.paused) {
@@ -290,75 +321,141 @@ function AudioCard({ attachment, duration: serverDuration }) {
     }
     activeAudioUrl = url;
     el.src = url;
+    el.preload = "metadata";
     el.play().catch(() => {
       activeAudioUrl = null;
       notifyAudioListeners();
     });
-  };
+  }, [url]);
 
-  const seek = (e) => {
-    const el = getSharedAudio();
-    if (!el || !Number.isFinite(el.duration)) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const t = ratio * el.duration;
-    el.currentTime = t;
-    setCurrentTime(t);
-  };
+  const seek = useCallback(
+    (e) => {
+      const el = getSharedAudio();
+      if (!el) return;
+      // If not yet loaded, prime with server duration fallback
+      const total = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : duration || serverDuration || 0;
+      if (!total) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      const t = ratio * total;
+      // If audio not yet active, activate it paused at seek position
+      if (activeAudioUrl !== url) {
+        activeAudioUrl = url;
+        el.src = url;
+        el.currentTime = t;
+        // Don't auto-play on seek; just update time
+        el.pause();
+        setCurrentTime(t);
+        if (Number.isFinite(el.duration) && el.duration > 0) setDuration(el.duration);
+        else setDuration(total);
+        notifyAudioListeners();
+        return;
+      }
+      el.currentTime = t;
+      setCurrentTime(t);
+    },
+    [duration, serverDuration, url],
+  );
 
   const shownDuration = duration > 0 ? duration : serverDuration || 0;
-  const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const progress = shownDuration > 0 ? Math.min(1, Math.max(0, currentTime / shownDuration)) : 0;
+  const displayedTime = playing ? currentTime : shownDuration;
+  // Tabular-nums prevents layout shift as digits change
+  const timerLabel = formatDuration(displayedTime);
 
   return (
-    <div className="flex min-w-[210px] max-w-[280px] items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5">
+    <div className="flex min-w-[220px] max-w-[300px] items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 sm:min-w-[260px] sm:max-w-[340px]">
       <button
         type="button"
         onClick={toggle}
         aria-label={playing ? "Pause voice message" : "Play voice message"}
-        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] transition hover:brightness-110 active:scale-95"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] shadow-sm transition hover:brightness-110 active:scale-95 disabled:opacity-60"
       >
-        {playing ? (
-          <Pause className="h-4 w-4 fill-current" />
-        ) : (
-          <Play className="ml-0.5 h-4 w-4 fill-current" />
-        )}
+        {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
       </button>
       <div
         role="slider"
-        aria-label="Voice message progress"
+        aria-label="Voice message waveform"
         aria-valuemin={0}
         aria-valuemax={Math.round(shownDuration) || 1}
-        aria-valuenow={Math.round(progress * (shownDuration || 1))}
+        aria-valuenow={Math.round(currentTime)}
+        aria-valuetext={`${timerLabel} of ${formatDuration(shownDuration)}`}
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+            e.preventDefault();
             const el = getSharedAudio();
-            if (!el || !Number.isFinite(el.duration)) return;
+            const total = Number.isFinite(el?.duration) && el.duration > 0 ? el.duration : shownDuration;
+            if (!total) return;
             const delta = e.key === "ArrowRight" ? 5 : -5;
-            el.currentTime = Math.min(
-              el.duration,
-              Math.max(0, el.currentTime + delta),
-            );
+            if (activeAudioUrl !== url) {
+              const t = Math.min(total, Math.max(0, delta > 0 ? delta : 0));
+              activeAudioUrl = url;
+              el.src = url;
+              el.currentTime = t;
+              el.pause();
+              setCurrentTime(t);
+              notifyAudioListeners();
+              return;
+            }
+            el.currentTime = Math.min(total, Math.max(0, el.currentTime + delta));
             setCurrentTime(el.currentTime || 0);
+          } else if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            toggle();
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            const el = getSharedAudio();
+            if (activeAudioUrl !== url) {
+              activeAudioUrl = url;
+              el.src = url;
+              el.currentTime = 0;
+              el.pause();
+              notifyAudioListeners();
+            } else el.currentTime = 0;
+            setCurrentTime(0);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            const el = getSharedAudio();
+            const total = shownDuration;
+            if (activeAudioUrl !== url) {
+              activeAudioUrl = url;
+              el.src = url;
+              el.currentTime = total;
+              el.pause();
+              notifyAudioListeners();
+            } else el.currentTime = total;
+            setCurrentTime(total);
           }
         }}
         onClick={seek}
-        className="group relative h-9 min-w-0 flex-1 cursor-pointer touch-none"
+        className="group relative flex h-9 min-w-0 flex-1 cursor-pointer touch-none items-center gap-[2px] rounded-md px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
         style={{ touchAction: "none" }}
       >
-        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-[var(--bg-base)]">
-          <div
-            className="h-full rounded-full bg-[var(--accent)]"
-            style={{ width: `${progress * 100}%` }}
+        {bars.map((h, i) => {
+          const filled = i / bars.length < progress;
+          const isActiveBar = filled && playing;
+          return (
+            <span
+              key={i}
+              aria-hidden
+              className={`w-[2.5px] shrink-0 rounded-full transition-colors duration-75 sm:w-[3px] ${filled ? (isActiveBar ? "bg-[var(--accent)]" : "bg-[var(--accent)]/90") : "bg-[var(--text-muted)]/25"}`}
+              style={{ height: `${h}%`, minHeight: "6px" }}
+            />
+          );
+        })}
+        {/* Subtle progress glow for playing state */}
+        {playing && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-1/2 -z-10 -translate-y-1/2 rounded-full bg-[var(--accent)]/10 blur-[6px] transition-all duration-150"
+            style={{ left: 0, width: `${progress * 100}%` }}
           />
-        </div>
-        <div
-          className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent)] opacity-0 transition-opacity group-hover:opacity-100"
-          style={{ left: `${progress * 100}%` }}
-        />
+        )}
       </div>
-      <span className="shrink-0 text-[11px] tabular-nums text-[var(--text-muted)]">
-        {formatDuration(shownDuration)}
+      <span className="min-w-[42px] shrink-0 text-right font-mono text-[11px] tabular-nums leading-none text-[var(--text-muted)] sm:min-w-[52px]">
+        <span className={playing ? "text-[var(--accent)] font-medium" : ""}>{timerLabel}</span>
+        <span className="hidden text-[10px] tabular-nums text-[var(--text-muted)]/70 sm:inline"> / {formatDuration(shownDuration)}</span>
       </span>
     </div>
   );

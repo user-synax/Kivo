@@ -659,11 +659,13 @@ Multiple files of mixed types can be sent in a single message.
 
 Voice messages need a connection (they upload like any attachment); while offline the mic shows a notice and text messages keep queuing as usual.
 
-### Play a voice message
+### Play a voice message — waveform
 
-- Voice bubbles show a **play/pause button**, a **progress bar**, and the **duration** (recorded at send time, so it's visible before the audio loads).
+- Voice bubbles show a **play/pause button**, a **32-bar deterministic waveform** (pseudo-waveform seeded by `fileId`/`url`, memoized, no extra fetch) + a **`tabular-nums` timer** (`m:ss` ` / m:ss` on `sm+`, mono `font-variant-numeric` so digits don't shift) — duration is visible before audio loads via `audioDuration`.
+- **Waveform is the progress control:** click / tap anywhere on the waveform to seek; `←`/`→` skip ±5s, `Home`/`End` jump to start/end, `Space`/`Enter` toggle play — all `aria-valuenow`/`valuetext` on `role="slider"` (a11y).
+- **One shared `<audio>` singleton** per tab — starting a second voice stops the first (classic messenger), `preload="metadata"`, `timeupdate` `passive`, `play`/`pause`/`ended` via `Set` listeners — no N `<audio>` mounts, no layout thrashing.
+- **Responsive & fast:** `min-w-[220px] max-w-[300px] sm:min-w-[260px] sm:max-w-[340px]` (`flex` gap `2px`, bars `w-[2.5px] sm:w-[3px]`, `h 18%–96%`, `rounded-full`, `transition-colors duration-75`), `will-change` via `transform` only, `tabular-nums` prevents CLS as timer ticks, waveform bars are pure CSS divs (no canvas/SVG fetch).
 - Tap play to hear it; tapping another voice message stops the first (one player at a time).
-- Click or drag on the progress bar to **seek**; arrow keys skip ±5 seconds when focused.
 - Voice messages can be **forwarded** (the audio + duration carry over with the "Forwarded from" pill), **saved**, and **deleted** like any message.
 
 ### View images

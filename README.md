@@ -142,7 +142,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Offline caching** (IndexedDB cache for conversations, Spaces, friends, requests, and last-50 messages)
 - **File & image attachments** (images + documents, max 10 files & 30 MB each per message — Appwrite storage, lightbox, inline preview)
 - **Shared media gallery** (per-chat Media/Files/Links drawer with viewer, counts, jump-to-message, rich empty states)
-- **Voice messages** (hold-to-record in the composer, slide up to cancel, inline play/pause player with progress + duration — recorded in-browser via MediaRecorder, stored as-is, no transcoding)
+- **Voice messages** (hold-to-record in the composer, slide up to cancel, **waveform** player with `tabular-nums` timer — deterministic 32-bar pseudo-waveform per file, shared `<audio>` singleton so only one plays at a time, seekable waveform + `Home`/`End`/`Arrow` keys; recorded in-browser via MediaRecorder, stored as-is, no transcoding)
 - **Global search (Ctrl+K)** — command palette with messages, people, spaces, jump-to-message
 - **Admin panel** — standalone dashboard with user/group/space management, ban/unban, **Plus plan grant/revoke (`POST /api/admin/users/:id/plan`)**, audit logging
 - **Offline indicator** — "You are offline" banner + composer keeps working for text
