@@ -38,6 +38,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollDurationMaxMs: 24 * 60 * 60 * 1000, // 1 day
     pollAllowMultiple: false,
     pollAllowAnonymous: false,
+    forwardLimitPerMessage: 5,
   }),
   plus: Object.freeze({
     messageMaxLength: 8000,
@@ -58,6 +59,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollDurationMaxMs: 7 * 24 * 60 * 60 * 1000, // 7 days
     pollAllowMultiple: true,
     pollAllowAnonymous: true,
+    forwardLimitPerMessage: 10,
   }),
 });
 

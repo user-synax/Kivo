@@ -18,6 +18,7 @@ import {
   Reply,
   Share,
   ShieldBan,
+  Timer,
   Trash,
   UserRound,
   X,
@@ -50,14 +51,14 @@ import { cn } from "@/lib/utils";
 
 import { AttachmentBubble } from "@/components/chat/attachments";
 import { LinkPreview } from "@/components/chat/link-preview";
-import { MentionToken } from "@/components/mentions/mention-token";
-import { firstUrl, normalizeUrl } from "@/lib/links";
-import { emojiCount } from "@/lib/emoji";
 import { Avatar } from "@/components/dashboard/avatar";
+import { MentionToken } from "@/components/mentions/mention-token";
 import { PollCard } from "@/components/polls/poll-card";
+import { emojiCount } from "@/lib/emoji";
+import { firstUrl, normalizeUrl } from "@/lib/links";
 
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
-const TRAILING_PUNCT_RE = /[.,;:!?'\"`>]+$/;
+const TRAILING_PUNCT_RE = /[.,;:!?'"`>]+$/;
 
 function LinkToken({ href, label }) {
   return (
@@ -79,7 +80,11 @@ function LinkToken({ href, label }) {
 function splitTrailing(raw) {
   let core = raw.replace(TRAILING_PUNCT_RE, "");
   let trailing = raw.slice(core.length);
-  for (const [open, close] of [["(", ")"], ["[", "]"], ["{", "}"]]) {
+  for (const [open, close] of [
+    ["(", ")"],
+    ["[", "]"],
+    ["{", "}"],
+  ]) {
     while (core.endsWith(close)) {
       const opens = core.split(open).length - 1;
       const closes = core.split(close).length - 1;
@@ -110,11 +115,7 @@ function tokenizeLinks(chunk, keyPrefix) {
     const href = normalizeUrl(core);
     if (href && core) {
       out.push(
-        <LinkToken
-          key={`${keyPrefix}-${idx}`}
-          href={href}
-          label={core}
-        />,
+        <LinkToken key={`${keyPrefix}-${idx}`} href={href} label={core} />,
       );
       if (trailing) out.push(trailing);
     } else {
@@ -433,9 +434,11 @@ export function MessageBubble({
   onPollVote,
   onPollRetract,
   onPollEnd,
+  onViewHistory,
 }) {
   const pinned = Boolean(message?.pinnedAt);
-  const canShare = isMobile && typeof navigator !== "undefined" && !!navigator.share;
+  const canShare =
+    isMobile && typeof navigator !== "undefined" && !!navigator.share;
   const deleted = message.isDeleted;
   const editRef = useRef(null);
   const [pressing, setPressing] = useState(false);
@@ -604,17 +607,21 @@ export function MessageBubble({
   const bubbleVariant =
     variant ?? (isBigEmoji ? "ghost" : mine ? "default" : "secondary");
 
+  const isDisappearing = Boolean(message?.expireAt) && !deleted;
   return (
     <ContextMenu>
       <ContextMenuTrigger disabled={deleted || isEditing || selectMode}>
         <Bubble
-          variant={bubbleVariant}
+          variant={isDisappearing ? "outline" : bubbleVariant}
           align={mine ? "end" : "start"}
           className={cn(
             "group/bubble relative transition-transform will-change-transform select-text touch-manipulation",
             pressing && !selectMode && "scale-[0.98]",
             isReplying && "border-l-2 border-[var(--accent)]",
             selected && "ring-2 ring-[var(--accent)]",
+            message?.isFrequentlyForwarded && !selected && "ring-1 ring-amber-500/40",
+            isDisappearing &&
+              "*:data-[slot=bubble-content]:!bg-[var(--bg-surface)]/20 *:data-[slot=bubble-content]:!border *:data-[slot=bubble-content]:!border-dashed *:data-[slot=bubble-content]:!border-[var(--border)] *:data-[slot=bubble-content]:backdrop-blur-[1px]",
             selectMode && "cursor-pointer",
             className,
           )}
@@ -680,10 +687,20 @@ export function MessageBubble({
             ) : (
               <>
                 {message.forwardedFromName && (
-                  <span className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)]">
+                  <span
+                    className={cn(
+                      "mb-1 flex items-center gap-1.5 text-[11px] font-semibold",
+                      message.isFrequentlyForwarded
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-[var(--text-muted)]",
+                    )}
+                  >
                     <Forward className="h-3 w-3 shrink-0" aria-hidden />
                     <span className="truncate">
-                      Forwarded from {message.forwardedFromName}
+                      Forwarded
+                      {message.forwardedFromName ? ` from ${message.forwardedFromName}` : ""}
+                      {message.isFrequentlyForwarded ? " \u2022 frequently forwarded" : ""}
+                      {message.forwardCount > 1 ? ` (${message.forwardCount})` : ""}
                     </span>
                   </span>
                 )}
@@ -931,36 +948,52 @@ export function MessageBubble({
 
       {/* Reaction chips — in normal flow under the bubble, aligned to its side
           so they never overlap the corner. Hidden for polls */}
-      {message.reactions && message.reactions.length > 0 && message.type !== "poll" && (
-        <div
-          className={cn(
-            "mt-1 flex max-w-[78%] flex-wrap gap-1",
-            mine ? "justify-end" : "justify-start",
-          )}
-        >
-          {Object.entries(
-            message.reactions.reduce((acc, r) => {
-              acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-              return acc;
-            }, {}),
-          ).map(([emoji, count]) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => onReact?.(emoji)}
-              className="flex items-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--text-primary)] transition-colors hover:bg-[var(--hover)]"
-            >
-              {emoji} {count}
-            </button>
-          ))}
-        </div>
-      )}
+      {message.reactions &&
+        message.reactions.length > 0 &&
+        message.type !== "poll" && (
+          <div
+            className={cn(
+              "mt-1 flex max-w-[78%] flex-wrap gap-1",
+              mine ? "justify-end" : "justify-start",
+            )}
+          >
+            {Object.entries(
+              message.reactions.reduce((acc, r) => {
+                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                return acc;
+              }, {}),
+            ).map(([emoji, count]) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => onReact?.(emoji)}
+                className="flex items-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--text-primary)] transition-colors hover:bg-[var(--hover)]"
+              >
+                {emoji} {count}
+              </button>
+            ))}
+          </div>
+        )}
 
       {/* Meta: time + receipt + failed retry (rendered once per group) */}
       {showMeta && (
-        <div className="mt-1 flex items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]">
+        <div
+          className={cn(
+            "mt-1 flex w-fit items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]",
+            mine ? "self-end" : "self-start",
+          )}
+        >
           <span>{formatTime(message.createdAt)}</span>
-          {message.isEdited && <span>· edited</span>}
+          {message.isEdited && (
+            <button
+              type="button"
+              onClick={() => onViewHistory?.(message.id)}
+              className="text-[11px] text-[var(--text-muted)] hover:underline hover:text-[var(--text-primary)]"
+              aria-label="View edit history"
+            >
+              (edited)
+            </button>
+          )}
           {message.status === "queued" && (
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" aria-hidden />
@@ -982,9 +1015,7 @@ export function MessageBubble({
                 type="button"
                 ref={ticksRef}
                 onClick={openReceipts}
-                aria-label={
-                  allRead ? "Seen by everyone" : "View receipts"
-                }
+                aria-label={allRead ? "Seen by everyone" : "View receipts"}
                 aria-expanded={receiptsOpen}
                 className={cn(
                   "flex cursor-pointer items-center rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none",
@@ -992,10 +1023,7 @@ export function MessageBubble({
                 )}
               >
                 <CheckCheck
-                  className={cn(
-                    "h-3 w-3",
-                    allRead && "text-[var(--accent)]",
-                  )}
+                  className={cn("h-3 w-3", allRead && "text-[var(--accent)]")}
                   aria-hidden
                 />
               </button>

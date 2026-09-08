@@ -7,6 +7,7 @@ import {
   updateGroupSchema,
   addMembersSchema,
   conversationLookSchema,
+  disappearingSchema,
 } from "./conversations.validation.js";
 import * as conversationsService from "./conversations.service.js";
 
@@ -168,4 +169,15 @@ export const deleteConversation = asyncHandler(async (req, res) => {
     userId: req.user.userId,
   });
   res.status(200).json({ success: true, data: result });
+});
+
+// Set disappearing messages duration (24h/7d or off). DM: either participant; group: admin only.
+export const setDisappearing = asyncHandler(async (req, res) => {
+  const { duration } = parseBody(disappearingSchema, req.body);
+  const conversation = await conversationsService.setDisappearing({
+    conversationId: req.params.id,
+    userId: req.user.userId,
+    duration,
+  });
+  res.status(200).json({ success: true, data: conversation });
 });

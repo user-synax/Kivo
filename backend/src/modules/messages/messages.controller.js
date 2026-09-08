@@ -27,7 +27,7 @@ export const listMessages = asyncHandler(async (req, res) => {
 });
 
 export const createMessage = asyncHandler(async (req, res) => {
-  const { content, replyToMessageId, threadId, attachments, audioDuration, forwardedFromId, poll } = parseBody(createMessageSchema, req.body);
+  const { content, replyToMessageId, threadId, attachments, audioDuration, forwardedFromId, scheduledAt, poll } = parseBody(createMessageSchema, req.body);
   const message = await messagesService.createMessage({
     conversationId: req.params.id,
     userId: req.user.userId,
@@ -37,9 +37,27 @@ export const createMessage = asyncHandler(async (req, res) => {
     attachments,
     audioDuration,
     forwardedFromId,
+    scheduledAt,
     poll,
   });
   res.status(201).json({ success: true, data: message });
+});
+
+export const listScheduled = asyncHandler(async (req, res) => {
+  const conversationId = req.params.conversationId || req.params.id;
+  const data = await messagesService.listScheduled({
+    conversationId,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data });
+});
+
+export const cancelScheduled = asyncHandler(async (req, res) => {
+  const data = await messagesService.cancelScheduled({
+    messageId: req.params.messageId,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data });
 });
 
 export const listThreads = asyncHandler(async (req, res) => {
@@ -110,6 +128,11 @@ export const deleteMessage = asyncHandler(async (req, res) => {
     userId: req.user.userId,
   });
   res.status(200).json({ success: true, data: message });
+});
+
+export const getEditHistory = asyncHandler(async (req, res) => {
+  const history = await messagesService.getEditHistory({ messageId: req.params.id, userId: req.user.userId });
+  res.status(200).json({ success: true, data: { history } });
 });
 
 export const addReaction = asyncHandler(async (req, res) => {

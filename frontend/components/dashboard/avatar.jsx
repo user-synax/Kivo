@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import Image from "next/image";
 import { getAvatarStyle } from "@/lib/avatar-styles";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -107,12 +108,23 @@ function AvatarSurface({ name, selected, avatarStyle, size = "md", url }) {
           : undefined
       }
     >
-      {/* Uploaded image — fades in on load, hidden if the URL errors. */}
+      {/* Uploaded image — next/image for LCP, lazy by default, unoptimized for external Appwrite URLs */}
       {url ? (
-        <img
+        <Image
           src={url}
           alt=""
-          loading="lazy"
+          fill
+          unoptimized
+          sizes={
+            size === "lg"
+              ? "80px"
+              : size === "md" || size === "xl"
+                ? "48px"
+                : size === "sm"
+                  ? "40px"
+                  : "28px"
+          }
+          priority={size === "lg"}
           onError={(e) => {
             e.currentTarget.style.display = "none";
           }}

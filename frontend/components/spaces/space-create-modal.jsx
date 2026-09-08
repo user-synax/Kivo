@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -101,13 +102,13 @@ export function SpaceCreateModal({ open, onClose, onCreated }) {
       <div>
         <span className="mb-2 block text-[12px] font-medium text-[var(--text-muted)]">Banner</span>
         <div className="relative h-20 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
-          {banner ? <img src={banner} alt="" aria-hidden="true" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />}
+          {banner ? <Image src={banner} alt="" aria-hidden="true" fill unoptimized sizes="400px" className="object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-[var(--accent-blue)]/40 to-[#6a4cf5]/40" />}
         </div>
         <div className="mt-2 grid grid-cols-4 gap-2">
           <button type="button" onClick={() => setBanner("")} aria-pressed={!banner} className={`flex h-12 items-center justify-center rounded-lg border text-[11px] font-medium ${!banner ? "border-[var(--accent)] bg-[var(--hover)] text-[var(--text-primary)]" : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]"}`}>None</button>
           {BANNER_OPTIONS.slice(0,7).map((opt) => {
             const active = banner === opt.url;
-            return <button key={opt.id} type="button" onClick={() => setBanner(opt.url)} aria-pressed={active} className={`relative h-12 overflow-hidden rounded-lg border ${active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}><img src={opt.url} alt="" aria-hidden="true" className="h-full w-full object-cover" /></button>;
+            return <button key={opt.id} type="button" onClick={() => setBanner(opt.url)} aria-pressed={active} className={`relative h-12 overflow-hidden rounded-lg border ${active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}><Image src={opt.url} alt="" aria-hidden="true" fill unoptimized sizes="80px" className="object-cover" /></button>;
           })}
         </div>
       </div>

@@ -35,6 +35,12 @@ export const createMessageSchema = z
     attachments: z.array(attachmentSchema).max(20).optional(),
     audioDuration: z.number().min(0).max(3600).optional(),
     forwardedFromId: z.string().optional(),
+    scheduledAt: z
+      .string()
+      .datetime()
+      .optional()
+      .refine((v) => !v || new Date(v).getTime() > Date.now(), "scheduledAt must be future")
+      .refine((v) => !v || new Date(v).getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1000, "max 30 days"),
     poll: pollInputSchema.optional(),
   })
   .refine(
@@ -83,6 +89,9 @@ export const listMessagesQuerySchema = z.object({
 export const markUnreadSchema = z.object({
   messageId: z.string().optional(),
 });
+
+export const listScheduledSchema = z.object({ conversationId: z.string() });
+export const editHistorySchema = z.object({ messageId: z.string() });
 
 // Convenience parser that throws a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {

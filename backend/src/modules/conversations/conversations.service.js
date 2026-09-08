@@ -85,6 +85,7 @@ function publicConversation(conversation, userId, onlineLookup, blockFlags) {
       wallpaper: conversation.appearance?.wallpaper || null,
       bubbleStyle: conversation.appearance?.bubbleStyle || null,
     },
+    disappearingDuration: conversation.disappearingDuration ?? null,
     lastMessageAt: conversation.lastMessageAt || null,
     createdAt: conversation.createdAt,
     spaceId: conversation.spaceId ? conversation.spaceId.toString() : null,
@@ -430,6 +431,21 @@ export async function updateConversationLook({ conversationId, userId, wallpaper
   const payload = publicConversation(updated, userId, onlineSnapshot());
   emitToConversation(conversationId, "conversation:updated", { conversation: payload });
   return payload;
+}
+
+export async function setDisappearing({ conversationId, userId, duration }) {
+  const conversation = await assertMembership(conversationId, userId);
+  if (conversation.type === "group") {
+    const isAdmin = (conversation.admins || []).some((a) => a.toString() === userId.toString());
+    if (!isAdmin) throw forbidden("Only admin can set disappearing", "NOT_ADMIN");
+  }
+  conversation.disappearingDuration = duration;
+  await conversation.save();
+  emitToConversation(conversationId, "conversation:disappearing", { conversationId, duration });
+  // Return public shape for API response
+  await conversation.populate("participants", "id displayName username email avatarStyle avatarUrl usernameColor lastActiveAt plan planExpiresAt");
+  await conversation.populate("admins", "id");
+  return publicConversation(conversation, userId.toString(), onlineSnapshot());
 }
 
 // Add one or more members to a group. Admin only. New members' sockets join

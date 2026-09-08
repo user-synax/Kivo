@@ -24,6 +24,9 @@ const reactionLimiter = rateLimiter({
 });
 
 router.get("/saved", messagesController.listSaved);
+router.get("/:id/history", messagesController.getEditHistory);
+router.get("/:conversationId/scheduled", messagesController.listScheduled);
+router.delete("/scheduled/:messageId", messagesController.cancelScheduled);
 router.patch("/:id", messageEditLimiter, messagesController.editMessage);
 router.delete("/:id", messagesController.deleteMessage);
 router.post("/:id/save", messagesController.toggleSave);

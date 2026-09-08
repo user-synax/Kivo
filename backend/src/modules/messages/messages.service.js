@@ -73,6 +73,16 @@ export function publicMessage(message, viewerId = null) {
     saved,
     isEdited: obj.isEdited,
     isDeleted: obj.isDeleted,
+    status: obj.status || "sent",
+    scheduledAt: obj.scheduledAt ? new Date(obj.scheduledAt).toISOString() : null,
+    expireAt: obj.expireAt ? new Date(obj.expireAt).toISOString() : null,
+    forwardCount: obj.forwardCount || 0,
+    isFrequentlyForwarded: (obj.forwardCount || 0) >= 3,
+    editHistory: (obj.editHistory || []).map((h) => ({
+      content: h.content,
+      editedAt: h.editedAt ? new Date(h.editedAt).toISOString() : null,
+      editedBy: h.editedBy ? h.editedBy.toString() : null,
+    })),
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
     poll: !isDeleted && obj.poll
@@ -151,6 +161,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     const docs = await Message.find({
       conversationId,
       threadId: null,
+      status: { $ne: "scheduled" },
       createdAt: { $gt: anchorMsg.createdAt },
     })
       .sort({ createdAt: 1 })
@@ -182,6 +193,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
       Message.find({
         conversationId,
         threadId: null,
+        status: { $ne: "scheduled" },
         createdAt: { $gt: anchorMsg.createdAt },
       })
         .sort({ createdAt: 1 })
@@ -191,6 +203,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
       Message.find({
         conversationId,
         threadId: null,
+        status: { $ne: "scheduled" },
         createdAt: { $lt: anchorMsg.createdAt },
       })
         .sort({ createdAt: -1 })
@@ -206,7 +219,7 @@ export async function listMessages({ conversationId, userId, cursor, around, aft
     return { messages, nextCursor: null, anchorId: around };
   }
 
-  const filter = { conversationId, threadId: null };
+  const filter = { conversationId, threadId: null, status: { $ne: "scheduled" } };
   if (cursor) {
     if (!mongoose.Types.ObjectId.isValid(cursor)) {
       throw badRequest("Invalid cursor", "INVALID_CURSOR");
@@ -265,6 +278,7 @@ export async function createMessage({
   attachments,
   audioDuration,
   forwardedFromId,
+  scheduledAt,
   poll,
 }) {
   const conversation = await assertMembership(conversationId, userId);
@@ -272,6 +286,9 @@ export async function createMessage({
 
   // Poll handling — polls are exclusive: no content/attachments/forward/thread/reply mix (enforced by Zod, re-checked)
   if (poll) {
+    if (scheduledAt) {
+      throw badRequest("Scheduled polls not supported", "POLL_SCHEDULED");
+    }
     if (replyToMessageId || threadId || forwardedFromId || (attachments && attachments.length)) {
       throw badRequest("Poll messages cannot carry attachments, forwards, threads or replies", "POLL_INVALID");
     }
@@ -458,18 +475,25 @@ export async function createMessage({
   let finalAttachments = attachments || [];
   let finalAudioDuration = audioDuration ?? null;
   let forwardedName = null;
+  let forwardedSourceId = null;
+  let forwardedSourceForwardCount = 0;
   if (forwardedFromId) {
     if (!mongoose.Types.ObjectId.isValid(forwardedFromId)) {
       throw badRequest("Invalid forwardedFromId", "INVALID_FORWARD");
     }
     const source = await Message.findById(forwardedFromId).select(
-      "conversationId senderId content attachments audioDuration isDeleted type poll",
+      "conversationId senderId content attachments audioDuration isDeleted type poll forwardCount",
     );
     if (!source || source.isDeleted) {
       throw notFound("Original message not found", "MESSAGE_NOT_FOUND");
     }
     if (source.type === "poll") {
       throw badRequest("Polls can't be forwarded yet", "POLL_FORWARD");
+    }
+    // Forward limit: free 5, Plus 10 — broadly forwarded guard
+    const forwardLimit = senderLimits.forwardLimitPerMessage || 5;
+    if ((source.forwardCount || 0) >= forwardLimit) {
+      throw forbidden(`Forward limit reached (${forwardLimit}) - broadly forwarded`, "FORWARD_LIMIT");
     }
     const sourceConv = await Conversation.findById(source.conversationId).select("participants");
     const sourceParticipants = (sourceConv?.participants || []).map((p) => p.toString());
@@ -494,9 +518,54 @@ export async function createMessage({
     // Forwarded voice messages keep their duration (a client-supplied value is
     // replaced, so a forward can't smuggle arbitrary duration data).
     finalAudioDuration = source.audioDuration ?? null;
+    forwardedSourceId = source._id;
+    forwardedSourceForwardCount = source.forwardCount || 0;
   } else {
     mentions = await resolveMentions(finalContent, conversation.participants);
   }
+
+  const disappearingDuration = conversation.disappearingDuration || null;
+
+  if (scheduledAt) {
+    const when = new Date(scheduledAt);
+    if (Number.isNaN(when.getTime())) throw badRequest("Invalid scheduledAt", "BAD_SCHEDULED");
+    if (when.getTime() <= Date.now()) throw badRequest("scheduledAt must be future", "BAD_SCHEDULED");
+    if (when.getTime() - Date.now() > 30 * 24 * 60 * 60 * 1000) throw badRequest("max 30 days", "BAD_SCHEDULED");
+    const expireAt = disappearingDuration ? new Date(when.getTime() + disappearingDuration) : null;
+    const message = await Message.create({
+      conversationId,
+      senderId: userId,
+      content: finalContent,
+      replyToMessageId: replyToMessageId || null,
+      threadId: inThread ? threadId : null,
+      mentions,
+      attachments: finalAttachments,
+      audioDuration: finalAudioDuration,
+      forwardedFromId: forwardedFromId || null,
+      forwardedFromName: forwardedName,
+      scheduledAt: when,
+      status: "scheduled",
+      expireAt,
+      forwardCount: forwardedFromId ? forwardedSourceForwardCount + 1 : 0,
+    });
+    if (forwardedSourceId) {
+      const updatedSource = await Message.findByIdAndUpdate(
+        forwardedSourceId,
+        { $inc: { forwardCount: 1 } },
+        { new: true },
+      );
+      if (updatedSource && (updatedSource.forwardCount || 0) >= 5) {
+        emitToConversation(updatedSource.conversationId.toString(), "message:forward-limit", {
+          messageId: updatedSource._id.toString(),
+          forwardCount: updatedSource.forwardCount,
+        });
+      }
+    }
+    // do NOT bump lastMessageAt, do NOT emit message:new, do NOT notify
+    return publicMessage(message, userId);
+  }
+
+  const expireAt = disappearingDuration ? new Date(Date.now() + disappearingDuration) : null;
 
   const message = await Message.create({
     conversationId,
@@ -509,7 +578,25 @@ export async function createMessage({
     audioDuration: finalAudioDuration,
     forwardedFromId: forwardedFromId || null,
     forwardedFromName: forwardedName,
+    status: "sent",
+    scheduledAt: null,
+    expireAt,
+    forwardCount: forwardedFromId ? forwardedSourceForwardCount + 1 : 0,
   });
+
+  if (forwardedSourceId) {
+    const updatedSource = await Message.findByIdAndUpdate(
+      forwardedSourceId,
+      { $inc: { forwardCount: 1 } },
+      { new: true },
+    );
+    if (updatedSource && (updatedSource.forwardCount || 0) >= 5) {
+      emitToConversation(updatedSource.conversationId.toString(), "message:forward-limit", {
+        messageId: updatedSource._id.toString(),
+        forwardCount: updatedSource.forwardCount,
+      });
+    }
+  }
 
   // Bump the conversation's activity timestamp for inbox ordering.
   await Conversation.findByIdAndUpdate(conversationId, { lastMessageAt: message.createdAt });
@@ -573,14 +660,26 @@ export async function editMessage({ messageId, userId, content }) {
 
   const mentionIds = await resolveMentions(content, conversation.participants);
 
+  if (message.content !== content) {
+    message.editHistory.push({ content: message.content, editedAt: new Date(), editedBy: new mongoose.Types.ObjectId(userId) });
+    if (message.editHistory.length > 10) message.editHistory.shift();
+  }
   message.content = content;
-  message.mentions = mentionIds;
   message.isEdited = true;
+  message.mentions = mentionIds;
   await message.save();
 
   const payload = publicMessage(message);
   emitToConversation(message.conversationId.toString(), "message:edited", payload);
   return payload;
+}
+
+export async function getEditHistory({messageId, userId}) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) throw badRequest("Invalid message id");
+  const msg = await Message.findById(messageId).select("conversationId editHistory content isEdited senderId");
+  if (!msg) throw notFound("Message not found");
+  await assertMembership(msg.conversationId.toString(), userId);
+  return (msg.editHistory || []).map(h=>({content:h.content, editedAt:h.editedAt, editedBy:h.editedBy ? h.editedBy.toString() : null}));
 }
 
 export async function deleteMessage({ messageId, userId }) {
@@ -1166,4 +1265,66 @@ export async function closeExpiredPolls() {
     emitToConversation(msg.conversationId.toString(), "poll:ended", publicMessage(msg));
   }
   return expired.length;
+}
+
+export async function listScheduled({ conversationId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw badRequest("Invalid conversation id", "INVALID_ID");
+  }
+  await assertMembership(conversationId, userId);
+  const docs = await Message.find({
+    conversationId,
+    status: "scheduled",
+    senderId: userId,
+  })
+    .sort({ scheduledAt: 1 })
+    .lean();
+  return docs.map((m) => publicMessage(m, userId));
+}
+
+export async function deliverScheduled() {
+  const now = new Date();
+  const due = await Message.find({
+    status: "scheduled",
+    scheduledAt: { $lte: now },
+  }).limit(50);
+  for (const msg of due) {
+    msg.status = "sent";
+    if (!msg.expireAt) {
+      const conv = await Conversation.findById(msg.conversationId).select("disappearingDuration");
+      if (conv?.disappearingDuration) {
+        msg.expireAt = new Date(Date.now() + conv.disappearingDuration);
+      }
+    }
+    await msg.save();
+    await Conversation.findByIdAndUpdate(msg.conversationId, {
+      lastMessageAt: msg.createdAt,
+    });
+    const payload = publicMessage(msg);
+    emitToConversation(msg.conversationId.toString(), "message:new", payload);
+    // fire-and-forget notifications for delivered scheduled message
+    try {
+      const conv2 = await Conversation.findById(msg.conversationId);
+      if (conv2) {
+        notificationsService
+          .createForMessage({ message: msg, conversation: conv2, inThread: !!msg.threadId })
+          .catch(() => {});
+      }
+    } catch {}
+  }
+  return due.length;
+}
+
+export async function cancelScheduled({ messageId, userId }) {
+  if (!mongoose.Types.ObjectId.isValid(messageId)) {
+    throw badRequest("Invalid message id", "INVALID_ID");
+  }
+  const msg = await Message.findById(messageId);
+  if (!msg || msg.status !== "scheduled") throw notFound("Scheduled message not found", "SCHEDULED_NOT_FOUND");
+  if (msg.senderId.toString() !== userId.toString()) throw forbidden("Not sender", "NOT_SENDER");
+  await msg.deleteOne();
+  emitToConversation(msg.conversationId.toString(), "message:scheduled-cancel", {
+    messageId: msg._id.toString(),
+  });
+  return { ok: true };
 }

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { Check, Crown, Hash, Megaphone, Plus, Shield, Trash2, UserMinus, X, Link2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -115,7 +116,7 @@ export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLef
       </div>
       <div className="flex flex-col gap-5 px-5 py-5">
         <div className="relative h-20 w-full overflow-hidden rounded-xl border border-[var(--border)]">
-          {banner ? <img src={banner} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-[var(--accent)]/30 to-[#6a4cf5]/30" />}
+          {banner ? <Image src={banner} alt="" fill unoptimized sizes="400px" className="object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-[var(--accent)]/30 to-[#6a4cf5]/30" />}
         </div>
         {canEdit ? (
           <>
@@ -137,7 +138,7 @@ export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLef
               <span className="mb-1.5 block text-[12px] font-medium text-[var(--text-muted)]">Banner</span>
               <div className="grid grid-cols-4 gap-2">
                 <button type="button" onClick={()=>setBanner("")} className={`h-12 rounded-lg border text-[11px] ${!banner ? "border-[var(--accent)] bg-[var(--hover)]" : "border-[var(--border)]"}`}>None</button>
-                {BANNER_OPTIONS.slice(0,7).map((o)=> <button key={o.id} type="button" onClick={()=>setBanner(o.url)} className={`h-12 overflow-hidden rounded-lg border ${banner===o.url ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}><img src={o.url} alt="" className="h-full w-full object-cover" /></button>)}
+                {BANNER_OPTIONS.slice(0,7).map((o)=> <button key={o.id} type="button" onClick={()=>setBanner(o.url)} className={`relative h-12 overflow-hidden rounded-lg border ${banner===o.url ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}><Image src={o.url} alt="" fill unoptimized sizes="80px" className="object-cover" /></button>)}
               </div>
             </div>
             <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1.5 self-start rounded-full bg-[var(--accent)] px-4 py-2 text-[12px] font-semibold text-[var(--on-accent)] disabled:opacity-40"><Check className="h-4 w-4" /> Save</button>

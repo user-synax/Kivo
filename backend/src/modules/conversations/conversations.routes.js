@@ -34,6 +34,9 @@ router.post("/:id/unread", messagesController.markUnread);
 // Shared chat look for a DM/group (wallpaper + bubble style).
 router.patch("/:id/look", conversationsController.updateLook);
 
+// Disappearing messages (24h/7d or off). DM: either participant; group: admin only.
+router.patch("/:id/disappearing", conversationsController.setDisappearing);
+
 // Permanent delete: DM (either participant) or group (admin only).
 // Space channels are rejected server-side.
 router.delete("/:id", conversationsController.deleteConversation);

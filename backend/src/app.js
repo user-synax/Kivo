@@ -28,10 +28,48 @@ const app = express();
 // pre-auth routes (login, refresh, etc.).
 app.set("trust proxy", 1);
 
-app.use(helmet());
+// Require explicit CORS origins in production — fail fast if unset.
+if (env.nodeEnv === "production" && !env.corsAllowedOrigins) {
+  throw new Error("CORS_ALLOWED_ORIGINS must be set in production (comma-separated origins, e.g. https://kivo.app)");
+}
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        fontSrc: ["'self'", "https:", "data:"],
+        connectSrc: [
+          "'self'",
+          "https:",
+          "wss:",
+          "ws:",
+          env.frontendUrl,
+          env.appwriteEndpoint,
+          env.livekitUrl,
+        ].filter(Boolean),
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // required for LiveKit/Appwrite cross-origin embeds
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(
   cors({
-    origin: env.corsAllowedOrigins ? env.corsAllowedOrigins.split(",").map((s) => s.trim()) : true,
+    origin: env.corsAllowedOrigins
+      ? env.corsAllowedOrigins.split(",").map((s) => s.trim())
+      : env.nodeEnv === "production"
+        ? false
+        : true,
     credentials: true,
   })
 );

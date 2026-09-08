@@ -1,12 +1,13 @@
 "use client";
+import Image from "next/image";
 import { Users, Hash } from "lucide-react";
 import { Avatar } from "@/components/dashboard/avatar";
 
 export function SpaceCard({ space, onClick, onJoin, actionLabel }) {
   return (
     <button type="button" onClick={onClick} className="flex w-full flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] text-left transition-colors hover:bg-[var(--hover)]">
-      <div className="h-16 w-full overflow-hidden bg-gradient-to-br from-[var(--accent)]/20 to-[#6a4cf5]/20">
-        {space.banner ? <img src={space.banner} alt="" aria-hidden="true" className="h-full w-full object-cover" /> : null}
+      <div className="relative h-16 w-full overflow-hidden bg-gradient-to-br from-[var(--accent)]/20 to-[#6a4cf5]/20">
+        {space.banner ? <Image src={space.banner} alt="" aria-hidden="true" fill unoptimized sizes="400px" className="object-cover" /> : null}
       </div>
       <div className="flex flex-1 flex-col p-4">
         <div className="-mt-8 flex items-end gap-3">

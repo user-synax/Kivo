@@ -161,6 +161,20 @@ const messageSchema = new mongoose.Schema(
     // Plain messages keep this null.
     audioDuration: { type: Number, min: 0, max: 3600, default: null },
     isEdited: { type: Boolean, default: false },
+    editHistory: {
+      type: [
+        {
+          content: String,
+          editedAt: Date,
+          editedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        },
+      ],
+      default: [],
+    },
+    scheduledAt: { type: Date, default: null, index: true },
+    status: { type: String, enum: ["sent", "scheduled", "expired"], default: "sent", index: true },
+    expireAt: { type: Date, default: null, index: true },
+    forwardCount: { type: Number, default: 0 },
     // Soft delete: keep the row (so replies/ordering remain stable) but blank it.
     isDeleted: { type: Boolean, default: false },
 
@@ -204,6 +218,10 @@ messageSchema.index({ "savedBy.userId": 1, "savedBy.savedAt": -1 });
 // Poll indexes
 messageSchema.index({ type: 1, "poll.expiresAt": 1 });
 messageSchema.index({ type: 1, "poll.isClosed": 1 });
+
+messageSchema.index({ status: 1, scheduledAt: 1 });
+messageSchema.index({ expireAt: 1 });
+messageSchema.index({ conversationId: 1, expireAt: 1 });
 
 // Text index for full-text search on message content.
 messageSchema.index({ content: "text" }, { weights: { content: 1 } });

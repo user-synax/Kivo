@@ -104,6 +104,14 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${inter.variable} ${outfit.variable} dark h-full antialiased`}
     >
+      <head>
+        <link rel="preconnect" href="https://cloud.appwrite.io" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://flagcdn.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://avatars.githubusercontent.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://cloud.appwrite.io" />
+        <link rel="dns-prefetch" href="https://flagcdn.com" />
+        <link rel="dns-prefetch" href="https://livekit.cloud" />
+      </head>
       <body className="min-h-full flex flex-col">
         {/* JSON-LD is static, built from local constants (no user input). React
             19 renders <script> children verbatim, so no dangerouslySetInnerHTML

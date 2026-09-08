@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -378,11 +379,15 @@ export function ProfileContent({
           className="relative h-[132px] w-full shrink-0 overflow-hidden border-b border-[var(--hairline)] bg-[var(--surface-1)] sm:h-[160px]"
         >
           {profile.banner ? (
-            <img
+            <Image
               src={profile.banner}
               alt=""
               aria-hidden="true"
-              className="h-full w-full object-cover"
+              fill
+              unoptimized
+              sizes="100vw"
+              className="object-cover"
+              priority
             />
           ) : (
             <div

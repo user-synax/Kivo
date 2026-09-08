@@ -1,6 +1,7 @@
 "use client";
 
 import { Ban, Eye, ShieldBan, UserMinus } from "lucide-react";
+import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
@@ -157,11 +158,14 @@ export function UserPanel({
           default coral gradient. */}
             <div className="relative h-24 shrink-0 overflow-hidden bg-gradient-to-br from-accent-blue/40 to-[#6a4cf5]/40">
                 {profile?.banner ? (
-                    <img
+                    <Image
                         src={profile.banner}
                         alt=""
                         aria-hidden="true"
-                        className="h-full w-full object-cover"
+                        fill
+                        unoptimized
+                        sizes="320px"
+                        className="object-cover"
                     />
                 ) : null}
             </div>

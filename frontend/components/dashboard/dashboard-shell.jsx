@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Palette, Settings } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
@@ -320,8 +321,8 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
         style={{ overscrollBehavior: "contain" }}
       >
         {user.banner ? (
-          <div className="h-28 w-full overflow-hidden rounded-xl border border-[var(--border)]">
-            <img src={user.banner} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+          <div className="relative h-28 w-full overflow-hidden rounded-xl border border-[var(--border)]">
+            <Image src={user.banner} alt="" aria-hidden="true" fill unoptimized sizes="100vw" className="object-cover" />
           </div>
         ) : null}
 
