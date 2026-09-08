@@ -131,9 +131,9 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
 function ConversationSection({ label, items, selectedId, onSelect, onMarkUnread, onRemove, baseIndex = 0, collapsed, onNewGroup }) {
   if (!items.length) return null;
   return (
-    <div className="mb-1">
+    <div className="mb-1 w-full min-w-0">
       {!collapsed && (
-        <div className="flex items-center justify-between px-3 pb-1 pt-3">
+        <div className="flex w-full min-w-0 items-center justify-between px-3 pb-1 pt-3">
           <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
             {label}
           </span>
@@ -188,8 +188,8 @@ function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCr
   if (collapsed) return null;
 
   return (
-    <div className="mb-2">
-      <div className="flex items-center justify-between px-3 pb-1 pt-3">
+    <div className="mb-2 w-full min-w-0">
+      <div className="flex w-full min-w-0 items-center justify-between px-3 pb-1 pt-3">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Spaces</span>
         {onCreateSpace && (
           <button
@@ -213,16 +213,16 @@ function SpacesSection({ spaces, channels, selectedId, onSelect, collapsed, onCr
           onAction={onCreateSpace}
         />
       ) : (
-        <div className="space-y-1">
+        <div className="w-full min-w-0 space-y-1">
           {spaces.map((space) => {
             const spaceChannels = channels.filter((c) => c.spaceId === space.id);
             const expandedOpen = isExpanded(space.id);
             return (
-              <div key={space.id} className="rounded-xl px-1">
+              <div key={space.id} className="w-full min-w-0 rounded-xl px-1">
                 <button
                   type="button"
                   onClick={() => toggle(space.id)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[${EASE}] hover:cursor-pointer hover:bg-[var(--hover)]"
+                  className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[${EASE}] hover:cursor-pointer hover:bg-[var(--hover)]"
                 >
                   <Avatar name={space.name} url={space.avatarUrl} size="sm" />
                   <div className="min-w-0 flex-1">
@@ -653,13 +653,13 @@ export function Sidebar({
 
 
   return (
-    <div className="flex h-full min-w-0 flex-col bg-(--bg-elevated) pt-[max(env(safe-area-inset-top),1rem)]">
+    <div className="flex h-full w-full min-w-0 flex-col bg-(--bg-elevated) pt-[max(env(safe-area-inset-top),1rem)]">
       {/* Header */}
       <div
-        className={`flex shrink-0 items-center gap-2 ${
+        className={`flex w-full min-w-0 shrink-0 items-center gap-2 ${
           collapsed
             ? "flex-col px-3 py-3"
-            : "justify-between border-b border--border px-5 py-3.5"
+            : "justify-between border-b border-[var(--border)] px-5 py-3.5"
         }`}
       >
         {!collapsed && (
@@ -714,8 +714,8 @@ export function Sidebar({
 
       {/* Search */}
       {!collapsed && (
-        <div className="shrink-0 px-3 py-3">
-          <label className="flex items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[${EASE}] focus-within:border-[var(--accent)]">
+        <div className="w-full min-w-0 shrink-0 px-3 py-3">
+          <label className="flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[${EASE}] focus-within:border-[var(--accent)]">
             <Search
               className="h-4 w-4 shrink-0 text-[var(--text-muted)]"
               strokeWidth={1.6}
@@ -744,7 +744,7 @@ export function Sidebar({
       )}
 
       {/* Conversation list */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5" style={{ overscrollBehavior: "contain" }}>
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar" style={{ overscrollBehavior: "contain" }}>
         {conversations.length === 0 ? (
           <>
             <RichEmptyState

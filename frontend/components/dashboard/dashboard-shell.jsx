@@ -142,8 +142,8 @@ function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLe
 function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover }) {
   const hasSpaces = Array.isArray(spaces) && spaces.length > 0;
   return (
-    <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
-      <div className="flex shrink-0 items-center justify-between px-5 py-3.5">
+    <div className="flex h-full w-full min-w-0 flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+      <div className="flex w-full min-w-0 shrink-0 items-center justify-between px-5 py-3.5">
         <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Spaces</span>
         <div className="flex items-center gap-2">
           <button
@@ -162,7 +162,7 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5" style={{ overscrollBehavior: "contain" }}>
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5 no-scrollbar" style={{ overscrollBehavior: "contain" }}>
         {!hasSpaces ? (
           <div className="px-3 py-10 text-center">
             <p className="text-[13px] text-[var(--text-muted)]">No spaces yet</p>
@@ -1895,9 +1895,9 @@ export function DashboardShell() {
               transition={slide}
               className="absolute inset-0 flex flex-col bg-[var(--bg-base)]"
             >
-              <div className="min-h-0 flex-1 overflow-hidden">
+              <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
                 {mobileTab === "chats" && (
-                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                  <div className="h-full w-full min-w-0 pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
                     <Sidebar
                       conversations={listItems}
                       selectedId={selectedId}
@@ -1923,7 +1923,7 @@ export function DashboardShell() {
                   </div>
                 )}
                 {mobileTab === "groups" && (
-                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                  <div className="h-full w-full min-w-0 pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
                     <Sidebar
                       conversations={listItems}
                       selectedId={selectedId}
@@ -2131,9 +2131,9 @@ export function DashboardShell() {
   // Desktop: nested icon-rail + panel sidebar + chat side by side.
   return (
     <CallProvider conversations={conversations}>
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
-      <div className="flex min-h-0 flex-1">
-      <div className="hidden h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
+    <div className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)]">
+      <div className="flex min-h-0 w-full min-w-0 flex-1">
+      <div className="hidden h-full w-full min-w-0 shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
         <NestedSidebar
           conversations={listItems}
           selectedId={selectedId}
@@ -2161,7 +2161,7 @@ export function DashboardShell() {
         />
       </div>
 
-      <div className="flex h-full min-w-0 flex-1 flex-col">
+      <div className="flex h-full w-full min-w-0 flex-1 flex-col">
         <ChatPanel
           conversation={selected}
           space={selectedSpace}

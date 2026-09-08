@@ -112,7 +112,7 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
 function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove }) {
   if (!items.length) return <EmptyState message="No conversations yet" />;
   return (
-    <div className="space-y-0.5">
+    <div className="w-full min-w-0 space-y-0.5">
       {items.map((c, i) => (
         <ConversationItem
           key={c.id}
@@ -162,16 +162,16 @@ function SpacesList({ spaces, channels, selectedId, onSelect, onCreateSpace }) {
   }
 
   return (
-    <div className="space-y-1">
+    <div className="w-full min-w-0 space-y-1">
       {spaces.map((space) => {
         const spaceChannels = channels.filter((c) => c.spaceId === space.id);
         const expandedOpen = isExpanded(space.id);
         return (
-          <div key={space.id} className="rounded-xl px-1">
+          <div key={space.id} className="w-full min-w-0 rounded-xl px-1">
             <button
               type="button"
               onClick={() => toggle(space.id)}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:cursor-pointer hover:bg-[var(--hover)]"
+              className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:cursor-pointer hover:bg-[var(--hover)]"
             >
               <Avatar name={space.name} url={space.avatarUrl} size="sm" />
               <div className="min-w-0 flex-1">
@@ -395,7 +395,7 @@ export function NestedSidebar({
   };
 
   return (
-    <div className="flex h-full min-w-0">
+    <div className="flex h-full w-full min-w-0">
       <IconRail
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -405,10 +405,10 @@ export function NestedSidebar({
       />
 
       {/* Content panel */}
-      <div className="flex h-full min-w-0 flex-1 flex-col bg-[var(--bg-elevated)]">
+      <div className="flex h-full min-w-0 w-full flex-1 flex-col bg-[var(--bg-elevated)]">
         {/* Header with search + actions */}
-        <div className="flex shrink-0 flex-col gap-2 border-b border-[var(--border)] px-3 py-3">
-          <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 shrink-0 flex-col gap-2 border-b border-[var(--border)] px-3 py-3">
+          <div className="flex w-full min-w-0 items-center gap-2">
             {notificationBell && <span className="shrink-0">{notificationBell}</span>}
             {onSavedOpen && (
               <button
@@ -474,7 +474,7 @@ export function NestedSidebar({
 
           {/* Search bar — scoped to active tab. Keep as-is styling. */}
           {activeTab !== "status" && (
-            <label className="flex items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
+            <label className="flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
               <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" strokeWidth={1.6} aria-hidden="true" />
               <input
                 type="text"
@@ -506,7 +506,7 @@ export function NestedSidebar({
         </div>
 
         {/* Panel body — exactly one context at a time, with shared easing */}
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait" initial={false}>
             {activeTab === "chats" && (
               <motion.div
@@ -515,7 +515,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {conversations.filter((c) => c.type === "dm").length === 0 ? (
@@ -549,7 +549,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {conversations.filter((c) => c.type === "group").length === 0 ? (
@@ -580,7 +580,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {filteredSpaces.length === 0 && query.trim() ? (
@@ -603,7 +603,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {/* Skip search for settings if filtered — but keep panel consistent */}
@@ -617,7 +617,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full overflow-hidden"
+                className="h-full w-full min-w-0 overflow-hidden"
                 style={{ overscrollBehavior: "contain" }}
               >
                 <StatusTab
