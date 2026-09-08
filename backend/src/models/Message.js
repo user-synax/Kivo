@@ -172,8 +172,7 @@ const messageSchema = new mongoose.Schema(
       default: [],
     },
     scheduledAt: { type: Date, default: null, index: true },
-    status: { type: String, enum: ["sent", "scheduled", "expired"], default: "sent", index: true },
-    expireAt: { type: Date, default: null, index: true },
+    status: { type: String, enum: ["sent", "scheduled"], default: "sent", index: true },
     forwardCount: { type: Number, default: 0 },
     // Soft delete: keep the row (so replies/ordering remain stable) but blank it.
     isDeleted: { type: Boolean, default: false },
@@ -220,8 +219,6 @@ messageSchema.index({ type: 1, "poll.expiresAt": 1 });
 messageSchema.index({ type: 1, "poll.isClosed": 1 });
 
 messageSchema.index({ status: 1, scheduledAt: 1 });
-messageSchema.index({ expireAt: 1 });
-messageSchema.index({ conversationId: 1, expireAt: 1 });
 
 // Text index for full-text search on message content.
 messageSchema.index({ content: "text" }, { weights: { content: 1 } });

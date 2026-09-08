@@ -18,7 +18,6 @@ import {
   Reply,
   Share,
   ShieldBan,
-  Timer,
   Trash,
   UserRound,
   X,
@@ -607,12 +606,11 @@ export function MessageBubble({
   const bubbleVariant =
     variant ?? (isBigEmoji ? "ghost" : mine ? "default" : "secondary");
 
-  const isDisappearing = Boolean(message?.expireAt) && !deleted;
   return (
     <ContextMenu>
       <ContextMenuTrigger disabled={deleted || isEditing || selectMode}>
         <Bubble
-          variant={isDisappearing ? "outline" : bubbleVariant}
+          variant={bubbleVariant}
           align={mine ? "end" : "start"}
           className={cn(
             "group/bubble relative transition-transform will-change-transform select-text touch-manipulation",
@@ -620,8 +618,6 @@ export function MessageBubble({
             isReplying && "border-l-2 border-[var(--accent)]",
             selected && "ring-2 ring-[var(--accent)]",
             message?.isFrequentlyForwarded && !selected && "ring-1 ring-amber-500/40",
-            isDisappearing &&
-              "*:data-[slot=bubble-content]:!bg-[var(--bg-surface)]/20 *:data-[slot=bubble-content]:!border *:data-[slot=bubble-content]:!border-dashed *:data-[slot=bubble-content]:!border-[var(--border)] *:data-[slot=bubble-content]:backdrop-blur-[1px]",
             selectMode && "cursor-pointer",
             className,
           )}

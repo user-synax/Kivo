@@ -7,7 +7,6 @@ import { sweepPlus } from "./modules/plus/plus.service.js";
 import { cleanupExpiredStatuses } from "./modules/status/status.service.js";
 import { closeExpiredPolls } from "./modules/messages/messages.service.js";
 import { startScheduledJob } from "./jobs/scheduledMessages.js";
-import { startExpiredJob } from "./jobs/expiredMessages.js";
 import "./config/webpush.js";
 
 // Hourly sweep (plus a run at boot): lapse Plus claims past their 24h review
@@ -70,7 +69,6 @@ async function start() {
   startStatusSweep();
   startPollSweep();
   startScheduledJob();
-  startExpiredJob();
 
   server.listen(env.port, () => {
     console.log(`[server] listening on http://localhost:${env.port} (${env.nodeEnv})`);

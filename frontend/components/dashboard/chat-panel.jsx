@@ -24,7 +24,6 @@ import {
   Reply,
   Send,
   ShieldBan,
-  Timer,
   Trash,
   User,
   UserMinus,
@@ -743,8 +742,6 @@ export function ChatPanel({
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduledList, setScheduledList] = useState([]);
   const [showScheduledList, setShowScheduledList] = useState(false);
-  const [showDisappearingMenu, setShowDisappearingMenu] = useState(false);
-  const disappearingMenuRef = useRef(null);
   const composerMenuRef = useRef(null);
   const plusBtnRef = useRef(null);
 
@@ -916,28 +913,6 @@ export function ChatPanel({
     }
   };
 
-  const handleSetDisappearing = async (duration) => {
-    if (!convId) return;
-    try {
-      const updated = await apiPatch(`/api/v1/conversations/${convId}/disappearing`, {
-        duration,
-      });
-      const nextDuration = updated?.disappearingDuration ?? duration;
-      if (onConversationUpdate && conversation) {
-        onConversationUpdate({ ...conversation, disappearingDuration: nextDuration });
-      }
-      showNotice(
-        duration === null
-          ? "Disappearing off"
-          : duration === 86400000
-            ? "Disappearing: 24 hours"
-            : "Disappearing: 7 days",
-      );
-    } catch (e) {
-      showNotice(e.message || "Could not update disappearing");
-    }
-  };
-
   // Reset per-conversation action state and load the pinned banner when the
   // open conversation changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: helper reads convId from closure; convId is the only real trigger.
@@ -961,7 +936,6 @@ export function ChatPanel({
     setShowSchedulePicker(false);
     setShowScheduledList(false);
     setScheduledList([]);
-    setShowDisappearingMenu(false);
     if (!convId) return undefined;
     apiGet(`/api/v1/conversations/${convId}/pinned`)
       .then((data) => setPinnedMessages(Array.isArray(data) ? data : []))
@@ -969,24 +943,6 @@ export function ChatPanel({
     refreshThreadSummaries();
     return undefined;
   }, [convId]);
-
-  // Close disappearing menu on outside click / Escape
-  useEffect(() => {
-    if (!showDisappearingMenu) return undefined;
-    const onDoc = (e) => {
-      if (disappearingMenuRef.current?.contains(e.target)) return;
-      setShowDisappearingMenu(false);
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") setShowDisappearingMenu(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [showDisappearingMenu]);
 
   // Ongoing-call lookup for the Join pill (late join / rejoin after drop).
   // Fetched on open + refreshed on call lifecycle events; never for channels.
@@ -2044,30 +2000,13 @@ export function ChatPanel({
     };
   }, [socket, convId]);
 
-  // Scheduled / expiry / disappearing realtime
+  // Scheduled / forward-limit realtime
   useEffect(() => {
     if (!socket || !convId) return undefined;
     const onScheduledCancel = (payload) => {
       const mid = payload?.messageId;
       if (!mid) return;
       setScheduledList((prev) => prev.filter((m) => m.id !== mid));
-    };
-    const onExpired = (payload) => {
-      const mid = payload?.messageId;
-      if (!mid) return;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === mid ? { ...m, isDeleted: true, content: "", reactions: [], pinnedAt: null } : m,
-        ),
-      );
-      setPinnedMessages((prev) => prev.filter((p) => p.id !== mid));
-    };
-    const onDisappearing = (payload) => {
-      if (!payload || payload.conversationId !== convId) return;
-      const duration = payload.duration ?? null;
-      if (onConversationUpdate && conversation) {
-        onConversationUpdate({ ...conversation, disappearingDuration: duration });
-      }
     };
     const onForwardLimit = (payload) => {
       if (!payload?.messageId) return;
@@ -2078,16 +2017,12 @@ export function ChatPanel({
       );
     };
     socket.on("message:scheduled-cancel", onScheduledCancel);
-    socket.on("message:expired", onExpired);
-    socket.on("conversation:disappearing", onDisappearing);
     socket.on("message:forward-limit", onForwardLimit);
     return () => {
       socket.off("message:scheduled-cancel", onScheduledCancel);
-      socket.off("message:expired", onExpired);
-      socket.off("conversation:disappearing", onDisappearing);
       socket.off("message:forward-limit", onForwardLimit);
     };
-  }, [socket, convId, conversation, onConversationUpdate]);
+  }, [socket, convId]);
 
   // Stop emitting "typing" when leaving the conversation.
   useEffect(() => {
@@ -3128,77 +3063,6 @@ export function ChatPanel({
             <Palette className="h-5 w-5" />
           </button>
         )}
-        {conversation && !isChannel && (
-          <div className="relative hidden sm:flex" ref={disappearingMenuRef}>
-            <button
-              type="button"
-              onClick={() => setShowDisappearingMenu((v) => !v)}
-              aria-label="Disappearing messages"
-              aria-expanded={showDisappearingMenu}
-              title={`Disappearing: ${conversation.disappearingDuration === 86400000 ? "24h" : conversation.disappearingDuration === 604800000 ? "7 days" : "Off"}`}
-              className={`flex size-9 items-center justify-center rounded-nav border transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)] ${conversation.disappearingDuration ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10" : "border-[var(--border)] text-[var(--text-muted)]"}`}
-            >
-              <Timer className="h-5 w-5" />
-            </button>
-            {showDisappearingMenu && (
-              <div className="absolute right-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1.5 shadow-xl">
-                <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Disappearing timer</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSetDisappearing(null);
-                    setShowDisappearingMenu(false);
-                  }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--hover)] ${!conversation.disappearingDuration ? "bg-[var(--accent)] text-white" : "text-[var(--text-primary)]"}`}
-                >
-                  Off <span className="text-xs opacity-70">∞</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSetDisappearing(86400000);
-                    setShowDisappearingMenu(false);
-                  }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--hover)] ${conversation.disappearingDuration === 86400000 ? "bg-[var(--accent)] text-white" : "text-[var(--text-primary)]"}`}
-                >
-                  24 hours <Clock className="h-3 w-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSetDisappearing(604800000);
-                    setShowDisappearingMenu(false);
-                  }}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--hover)] ${conversation.disappearingDuration === 604800000 ? "bg-[var(--accent)] text-white" : "text-[var(--text-primary)]"}`}
-                >
-                  7 days <Clock className="h-3 w-3" />
-                </button>
-                {conversation.disappearingDuration ? (
-                  <p className="px-2 pt-1.5 text-[11px] leading-snug text-[var(--text-muted)]">New messages disappear after the timer.</p>
-                ) : null}
-              </div>
-            )}
-          </div>
-        )}
-        {conversation && !isChannel && (
-          <select
-            value={
-              conversation.disappearingDuration
-                ? String(conversation.disappearingDuration)
-                : ""
-            }
-            onChange={(e) => {
-              const v = e.target.value;
-              handleSetDisappearing(v ? Number(v) : null);
-            }}
-            aria-label="Disappearing messages"
-            className="hidden sm:block rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-          >
-            <option value="">Off</option>
-            <option value="86400000">24h</option>
-            <option value="604800000">7 days</option>
-          </select>
-        )}
         {conversation && (
           <button
             type="button"
@@ -3310,45 +3174,6 @@ export function ChatPanel({
                   >
                     <LayoutGrid className="h-4 w-4" /> Shared media
                   </button>
-                  {!isChannel && (
-                    <>
-                      <div className="mx-3 my-1 h-px bg-[var(--border)]" />
-                      <p className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Disappearing</p>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowMore(false);
-                          handleSetDisappearing(null);
-                        }}
-                        className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--hover)] ${!conversation?.disappearingDuration ? "bg-[var(--accent)] text-white" : "text-[var(--text-primary)]"}`}
-                      >
-                        <Timer className="h-4 w-4" /> Off
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowMore(false);
-                          handleSetDisappearing(86400000);
-                        }}
-                        className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--hover)] ${conversation?.disappearingDuration === 86400000 ? "bg-[var(--accent)] text-white" : "text-[var(--text-primary)]"}`}
-                      >
-                        <Clock className="h-4 w-4" /> 24 hours
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowMore(false);
-                          handleSetDisappearing(604800000);
-                        }}
-                        className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--hover)] ${conversation?.disappearingDuration === 604800000 ? "bg-[var(--accent)] text-white" : "text-[var(--text-primary)]"}`}
-                      >
-                        <Clock className="h-4 w-4" /> 7 days
-                      </button>
-                    </>
-                  )}
                   {isDm && otherId && (
                     <>
                       <div className="mx-3 my-1 h-px bg-[var(--border)]" />

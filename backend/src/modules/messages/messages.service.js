@@ -75,7 +75,6 @@ export function publicMessage(message, viewerId = null) {
     isDeleted: obj.isDeleted,
     status: obj.status || "sent",
     scheduledAt: obj.scheduledAt ? new Date(obj.scheduledAt).toISOString() : null,
-    expireAt: obj.expireAt ? new Date(obj.expireAt).toISOString() : null,
     forwardCount: obj.forwardCount || 0,
     isFrequentlyForwarded: (obj.forwardCount || 0) >= 3,
     editHistory: (obj.editHistory || []).map((h) => ({
@@ -524,14 +523,11 @@ export async function createMessage({
     mentions = await resolveMentions(finalContent, conversation.participants);
   }
 
-  const disappearingDuration = conversation.disappearingDuration || null;
-
   if (scheduledAt) {
     const when = new Date(scheduledAt);
     if (Number.isNaN(when.getTime())) throw badRequest("Invalid scheduledAt", "BAD_SCHEDULED");
     if (when.getTime() <= Date.now()) throw badRequest("scheduledAt must be future", "BAD_SCHEDULED");
     if (when.getTime() - Date.now() > 30 * 24 * 60 * 60 * 1000) throw badRequest("max 30 days", "BAD_SCHEDULED");
-    const expireAt = disappearingDuration ? new Date(when.getTime() + disappearingDuration) : null;
     const message = await Message.create({
       conversationId,
       senderId: userId,
@@ -545,7 +541,6 @@ export async function createMessage({
       forwardedFromName: forwardedName,
       scheduledAt: when,
       status: "scheduled",
-      expireAt,
       forwardCount: forwardedFromId ? forwardedSourceForwardCount + 1 : 0,
     });
     if (forwardedSourceId) {
@@ -565,8 +560,6 @@ export async function createMessage({
     return publicMessage(message, userId);
   }
 
-  const expireAt = disappearingDuration ? new Date(Date.now() + disappearingDuration) : null;
-
   const message = await Message.create({
     conversationId,
     senderId: userId,
@@ -580,7 +573,6 @@ export async function createMessage({
     forwardedFromName: forwardedName,
     status: "sent",
     scheduledAt: null,
-    expireAt,
     forwardCount: forwardedFromId ? forwardedSourceForwardCount + 1 : 0,
   });
 
@@ -1290,12 +1282,6 @@ export async function deliverScheduled() {
   }).limit(50);
   for (const msg of due) {
     msg.status = "sent";
-    if (!msg.expireAt) {
-      const conv = await Conversation.findById(msg.conversationId).select("disappearingDuration");
-      if (conv?.disappearingDuration) {
-        msg.expireAt = new Date(Date.now() + conv.disappearingDuration);
-      }
-    }
     await msg.save();
     await Conversation.findByIdAndUpdate(msg.conversationId, {
       lastMessageAt: msg.createdAt,

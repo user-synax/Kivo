@@ -84,17 +84,6 @@ const conversationSchema = new mongoose.Schema(
       },
     },
 
-    disappearingDuration: {
-      type: Number,
-      default: null,
-      validate: {
-        validator(v) {
-          return v === null || v === 86400000 || v === 604800000;
-        },
-        message: "disappearingDuration must be null, 86400000 (24h) or 604800000 (7d)",
-      },
-    },
-
     // Denormalized timestamp of the latest message, used to sort the inbox.
     lastMessageAt: { type: Date, default: null, index: true },
   },

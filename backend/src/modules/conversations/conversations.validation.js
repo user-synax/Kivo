@@ -39,10 +39,6 @@ export const addMembersSchema = z.object({
   memberIds: z.array(z.string().min(1)).min(1, "Select at least one member"),
 });
 
-export const disappearingSchema = z.object({
-  duration: z.union([z.literal(86400000), z.literal(604800000), z.null()]),
-});
-
 // Convenience parser that throws a VALIDATION_ERROR ApiError on failure.
 export function parseBody(schema, body) {
   const result = schema.safeParse(body);
