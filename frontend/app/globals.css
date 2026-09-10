@@ -939,40 +939,24 @@
         position: absolute;
         bottom: calc(100% + 8px);
         left: 0;
+        right: 0;
+        margin: 0 auto;
         z-index: 50;
         display: flex;
         flex-direction: column;
-        width: 320px;
-        max-width: calc(100vw - 24px);
+        width: min(320px, calc(100vw - 32px));
+        max-width: 360px;
+        max-height: min(60vh, 380px);
         background: var(--bg-elevated, #1c1c1c);
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-md);
         overflow: hidden;
-        transform-origin: bottom left;
+        transform-origin: bottom center;
         animation: t-panel-in var(--duration-fast) var(--ease-smooth-out) both;
     }
-    @media (max-width: 640px) {
-        .t-emoji-picker {
-            position: absolute;
-            left: 50%;
-            right: auto;
-            transform: translateX(-50%);
-            width: calc(100vw - 32px);
-            max-width: 360px;
-            max-height: min(60vh, 380px);
-            transform-origin: bottom center;
-        }
-        .t-emoji-picker__grid {
-            max-height: 200px;
-        }
-    }
-    @media (min-width: 641px) {
-        .t-emoji-picker {
-            left: auto;
-            right: 0;
-            transform-origin: bottom right;
-        }
+    .t-emoji-picker__grid {
+        max-height: 200px;
     }
     .t-emoji-picker__tabs {
         display: flex;
