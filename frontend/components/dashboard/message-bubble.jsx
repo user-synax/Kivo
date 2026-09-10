@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ContextMenu,
@@ -175,6 +175,23 @@ function CustomEmojiImg({ emoji, size = 22 }) {
       style={{ width: size, height: size }}
       draggable={false}
     />
+  );
+}
+
+function QuickReactionButton({ emoji, onReact, className, children, ...props }) {
+  const ctx = useContext(ContextMenuContext);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onReact?.(emoji);
+        ctx?.setOpen(false);
+      }}
+      className={className}
+      {...props}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -898,27 +915,27 @@ export function MessageBubble({
           <>
             <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
               {REACTION_EMOJIS.map((e) => (
-                <button
+                <QuickReactionButton
                   key={e}
-                  type="button"
+                  emoji={e}
+                  onReact={onReact}
                   aria-label={`React ${e}`}
-                  onClick={() => onReact?.(e)}
                   className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
                 >
                   {e}
-                </button>
+                </QuickReactionButton>
               ))}
               {customEmojiById && [...customEmojiById.values()].slice(0, 6).map((ce) => (
-                <button
+                <QuickReactionButton
                   key={ce.id}
-                  type="button"
+                  emoji={`custom:${ce.id}`}
+                  onReact={onReact}
                   aria-label={`React :${ce.name}:`}
-                  onClick={() => onReact?.(`custom:${ce.id}`)}
                   className="rounded-lg p-0.5 transition-transform hover:scale-110"
                   title={`:${ce.name}:`}
                 >
                   <img src={ce.url} alt={`:${ce.name}:`} width={20} height={20} className="size-5" loading="lazy" decoding="async" />
-                </button>
+                </QuickReactionButton>
               ))}
             </div>
           </>
