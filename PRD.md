@@ -126,7 +126,9 @@ Kivo
 | **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits last message; **mobile swipe-to-reply** (right swipe ~45 px with direction lock, haptics) |
 | **Status (24h text+photo)** | **Complete** | `Status` model `text 280` + `background` 6 + `media{fileId,bucketId,url,kind:image,mimeType,size,fileName}` nullable + `viewers[]` + `expiresAt` 24h (indexed, hourly `cleanupExpiredStatuses()` deletes Appwrite file then doc — no orphaned bucket files); friends-only feed `GET /api/v1/status/feed` (grouped by user, `isViewed`, blocked both-ways) + `GET /me` + `POST /` multipart `media` 10/day (`STATUS_ALLOWED_MIMES` image 30MB, `uploadAttachment` to `APPWRITE_ATTACHMENTS_BUCKET_ID`, caption=`text`) + `POST /:id/view` 60/min + `DELETE /:id` (Appwrite delete); WhatsApp Desktop vertical tab (`StatusTab` Photo label + `StatusRing` green/grey) + mobile `BottomTabBar` 5th item, `StatusCreateModal` 6 backgrounds + Photo picker with preview, `StatusViewer` image 5s auto-advance + caption overlay + live `status:new/deleted/viewed` |
 | **Polls** | **Complete** | Interactive polls in any DM/group/Space channel: `Message.type poll` + `poll{question, options[]{id,text,voters}, allowMultiple, anonymous, expiresAt, isClosed, totalVotes}`; free 5 opts/24h/single, Plus 8/7d/multi+anon; `POST /conversations/:id/messages {poll}` + `POST /messages/:id/poll/vote`/`DELETE` retract + `POST /poll/end`; `poll:updated`/`poll:ended` realtime, 60s `closeExpiredPolls()` sweep; search includes polls |
-| Voice / Video Calls | **Not started** | No voice/call backend or UI |
+| **Custom Emoji** | **Complete** | `CustomEmoji` model (global/space/personal), `emoji` module (CRUD + Appwrite upload), personal emoji (Plus-only, 50 max, usable everywhere), Space emoji (Plus/admin, 100 max), global emoji (admin-only, 200 max), `:name:` shortcode parsing, `customReactionKey` for reactions, IndexedDB caching with stale-while-revalidate, `emoji:new`/`emoji:deleted` realtime events |
+| **Kivo Plus (UPI payments)** | **Complete** | Self-serve ₹49/month via UPI, `/plus` page with pricing + claim form + status cards, `PlusRequest` model (pending/approved/rejected/expired), admin review queue, 24h review window, 30-day grants, hourly sweep for expired claims + scrubbing Plus-only effects, per-plan caps in `PLAN_LIMITS` |
+| Voice / Video Calls | **Complete** | LiveKit Cloud SFU; `POST /api/v1/calls/token` + `GET /calls/status`; Socket.IO ring coordination; incoming overlay + floating call panel; in-chat call history |
 
 ---
 
@@ -259,7 +261,8 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | instagramUsername | String | Yes | Social link chip — Instagram handle, no @ (max 60, `^[a-zA-Z0-9_.]*$`) |
 | youtubeUrl | String | Yes | Social link chip — full `https://` URL (max 500) |
 | websiteUrl | String | Yes | Social link chip — full `https://` URL (max 500) — brand glyphs via `social-links.jsx` (`SocialGlyph`) |
-| plan | String | No | `free`/`plus`, admin-granted (`POST /api/admin/users/:id/plan`); see admin 7.2 |
+| plan | String | No | `free`/`plus`, admin-granted (`POST /api/admin/users/:id/plan`) or self-serve via UPI (`/plus` page); see admin 7.2 |
+| planExpiresAt | Date | No | Nullable; set when Plus is granted (30 days from grant); null = no expiry (manual/admin grant) |
 | verified / showBadge | Boolean | No / Yes | Admin grants `verified`; the user toggles `showBadge` visibility in Settings |
 | avatarStyle | String | Yes | One of 10 presets: Default + My accent (follows the theme token) + 6 solid colors + 2 gradient rings (`AVATAR_STYLE_IDS`) |
 | avatarUrl | String | Via upload | Hosted on Appwrite Storage (`PATCH /users/me/avatar`, 4 MB) |
@@ -1214,6 +1217,36 @@ Media flows through LiveKit Cloud; the backend mints tokens and coordinates ring
 
 Room names are deterministic per conversation (`kivo_<conversationId>`) so late joiners and reconnects land in the same room. Socket ring registry (30s timeout → `call:missed` + missed-call chip + `missed_call` notification) lives in `socket/index.js`.
 
+#### Custom Emoji
+
+| Method | Path | Auth | Rate Limit | Body |
+|---|---|---|---|---|
+| GET | `/api/v1/emoji?spaceId=` | Yes | — | — (returns global + space + personal emoji merged; `spaceId` optional) |
+| GET | `/api/v1/emoji/personal` | Yes | — | — (returns the user's personal emoji library) |
+| POST | `/api/v1/emoji` | Yes | — | `multipart: name, spaceId?, personal?, image` (Plus-gated for personal/space; admin-only for global) |
+| DELETE | `/api/v1/emoji/:id` | Yes | — | — (owner/creator, Space admin, or site admin) |
+
+**Limits:** Global 200, per-Space 100, per-user personal 50. Image: jpg/png/gif/webp, 2 MB max, auto-normalized to webp (gif preserved). Name: 2-32 chars, lowercase alphanumeric + underscore.
+
+**Realtime:** `emoji:new` and `emoji:deleted` events broadcast to space rooms or globally.
+
+#### Kivo Plus (UPI payments)
+
+| Method | Path | Auth | Rate Limit | Body |
+|---|---|---|---|---|
+| POST | `/api/v1/plus/claim` | Yes | 5/day | `{ utr }` (12-digit UPI reference) → claim object |
+| GET | `/api/v1/plus/claim` | Yes | — | — (returns latest claim for the user) |
+
+**Flow:** User pays ₹49 to published UPI ID → submits 12-digit UTR → admin reviews within 24h → approval grants 30 days of Plus. Claims have states: pending, approved, rejected, expired. Hourly sweep lapses expired claims and scrubs Plus-only effects on expired accounts.
+
+**Admin endpoints:**
+
+| Method | Path | Auth | Body |
+|---|---|---|---|
+| GET | `/api/admin/plus-requests` | Admin cookie | `?status=&page=&limit=` |
+| POST | `/api/admin/plus-requests/:id/approve` | Admin cookie | — |
+| POST | `/api/admin/plus-requests/:id/reject` | Admin cookie | `{ note? }` |
+
 #### Admin (standalone panel at `/admin`)
 
 Admin auth uses a separate JWT cookie (`admin_token`) — never mixed with user auth.
@@ -1228,6 +1261,10 @@ Admin auth uses a separate JWT cookie (`admin_token`) — never mixed with user 
 | GET | `/api/admin/users/:id` | Admin cookie | — |
 | POST | `/api/admin/users/:id/ban` | Admin cookie | `{ reason? }` |
 | POST | `/api/admin/users/:id/unban` | Admin cookie | — |
+| POST | `/api/admin/users/:id/plan` | Admin cookie | `{ plan: "plus"|"free", expiresAt? }` |
+| GET | `/api/admin/plus-requests` | Admin cookie | `?status=&page=&limit=` |
+| POST | `/api/admin/plus-requests/:id/approve` | Admin cookie | — |
+| POST | `/api/admin/plus-requests/:id/reject` | Admin cookie | `{ note? }` |
 | GET | `/api/admin/groups` | Admin cookie | `?page=&limit=` |
 | DELETE | `/api/admin/groups/:id` | Admin cookie | — |
 | GET | `/api/admin/spaces` | Admin cookie | `?page=&limit=` |

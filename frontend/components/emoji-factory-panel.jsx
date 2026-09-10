@@ -98,7 +98,7 @@ export function EmojiFactoryPanel({ onClose }) {
       return;
     }
     if (!file) {
-      setError("Choose an image (png, jpeg, webp, gif ≤256 KB)");
+      setError("Choose an image (png, jpeg, webp, gif ≤2 MB)");
       return;
     }
     if (emojis.length >= 50) {
@@ -197,7 +197,7 @@ export function EmojiFactoryPanel({ onClose }) {
           <div className="mt-4 flex flex-col gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-surface)] p-4 sm:p-5">
             <div>
               <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Create personal emoji</h3>
-              <p className="mt-1 text-[11px] text-[var(--text-muted)]">≤256 KB • auto-resized to 128px WebP/GIF • usable everywhere via `:name:`</p>
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">≤2 MB • auto-resized to 128px WebP/GIF • usable everywhere via `:name:`</p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>

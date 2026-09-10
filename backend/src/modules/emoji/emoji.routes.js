@@ -31,7 +31,7 @@ const deleteLimiter = rateLimiter({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 256 * 1024, files: 1 },
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
     const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
     if (!allowed.includes(file.mimetype)) {
@@ -49,7 +49,7 @@ function withUpload(handler) {
     upload.single("image")(req, res, async (err) => {
       if (err) {
         if (err.code === "LIMIT_FILE_SIZE") {
-          return res.status(400).json({ success: false, error: { code: "FILE_TOO_LARGE", message: "File too large (max 256 KB)" } });
+          return res.status(400).json({ success: false, error: { code: "FILE_TOO_LARGE", message: "File too large (max 2 MB)" } });
         }
         const status = err.statusCode || 400;
         const code = err.code || "UPLOAD_ERROR";

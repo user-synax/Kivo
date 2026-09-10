@@ -100,7 +100,7 @@ export function SpaceEmojiSection({ space, canEdit }) {
       return;
     }
     if (!file) {
-      setError("Choose an image (png, jpeg, webp, gif ≤256 KB)");
+      setError("Choose an image (png, jpeg, webp, gif ≤2 MB)");
       return;
     }
     if (emojis.length >= 100) {
@@ -162,7 +162,7 @@ export function SpaceEmojiSection({ space, canEdit }) {
         </div>
       </div>
       <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-        Upload tiny images (≤256 KB) — they’re auto-resized to 128px WebP and appear as :name: in messages. Space members can use them; admins manage them.
+        Upload tiny images (≤2 MB) — they’re auto-resized to 128px WebP and appear as :name: in messages. Space members can use them; admins manage them.
       </p>
 
       {error && (

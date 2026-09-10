@@ -161,7 +161,7 @@ function tokenizeLinks(chunk, keyPrefix) {
   return out;
 }
 
-function CustomEmojiImg({ emoji, size = 22 }) {
+function CustomEmojiImg({ emoji, size = 32 }) {
   if (!emoji?.url) return null;
   return (
     <img
@@ -176,6 +176,25 @@ function CustomEmojiImg({ emoji, size = 22 }) {
       draggable={false}
     />
   );
+}
+
+function getCustomBigInfo(content, customEmojiMap) {
+  if (!content || !customEmojiMap || customEmojiMap.size === 0) return { isBig: false, count: 0 };
+  const tokens = parseCustomEmoji(content, customEmojiMap);
+  // Check if tokens are only emoji or whitespace/text that is whitespace-only
+  let emojiCount = 0;
+  for (const tok of tokens) {
+    if (tok.type === "emoji") {
+      emojiCount += 1;
+    } else {
+      const v = tok.value || "";
+      if (v.trim() !== "") return { isBig: false, count: 0 };
+      // whitespace-only text is ok (spaces between emojis)
+      // but if it contains non-whitespace non-emoji, already returned
+    }
+  }
+  if (emojiCount >= 1 && emojiCount <= 3) return { isBig: true, count: emojiCount };
+  return { isBig: false, count: 0 };
 }
 
 function QuickReactionButton({ emoji, onReact, className, children, ...props }) {
@@ -204,6 +223,8 @@ function MessageContent({
   searchQuery,
   isActiveSearch,
   customEmojiMap,
+  isBigCustom = false,
+  bigCustomCount = 0,
 }) {
   if (!content) return null;
 
@@ -263,11 +284,23 @@ function MessageContent({
 
   // First split by custom emoji shortcodes, then run mention+link parsing on text chunks.
   const emojiTokens = parseCustomEmoji(content, customEmojiMap);
+  const bigSize = bigCustomCount === 1 ? 128 : bigCustomCount === 2 ? 64 : 56;
   for (const tok of emojiTokens) {
     if (tok.type === "emoji" && tok.emoji) {
-      parts.push(<CustomEmojiImg key={`e-${key++}-${tok.name}`} emoji={tok.emoji} size={22} />);
+      const size = isBigCustom ? bigSize : 32;
+      parts.push(<CustomEmojiImg key={`e-${key++}-${tok.name}`} emoji={tok.emoji} size={size} />);
     } else {
-      pushMentionChunk(tok.value || "");
+      if (isBigCustom) {
+        // In big mode ignore whitespace-only chunks except to add a tiny gap between emojis
+        const v = tok.value || "";
+        if (v.trim() === "" && parts.length > 0) {
+          parts.push(<span key={`sp-${key++}`} className="inline-block w-1.5" aria-hidden="true" />);
+        } else if (v.trim() !== "") {
+          pushMentionChunk(v);
+        }
+      } else {
+        pushMentionChunk(tok.value || "");
+      }
     }
   }
 
@@ -687,9 +720,19 @@ export function MessageBubble({
     !message.forwardedFromName &&
     (!message.attachments || message.attachments.length === 0);
 
+  // Custom emoji big: 1-3 custom :name: only, no bubble
+  const customBigInfo =
+    !deleted && !isEditing && !isPoll && message.content && !replyTo && customEmojiMap
+      ? getCustomBigInfo(message.content, customEmojiMap)
+      : { isBig: false, count: 0 };
+  const isBigCustom =
+    customBigInfo.isBig &&
+    !message.forwardedFromName &&
+    (!message.attachments || message.attachments.length === 0);
+  const isBig = isBigEmoji || isBigCustom;
+
   // Sent messages use the primary (accent) bubble, received use the secondary.
-  const bubbleVariant =
-    variant ?? (isBigEmoji ? "ghost" : mine ? "default" : "secondary");
+  const bubbleVariant = variant ?? (isBig ? "ghost" : mine ? "default" : "secondary");
 
   return (
     <ContextMenu>
@@ -719,12 +762,14 @@ export function MessageBubble({
           <BubbleContent
             className={cn(
               "min-w-0",
-              isBigEmoji &&
+              isBig &&
+                !isBigCustom &&
                 (bigEmojiCount === 1
                   ? "text-[44px] leading-none"
                   : bigEmojiCount === 2
                     ? "text-[36px] leading-none"
                     : "text-[30px] leading-snug"),
+              isBigCustom && "py-1",
               contentClassName,
             )}
           >
@@ -797,8 +842,10 @@ export function MessageBubble({
                   searchQuery={searchQuery}
                   isActiveSearch={isActiveSearch}
                   customEmojiMap={customEmojiMap}
+                  isBigCustom={isBigCustom}
+                  bigCustomCount={customBigInfo.count}
                 />
-                {!deleted && !isEditing && !isBigEmoji && message.content ? (
+                {!deleted && !isEditing && !isBig && message.content ? (
                   <LinkPreview url={firstUrl(message.content)} />
                 ) : null}
                 <AttachmentBubble

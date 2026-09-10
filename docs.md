@@ -852,6 +852,7 @@ The admin panel uses a separate JWT cookie (`admin_token`) that is never accepte
 |-----|---------------|
 | **Overview** | Total users, banned users, groups, spaces, messages |
 | **Users** | Paginated user table with search, ban status filter, ban/unban, **plan (Kivo Plus) grant/revoke**, and detail drawer (conversation/group/space counts) |
+| **Plus Claims** | Pending/approved/rejected/expired Plus claims with approve/reject actions and 24h review deadline |
 | **Groups** | All group conversations with member count, admins, delete action |
 | **Spaces** | All spaces with member/channel count, owner, delete action |
 
@@ -859,7 +860,16 @@ The admin panel uses a separate JWT cookie (`admin_token`) that is never accepte
 
 - **Ban a user**: Sets `isBanned` on the user document (does not delete it — the email stays locked). Immediately disconnects their sockets and revokes all sessions. The user is also rejected at login.
 - **Unban a user**: Clears the ban fields so they can log in again.
-- **Kivo Plus grant**: `POST /api/admin/users/:id/plan` `{ plan: "plus" | "free" }`. Admin-only; users can never self-grant. Granting Plus unlocks custom banner uploads and profile effects; **revoking** (`free`) also resets `profileEffect` to `none` automatically. Every grant/revoke is logged (`grant_plus` / `revoke_plus`).
+- **Kivo Plus grant**: `POST /api/admin/users/:id/plan` `{ plan: "plus" | "free" }`. Admin-only; users can never self-grant. Granting Plus unlocks custom banner uploads, profile effects, custom emoji, and higher limits; **revoking** (`free`) also resets `profileEffect` to `none` automatically. Every grant/revoke is logged (`grant_plus` / `revoke_plus`).
+
+### Plus claims review
+
+Users can purchase Kivo Plus via UPI (₹49/month) on the `/plus` page. After paying, they submit a 12-digit UTR reference for admin review:
+
+1. Go to **Admin → Plus Claims** tab.
+2. See pending claims sorted by oldest first (tightest 24h deadline on top).
+3. Click **Approve** to grant 30 days of Plus, or **Reject** with a note (e.g., "UTR doesn't match ₹49 payment").
+4. Expired claims (past 24h without review) are automatically swept and shown as expired; the user can refile.
 
 ### Group & space management
 
@@ -956,6 +966,95 @@ Notes: calls need mic (and camera for video) permission — a blocked permission
 
 ---
 
+## 23. Custom emoji
+
+Kivo supports custom emoji at three levels — global, Space-scoped, and personal.
+
+### Using custom emoji
+
+- Type `:name:` in the composer (e.g., `:wave:`) — the autocomplete suggests matching emoji from your available set.
+- Custom emoji work in messages, reactions, and display names.
+- The parser is grapheme-aware: unknown shortcodes degrade to plain text.
+
+### Creating custom emoji
+
+**Global emoji (admin-only):**
+- Only site admins can create global emoji visible to everyone.
+- Max 200 global emoji.
+
+**Space emoji (Plus or admin):**
+- Space owners and admins can add emoji scoped to their Space.
+- Max 100 per Space.
+- Requires Kivo Plus (or site admin).
+
+**Personal emoji (Plus-only):**
+- Plus users get a personal emoji library usable across all DMs, groups, and Spaces.
+- Max 50 per user.
+- Visible to everyone for rendering (so DM peers can see your personal emoji), but only you can add to your personal library.
+
+### Emoji specs
+
+- Supported formats: JPG, PNG, GIF, WebP
+- Images are auto-normalized to WebP (GIFs preserved for animation) via sharp
+- Max file size: 2 MB per emoji
+- Name: 2–32 characters, lowercase letters/numbers/underscores only
+
+### Realtime
+
+- `emoji:new` and `emoji:deleted` events keep all clients in sync.
+- Emoji are cached in IndexedDB with stale-while-revalidate for instant rendering.
+
+---
+
+## 24. Kivo Plus (with UPI payments)
+
+Kivo Plus is a premium plan that unlocks higher limits, custom emoji, profile effects, and custom banner uploads.
+
+### Purchasing Plus
+
+1. Go to **`/plus`** (accessible from the landing page or app).
+2. See the pricing: **₹49/month**.
+3. Pay ₹49 to the published UPI ID (shown on the page).
+4. Copy the **12-digit UTR** (transaction reference) from your UPI app.
+5. Paste the UTR in the claim form and submit.
+6. Admin reviews within 24 hours — you'll see the status on the `/plus` page.
+
+### What Plus unlocks
+
+| Feature | Free | Plus |
+|---------|------|------|
+| Message length | 4,000 chars | 8,000 chars |
+| Attachments per message | 10 | 20 |
+| Max file size | 30 MB | 100 MB |
+| Pins per conversation | 10 | 50 |
+| Saved messages | 200 | 1,000 |
+| Groups owned | 5 | 20 |
+| Group members | 20 | 100 |
+| Spaces owned | 3 | 15 |
+| Space members | 50 | 300 |
+| Channels per Space | 10 | 30 |
+| Call participants | 5 | 25 |
+| Search results/category | 5 | 20 |
+| Poll options | 5 | 8 |
+| Poll duration | 1 day | 7 days |
+| Multi-choice polls | No | Yes |
+| Anonymous polls | No | Yes |
+| Forward limit/message | 5 | 10 |
+| Personal emoji | 0 | 50 |
+| Custom banner upload | No | Yes (8 MB) |
+| Profile effects | No | Yes (glow/gradient/aura) |
+
+### Plus page features
+
+- **Pricing display** — shows ₹49/month with UPI payment steps
+- **Copy UPI ID** — one-tap copy of the published UPI ID
+- **UPI intent link** — "Pay in your UPI app" deep link for mobile
+- **Claim form** — 12-digit UTR input with validation
+- **Status cards** — pending (with review countdown), rejected (with refile option), expired (with refile option)
+- **Already Plus** — shows "You're on Plus ✓" with expiry date
+
+---
+
 ## What is not in the product yet
 
 Do not expect these in the current MVP:
@@ -1006,7 +1105,7 @@ Do not expect these in the current MVP:
 | Voice messages (hold-to-record) | Mic button in composer → hold → release to send |
 | Image lightbox (fullscreen, arrows, download) | Click any image in chat |
 | Global search (Ctrl+K) | Ctrl+K or search icon in panel header |
-| Admin panel | `/admin` — standalone dashboard (Plus grant/revoke, ban/unban, deletes + audit log) |
+| Admin panel | `/admin` — standalone dashboard (Plus claims review, Plus grant/revoke, ban/unban, deletes + audit log) |
 | Offline indicator | "You are offline" banner in sidebar |
 | Forgot / reset password | `/forgot-password` → emailed link → `/reset-password` |
 | Last online status | "active … ago" in DMs & profiles when offline |
@@ -1022,5 +1121,9 @@ Do not expect these in the current MVP:
 | Up-arrow to edit | Empty composer + ↑ edits your last message |
 | Chat performance | Memoized `MessageRows`, O(1) reply map, throttled like/anim, bulk notification `insertMany` |
 | Health check (ops) | `GET /health` on the API |
+| Custom emoji (global/Space/personal) | Type `:name:` in composer; Space admins create Space emoji; Plus users create personal emoji; admin creates global emoji |
+| Kivo Plus (₹49/month UPI) | `/plus` page → pay UPI → paste 12-digit UTR → admin reviews within 24h → 30 days of Plus |
+| Plus claims review (admin) | Admin → Plus Claims tab → approve/reject pending claims |
+| Public pages | `/plus`, `/learn`, `/author`, `/privacy`, `/terms`, `/cookie` |
 
 For endpoint-level detail, see **API Reference** in [`PRD.md`](./PRD.md).

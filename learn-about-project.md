@@ -65,6 +65,8 @@ Think of Kivo as one app with three kinds of conversation:
 - 🔔 A **notification center** with per-category preferences and sounds — plus **push notifications** to your device even when the app is closed.
 - 📱 An **installable app (PWA)** — works on phone and desktop, keeps your recent chats available offline, and **queues messages you send while offline** to deliver automatically on reconnect.
 - 📞 **Voice & video calls** in DMs and groups (ring, join, mute, camera, group grid, call history with "Call back").
+- 🎨 **Custom emoji** — create personal emoji (Plus-only, usable everywhere) or Space-scoped emoji; type `:name:` in messages and reactions.
+- 💳 **Kivo Plus (₹49/month)** — self-serve UPI payments: pay ₹49, paste your 12-digit UTR, get Plus within 24 hours. Higher limits, custom emoji, profile effects, and custom banners.
 - 🔐 **Serious security**: optional **two-factor authentication** (authenticator app + backup codes), **Google/GitHub sign-in**, password reset that logs out every device, and blocking.
 
 ---
@@ -197,7 +199,7 @@ This is the part most projects never explain. Each choice here was made *against
 
 | Model | What it holds |
 |---|---|
-| **User** | email, username, display name, bio, status, avatar/banner, country, social links, `plan` (free/plus), 2FA secrets, blocked users, notification preferences, appearance (accent, tint, wallpaper, bubble style) |
+| **User** | email, username, display name, bio, status, avatar/banner, country, social links, `plan` (free/plus) + `planExpiresAt`, 2FA secrets, blocked users, notification preferences, appearance (accent, tint, wallpaper, bubble style) |
 | **Session** | one row per refresh token, with an expiry date — deleting the row *is* logging out |
 | **Conversation** | type `dm` / `group` / `space_channel`, participants, admins, per-chat look |
 | **Message** | content (4000), sender, reply/thread links, reactions, `readBy`/`deliveredTo` receipts, mentions, embedded attachments, `pinnedAt`, `savedBy`, forwarding attribution |
@@ -205,6 +207,8 @@ This is the part most projects never explain. Each choice here was made *against
 | **Space** | embedded members with roles, embedded channels, category, visibility, invite code |
 | **Notification** | recipient, type, delivery flags — fan-out per recipient |
 | **PushSubscription** | per-user browser push endpoint |
+| **CustomEmoji** | name, spaceId (global/space/personal), ownerId (personal Plus-only), url, animated — three-tiered emoji system |
+| **PlusRequest** | userId, UTR (12-digit UPI ref), status (pending/approved/rejected/expired), 24h review window |
 | **AdminActionLog** | who banned/granted/deleted what, and when |
 
 Messages are heavily **indexed** for the ways they're read: by conversation + time, by thread, by pinned state, by who saved them, plus a text index for search.
@@ -217,9 +221,12 @@ Versioned REST under `/api/v1`, one mount per domain — `auth`, `users`, `frien
 ```
 kivo/
 ├── frontend/    Next.js 16 web app (React 19, Tailwind v4, JS only)
-│   ├── app/         routes: / landing, /learn, /docs, /login…, /app chat, /u/<name>, /admin
-│   ├── components/  chat shell, bubbles, spaces, calls, notifications, profile, ui…
-│   └── lib/         api client, themes, cache (IndexedDB), socket, drafts, push, sounds…
+│   ├── app/         routes: / landing, /learn, /docs, /login…, /app chat, /u/<name>,
+│   │                /plus, /author, /privacy, /terms, /cookie, /admin
+│   ├── components/  chat shell, bubbles, spaces, calls, notifications, profile, ui,
+│   │                plus, learn, author
+│   └── lib/         api client, themes, cache (IndexedDB), socket, drafts, push, sounds,
+│                    custom-emoji, plus, polls, profile-effects, social-links, status
 ├── backend/     Express 5 + Socket.IO + Mongoose (JS only)
 │   └── src/         modules/ (one folder per domain), models/, middleware/, socket/, lib/
 ├── README.md        full feature list & setup
@@ -241,10 +248,11 @@ kivo/
 | Database | **MongoDB (Atlas)** | The filing cabinet holding all users, chats, Spaces |
 | Validation | **Zod 4** | The bouncer that rejects malformed or malicious requests |
 | Auth | **JWT + bcryptjs** | Tamper-proof identity tickets + one-way password hashing |
-| Files | **Appwrite Storage + Multer** | Where images, documents, and voice notes live |
+| Files | **Appwrite Storage + Multer** | Where images, documents, voice notes, and custom emoji live |
 | Push | **web-push (VAPID)** | Delivering notifications when the app is closed |
 | Email | **Nodemailer (Gmail SMTP)** | Password-reset and verification emails |
 | Calls | **LiveKit Cloud** | The audio/video rooms for voice & video calls |
+| Image processing | **sharp** | Normalizing custom emoji images (gif preserved for animation) |
 | Runtime | **Bun** | The fast JavaScript runtime used to develop & run it |
 
 ---
@@ -273,7 +281,7 @@ For web push, generate keys with `npx web-push generate-vapid-keys`. For calls, 
 
 ## 🚧 What's *not* in Kivo (yet)
 
-Honesty is part of the design docs, so: no payments (Plus is admin-granted), no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. The roadmap in the [README](README.md) tracks everything.
+Honesty is part of the design docs, so: no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. The roadmap in the [README](README.md) tracks everything.
 
 ---
 

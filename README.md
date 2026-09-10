@@ -26,6 +26,8 @@
 - ⚡ **Real-time everything** — messages, typing, presence, and read receipts via Socket.IO (no polling). Missed messages are **gap-filled on reconnect**.
 - 🔔 **Full notification system** — in-app notification center with a bell, per-category **notification preferences**, DM-focused suppression, and web push for offline users.
 - 📱 **Progressive Web App** — installable on any device with a service worker, manifest, offline push delivery, and a **full offline shell** (app shell + assets cached; navigations fall back to a styled offline page when the network is gone).
+- 💳 **Kivo Plus (₹49/month)** — self-serve UPI payments with instant activation: pay ₹49, paste your 12-digit UTR, get Plus within 24 hours. Includes custom banners, profile effects, higher limits, and custom emoji.
+- 🎨 **Custom Emoji** — create personal emoji (Plus-only, usable everywhere) or Space-scoped emoji; global emoji via admin. IndexedDB caching with stale-while-revalidate for instant rendering.
 - 🏠 **Discord-style Spaces & Channels** — moderated communities with text/announcement channels, role-based permissions, and realtime updates.
 - 👥 **Full group chats** — private multi-person conversations with admins, member management, and moderation.
 - 🔎 **Space discovery** — browse and join public communities by category or search.
@@ -41,7 +43,7 @@
 - 🎨 **10 live-switchable themes** — six dark (Framer, Midnight, Graphite, Espresso, Pine, Plum) and four light (Porcelain, Linen, Mist, Sage), persisted without a page reload.
 - 👤 **Rich profiles** — display name, custom status (32 emoji chip + 6 vibe presets: Gaming/Vibing/Away/Studying/Working/Sleepy), bio, banner, avatar uploads & frames, **country flag**, **GitHub contribution graph**, and **social link chips** (GitHub/X/Instagram/YouTube/website) on a public profile page (`/u/username`) — plus a one-tap **Wave 👋** ping (20 s cooldown, `wave` notification that deep-links to the sender's profile), a **Share** sheet with **QR code** for the profile, and the page **wears the owner's theme colors** (`profile-skin.js`).
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
-- 👑 **Kivo Plus (entitlement scaffold)** — admin-granted `free`/`plus` plan (`POST /api/admin/users/:id/plan`; no payments/stripe UI) with Plus-only profile perks: **custom banner uploads** (own GIF/image up to 8 MB, `PATCH /api/v1/users/me/banner`, auto-retires old file) and **profile effects** (`none`/`glow`/`gradient-name`/`aura` — avatar halo + animated name via `profile-effects.js` / `globals.css`). Downgrade resets effects to `none`; free users are server-forced to `none`.
+- 👑 **Kivo Plus (with UPI payments)** — self-serve **₹49/month** via UPI: pay to the published UPI ID, paste your 12-digit UTR reference, admin reviews within 24h and grants 30 days of Plus. Includes **custom banner uploads** (own GIF/image up to 8 MB), **profile effects** (`none`/`glow`/`gradient-name`/`aura`), **custom emoji** (personal library usable everywhere), and **higher limits** (8K messages, 20 attachments, 100MB files, more groups/spaces/polls). Admin panel has a Plus claims review queue. `/plus` page shows pricing, UPI steps, and claim status.
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
 - 🤝 **Complete friends system** — send, accept, decline, **remove** (mutual — both lists update live), search, and jump straight into a DM.
 - 📊 **Polls** — create 2-8 option polls in any DM/group/Space channel with live tallies, anonymous + multi-choice (Plus), 1h/24h/3d/7d/never expiry, end-early, `poll:updated/ended` realtime
@@ -153,7 +155,9 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Date dividers + big emoji** — Today/Yesterday/weekday/date pills; 1–3 emoji-only messages render large and chromeless
 - **Jump-to-latest pill** — floating unread-count button when scrolled off the live edge; auto-scroll only pins when already at the bottom (or for your own sends)
 - **Composer upgrades** — per-conversation drafts in localStorage (debounced, cleared on send), paste-image to attach, ↑-on-empty-composer edits your last message, **mobile swipe-to-reply**
-- **Kivo Plus extras** — custom banner upload (8 MB, `PATCH /users/me/banner`), profile effects (4 presets, `profile-effects.js` / `globals.css`), locked state for free users
+- **Kivo Plus with UPI payments** — self-serve ₹49/month via UPI, `/plus` page with pricing + claim form + status cards, `PlusRequest` model (pending/approved/rejected/expired), admin review queue (`listPlusRequests`, `approvePlusRequest`, `rejectPlusRequest`), 24h review window, 30-day grants, hourly sweep for expired claims + scrubbing Plus-only effects
+- **Custom Emoji** — `CustomEmoji` model (global/space/personal), `emoji` module (CRUD + Appwrite upload), personal emoji (Plus-only, 50 max, usable everywhere), Space emoji (Plus/admin, 100 max), global emoji (admin-only, 200 max), `:name:` shortcode parsing, `customReactionKey` for reactions, IndexedDB caching with stale-while-revalidate, `emoji:new`/`emoji:deleted` realtime events
+- **Enhanced Plus limits** — per-plan caps in `backend/src/lib/plus.js`: message length (4K→8K), attachments (10→20), file size (30MB→100MB), pins (10→50), saved (200→1K), groups owned (5→20), group members (20→100), spaces owned (3→15), space members (50→300), channels (10→30), call participants (5→25), search (5→20), poll options (5→8), poll duration (1d→7d), multi-choice + anonymous polls, forward limit (5→10), personal emoji (0→50)
 - **Wave & social links** — GitHub/X/Instagram/YouTube/Website fields on profile, `social-links.jsx` chips + brand glyphs, wave ping (`POST /notifications/:id/wave`, 20 s cooldown)
 - **Voice & video calls** — LiveKit Cloud SFU in DMs and groups: incoming overlay with ringtone, floating call panel (mute/camera/devices/leave, voice→video upgrade, group grid), Ongoing-call Join pill, reconnect banner, full in-chat call history (started/declined/missed/ended cards with duration + Call back), missed-call chip + bell entry
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
@@ -213,23 +217,29 @@ kivo/
 ├── frontend/                 # Next.js 16 app (App Router, React 19, JS only)
 │   ├── app/                  # Routes: /, login, signup, verify-email, forgot/reset
 │   │   │                     #   password, /app (chat), /app/profile, /u/[username],
+│   │   │                     #   /plus, /learn, /author, /privacy, /terms, /cookie,
 │   │   │                     #   /docs, /admin + /admin/dashboard
 │   ├── components/           # dashboard (chat shell, panels), spaces, notifications,
-│   │   │                     #   profile, chat, ui, motion, navbar, admin, docs
+│   │   │                     #   profile, chat, ui, motion, navbar, admin, docs,
+│   │   │                     #   plus, learn, author
 │   ├── lib/                  # api, auth, cache, chat, theme, push, sound, spaces,
 │   │   │                     #   avatar-styles, banners, countries, last-active, links,
-│   │   │                     #   emoji, drafts, hooks
+│   │   │                     #   emoji, custom-emoji, drafts, hooks, plus, polls,
+│   │   │                     #   profile-effects, profile-skin, social-links, status
 │   └── Design.md             # Visual design system & tokens
 │
 ├── backend/                  # Express 5 + Socket.IO + Mongoose (JS only)
 │   └── src/
 │       ├── config/           # env, db, webpush config
-│       ├── lib/              # appwrite client, attachment upload, email (nodemailer)
+│       ├── lib/              # appwrite client, attachment upload, email (nodemailer),
+│       │                     #   plus (entitlements + limits), emoji-image processing
 │       ├── middleware/       # auth, adminAuth, errorHandler, rateLimiter (in-memory)
 │       ├── models/           # User, Session, Conversation, Message, FriendRequest,
-│       │                     #   Space, Notification, PushSubscription, AdminActionLog
+│       │                     #   Space, Notification, PushSubscription, AdminActionLog,
+│       │                     #   Status, CustomEmoji, PlusRequest
 │       ├── modules/          # auth, users, friends, conversations, messages, spaces,
-│       │                     #   notifications, push, attachments, search, link-preview, admin
+│       │                     #   notifications, push, attachments, search, link-preview,
+│       │                     #   admin, status, emoji, plus, calls, crypto, billing, voice
 │       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
 │       └── utils/            # errors & async handlers
 │
@@ -303,6 +313,7 @@ bun run lint  # biome check
 | `APPWRITE_ENDPOINT` / `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` | backend | Appwrite credentials (storage) |
 | `APPWRITE_BUCKET_ID` | backend | Appwrite bucket for avatar uploads |
 | `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket for message attachments (separate from avatar bucket) |
+| `APPWRITE_EMOJI_BUCKET_ID` | backend | Appwrite bucket for custom emoji uploads (falls back to attachments bucket) |
 | `CORS_ALLOWED_ORIGINS` | backend | Allowed frontend origins (empty = allow any in dev) |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | backend | Gmail SMTP credentials for transactional email |
 | `EMAIL_FROM` | backend | "From" header for outgoing emails |
@@ -315,6 +326,8 @@ bun run lint  # biome check
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_REDIRECT_URI` | backend | GitHub OAuth — signup/login + provider verification linking |
 | `BACKEND_URL` | frontend | Backend origin used by Next.js API rewrites (default `http://localhost:4000`) |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend origin for the Socket.IO connection (default `http://localhost:4000`) |
+| `NEXT_PUBLIC_PLUS_UPI_ID` | frontend | Published UPI ID for Kivo Plus payments (shown on `/plus` page) |
+| `NEXT_PUBLIC_PLUS_PAYEE` | frontend | Payee name for UPI payments (default "Kivo") |
 | `NEXT_PUBLIC_APP_DOWNLOAD_URL` | frontend | Direct mobile-app download link for the landing page "Download App" section (the section stays hidden until set) |
 
 > See `backend/.env.example` for the full list with comments. Never commit real secrets — `*.env` is gitignored.
@@ -374,6 +387,8 @@ Registration / Login
 | `notification:new` | Server → User | New in-app notification (fanned out per recipient) |
 | `call:ring` / `call:accepted` / `call:declined` / `call:ended` | Both directions | Call ring coordination (30s timeout → `call:missed`) |
 | `call:missed` / `call:failed` | Server → Room / Caller | No-answer timeout / blocked-call rejection |
+| `emoji:new` / `emoji:deleted` | Server → Space / Global | Custom emoji created or deleted (Space-scoped or global broadcast) |
+| `status:new` / `status:deleted` / `status:viewed` | Server → Friends | Status updates for friends-only feed |
 
 > Every connection is **authenticated** via JWT handshake (banned users are rejected at reconnect), and the server verifies conversation/space membership before accepting sensitive events. All socket rooms are joined automatically on connect. After a reconnect the client **gap-fills**: it refetches the conversation list and fetches messages newer than the newest known message in the open chat, so nothing is missed while offline.
 
@@ -491,6 +506,41 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - Permission is opt-in via explicit user action (`requestPermission`); `syncSubscription` only auto-subscribes when permission is already granted
 - Push subscriptions are stored per user; expired/unsubscribed endpoints (404/410) are cleaned up automatically
 - Notification click actions in the service worker deep-link into the open conversation
+
+### 🎨 Custom Emoji
+- **Three tiers**: Global (admin-only, 200 max), Space-scoped (Plus/admin, 100 per Space), Personal (Plus-only, 50 per user, usable everywhere)
+- Upload images (jpg/png/gif/webp) — auto-normalized to webp (gif preserved for animation) via sharp
+- **`:shortcode:` parsing** — type `:name:` in messages to use custom emoji; works in text and reactions
+- **Personal emoji library** — Plus users get a personal library usable across all DMs, groups, and Spaces
+- **Space emoji** — Space admins can add emoji scoped to their Space; visible to all Space members
+- **IndexedDB caching** — emoji are cached with stale-while-revalidate for instant rendering; background refresh on stale
+- **Realtime updates** — `emoji:new` and `emoji:deleted` events keep all clients in sync
+- **Reactions** — custom emoji work in reactions via `custom:<emojiId>` format
+
+### 👑 Kivo Plus (with UPI payments)
+- **Self-serve UPI payments** — pay ₹49/month to the published UPI ID, paste your 12-digit UTR reference
+- **24-hour review window** — admin reviews claims in the admin panel; approval grants 30 days of Plus
+- **`/plus` page** — shows pricing, UPI payment steps, claim form, and status cards (pending/rejected/expired)
+- **Per-plan limits** — detailed caps in `backend/src/lib/plus.js`:
+  - Message length: 4,000 (free) → 8,000 (plus)
+  - Attachments per message: 10 → 20
+  - Max file size: 30 MB → 100 MB
+  - Pins per conversation: 10 → 50
+  - Saved messages: 200 → 1,000
+  - Groups owned: 5 → 20
+  - Group members: 20 → 100
+  - Spaces owned: 3 → 15
+  - Space members: 50 → 300
+  - Channels per Space: 10 → 30
+  - Call participants: 5 → 25
+  - Search results per category: 5 → 20
+  - Poll options: 5 → 8
+  - Poll duration: 1 day → 7 days
+  - Multi-choice + anonymous polls (Plus only)
+  - Forward limit per message: 5 → 10
+  - Personal emoji: 0 → 50
+- **Admin review queue** — admin panel lists Plus claims with approve/reject actions
+- **Hourly sweep** — expired claims and Plus-only effects on expired accounts are cleaned up automatically
 
 ---
 

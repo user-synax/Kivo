@@ -7,7 +7,7 @@ const ALLOWED_MIMES = new Set([
   "image/gif",
 ]);
 
-const MAX_PRE_NORMALIZE_BYTES = 256 * 1024; // 256 KB
+const MAX_PRE_NORMALIZE_BYTES = 2 * 1024 * 1024;
 const EMOJI_SIZE = 128;
 
 export function isAllowedEmojiMime(mimeType) {
@@ -28,7 +28,7 @@ export function assertEmojiMime(mimeType) {
 export function assertEmojiSize(size) {
   if (size > MAX_PRE_NORMALIZE_BYTES) {
     const err = new Error(
-      `Emoji image too large (${(size / 1024).toFixed(0)} KB). Max 256 KB before processing.`
+      `Emoji image too large (${(size / (1024 * 1024)).toFixed(2)} MB). Max 2 MB before processing.`
     );
     err.statusCode = 400;
     err.code = "FILE_TOO_LARGE";
