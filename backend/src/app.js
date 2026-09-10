@@ -20,6 +20,7 @@ import linkPreviewRoutes from "./modules/link-preview/link-preview.routes.js";
 import callsRoutes from "./modules/calls/calls.routes.js";
 import plusRoutes from "./modules/plus/plus.routes.js";
 import statusRoutes from "./modules/status/status.routes.js";
+import emojiRoutes from "./modules/emoji/emoji.routes.js";
 
 const app = express();
 
@@ -95,6 +96,7 @@ app.use("/api/v1/link-preview", linkPreviewRoutes);
 app.use("/api/v1/calls", callsRoutes);
 app.use("/api/v1/plus", plusRoutes);
 app.use("/api/v1/status", statusRoutes);
+app.use("/api/v1/emoji", emojiRoutes);
 
 // 404 + centralized error handler (must be registered last).
 app.use(notFoundHandler);

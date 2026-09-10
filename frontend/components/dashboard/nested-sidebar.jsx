@@ -35,6 +35,7 @@ import { IconRail } from "@/components/dashboard/icon-rail";
 import { SettingsPanel } from "@/components/dashboard/settings-panel";
 import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
 import { StatusTab } from "@/components/status/status-tab";
+import { EmojiFactoryPanel } from "@/components/emoji-factory-panel";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -495,6 +496,7 @@ export function NestedSidebar({
     spaces: "Search spaces",
     settings: "Search settings",
     status: "Search status",
+    "emoji-factory": "Search emoji",
   };
 
   return (
@@ -740,6 +742,19 @@ export function NestedSidebar({
                   onViewMy={onStatusViewMy}
                   uploading={statusUploading}
                 />
+              </motion.div>
+            )}
+            {activeTab === "emoji-factory" && (
+              <motion.div
+                key="emoji-factory"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
+                className="h-full w-full min-w-0 overflow-hidden"
+                style={{ overscrollBehavior: "contain" }}
+              >
+                <EmojiFactoryPanel />
               </motion.div>
             )}
           </AnimatePresence>

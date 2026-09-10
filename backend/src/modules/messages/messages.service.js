@@ -998,6 +998,17 @@ export async function toggleReaction({ messageId, userId, emoji }) {
     throw badRequest("Polls can't be reacted to", "POLL_REACTION");
   }
 
+  // Custom emoji reactions: validate the referenced emoji exists
+  if (emoji.startsWith("custom:")) {
+    const cid = emoji.slice(7);
+    if (!mongoose.Types.ObjectId.isValid(cid)) {
+      throw badRequest("Invalid custom emoji", "INVALID_EMOJI");
+    }
+    const CustomEmoji = (await import("../../models/CustomEmoji.js")).default;
+    const exists = await CustomEmoji.findById(cid).select("_id").lean();
+    if (!exists) throw notFound("Custom emoji not found", "EMOJI_NOT_FOUND");
+  }
+
   const existing = message.reactions.find(
     (r) => r.userId.toString() === userId && r.emoji === emoji
   );

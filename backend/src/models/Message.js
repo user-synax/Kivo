@@ -5,7 +5,8 @@ import mongoose from "mongoose";
 const reactionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    emoji: { type: String, required: true, maxlength: 8 },
+    // Unicode emoji (e.g. "👍") or custom "custom:<emojiId>"
+    emoji: { type: String, required: true, maxlength: 64 },
   },
   { _id: true, timestamps: true }
 );

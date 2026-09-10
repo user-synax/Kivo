@@ -39,6 +39,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollAllowMultiple: false,
     pollAllowAnonymous: false,
     forwardLimitPerMessage: 5,
+    personalEmojiMax: 0, // free cannot create personal emoji
   }),
   plus: Object.freeze({
     messageMaxLength: 8000,
@@ -60,6 +61,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollAllowMultiple: true,
     pollAllowAnonymous: true,
     forwardLimitPerMessage: 10,
+    personalEmojiMax: 50, // Plus personal library usable everywhere
   }),
 });
 

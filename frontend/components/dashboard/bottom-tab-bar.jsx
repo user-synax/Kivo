@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDashed, Layers, Menu, MessageCircle, Users } from "lucide-react";
+import { CircleDashed, Layers, Menu, MessageCircle, Smile, Users } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,10 @@ const TABS = [
   { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
   { id: "menu", label: "Menu", icon: Menu },
+];
+
+const EXTRA_TABS = [
+  { id: "emoji-factory", label: "Emoji Factory", icon: Smile },
 ];
 
 const EASE = [0.22, 1, 0.36, 1];

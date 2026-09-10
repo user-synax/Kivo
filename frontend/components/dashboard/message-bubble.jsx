@@ -28,6 +28,7 @@ import { createPortal } from "react-dom";
 import {
   ContextMenu,
   ContextMenuContent,
+  ContextMenuContext,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -55,6 +56,7 @@ import { MentionToken } from "@/components/mentions/mention-token";
 import { PollCard } from "@/components/polls/poll-card";
 import { emojiCount } from "@/lib/emoji";
 import { firstUrl, normalizeUrl } from "@/lib/links";
+import { parseCustomEmoji, isCustomReaction, customReactionId } from "@/lib/custom-emoji";
 
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?'"`>]+$/;
@@ -159,6 +161,23 @@ function tokenizeLinks(chunk, keyPrefix) {
   return out;
 }
 
+function CustomEmojiImg({ emoji, size = 22 }) {
+  if (!emoji?.url) return null;
+  return (
+    <img
+      src={emoji.url}
+      alt={`:${emoji.name}:`}
+      width={size}
+      height={size}
+      loading="lazy"
+      decoding="async"
+      className="inline-block select-none align-[-4px]"
+      style={{ width: size, height: size }}
+      draggable={false}
+    />
+  );
+}
+
 function MessageContent({
   content,
   mentions = [],
@@ -167,6 +186,7 @@ function MessageContent({
   onOpenProfile,
   searchQuery,
   isActiveSearch,
+  customEmojiMap,
 }) {
   if (!content) return null;
 
@@ -224,7 +244,15 @@ function MessageContent({
     }
   };
 
-  pushMentionChunk(content);
+  // First split by custom emoji shortcodes, then run mention+link parsing on text chunks.
+  const emojiTokens = parseCustomEmoji(content, customEmojiMap);
+  for (const tok of emojiTokens) {
+    if (tok.type === "emoji" && tok.emoji) {
+      parts.push(<CustomEmojiImg key={`e-${key++}-${tok.name}`} emoji={tok.emoji} size={22} />);
+    } else {
+      pushMentionChunk(tok.value || "");
+    }
+  }
 
   return (
     <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
@@ -447,6 +475,8 @@ export function MessageBubble({
   isUserOnline,
   onOpenProfile,
   isMobile = false,
+  customEmojiMap,
+  customEmojiById,
   // Message-action menu extras (context menu + long-press).
   onCopy,
   onSaveToggle,
@@ -749,6 +779,7 @@ export function MessageBubble({
                   onOpenProfile={onOpenProfile}
                   searchQuery={searchQuery}
                   isActiveSearch={isActiveSearch}
+                  customEmojiMap={customEmojiMap}
                 />
                 {!deleted && !isEditing && !isBigEmoji && message.content ? (
                   <LinkPreview url={firstUrl(message.content)} />
@@ -830,7 +861,7 @@ export function MessageBubble({
           {reactionOpen && (
             <div
               className={cn(
-                "absolute bottom-full z-10 mb-1 flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
+                "absolute bottom-full z-10 mb-1 flex max-w-[280px] flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
                 mine ? "right-0" : "left-0",
               )}
             >
@@ -844,6 +875,18 @@ export function MessageBubble({
                   {e}
                 </button>
               ))}
+              {customEmojiById && [...customEmojiById.values()].slice(0, 20).map((ce) => (
+                <button
+                  key={ce.id}
+                  type="button"
+                  onClick={() => onReact?.(`custom:${ce.id}`)}
+                  className="rounded p-0.5 transition-colors hover:bg-[var(--hover)]"
+                  title={`:${ce.name}:`}
+                  aria-label={`React with :${ce.name}:`}
+                >
+                  <img src={ce.url} alt={`:${ce.name}:`} width={22} height={22} className="size-[22px]" loading="lazy" decoding="async" />
+                </button>
+              ))}
             </div>
           )}
         </Bubble>
@@ -852,19 +895,33 @@ export function MessageBubble({
       <ContextMenuContent ariaLabel="Message actions">
         {/* One-tap quick reactions — no extra tap to open the picker (hidden for polls) */}
         {message.type !== "poll" && (
-          <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
-            {REACTION_EMOJIS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                aria-label={`React ${e}`}
-                onClick={() => onReact?.(e)}
-                className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
-              >
-                {e}
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
+              {REACTION_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  aria-label={`React ${e}`}
+                  onClick={() => onReact?.(e)}
+                  className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
+                >
+                  {e}
+                </button>
+              ))}
+              {customEmojiById && [...customEmojiById.values()].slice(0, 6).map((ce) => (
+                <button
+                  key={ce.id}
+                  type="button"
+                  aria-label={`React :${ce.name}:`}
+                  onClick={() => onReact?.(`custom:${ce.id}`)}
+                  className="rounded-lg p-0.5 transition-transform hover:scale-110"
+                  title={`:${ce.name}:`}
+                >
+                  <img src={ce.url} alt={`:${ce.name}:`} width={20} height={20} className="size-5" loading="lazy" decoding="async" />
+                </button>
+              ))}
+            </div>
+          </>
         )}
         {onCopy && (
           <ContextMenuItem onSelect={() => onCopy?.()}>
@@ -1001,16 +1058,30 @@ export function MessageBubble({
                 acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                 return acc;
               }, {}),
-            ).map(([emoji, count]) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => onReact?.(emoji)}
-                className="flex items-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--text-primary)] transition-colors hover:bg-[var(--hover)]"
-              >
-                {emoji} {count}
-              </button>
-            ))}
+            ).map(([emoji, count]) => {
+              const isCustom = isCustomReaction(emoji);
+              const cid = isCustom ? customReactionId(emoji) : null;
+              const ce = cid ? customEmojiById?.get(cid) : null;
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onReact?.(emoji)}
+                  className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--text-primary)] transition-colors hover:bg-[var(--hover)]"
+                >
+                  {isCustom ? (
+                    ce ? (
+                      <img src={ce.url} alt={`:${ce.name}:`} width={16} height={16} className="size-4 inline-block" loading="lazy" decoding="async" />
+                    ) : (
+                      <span className="text-[11px]">:{emoji.slice(7, 13)}:</span>
+                    )
+                  ) : (
+                    emoji
+                  )}{" "}
+                  {count}
+                </button>
+              );
+            })}
           </div>
         )}
 

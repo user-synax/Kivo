@@ -25,6 +25,7 @@ import {
   Search,
   Send,
   ShieldBan,
+  Smile,
   Trash,
   User,
   UserMinus,
@@ -88,6 +89,12 @@ import { cssVarsForColors, customIsActive, derivePalette } from "@/lib/theme";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { uploadSingleFileObject, useFileUpload } from "@/lib/use-file-upload";
 import { usernameColorClass, usernameColorStyle } from "@/lib/username-colors";
+import {
+  getCustomEmojis,
+  getMergedEmojis,
+  invalidateEmojiCache,
+  isCustomReaction,
+} from "@/lib/custom-emoji";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -189,6 +196,41 @@ function SwipeToReply({ children, onReply, enabled }) {
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+function CustomEmojiAutocomplete({ emojis = [], query = "", selectedIndex = 0, onSelect }) {
+  const filtered = (emojis || []).filter((e) => {
+    if (!query) return true;
+    return e.name.toLowerCase().includes(query.toLowerCase());
+  }).slice(0, 8);
+  if (filtered.length === 0) return null;
+  return (
+    <div
+      id="kivo-emoji-autocomplete"
+      className="absolute bottom-[calc(100%+8px)] left-0 z-50 max-h-56 min-w-[260px] max-w-[320px] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-1.5 shadow-2xl backdrop-blur-xl"
+    >
+      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        Custom Emoji
+      </div>
+      {filtered.map((e, index) => {
+        const isSelected = index === selectedIndex;
+        return (
+          <button
+            key={e.id}
+            type="button"
+            onMouseDown={(ev) => {
+              ev.preventDefault();
+              onSelect?.(e);
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-xs transition-colors ${isSelected ? "bg-[var(--accent)]/15 text-[var(--accent)] font-medium" : "text-[var(--text-primary)] hover:bg-[var(--hover)]"}`}
+          >
+            <img src={e.url} alt={`:${e.name}:`} width={16} height={16} className="size-4 shrink-0 object-contain" loading="lazy" decoding="async" />
+            <span className="truncate font-medium">:{e.name}:</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -317,6 +359,8 @@ const MessageRows = React.memo(function MessageRows({
   ctx,
   searchQuery,
   activeSearchId,
+  customEmojiMap,
+  customEmojiById,
 }) {
   const a = ctx.current;
   const { userId, otherId, isGroup, isChannel, isDm } = a;
@@ -580,6 +624,8 @@ const MessageRows = React.memo(function MessageRows({
                   isMobile={isMobile}
                   searchQuery={searchQuery}
                   isActiveSearch={isActiveSearch}
+                  customEmojiMap={customEmojiMap}
+                  customEmojiById={customEmojiById}
                 />
               </SwipeToReply>
             </div>
@@ -707,6 +753,8 @@ export function ChatPanel({
     suppressDraftSaveRef.current = true;
     setText(loadDraft(draftsKey(userId), convId));
     setMentionOpen(false);
+    setEmojiAutocompleteOpen(false);
+    setShowEmoji(false);
   }, [convId]);
   useEffect(() => {
     if (!convId || !userId) return undefined;
@@ -1041,6 +1089,8 @@ export function ChatPanel({
     setPollOpen(false);
     setPollVoteBusyId(null);
     setComposerMenuOpen(false);
+    setShowEmoji(false);
+    setEmojiAutocompleteOpen(false);
     setOngoingCall(null);
     setPinnedMessages([]);
     setHistoryFor(null);
@@ -1262,6 +1312,25 @@ export function ChatPanel({
   const [replyingTo, setReplyingTo] = useState(null); // message being replied to
   const [showEmoji, setShowEmoji] = useState(false);
 
+  // Custom emoji — IndexedDB SWR, in-memory index for picker + rendering
+  const [customEmojis, setCustomEmojis] = useState([]);
+  const customEmojiMap = useMemo(() => {
+    const m = new Map();
+    for (const e of customEmojis) m.set(e.name, e);
+    return m;
+  }, [customEmojis]);
+  const customEmojiById = useMemo(() => {
+    const m = new Map();
+    for (const e of customEmojis) m.set(e.id, e);
+    return m;
+  }, [customEmojis]);
+
+  // Custom emoji : autocomplete (reuses mention infra keyboard nav)
+  const [emojiAutocompleteOpen, setEmojiAutocompleteOpen] = useState(false);
+  const [emojiQuery, setEmojiQuery] = useState("");
+  const [emojiIndex, setEmojiIndex] = useState(0);
+  const [emojiPos, setEmojiPos] = useState(null);
+
   // Mention autocomplete state
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -1480,6 +1549,70 @@ export function ChatPanel({
     };
   }, [socket]);
 
+  // ── Custom emoji: IndexedDB SWR + socket invalidation ──────────────────────
+  const spaceIdForEmoji = isChannel && space?.id ? space.id : null;
+  useEffect(() => {
+    let active = true;
+    // SWR: getCustomEmojis handles IndexedDB cache + background revalidate
+    // For channels we want merged (global + space), otherwise just global
+    const load = async () => {
+      try {
+        if (spaceIdForEmoji) {
+          const { list } = await getMergedEmojis(spaceIdForEmoji);
+          if (active) setCustomEmojis(list);
+        } else {
+          const list = await getCustomEmojis(null);
+          if (active) setCustomEmojis(Array.isArray(list) ? list : []);
+        }
+      } catch {
+        if (active) setCustomEmojis([]);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [spaceIdForEmoji]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onEmojiNew = (emoji) => {
+      // Personal emoji is globally visible (included in every space/global fetch), so invalidate all
+      if (emoji?.ownerId) {
+        import("@/lib/custom-emoji").then(({ invalidateAllEmojiCaches }) => invalidateAllEmojiCaches().catch(() => {}));
+      } else if (emoji?.spaceId) invalidateEmojiCache(emoji.spaceId);
+      else invalidateEmojiCache(null);
+      // Refresh current view
+      (async () => {
+        try {
+          if (spaceIdForEmoji) {
+            const { list } = await getMergedEmojis(spaceIdForEmoji);
+            setCustomEmojis(list);
+          } else {
+            const list = await getCustomEmojis(null);
+            setCustomEmojis(Array.isArray(list) ? list : []);
+          }
+        } catch {}
+      })();
+    };
+    const onEmojiDeleted = (payload) => {
+      if (payload?.ownerId) {
+        import("@/lib/custom-emoji").then(({ invalidateAllEmojiCaches }) => invalidateAllEmojiCaches().catch(() => {}));
+      } else {
+        const sid = payload?.spaceId || null;
+        if (sid) invalidateEmojiCache(sid);
+        else invalidateEmojiCache(null);
+      }
+      setCustomEmojis((prev) => prev.filter((e) => e.id !== payload?.id));
+    };
+    socket.on("emoji:new", onEmojiNew);
+    socket.on("emoji:deleted", onEmojiDeleted);
+    return () => {
+      socket.off("emoji:new", onEmojiNew);
+      socket.off("emoji:deleted", onEmojiDeleted);
+    };
+  }, [socket, spaceIdForEmoji]);
+
   const firstUnreadId = useMemo(() => {
     if (!userId) return null;
     const found = messages.find(
@@ -1506,6 +1639,35 @@ export function ChatPanel({
     });
   };
 
+  const getFilteredEmojis = (queryStr) => {
+    const q = (queryStr || "").toLowerCase();
+    if (!q) return customEmojis.slice(0, 8);
+    return customEmojis.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 8);
+  };
+
+  const checkEmojiTrigger = (val, cursorPosition) => {
+    const pos =
+      cursorPosition ?? textareaRef.current?.selectionStart ?? val.length;
+    const textBeforeCaret = val.slice(0, pos);
+    const lastColon = textBeforeCaret.lastIndexOf(":");
+    if (lastColon !== -1) {
+      const isStartOrSpace = lastColon === 0 || /\s/.test(val[lastColon - 1]);
+      const sub = val.slice(lastColon + 1, pos);
+      // :query must be 0-32 chars, only [a-z0-9_], no spaces, no closing colon yet
+      if (isStartOrSpace && /^[a-z0-9_]*$/.test(sub) && !sub.includes(":")) {
+        const matching = getFilteredEmojis(sub);
+        if (matching.length > 0) {
+          return { open: true, query: sub, pos: lastColon, filtered: matching };
+        }
+        // Even if no match but user typed :, show empty? keep closed to avoid spam
+        if (sub.length === 0 && customEmojis.length > 0) {
+          return { open: true, query: "", pos: lastColon, filtered: customEmojis.slice(0, 8) };
+        }
+      }
+    }
+    return { open: false };
+  };
+
   const checkMentionTrigger = (val, cursorPosition) => {
     const pos =
       cursorPosition ?? textareaRef.current?.selectionStart ?? val.length;
@@ -1519,15 +1681,49 @@ export function ChatPanel({
         const matching = getFilteredParticipants(sub);
 
         if (matching.length > 0) {
-          setMentionOpen(true);
-          setMentionQuery(sub);
-          setMentionPos(lastAt);
-          setMentionIndex(0);
-          return;
+          return { open: true, query: sub, pos: lastAt, filtered: matching };
         }
       }
     }
-    setMentionOpen(false);
+    return { open: false };
+  };
+
+  const checkAllTriggers = (val, cursorPosition) => {
+    const m = checkMentionTrigger(val, cursorPosition);
+    const e = checkEmojiTrigger(val, cursorPosition);
+    // Decide which popover wins: closest to caret (larger pos) wins; if tie, mention wins
+    const mPos = m.open ? m.pos : -2;
+    const ePos = e.open ? e.pos : -2;
+    if (m.open && e.open) {
+      if (ePos > mPos) {
+        setMentionOpen(false);
+        setEmojiAutocompleteOpen(true);
+        setEmojiQuery(e.query);
+        setEmojiPos(e.pos);
+        setEmojiIndex(0);
+      } else {
+        setEmojiAutocompleteOpen(false);
+        setMentionOpen(true);
+        setMentionQuery(m.query);
+        setMentionPos(m.pos);
+        setMentionIndex(0);
+      }
+    } else if (m.open) {
+      setEmojiAutocompleteOpen(false);
+      setMentionOpen(true);
+      setMentionQuery(m.query);
+      setMentionPos(m.pos);
+      setMentionIndex(0);
+    } else if (e.open) {
+      setMentionOpen(false);
+      setEmojiAutocompleteOpen(true);
+      setEmojiQuery(e.query);
+      setEmojiPos(e.pos);
+      setEmojiIndex(0);
+    } else {
+      setMentionOpen(false);
+      setEmojiAutocompleteOpen(false);
+    }
   };
 
   const handleSelectMention = (p) => {
@@ -1545,6 +1741,24 @@ export function ChatPanel({
     setText(newText);
     setMentionOpen(false);
 
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+  };
+
+  const handleSelectEmoji = (emoji) => {
+    if (!emoji || emojiPos === null) return;
+    const pos = textareaRef.current?.selectionStart ?? text.length;
+    const before = text.slice(0, emojiPos);
+    const after = text.slice(pos);
+    const inserted = `:${emoji.name}: `;
+    const newText = before + inserted + after;
+    const newCursorPos = emojiPos + inserted.length;
+    setText(newText);
+    setEmojiAutocompleteOpen(false);
     requestAnimationFrame(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -3530,6 +3744,8 @@ export function ChatPanel({
             ctx={rowsCtx}
             searchQuery={inChatQuery}
             activeSearchId={activeInChatId}
+            customEmojiMap={customEmojiMap}
+            customEmojiById={customEmojiById}
           />
           {typing && (
             <div className="flex items-center gap-2 px-1 text-[12px] text-[var(--text-muted)]">
@@ -3884,6 +4100,14 @@ export function ChatPanel({
                     </div>
                   ) : (
                     <>
+                      {emojiAutocompleteOpen && (
+                        <CustomEmojiAutocomplete
+                          emojis={customEmojis}
+                          query={emojiQuery}
+                          selectedIndex={emojiIndex}
+                          onSelect={handleSelectEmoji}
+                        />
+                      )}
                       {mentionOpen && (
                         <MentionAutocomplete
                           participants={getFilteredParticipants(mentionQuery)}
@@ -3891,6 +4115,42 @@ export function ChatPanel({
                           selectedIndex={mentionIndex}
                           onSelect={handleSelectMention}
                         />
+                      )}
+                      {showEmoji && (
+                          <EmojiPicker
+                            customEmojis={customEmojis}
+                            onSelect={(emoji) => {
+                              const el = textareaRef.current;
+                              const start = el ? el.selectionStart : text.length;
+                              const end = el ? el.selectionEnd : text.length;
+                              const next = text.slice(0, start) + emoji + text.slice(end);
+                              setText(next);
+                              setShowEmoji(false);
+                              requestAnimationFrame(() => {
+                                if (!el) return;
+                                const pos = start + emoji.length;
+                                el.focus();
+                                el.setSelectionRange(pos, pos);
+                              });
+                            }}
+                            onSelectCustom={(ce) => {
+                              const el = textareaRef.current;
+                              const start = el ? el.selectionStart : text.length;
+                              const end = el ? el.selectionEnd : text.length;
+                              const inserted = `:${ce.name}:`;
+                              const next = text.slice(0, start) + inserted + text.slice(end);
+                              setText(next);
+                              setShowEmoji(false);
+                              requestAnimationFrame(() => {
+                                if (!el) return;
+                                const pos = start + inserted.length;
+                                el.focus();
+                                el.setSelectionRange(pos, pos);
+                              });
+                            }}
+                            onClose={() => setShowEmoji(false)}
+                            ignoreRef={emojiBtnRef}
+                          />
                       )}
                       <div className="relative flex shrink-0 items-center">
                         <button
@@ -3910,14 +4170,15 @@ export function ChatPanel({
                       </div>
 
                       <button
+                        ref={emojiBtnRef}
                         type="button"
-                        onClick={openSchedulePicker}
-                        disabled={!text.trim()}
-                        title="Schedule message"
-                        aria-label="Schedule message"
-                        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40"
+                        onClick={() => setShowEmoji((v) => !v)}
+                        aria-label="Emoji picker"
+                        title="Emoji picker"
+                        disabled={!canPost}
+                        className={`flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${showEmoji ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
                       >
-                        <Clock className="h-4 w-4" />
+                        <Smile className="h-5 w-5" />
                       </button>
 
                       <button
@@ -3944,7 +4205,7 @@ export function ChatPanel({
                           setText(val);
                           setSendError(null);
                           emitTyping();
-                          checkMentionTrigger(val, e.target.selectionStart);
+                          checkAllTriggers(val, e.target.selectionStart);
                         }}
                         onPaste={(e) => {
                           // Pasting a screenshot/photo attaches it
@@ -3976,7 +4237,7 @@ export function ChatPanel({
                           addFiles(named);
                         }}
                         onClick={(e) => {
-                          checkMentionTrigger(text, e.target.selectionStart);
+                          checkAllTriggers(text, e.target.selectionStart);
                         }}
                         onKeyUp={(e) => {
                           if (
@@ -3984,10 +4245,44 @@ export function ChatPanel({
                               e.key,
                             )
                           ) {
-                            checkMentionTrigger(text, e.target.selectionStart);
+                            checkAllTriggers(text, e.target.selectionStart);
                           }
                         }}
                         onKeyDown={(e) => {
+                          if (emojiAutocompleteOpen) {
+                            const filtered = getFilteredEmojis(emojiQuery);
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              setEmojiIndex((prev) =>
+                                filtered.length ? (prev + 1) % filtered.length : 0
+                              );
+                              return;
+                            }
+                            if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              setEmojiIndex((prev) =>
+                                filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0
+                              );
+                              return;
+                            }
+                            if (
+                              (e.key === "Enter" || e.key === "Tab") &&
+                              !e.shiftKey
+                            ) {
+                              e.preventDefault();
+                              if (filtered[emojiIndex]) {
+                                handleSelectEmoji(filtered[emojiIndex]);
+                              } else {
+                                setEmojiAutocompleteOpen(false);
+                              }
+                              return;
+                            }
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              setEmojiAutocompleteOpen(false);
+                              return;
+                            }
+                          }
                           if (mentionOpen) {
                             const filtered =
                               getFilteredParticipants(mentionQuery);
@@ -4172,7 +4467,7 @@ export function ChatPanel({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-3 p-4 sm:gap-3">
+              <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -4211,6 +4506,26 @@ export function ChatPanel({
                   </span>
                   <span className="text-[11px] leading-tight text-[var(--text-muted)]">
                     2–8 options, live votes
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComposerMenuOpen(false);
+                    if (!canPost || !text.trim()) return;
+                    openSchedulePicker();
+                  }}
+                  disabled={!canPost || !text.trim()}
+                  className="group col-span-2 flex flex-col items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-5 text-center transition-colors hover:border-[var(--accent)]/30 hover:bg-[var(--hover)] disabled:opacity-40 sm:col-span-1"
+                >
+                  <span className="flex size-12 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)] transition-colors group-hover:bg-[var(--accent)] group-hover:text-white">
+                    <Clock className="h-6 w-6" />
+                  </span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    Schedule
+                  </span>
+                  <span className="text-[11px] leading-tight text-[var(--text-muted)]">
+                    Send later
                   </span>
                 </button>
               </div>

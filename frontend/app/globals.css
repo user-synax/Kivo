@@ -952,6 +952,28 @@
         transform-origin: bottom left;
         animation: t-panel-in var(--duration-fast) var(--ease-smooth-out) both;
     }
+    @media (max-width: 640px) {
+        .t-emoji-picker {
+            position: absolute;
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            width: calc(100vw - 32px);
+            max-width: 360px;
+            max-height: min(60vh, 380px);
+            transform-origin: bottom center;
+        }
+        .t-emoji-picker__grid {
+            max-height: 200px;
+        }
+    }
+    @media (min-width: 641px) {
+        .t-emoji-picker {
+            left: auto;
+            right: 0;
+            transform-origin: bottom right;
+        }
+    }
     .t-emoji-picker__tabs {
         display: flex;
         gap: 2px;

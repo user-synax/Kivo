@@ -15,6 +15,7 @@ import { SPACE_CATEGORIES } from "@/lib/space-categories";
 import { apiPostForm } from "@/lib/api";
 import { SpacePaletteSection } from "./space-palette-section";
 import { SpacePrivacySection } from "./space-privacy-section";
+import { SpaceEmojiSection } from "./space-emoji-section";
 
 export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLeft }) {
   const currentUser = getSession();
@@ -156,6 +157,8 @@ export function SpaceSettingsPanel({ space, onClose, onUpdated, onDeleted, onLef
         <SpacePaletteSection space={space} onUpdated={onUpdated} canEdit={canEdit} />
 
         <SpacePrivacySection space={space} onUpdated={onUpdated} canEdit={canEdit} />
+
+        <SpaceEmojiSection space={space} canEdit={canEdit} />
 
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Members · {members.length}</p>

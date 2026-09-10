@@ -39,6 +39,7 @@ const env = {
   appwriteApiKey: process.env.APPWRITE_API_KEY || "",
   appwriteBucketId: process.env.APPWRITE_BUCKET_ID || "",
   appwriteAttachmentsBucketId: process.env.APPWRITE_ATTACHMENTS_BUCKET_ID || "",
+  appwriteEmojiBucketId: process.env.APPWRITE_EMOJI_BUCKET_ID || "",
 
   vapidPublicKey: required("VAPID_PUBLIC_KEY", process.env.VAPID_PUBLIC_KEY),
   vapidPrivateKey: required("VAPID_PRIVATE_KEY", process.env.VAPID_PRIVATE_KEY),

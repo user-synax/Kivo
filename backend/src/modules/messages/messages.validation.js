@@ -68,7 +68,14 @@ export const updateMessageSchema = z.object({
 });
 
 export const reactionSchema = z.object({
-  emoji: z.string().min(1).max(8, "Emoji too long"),
+  emoji: z
+    .string()
+    .min(1)
+    .max(64, "Emoji too long")
+    .refine(
+      (v) => v.startsWith("custom:") || [...v].length <= 8,
+      "Emoji too long"
+    ),
 });
 
 export const pinSchema = z.object({

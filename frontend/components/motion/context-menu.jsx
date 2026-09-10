@@ -26,7 +26,7 @@ const LONG_PRESS_DELAY = 520;
 const LONG_PRESS_TOLERANCE = 10;
 const MORPH_DURATION = 0.3;
 
-const ContextMenuContext = createContext(null);
+export const ContextMenuContext = createContext(null);
 
 function useContextMenuContext(component) {
     const context = useContext(ContextMenuContext);

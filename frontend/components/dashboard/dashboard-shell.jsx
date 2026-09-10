@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Palette, Search, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Palette, Search, Settings, Smile } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
@@ -18,6 +18,7 @@ import { AppearanceScreen } from "./appearance-screen";
 import { ChatPanel } from "./chat-panel";
 import { FriendsModal } from "./friends-modal";
 import { GroupCreateModal } from "./group-create-modal";
+import { EmojiFactoryPanel } from "@/components/emoji-factory-panel";
 import { GroupSettingsPanel } from "./group-settings-panel";
 import { Sidebar } from "./sidebar";
 import { NestedSidebar } from "./nested-sidebar";
@@ -369,7 +370,7 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
 
 // Mobile hamburger tab: the bottom bar stays to Chats / Groups / Spaces / Menu;
 // Profile, Appearance and Settings open as pushed screens from here.
-function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch }) {
+function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch, onOpenEmojiFactory }) {
   const displayName =
     currentUser?.displayName || currentUser?.username || currentUser?.email || "Account";
   return (
@@ -447,6 +448,29 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
               </span>
               <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
                 Badge, 2FA, blocked users, notifications &amp; sounds
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenEmojiFactory}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-3 text-left transition-colors duration-150 hover:from-amber-500/20 hover:to-orange-500/20"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+              <Smile className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Emoji Factory
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                  Plus
+                </span>
+                {!isPlusUser(currentUser) && <span className="text-[10px] text-amber-600">• Plus only</span>}
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Create personal emoji — use everywhere
               </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
@@ -2118,6 +2142,7 @@ export function DashboardShell() {
                     onOpenAppearance={() => setMobileTab("appearance")}
                     onOpenSettings={() => setMobileTab("settings")}
                     onOpenSearch={() => setSearchOpen(true)}
+                    onOpenEmojiFactory={() => setMobileTab("emoji-factory")}
                   />
                 )}
                 {mobileTab === "settings" && (
@@ -2142,6 +2167,11 @@ export function DashboardShell() {
                     onProfileUpdate={refreshUser}
                     onBack={() => setMobileTab("menu")}
                   />
+                )}
+                {mobileTab === "emoji-factory" && (
+                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                    <EmojiFactoryPanel onClose={() => setMobileTab("menu")} />
+                  </div>
                 )}
               </div>
               {(mobileTab === "chats" ||
