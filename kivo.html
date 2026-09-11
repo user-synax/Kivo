@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#090909"/>
+<title>Kivo — How It Works | User Guide, Deep Dive & Interview Prep</title>
+<meta name="description" content="Learn Kivo end-to-end: everyday user manual, architecture deep dive, why-this-not-that decisions, and 100+ interview Q&A. Single-file interactive guide."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--canvas:#090909;--surface-1:#141414;--surface-2:#1c1c1c;--hairline:#262626;--hairline-soft:#1a1a1a;--ink:#fff;--ink-muted:#999;--accent-blue:#4ba9e1;--success:#22c55e;--magenta:#d44df0;--violet:#6a4cf5;--orange:#ff7a3d;--radius:20px;--max:1280px;--nav-h:64px}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:84px}body{margin:0;background:var(--canvas);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;font-feature-settings:"cv01" 1,"cv05" 1,"cv09" 1,"cv11" 1,"ss03" 1,"ss07" 1;font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(circle at 50% 0%,black,transparent 78%);-webkit-mask-image:radial-gradient(circle at 50% 0%,black,transparent 78%)}
+::selection{background:var(--accent-blue);color:#fff}::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:99px}::-webkit-scrollbar-track{background:transparent}
+a{color:var(--accent-blue);text-decoration:none}a:hover{text-decoration:underline}
+:focus-visible{outline:none;box-shadow:0 0 0 2px var(--canvas),0 0 0 4px var(--accent-blue);border-radius:8px}
+code{font-family:"JetBrains Mono",monospace;font-size:.83em;background:var(--surface-2);border:1px solid var(--hairline);padding:1px 6px;border-radius:6px;color:var(--ink);word-break:break-word}pre{background:#0c0c0c;border:1px solid var(--hairline);border-radius:14px;padding:16px 16px 16px;overflow:auto;font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.65;color:#d6d6d6;position:relative;max-width:100%}pre button{position:absolute;top:10px;right:10px;background:var(--surface-2);border:1px solid var(--hairline);color:var(--ink);border-radius:99px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;min-height:32px}
+.skip{position:absolute;left:-999px;top:0;background:#fff;color:#000;padding:10px 18px;border-radius:0 0 12px 0;z-index:200;font-weight:700}.skip:focus{left:0}
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--violet),var(--accent-blue));z-index:99}
+/* NAV */
+.navwrap{position:sticky;top:10px;z-index:50;display:flex;justify-content:center;padding:0 12px}
+.navpill{display:flex;align-items:center;gap:4px;background:rgba(20,20,20,.86);border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:7px 8px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px -10px rgba(0,0,0,.65);max-width:100%;width:fit-content}
+.brand{display:flex;align-items:center;gap:8px;font-family:Outfit;font-weight:700;letter-spacing:-.02em;padding:4px 12px 4px 6px;border-right:1px solid var(--hairline);white-space:nowrap;font-size:15px}.dot{width:26px;height:26px;border-radius:50%;background:#fff;color:#000;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0}
+.links-desktop{display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none;max-width:62vw}.links-desktop::-webkit-scrollbar{display:none}
+.navpill a.nl{color:var(--ink-muted);font-size:13px;font-weight:500;padding:8px 12px;border-radius:99px;white-space:nowrap;min-height:36px;display:inline-flex;align-items:center}.navpill a.nl:hover,.navpill a.nl.active{color:var(--ink);background:rgba(255,255,255,.07);text-decoration:none}
+.burger{display:none;background:var(--surface-2);border:1px solid var(--hairline);color:var(--ink);border-radius:99px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;min-height:40px;white-space:nowrap}
+.drawer{display:none;position:fixed;inset:0;z-index:80}.drawer.open{display:block}.drawer .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6)}.drawer .panel{position:absolute;top:0;right:0;bottom:0;width:min(340px,88vw);background:var(--surface-1);border-left:1px solid var(--hairline);padding:20px;overflow-y:auto}.drawer .panel a{display:flex;align-items:center;color:var(--ink);font-size:14px;font-weight:500;padding:12px;border-radius:12px;min-height:48px}.drawer .panel a:hover,.drawer .panel a:active{background:rgba(255,255,255,.06);text-decoration:none}.drawer .grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);margin:14px 4px 6px;font-weight:700}
+/* HERO */
+.hero{max-width:var(--max);margin:0 auto;padding:clamp(56px,8vw,96px) clamp(16px,4vw,32px) 24px;position:relative;z-index:1}
+.kicker{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(75,169,225,.25);background:rgba(75,169,225,.1);color:var(--accent-blue);font-size:12px;font-weight:600;padding:7px 14px;border-radius:99px;max-width:100%}.kicker i{width:7px;height:7px;border-radius:50%;background:var(--accent-blue);display:inline-block;animation:pulse 2s infinite;flex-shrink:0}@keyframes pulse{50%{opacity:.35}}
+h1{font-family:Outfit;font-size:clamp(38px,7.5vw,84px);line-height:.96;letter-spacing:-.045em;font-weight:500;margin:20px 0 14px;text-wrap:balance}h1 .b{color:var(--accent-blue)}
+h2{font-family:Outfit;font-size:clamp(24px,3.4vw,38px);letter-spacing:-.03em;line-height:1.08;margin:0 0 10px;font-weight:500;text-wrap:balance}
+h3{font-family:Outfit;font-size:clamp(16px,2.4vw,19px);letter-spacing:-.01em;margin:26px 0 8px}
+h4{font-size:14px;margin:18px 0 6px}
+.sub{color:var(--ink-muted);font-size:clamp(14.5px,2vw,18px);max-width:760px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;color:var(--ink-muted);font-size:12.5px}
+.cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.btn{border-radius:999px;padding:13px 24px;font-weight:600;font-size:14px;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;text-decoration:none}.btn-p{background:#fff;color:#000}.btn-p:hover{filter:brightness(.93);text-decoration:none;color:#000}.btn-g{background:transparent;color:var(--ink);border:1px solid rgba(255,255,255,.22)}.btn-g:hover{background:rgba(255,255,255,.06);text-decoration:none;color:var(--ink)}
+.paths{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px}
+.path{background:var(--surface-1);border:1px solid var(--hairline);border-radius:16px;padding:16px;display:block;color:var(--ink)}.path:hover{border-color:rgba(75,169,225,.5);text-decoration:none}.path b{font-size:14px;display:block;margin:6px 0 4px}.path p{margin:0;color:var(--ink-muted);font-size:12.5px}.path .ic{font-size:22px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:18px}
+.stat{background:var(--surface-1);border:1px solid var(--hairline);border-radius:16px;padding:15px}.stat b{font-family:Outfit;font-size:clamp(20px,2.6vw,26px);letter-spacing:-.03em;display:block}.stat span{color:var(--ink-muted);font-size:12px;line-height:1.5;display:block;margin-top:2px}
+/* LAYOUT */
+.layout{max-width:var(--max);margin:0 auto;display:grid;grid-template-columns:264px minmax(0,1fr);gap:22px;padding:18px clamp(12px,3vw,24px) 70px;position:relative;z-index:1}
+.toc{position:sticky;top:78px;align-self:start;max-height:calc(100vh - 96px);overflow:auto;background:var(--surface-1);border:1px solid var(--hairline);border-radius:18px;padding:14px}
+.toc input{width:100%;background:var(--surface-2);border:1px solid var(--hairline);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:8px;outline:none;min-height:42px}.toc input:focus{border-color:var(--accent-blue)}
+.toc a{display:flex;align-items:center;color:var(--ink-muted);font-size:13px;padding:8px 10px;border-radius:9px;min-height:38px}.toc a:hover{color:var(--ink);background:rgba(255,255,255,.05);text-decoration:none}.toc a.active{color:var(--ink);background:rgba(75,169,225,.14);box-shadow:inset 2px 0 0 var(--accent-blue)}.toc .grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);margin:12px 4px 4px;font-weight:700}
+.toc-toggle{display:none;width:100%;background:var(--surface-1);border:1px solid var(--hairline);color:var(--ink);border-radius:14px;padding:13px 16px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;min-height:48px}
+main{min-width:0}
+.card{background:var(--surface-1);border:1px solid var(--hairline);border-radius:var(--radius);padding:clamp(18px,3vw,28px);margin-bottom:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 30px -12px rgba(0,0,0,.6);min-width:0}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-muted)}.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent-blue);flex-shrink:0}
+.plain{background:rgba(75,169,225,.07);border:1px solid rgba(75,169,225,.22);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink);margin:12px 0}.plain b{color:var(--accent-blue)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.mini{background:var(--surface-2);border:1px solid var(--hairline);border-radius:14px;padding:14px;min-width:0}.mini b{font-size:13.5px;display:block;margin-bottom:4px}.mini p{margin:0;color:var(--ink-muted);font-size:13px}.mini ol,.mini ul{margin:8px 0 0;padding-left:18px;color:var(--ink-muted);font-size:13px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;margin:12px -4px;padding:0 4px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;margin:0}th{text-align:left;color:var(--ink-muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:9px 10px;border-bottom:1px solid var(--hairline);white-space:nowrap}td{padding:9px 10px;border-bottom:1px solid var(--hairline-soft);vertical-align:top}tr:hover td{background:rgba(255,255,255,.02)}
+.tag{display:inline-block;font-size:11px;font-weight:600;background:var(--surface-2);border:1px solid var(--hairline);padding:2px 9px;border-radius:99px;color:var(--ink-muted);margin:1px 2px;white-space:nowrap}.tag.blue{color:var(--accent-blue);border-color:rgba(75,169,225,.3);background:rgba(75,169,225,.1)}.tag.green{color:var(--success);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+.spot{border-radius:26px;padding:clamp(20px,4vw,32px);color:#fff;border:1px solid rgba(255,255,255,.1);margin-bottom:16px;position:relative;overflow:hidden}.spot.v{background:radial-gradient(120% 120% at 0% 0%,var(--violet),transparent 60%),linear-gradient(135deg,#5a3df0,#7d4df0)}.spot.m{background:radial-gradient(120% 120% at 100% 0%,var(--magenta),transparent 60%),linear-gradient(135deg,#c23de0,#e06fc0)}.spot.o{background:radial-gradient(120% 120% at 0% 100%,var(--orange),transparent 60%),linear-gradient(135deg,#ff6a2d,#ff9a4d)}.spot h2{color:#fff}.spot p{color:rgba(255,255,255,.88);font-size:14px}
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.step-btn{background:var(--surface-2);border:1px solid var(--hairline);color:var(--ink-muted);border-radius:99px;padding:9px 15px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:40px}.step-btn.on{background:#fff;color:#000;border-color:#fff}.step-panel{background:#0c0c0c;border:1px solid var(--hairline);border-radius:14px;padding:16px;font-size:13.5px;min-height:110px}.step-panel b{color:var(--accent-blue)}
+.qa-tools{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.qa-tools input,.qa-tools select{background:var(--surface-2);border:1px solid var(--hairline);color:var(--ink);border-radius:99px;padding:11px 16px;font-size:13px;outline:none;min-height:44px}.qa-tools input{flex:1;min-width:180px}.qa-tools input:focus{border-color:var(--accent-blue)}.pill{border:1px solid var(--hairline);background:var(--surface-2);color:var(--ink-muted);border-radius:99px;padding:9px 16px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:42px}.pill.on{background:#fff;color:#000;border-color:#fff}.catrow{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.qa{border:1px solid var(--hairline);border-radius:14px;margin-bottom:9px;overflow:hidden;background:var(--surface-2)}.qa summary{cursor:pointer;padding:14px 15px;font-weight:600;font-size:14px;list-style:none;display:flex;gap:10px;align-items:flex-start;min-height:48px}.qa summary::-webkit-details-marker{display:none}.qa summary:hover{background:rgba(255,255,255,.03)}.qa summary .n{flex-shrink:0;background:rgba(75,169,225,.14);color:var(--accent-blue);font-size:11px;font-weight:700;border-radius:8px;padding:3px 8px;margin-top:2px}.qa .body{padding:0 15px 15px;color:var(--ink-muted);font-size:13.5px;border-top:1px solid var(--hairline-soft)}.qa .body p{margin:9px 0}.qa .why{background:rgba(75,169,225,.07);border:1px solid rgba(75,169,225,.2);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--ink)}.count{font-size:12.5px;color:var(--ink-muted)}
+.themes{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.th{cursor:pointer;border:2px solid transparent;border-radius:14px;padding:9px 12px;background:var(--surface-2);display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink);min-height:44px}.th.on{border-color:var(--accent-blue)}.sw{width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.3);flex-shrink:0}
+.flow{background:#0c0c0c;border:1px solid var(--hairline);border-radius:14px;padding:14px;font-family:"JetBrains Mono",monospace;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre;color:#cfcfcf;-webkit-overflow-scrolling:touch}
+.check li{margin-bottom:6px}
+#top{position:fixed;bottom:20px;right:20px;width:48px;height:48px;border-radius:50%;background:#fff;color:#000;border:0;font-weight:800;font-size:18px;cursor:pointer;display:none;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#tocFab{display:none;position:fixed;bottom:20px;left:20px;z-index:60;background:var(--surface-2);border:1px solid var(--hairline);color:var(--ink);border-radius:99px;padding:12px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.minfoot{border-top:1px solid var(--hairline);padding:34px clamp(16px,4vw,32px);text-align:center;color:var(--ink-muted);font-size:13px;position:relative;z-index:1}
+/* RESPONSIVE */
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.paths{grid-template-columns:1fr 1fr}.grid4{grid-template-columns:1fr 1fr}}
+@media(max-width:960px){
+.links-desktop{display:none}.burger{display:inline-flex}
+.layout{grid-template-columns:1fr}.toc{position:static;max-height:none;display:none}.toc.open{display:block}.toc-toggle{display:block}
+.stats{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr 1fr}
+#tocFab{display:block}
+}
+@media(max-width:640px){
+.hero{padding-top:48px}.paths{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr;gap:8px}.grid2,.grid3,.grid4{grid-template-columns:1fr}
+.card{border-radius:16px}.spot{border-radius:20px}
+.btn{width:100%}.cta-row .btn{flex:1 1 100%}
+pre{font-size:11.5px;border-radius:12px}
+table{font-size:12.5px;min-width:520px}
+h3{margin-top:22px}
+}
+@media(pointer:coarse){.navpill a.nl,.toc a,.qa summary{min-height:44px}.pill,.step-btn{min-height:44px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}html{scroll-behavior:auto}}
+@media print{.navwrap,.toc,#top,#tocFab,#progress,.cta-row,.qa-tools,.themes{display:none!important}body{background:#fff;color:#000}.card{break-inside:avoid;border-color:#ccc}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div id="progress"></div>
+
+<div class="navwrap"><nav class="navpill" aria-label="Guide sections">
+<div class="brand"><span class="dot">K</span> Kivo&nbsp;<span style="color:var(--ink-muted);font-weight:500">Learn</span></div>
+<div class="links-desktop" id="deskLinks">
+<a class="nl" href="#start">Start</a><a class="nl" href="#user-manual">Use</a><a class="nl" href="#journey">Messages</a><a class="nl" href="#stack">Stack</a><a class="nl" href="#arch">Architecture</a><a class="nl" href="#data">Data</a><a class="nl" href="#realtime">Realtime</a><a class="nl" href="#auth">Auth</a><a class="nl" href="#features">Features</a><a class="nl" href="#themesec">Themes</a><a class="nl" href="#decisions">Decisions</a><a class="nl" href="#qa">Q&amp;A</a>
+</div>
+<button class="burger" onclick="toggleDrawer(true)" aria-label="Open menu">☰ Menu</button>
+</nav></div>
+<div class="drawer" id="drawer" aria-hidden="true"><div class="scrim" onclick="toggleDrawer(false)"></div>
+<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-family:Outfit">Kivo Learn</b><button class="pill" onclick="toggleDrawer(false)">✕ Close</button></div>
+<div class="grp">Start here</div>
+<a href="#start" onclick="toggleDrawer(false)">🚀 Start here</a><a href="#user-manual" onclick="toggleDrawer(false)">📱 Everyday user manual</a><a href="#journeys" onclick="toggleDrawer(false)">🗺️ User journeys</a>
+<div class="grp">How it works</div>
+<a href="#journey" onclick="toggleDrawer(false)">✉️ Journey of a message</a><a href="#stack" onclick="toggleDrawer(false)">🧱 Tech stack</a><a href="#arch" onclick="toggleDrawer(false)">🏗️ Architecture &amp; API</a><a href="#data" onclick="toggleDrawer(false)">🗄️ Data models</a><a href="#realtime" onclick="toggleDrawer(false)">🔴 Realtime &amp; presence</a><a href="#auth" onclick="toggleDrawer(false)">🔐 Auth &amp; security</a><a href="#features" onclick="toggleDrawer(false)">⚙️ Every feature</a><a href="#themesec" onclick="toggleDrawer(false)">🎨 Themes</a><a href="#perf" onclick="toggleDrawer(false)">⚡ Performance</a>
+<div class="grp">Think &amp; prepare</div>
+<a href="#decisions" onclick="toggleDrawer(false)">🤔 Why this, not that</a><a href="#deploy" onclick="toggleDrawer(false)">🚀 Run &amp; deploy</a><a href="#qa" onclick="toggleDrawer(false)">💬 Interview Q&amp;A</a><a href="#userfaq" onclick="toggleDrawer(false)">🙋 Everyday FAQ</a><a href="#glossary" onclick="toggleDrawer(false)">📖 Glossary</a><a href="#roadmap" onclick="toggleDrawer(false)">🚧 Roadmap</a>
+</div></div>
+
+<header class="hero">
+<span class="kicker"><i></i> Single-file guide · v3 · Users + Developers + Interviews</span>
+<h1><span class="b">Chat</span> your way.<br/>Learn how.</h1>
+<p class="sub">Kivo blends <b style="color:var(--ink)">WhatsApp-style DMs &amp; groups</b> with <b style="color:var(--ink)">Discord-style Spaces &amp; channels</b>, plus deep customization. Student-built, fully usable realtime chat — <b>Next.js 16 + Express 5 + Socket.IO + MongoDB</b>, JavaScript only, no microservices. This page teaches <b>everyone</b>: curious users, new teammates, and interviewers.</p>
+<div class="meta"><span class="tag blue">Version 3.1 · Sept 2026</span><span class="tag">⏱ ~35 min read</span><span class="tag">📱 Fully responsive</span><span class="tag green">● MVP + Plus + Calls + Polls + Nearby</span></div>
+<div class="cta-row">
+<a class="btn btn-p" href="#start">▶ Start learning</a>
+<a class="btn btn-g" href="#qa">Jump to 100+ Q&amp;A</a>
+<a class="btn btn-g" href="#user-manual">📱 I just use Kivo</a>
+</div>
+<div class="paths">
+<a class="path" href="#user-manual"><span class="ic">📱</span><b>I'm new / I use Kivo</b><p>Plain-language manual: chats, Spaces, themes, Plus, safety. No code.</p></a>
+<a class="path" href="#journeys"><span class="ic">🗺️</span><b>Show me flows</b><p>Signup → first DM, groups, Spaces, Plus UPI, offline sends.</p></a>
+<a class="path" href="#arch"><span class="ic">🛠️</span><b>I build / review code</b><p>File tour, API + socket examples, schemas, env, deploy.</p></a>
+<a class="path" href="#qa"><span class="ic">🎤</span><b>Interview prep</b><p>100+ Q&amp;A, 60-sec pitch, system-design follow-ups.</p></a>
+</div>
+<div class="stats">
+<div class="stat"><b>3</b><span>DMs · Groups · Spaces → Channels. One identity.</span></div>
+<div class="stat"><b>10</b><span>Themes + studio, wallpapers, bubble styles.</span></div>
+<div class="stat"><b>13</b><span>Mongo collections. Messages never embedded.</span></div>
+<div class="stat"><b>15m / 7d</b><span>JWT access + session-backed httpOnly refresh.</span></div>
+<div class="stat"><b>₹49/mo</b><span>Plus via UPI + 12-digit UTR, 24h review, 30d grant.</span></div>
+</div>
+</header>
+
+<div class="layout">
+<div><button class="toc-toggle" id="tocToggle" onclick="document.getElementById('toc').classList.toggle('open')">☰ Contents — tap to browse sections</button>
+<aside class="toc" id="toc" aria-label="Table of contents">
+<input id="tocSearch" placeholder="Filter sections…" oninput="filterToc(this.value)" aria-label="Filter sections"/>
+<div id="tocLinks">
+<div class="grp">Start</div>
+<a href="#start">🚀 Start here</a><a href="#overview">✨ What is Kivo?</a><a href="#user-manual">📱 User manual</a><a href="#journeys">🗺️ Journeys</a><a href="#journey">✉️ Message journey</a>
+<div class="grp">How it works</div>
+<a href="#stack">🧱 Stack + why</a><a href="#arch">🏗️ Architecture &amp; API</a><a href="#data">🗄️ Data models</a><a href="#realtime">🔴 Realtime</a><a href="#auth">🔐 Auth &amp; security</a><a href="#features">⚙️ Every feature</a><a href="#themesec">🎨 Themes (demo)</a><a href="#perf">⚡ Performance</a>
+<div class="grp">Think</div>
+<a href="#decisions">🤔 Why this, not that</a><a href="#deploy">🚀 Run &amp; deploy</a><a href="#qa">💬 Interview Q&amp;A</a><a href="#userfaq">🙋 Everyday FAQ</a><a href="#glossary">📖 Glossary</a><a href="#roadmap">🚧 Roadmap</a>
+</div>
+</aside></div>
+
+<main id="main">
+<!-- START -->
+<section class="card" id="start">
+<span class="eyebrow">Start here</span><h2>How to use this guide</h2>
+<div class="plain"><b>In plain words:</b> this one page replaces README + docs + PRD + tech-stack + a mock interview. Pick your path — everything links together, and every technical claim names the real file or endpoint so you can verify it in the repo.</div>
+<div class="grid3">
+<div class="mini"><b>📱 Everyday users (10 min)</b><p>Read <a href="#user-manual">User manual</a> → <a href="#journeys">Journeys</a> → <a href="#userfaq">Everyday FAQ</a>. You'll be able to chat, join Spaces, theme, and stay safe.</p></div>
+<div class="mini"><b>🛠️ Developers (20 min)</b><p>Read <a href="#journey">Message journey</a> → <a href="#arch">Architecture</a> → <a href="#data">Data</a> → <a href="#realtime">Realtime</a> → <a href="#auth">Auth</a> → <a href="#deploy">Run &amp; deploy</a>. Then browse code by file paths.</p></div>
+<div class="mini"><b>🎤 Interviews (15 min)</b><p>Memorize the <a href="#roadmap">60-sec pitch</a>, skim <a href="#decisions">decisions</a>, then drill <a href="#qa">Q&amp;A bank</a> with search + categories.</p></div>
+</div>
+<h3>What you'll be able to explain</h3>
+<ul class="check" style="color:var(--ink-muted);font-size:13.5px">
+<li>What Kivo is, who it's for, and what it deliberately <i>isn't</i> (not Slack).</li>
+<li>How a message travels (optimistic UI → JWT → Zod → Mongo → Socket → receipts → push → offline outbox).</li>
+<li>Why Mongo is truth and sockets only announce; why no Redis/microservices/TS — yet.</li>
+<li>Auth that actually revokes, presence that doesn't spam, threads that stay quiet, Plus that the client can't fake.</li>
+</ul>
+</section>
+
+<!-- OVERVIEW -->
+<section class="card" id="overview">
+<span class="eyebrow">Overview</span><h2>What is Kivo?</h2>
+<div class="plain"><b>In plain words:</b> one app for private chats (like WhatsApp) <i>and</i> communities (like Discord), with unusually deep theming. Built by one student (Ayush) to learn full-stack properly — but real people can use it daily. Live at <code>kivo.usersynax.dev</code>, open source <code>user-synax/Kivo</code>.</div>
+<div class="grid3">
+<div class="mini"><b>📱 DMs &amp; Groups</b><p>Private 1:1 DMs (unique per pair via <code>$all</code>) + small groups (you + ≥2 friends, admins, system chips, last-admin protection).</p></div>
+<div class="mini"><b>🛰️ Spaces &amp; Channels</b><p>Discord-like servers: text + announcement channels, roles <code>owner → admin → moderator → member</code>, Discover + 7-day rotating invites.</p></div>
+<div class="mini"><b>🎨 Customization</b><p>10 presets + personal studio + per-Space palettes + per-chat look + wallpapers + bubbles + profile effects. Beyond light/dark.</p></div>
+</div>
+<h3>Principles</h3>
+<p style="color:var(--ink-muted);font-size:13.5px">Fast &amp; realtime · Simple despite rich · Personal &amp; customizable · Clean responsive UI (bottom tabs on phones, icon rail on desktop) · Privacy + authorization foundational — never trust the client · One identity across DMs/Groups/Spaces · No premature microservices.</p>
+<h3>Pages (what users actually open)</h3>
+<div class="tw"><table><tr><th>URL</th><th>Who</th><th>What</th></tr>
+<tr><td><code>/</code></td><td>Anyone</td><td>Landing (features, customization, security, roadmap). Logged-in → <code>/app</code>.</td></tr>
+<tr><td><code>/signup</code> · <code>/login</code></td><td>Guests</td><td>Create account (instant, no OTP) / login with email <i>or</i> username, or Google/GitHub.</td></tr>
+<tr><td><code>/forgot-password</code> · <code>/reset-password?token</code> · <code>/verify-email?token</code></td><td>Anyone</td><td>1h reset link (kills all sessions) + 24h verify link (API-only, no auto-email today).</td></tr>
+<tr><td><code>/app</code> · <code>/app/profile</code></td><td>Signed in</td><td>Chat dashboard (lists + chat + drawers) · read-only profile + logout.</td></tr>
+<tr><td><code>/u/:username</code></td><td>Anyone</td><td>Public shareable profile: badge, flag, status, bio, socials, graph, Wave, QR share. Wears owner's theme.</td></tr>
+<tr><td><code>/plus</code> · <code>/docs</code> · <code>/learn</code> · <code>/author</code></td><td>Anyone</td><td>Pricing + UPI claim + status · how-to guide · visual story (this page is the deep version) · author.</td></tr>
+<tr><td><code>/admin</code> · <code>/admin/dashboard</code></td><td>Admins</td><td>Separate login; users, bans, groups/spaces, Plus queue, audit log.</td></tr></table></div>
+<h3>Repository map + 4-file rule</h3>
+<div class="flow">kivo/
+├── frontend/  Next.js 16 App Router · React 19 · JS only · Bun
+│   ├── app/        / · (auth)/ · /app · /u/[username] · /plus /learn /docs /admin …
+│   ├── components/ dashboard(chat-panel, message-bubble, sidebar, icon-rail,
+│   │               nearby-screen, appearance-screen, thread-panel, chat-media-drawer)
+│   │               spaces · notifications · profile · calls · status · polls · ui · admin
+│   ├── lib/        api.js auth.js cache.js theme.js chat-style.js drafts.js outbox.js
+│   │               push.js sound.js polls.js status.js custom-emoji.js plus.js …
+│   └── Design.md · globals.css (tokens) · public/kivo.html ← this guide, served
+├── backend/   Express 5 + Socket.IO 4 + Mongoose 9 · JS only · Bun (nodemon dev)
+│   └── src/ app.js (builds app) · server.js (real entry; root server.js = legacy stub)
+│       ├── modules/ auth users friends conversations messages spaces notifications
+│       │            push attachments search link-preview calls status emoji plus admin …
+│       │            each: *.routes.js → *.controller.js → *.service.js → *.validation.js
+│       ├── models/ User Session Conversation Message FriendRequest Space
+│       │            Notification PushSubscription Status CustomEmoji PlusRequest AdminActionLog
+│       ├── middleware/ auth adminAuth rateLimiter errorHandler · lib/ plus appwrite
+│       │   attachments email emoji-image totp · socket/ index.js io.js · config/ jobs/ utils/
+└── README.md · docs.md · PRD.md · TECH-STACK.md · kivo.html (repo copy of this guide)</div>
+</section>
+
+<!-- USER MANUAL -->
+<section class="card" id="user-manual">
+<span class="eyebrow">For everyone · no code</span><h2>📱 Everyday user manual</h2>
+<div class="plain"><b>In plain words:</b> if you only read one section, read this. Everything below is clickable in the real app — no technical knowledge needed.</div>
+<h3>1 · Create account &amp; log in (2 minutes)</h3>
+<div class="mini"><ol>
+<li>Open the site → <b>Sign up</b>. Enter display name, username (3–30, letters/numbers/_), email, password (≥8). You land in <code>/app</code> <b>instantly</b> — no OTP, no waiting.</li>
+<li>Or tap <b>Continue with Google / GitHub</b> — a new account is made for you (email pre-verified, provider photo as avatar). Same email as an existing account? They're <b>auto-linked</b>, nothing lost.</li>
+<li>Log in later with <b>email or username + password</b>, or the provider button. OAuth-only accounts (no password) tell you to use the provider button instead.</li>
+<li>Forgot password? <b>Forgot password</b> → email → 1h link → new password. All devices are signed out — log in again.</li>
+</ol></div>
+<h3>2 · Layout: desktop vs phone</h3>
+<div class="grid2">
+<div class="mini"><b>🖥️ Desktop / tablet</b><p>Far-left <b>icon rail</b>: Chats · Nearby · Status · Groups · Spaces · Emoji Factory · Settings, avatar at bottom. Header has bell 🔔, search <span class="tag">Ctrl+K</span>, New menu. Center = chat; right = profile/group/Space panel on wide screens. Unread dots sit on rail icons.</p></div>
+<div class="mini"><b>📱 Phone</b><p>Bottom tabs: <b>Chats · Status · Groups · Spaces · Menu</b>. Menu holds Nearby, Discover, profile, Appearance (full-screen themes), Settings — each a pushed screen with Back. Edge-swipe goes back; notches respected.</p></div>
+</div>
+<h3>3 · Friends, Find &amp; Nearby</h3>
+<div class="mini"><ol>
+<li><b>New → Friends → Find</b>: search username/email/name (300ms debounce). Results are <b>square cards</b> — tap View profile or Send Request.</li>
+<li>Sending? Choose <b>with welcome message</b> (≤280 chars, shown before accept — be kind, only they see it) or <b>without</b>. Can't friend yourself, blocked users, or duplicates.</li>
+<li><b>Requests tab</b>: accept/decline; welcome shows as a Quote bubble. Sender gets a notification (80-char snippet).</li>
+<li><b>Friends tab → Message</b> opens/creates the DM. <b>Unfriend</b> from any profile — removes both sides live; history stays until you Remove-from-list.</li>
+<li><b>Nearby</b> (rail / Menu → Nearby users, full-screen): first open shows a consent sheet. Tap <b>Share location</b> (one-shot, not tracking) → see people by <b>fuzzed distance only</b> (250 m / 1.2 km — never exact). Radius chips 1/2/5/10 km. Off in <b>Settings → Privacy → Nearby discovery</b> (hides you + clears location).</li>
+</ol></div>
+<h3>4 · Chat like a pro</h3>
+<div class="tw"><table><tr><th>Do</th><th>How</th></tr>
+<tr><td>Send</td><td>Type → <b>Enter</b> (Shift+Enter = newline). ≤4000 chars (Plus 8000). Appears instantly; retry on fail.</td></tr>
+<tr><td>Reply / React</td><td>Right-click / long-press → Reply (quote preview, X cancels) · React · double-click/long-press = ❤️ · 270+ picker.</td></tr>
+<tr><td>Edit / Delete</td><td>Own messages only. <b>↑</b> on empty box edits your last message. Edited label; delete blanks but keeps order.</td></tr>
+<tr><td>Forward / Pin / Save</td><td>Forward → pick chats (pill "Forwarded from @user", no caption). Pin → banner under header (max 10). Save → bookmark icon panel, jump anytime.</td></tr>
+<tr><td>Threads</td><td>Menu → Thread → side panel. Quiet by design: no badge/bell (mentions still ping). "N replies" chip reopens.</td></tr>
+<tr><td>Mentions</td><td>Type <code>@</code> → pick participant → highlighted. They get notified even if category muted.</td></tr>
+<tr><td>Voice / Files</td><td>Hold <b>mic</b> → release sends (slide up cancels). Paperclip or <b>paste screenshots</b> → ≤10 files ≤30 MB. Images → lightbox (arrows/download); docs → cards; grid icon → Media/Files/Links gallery + jump.</td></tr>
+<tr><td>Receipts</td><td>✓ sent · ✓✓ delivered · <b>blue ✓✓</b> all read. <b>Tap ticks</b> → Seen-by card (Read · time / Delivered per person).</td></tr>
+<tr><td>Stay oriented</td><td>Day pills (Today/Yesterday/…) · big emoji for 1–3 emoji-only · <b>"N new" pill</b> when scrolled up · scroll up loads history · right-click chat → Mark unread.</td></tr>
+<tr><td>Mobile gesture</td><td><b>Swipe bubble right</b> (~45px) to reply. Works with scroll via direction lock.</td></tr></table></div>
+<h3>5 · Groups &amp; Spaces</h3>
+<div class="grid2">
+<div class="mini"><b>👥 Groups (private circles)</b><ol><li>Groups → New group → name (≤50) + optional photo + ≥2 friends.</li><li>You become first admin. Settings: rename/photo, add/remove, promote/demote. Last admin can't be removed.</li><li>Joins/leaves show as centered chips, live for all.</li></ol></div>
+<div class="mini"><b>🏠 Spaces (communities)</b><ol><li>Spaces → New → name/desc/category/banner/avatar → auto <code>#general</code>. You own it.</li><li>Text channels = all post; announcement = admins only. Admin+ manages channels (last protected).</li><li>Roles owner→admin→moderator→member. Owner-only: promote admin, delete Space.</li><li>Discover → search/category → Join (public). Private = hidden, invite link/code only (7-day rotating, Space settings → Privacy &amp; invites; <code>/app?join=CODE</code> deep-link).</li></ol></div>
+</div>
+<h3>6 · Make it yours + stay notified + Plus</h3>
+<div class="mini"><ol>
+<li><b>Appearance</b> (full-screen): 10 themes switch live, no reload. Studio recolors accent + canvas tone → <b>Save to my account</b> (follows you). Chat look: wallpaper (Plain/Dots/Grid/Lines/Bubbles/Wash) + bubbles (Rounded/Pill/Squared/Outlined-mine). Per-chat palette icon overrides; Spaces can set their own look for members.</li>
+<li><b>Profile</b> (rail avatar / Menu): name, handle, bio 280, status 60 + emoji chip (32 + 6 vibes), photo 4MB, 10 frames, banner (curated GIFs; <b>Plus: your own ≤8MB</b>), effects (Plus: glow/gradient-name/aura), country flag, GitHub graph, X/Instagram/YouTube/website chips, pronouns, status auto-clear, privacy toggles.</li>
+<li><b>Public page</b> <code>/u/you</code>: share + QR. Visitors Wave 👋 (20s cooldown → notification deep-linking to them), add/message/block.</li>
+<li><b>Bell 🔔</b>: DMs/groups/Spaces/mentions/requests/waves. Click → jump + mark read. <b>Settings → Notification preferences</b> per category (Space msgs OFF default; mentions break through). <b>Sounds</b> per category + master + preview (synthesized, no downloads). First bell-open asks <b>push permission</b> → offline pings even when closed. Quiet automatically when you're already viewing that DM.</li>
+<li><b>Install (PWA)</b>: Chrome/Edge address-bar install icon · Android Add to Home Screen · iPhone Share → Add to Home Screen. Recent chats paint instantly offline; offline texts queue and auto-send on reconnect.</li>
+<li><b>Plus ₹49/mo</b>: <code>/plus</code> → pay published UPI ID → paste 12-digit UTR → approved within 24h → 30 days Plus (custom banner/effects/emoji, bigger limits). Status cards show pending/rejected/expired.</li>
+<li><b>Safety</b>: Block from any DM/profile (removes friendship, hides chat, server-enforced). Manage in <b>Settings → Blocked users</b> (one-tap unblock). Remove-from-list deletes a DM/group for <b>everyone</b> (confirm twice — permanent). Admins can ban rogue accounts.</li>
+</ol></div>
+</section>
+
+<!-- JOURNEYS -->
+<section class="card" id="journeys">
+<span class="eyebrow">Flows</span><h2>🗺️ Five journeys, end to end</h2>
+<div class="grid2">
+<div class="mini"><b>① Signup → first DM (3 min)</b><ol><li>Signup → land <code>/app</code>.</li><li>New → Friends → Find → search friend → Send Request (+ "hey, it's me!").</li><li>They Accept → Friends → Message → type → Enter → ✓✓ blue. Right-click → Pin "coffee Saturday".</li></ol></div>
+<div class="mini"><b>② Squad group</b><ol><li>Groups → New group "Project X" + photo + 2 friends → Create.</li><li>Chat, @mention the lead (overrides mute), start a Thread on the plan message.</li><li>Promote a co-admin; leave anytime (last admin protected).</li></ol></div>
+<div class="mini"><b>③ Space community</b><ol><li>Spaces → New "Design Club" (category Design) → #general ready.</li><li>Space settings → add #inspiration (text) + #news (announcement).</li><li>Private? Privacy &amp; invites → New link (7d) → share <code>/app?join=CODE</code>. Public? It appears in Discover.</li><li>Give it a look (accent + wallpaper) — members see it in channels.</li></ol></div>
+<div class="mini"><b>④ Plus UPI</b><ol><li><code>/plus</code> → pay ₹49 to shown UPI ID in any UPI app → copy 12-digit UTR.</li><li>Paste UTR → claim filed (pending card). Admin approves ≤24h → 30d Plus.</li><li>Upload custom banner + glow effect + personal emoji <code>:mylogo:</code>.</li></ol></div>
+<div class="mini"><b>⑤ Offline hero</b><ol><li>Enter a tunnel, keep typing → messages queue in outbox (banner "You are offline").</li><li>Reload — drafts + queue survive (IndexedDB).</li><li>Back online → queue flushes in order + gap-fill pulls what you missed. Nothing lost.</li></ol></div>
+</div>
+</section>
+
+<!-- MESSAGE JOURNEY -->
+<section class="card" id="journey">
+<span class="eyebrow">Core mental model</span><h2>The journey of a message</h2>
+<div class="plain"><b>In plain words:</b> your words paint instantly, get verified by the server, then everyone is told at once. If anyone was offline, the system catches them up quietly.</div>
+<div class="steps" id="stepBtns" role="tablist" aria-label="Message steps"></div>
+<div class="step-panel" id="stepPanel" role="tabpanel"></div>
+<div class="flow">Client → POST /api/v1/conversations/:id/messages → Auth(JWT) → Zod validate
+→ Authorize membership → Rate-limit 40/min → MongoDB write
+→ Socket.IO emit message:new → recipients → delivered/read acks
+→ Notifications (bulk insertMany + fire-and-forget push) → Offline? outbox flush
+Mantra: instant paint → verified truth → instant delivery → quiet catch-up.</div>
+<p style="color:var(--ink-muted);font-size:13px">Code refs: <code>backend/src/modules/messages/messages.service.js</code> (createMessage) · <code>backend/src/modules/notifications/notifications.service.js</code> (createForMessage) · <code>backend/src/socket/io.js</code> (emitToConversation) · <code>frontend/lib/outbox.js</code> + <code>components/outbox/outbox-flusher.jsx</code> · <code>frontend/lib/cache.js</code>.</p>
+</section>
+
+<!-- STACK -->
+<section class="card" id="stack">
+<span class="eyebrow">Stack</span><h2>Tech stack + why each choice</h2>
+<div class="tw"><table><tr><th>Piece</th><th>Technology</th><th>Why this (not the alternative)</th></tr>
+<tr><td>Web app</td><td><b>Next.js 16 + React 19</b></td><td>File routes + SSR/SEO (landing/docs/profiles) + rewrites. Not plain Vite: needs routing, metadata, sitemap/robots.</td></tr>
+<tr><td>Styling</td><td><b>Tailwind v4 + shadcn/ui + Base UI</b></td><td>Utilities + accessible primitives. No extra component lib — native + shadcn is enough.</td></tr>
+<tr><td>Motion</td><td><b>Motion (Framer Motion)</b></td><td>Staggers, dropdowns, panels. Always honors <code>prefers-reduced-motion</code>.</td></tr>
+<tr><td>Server</td><td><b>Node + Express 5</b></td><td>Boring + productive. Not Nest/Fastify: no decorator/DI ceremony for a solo MVP. Real entry <code>src/server.js</code> (<code>src/app.js</code> builds app; root server.js = legacy stub).</td></tr>
+<tr><td>Realtime</td><td><b>Socket.IO 4</b></td><td>Rooms + auto-reconnect + fallback beat raw WS for an MVP. No polling anywhere.</td></tr>
+<tr><td>Database</td><td><b>MongoDB Atlas + Mongoose 9</b></td><td>Flexible chat docs + geospatial (<code>2dsphere</code>) + text index. Not Postgres: schema fluidity + embedded members/channels fit documents.</td></tr>
+<tr><td>Validation</td><td><b>Zod 4</b></td><td>Every body/query/param server-side. Strictness without TypeScript.</td></tr>
+<tr><td>Auth</td><td><b>JWT + bcryptjs 12</b></td><td>Short tickets + one-way hashes. Sessions table gives real revocation.</td></tr>
+<tr><td>Files</td><td><b>Appwrite Storage + Multer memory</b></td><td>Separate buckets (avatar/attachments/emoji). Not S3: generous free tier + preview URLs. Never blobs in Mongo.</td></tr>
+<tr><td>Push</td><td><b>web-push VAPID</b></td><td>Native offline pings. Not Appwrite Messaging: standard + already integrated with SW.</td></tr>
+<tr><td>Email</td><td><b>Nodemailer Gmail SMTP</b></td><td>Reset/verify links. Fire-and-forget so auth never blocks on mail.</td></tr>
+<tr><td>Calls</td><td><b>LiveKit Cloud SFU</b></td><td>Chat servers are bad at media — delegate audio/video to an SFU; deterministic rooms.</td></tr>
+<tr><td>Images</td><td><b>sharp</b></td><td>Emoji → webp (gif kept for animation), 2MB cap.</td></tr>
+<tr><td>Runtime</td><td><b>Bun</b> (nodemon dev)</td><td>Fast install/run. <code>bun run dev/start</code>.</td></tr>
+<tr><td>Offline cache</td><td><b>idb-keyval</b></td><td>Browser DB: lists + last-50/chat, SWR instant paint.</td></tr>
+<tr><td>Lint</td><td><b>Biome</b></td><td><code>bun run lint</code>. TS intentionally out — JS-only is a project constraint.</td></tr></table></div>
+<p><span class="tag blue">Monorepo, no microservices</span><span class="tag">JS only</span><span class="tag green">Redis planned, NOT used</span></p>
+</section>
+
+<!-- ARCH -->
+<section class="card" id="arch">
+<span class="eyebrow">Architecture</span><h2>Architecture, API &amp; file tour</h2>
+<div class="flow">Browser ──HTTPS──▶ Next.js ──REST──▶ Express ──▶ MongoDB
+  │                                    │
+  └────── Socket.IO (realtime) ◄───────┘   Appwrite (files) · VAPID (push) · LiveKit (media)
+REST saves/fetches. Socket announces. DB write FIRST, emit SECOND.</div>
+<h3>Networking rule (interview favorite)</h3>
+<p style="color:var(--ink-muted);font-size:13.5px">REST uses relative <code>/api/…</code> → Next.js <b>rewrites</b> (<code>next.config.mjs</code>) to <code>BACKEND_URL</code> (default <code>http://localhost:4000</code>), staying same-origin so <code>sameSite=strict</code> httpOnly cookies flow without CORS. <b>Socket.IO dials <code>NEXT_PUBLIC_API_URL</code> directly</b> — rewrites can't proxy WebSocket upgrades. Config: <code>frontend/lib/api.js</code> (fetch + auto-refresh) · <code>components/socket-provider.jsx</code>.</p>
+<h3>Request lifecycle (example: send message)</h3>
+<pre><button onclick="copyCode(this)">Copy</button>POST /api/v1/conversations/:id/messages
+Authorization: Bearer &lt;15m JWT&gt;
+{"content":"hey!","replyToMessageId":null}
+
+routes.js → auth() → rateLimiter(send 40/min) → controller
+  → service: Zod validate → membership/ban/block check
+  → getRequesterPlan() limits → Message.create()
+  → Conversation.lastMessageAt touch
+  → notifications.createForMessage() [bulk insertMany + async push]
+  → io.emitToConversation(id,"message:new",msg) → 201</pre>
+<h3>Module mounts</h3>
+<div class="tw"><table><tr><th>Mount</th><th>What lives there</th></tr>
+<tr><td><code>/api/v1/auth</code></td><td>register login refresh logout logout-all verify-email resend forgot/reset + OAuth providers/start/link-url/callback</td></tr>
+<tr><td><code>/api/v1/users</code></td><td>me, profile/avatar/banner, public by username, search 30/min, blocked, privacy, location 10/min, nearby 30/min</td></tr>
+<tr><td><code>/api/v1/friends</code></td><td>request (+welcome 280, 20/h) accept decline list remove + requests feed</td></tr>
+<tr><td><code>/api/v1/conversations</code></td><td>DM/group CRUD, members/admins, read/unread, look <code>PATCH /:id/look</code>, permanent <code>DELETE /:id</code>, messages, pinned, threads</td></tr>
+<tr><td><code>/api/v1/messages</code></td><td>edit delete pin save/unsave saved-feed reactions (receipts via readBy/deliveredTo)</td></tr>
+<tr><td><code>/api/v1/spaces</code></td><td>CRUD, discover (public only), join, join-by-code, invites, members/roles, channels</td></tr>
+<tr><td><code>/api/v1/notifications</code></td><td>list unread-count mark-read preferences wave <code>POST /:id/wave</code> 20s</td></tr>
+<tr><td><code>push · attachments · search · link-preview · calls · status · emoji · plus</code></td><td>VAPID subscribe · Multer→Appwrite · Ctrl+K unified · SSRF-guarded og 1h cache · LiveKit token/config/status · 24h text+photo · emoji CRUD · UPI claim/status</td></tr>
+<tr><td><code>/api/admin</code></td><td>login stats users ban/unban/plan <code>POST /users/:id/plan</code> plus-queue approve/reject groups/spaces delete</td></tr>
+<tr><td><code>GET /health</code></td><td><code>{success:true, data:{status:"ok"}}</code></td></tr></table></div>
+<p style="color:var(--ink-muted);font-size:13px">Errors: <code>{success:false, error:{code,message}}</code> — prod never leaks stacks/secrets/paths (<code>middleware/errorHandler.js</code>). Frontend tour: <code>app/</code> routes · <code>components/dashboard/*</code> shell/panels · <code>lib/theme.js</code> truth · <code>lib/cache.js outbox.js drafts.js</code>.</p>
+</section>
+
+<!-- DATA -->
+<section class="card" id="data">
+<span class="eyebrow">Data</span><h2>Data models — MongoDB is truth</h2>
+<div class="plain"><b>In plain words:</b> everything important lives in Mongo. If the server restarts, nothing is lost. Messages get their own table (never stuffed inside chats) so history can grow forever.</div>
+<div class="flow">User 1──* Session · User *──* Conversation *──* Message (threadId/pins/saves)
+User *──* FriendRequest (directed) · Space{embedded members/channels} 1──* Conversation
+User 1──* Notification · PushSubscription · Status · CustomEmoji · PlusRequest</div>
+<div class="tw"><table><tr><th>Model</th><th>Holds &amp; key rules · file</th></tr>
+<tr><td><b>User</b> <code>models/User.js</code></td><td>email/username/displayName, bio280, status60, statusEmoji8, pronouns20, statusExpiresAt, avatarStyle(10), avatarUrl+banner (+FileIds select:false), country→flag, github/x/instagram/youtube/website, verified/showBadge, <b>plan + planExpiresAt</b>, profileEffect, usernameColor hex, passwordHash nullable (OAuth-only), googleId/githubId sparse-unique + verified flags, role, blockedUsers, lastActiveAt, verify/reset hashes, 2FA secret + hashed backups, isBanned, <b>location Point + 2dsphere + discoverableByNearby=true</b>, notificationPreferences (Space OFF), appearance{accent,tint,wallpaper,bubbleStyle}</td></tr>
+<tr><td><b>Session</b></td><td>One row per refresh token, TTL expiry. Delete = logout. Powers logout-all/reset-all/ban.</td></tr>
+<tr><td><b>Conversation</b> <code>models/Conversation.js</code></td><td>dm/group/space_channel, participants, admins, createdBy, spaceId+channelId, appearance look, lastMessageAt. Duplicate DM via service <code>$all</code> (no pairwise unique index exists in Mongo).</td></tr>
+<tr><td><b>Message</b> <code>models/Message.js</code></td><td>conv+sender, content ≤4000 blanked on delete, type text/system/poll, replyTo, <b>threadId null=timeline</b>, reactions, deliveredTo, readBy{user,at}, savedBy, mentions, attachments{fileId,bucketId,name,mime,size,kind,url}, audioDuration, isEdited+history(10), scheduledAt+status, forwardCount, forwardedFromId/Name, pinnedAt/By, poll{question140, opts 2–8, multi, anon, expiry, closed, total}, isDeleted. Indexes per read pattern + text index (threads excluded).</td></tr>
+<tr><td><b>FriendRequest</b></td><td>from→to + pending/accepted/declined + welcomeMessage280 + at. Accepted row = edge. Directed-unique.</td></tr>
+<tr><td><b>Space</b> <code>models/Space.js</code></td><td>name/slug-unique/desc/category(10)/avatar/banner, owner, members[{user,role,joined}], channels[{name,slug,desc,type,by}], appearance, visibility public/private, inviteCode+inviteExpiresAt 7d (never in payloads).</td></tr>
+<tr><td><b>Notification</b></td><td>recipient/sender/senderUsername, types dm/group/space/mention/friend_request/friend_accept/space_invite/wave, flags inApp/pushDelivered/pushError.</td></tr>
+<tr><td><b>Status</b></td><td>user text280 background(6) media{file,bucket,url,kind,mime,size,name} viewers[] expiresAt 24h (indexed, no TTL — hourly sweep deletes file then doc).</td></tr>
+<tr><td><b>CustomEmoji</b></td><td>name 2–32, spaceId, ownerId, by, url/file/bucket/animated. Sparse-unique per scope.</td></tr>
+<tr><td><b>PlusRequest</b></td><td>user utr-12-digit amount4900 status pending/approved/rejected/expired expiresAt 24h reviewedAt note.</td></tr>
+<tr><td><b>PushSubscription</b> · <b>AdminActionLog</b></td><td>VAPID endpoint+keys (unique) · ban/unban/grant_plus/revoke_plus/delete_* + IP + time.</td></tr></table></div>
+<p><span class="tag blue">Never embed messages</span><span class="tag">Pins/saves = fields</span><span class="tag green">Threads reuse Message</span></p>
+</section>
+
+<!-- REALTIME -->
+<section class="card" id="realtime">
+<span class="eyebrow">Realtime</span><h2>Socket.IO: rooms, presence, receipts</h2>
+<div class="plain"><b>In plain words:</b> one always-open wire per device. The server puts you in a "room" per chat/Space and shouts into the right room when something happens. Online dots only go to people who share a chat with you — not the whole internet.</div>
+<div class="grid2">
+<div class="mini"><b>🔌 Connection</b><p>JWT handshake (same secret as HTTP); banned rejected. Auto-join <code>conversation:{id}</code> + <code>space:{id}</code>. <code>socket/io.js</code> helper <code>emitToConversation</code>. File <code>socket/index.js</code>.</p></div>
+<div class="mini"><b>🟢 Presence (scoped)</b><p><code>Map&lt;user,Set&lt;socket&gt;&gt;</code> single-instance. Peers = union of conversations+spaces (<code>getRelevantPeerIds</code>). 12s grace (<code>pendingOffline</code>) stops flicker. <code>presence:snapshot</code> fixes late joiners. Offline = <code>lastActiveAt → "active X ago"</code> (<code>lib/last-active.js</code>).</p></div>
+<div class="mini"><b>⌨️ Typing</b><p><code>typing:start/stop {conversationId}</code> → room excl. sender. No DB write. Client: <code>chat-panel.jsx</code>.</p></div>
+<div class="mini"><b>✅ Receipts</b><p><code>message:delivered {messageId}</code> → <code>$addToSet</code> → <code>delivery-updated</code>. Read = anchor <code>{userId,upToMessageId,upToCreatedAt,readAt}</code> → client groups Read/Delivered. Tap ticks → portaled Seen-by (<code>message-bubble.jsx</code>).</p></div>
+<div class="mini"><b>🔁 Gap-fill</b><p>Reconnect → refetch list (single agg) + <code>after=newestId</code> → merge into <code>cache.js</code>. No full download.</p></div>
+<div class="mini"><b>📞 Ring only (media = LiveKit)</b><p><code>call:ring/accept/decline/end → accepted/declined/ended/missed/failed</code>. 30s <code>activeRings</code> → missed chip+bell (<code>calls.service recordMissedCall</code>). 3s spam guard. Blocked → <code>CALL_BLOCKED</code>.</p></div>
+</div>
+<pre><button onclick="copyCode(this)">Copy</button>// client minimal (frontend)
+import { io } from "socket.io-client";
+const s = io(process.env.NEXT_PUBLIC_API_URL, { auth: { token } });
+s.on("message:new", m =&gt; m.threadId ? openThread(m) : appendChat(m));
+s.emit("conversation:focus", { conversationId }); // suppresses its DM notifs
+s.emit("message:delivered", { messageId });</pre>
+<div class="tw"><table><tr><th>Event</th><th>Dir</th><th>Meaning</th></tr>
+<tr><td><code>message:new/edited/deleted/reaction/pin-updated</code></td><td>S→Room</td><td>Thread replies reuse with <code>threadId</code> → panel vs chip refresh</td></tr>
+<tr><td><code>message:read/unread/delivery-updated</code></td><td>Both</td><td>Anchor receipts + unread badge + "New messages" line</td></tr>
+<tr><td><code>conversation:focus/blur</code></td><td>C→S</td><td>Viewing DM skips its notification (<code>isUserFocusedOnConversation</code>)</td></tr>
+<tr><td><code>conversation:member-added/removed/updated/admin-changed/removed</code></td><td>S→Room</td><td>Group live; <code>removed</code> also per-user on permanent delete</td></tr>
+<tr><td><code>space:updated/member-*/channel-*/deleted/joined/removed</code></td><td>S→Space</td><td>Space/channel lifecycle</td></tr>
+<tr><td><code>notification:new · friend:removed · emoji:new/deleted · status:new/deleted/viewed</code></td><td>S→User</td><td>Bell · live unfriend · emoji sync · status feed</td></tr></table></div>
+</section>
+
+<!-- AUTH -->
+<section class="card" id="auth">
+<span class="eyebrow">Auth &amp; security</span><h2>Identity, trust, and guards</h2>
+<div class="plain"><b>In plain words:</b> short-lived tickets prove who you are; a hidden cookie keeps you logged in; the server can revoke either instantly (logout everywhere, password reset, ban). Every input is validated; every action checks permission.</div>
+<div class="grid2">
+<div class="mini"><b>⚡ Instant signup</b><p>name + username <code>^[a-zA-Z0-9_]+$</code> 3–30 + email + password ≥8 → bcrypt12 → user + session → access + httpOnly cookie → <code>/app</code>. Duplicate → CONFLICT. <code>GuestGate/AuthGate</code> (<code>components/auth-guard.jsx</code>).</p></div>
+<div class="mini"><b>🎫 Sessions that revoke</b><p>Access 15m Bearer + refresh strict-cookie backed by Session TTL. <code>POST /refresh-token</code> mints access, <b>no rotation</b> (race-safe). Single-flight + 60s early refresh (<code>lib/api.js</code>). Logout one / logout-all / reset-all / ban-all = delete docs.</p></div>
+<div class="mini"><b>📧 Verify + reset</b><p>Verify 24h SHA-256 link + resend 1/min (API-only today). Forgot 5/5min always-success (no enumeration) 1h; reset 10/5min + kill all. Gmail SMTP fire-and-forget (<code>lib/email.js</code>, FRONTEND_URL links).</p></div>
+<div class="mini"><b>🔢 2FA TOTP</b><p>Optional. In-repo <code>lib/totp.js</code> RFC6238 SHA-1/30s constant-time; QR (<code>qrcode</code>); pending secret; bcrypt-hashed single-use backups; 5m ticket → session; password to disable (OAuth-only exempt). UI: <code>dashboard/two-factor-section.jsx</code>.</p></div>
+<div class="mini"><b>🔑 Google + GitHub</b><p><code>GET /oauth/providers</code> gates buttons. Start 302 signed-state → callback creates (pre-verified, derived username, provider avatar if unset) or auto-links by email. <code>link-url</code> embeds userId. <code>PROVIDER_ALREADY_LINKED</code>; sparse-unique; OAuth-only null password → <code>OAUTH_ONLY_ACCOUNT</code>. Both linked → native verified. UI: <code>auth/OAuthButtons.jsx</code>, <code>oauth/callback/page.jsx</code>.</p></div>
+<div class="mini"><b>🛡️ Never trust client</b><p>Zod all inputs. Membership / sender-only / rank (owner&gt;admin&gt;moderator&gt;member) / owner-only promote+delete / last-owner+admin guards. Helmet, CORS allowlist, body limits, trust proxy, allow-list uploads + old-file delete, no prod leaks.</p></div>
+</div>
+<h3>Rate limits — in-memory fixed window (<code>middleware/rateLimiter.js</code>)</h3>
+<p style="color:var(--ink-muted);font-size:13px">Per-user else IP · <code>X-RateLimit-*</code> + <code>Retry-After</code> · 5-min unref sweep · per-process (shared store only if multi-instance).<br/>register 5/h/IP · login 10/15m · 2FA code 10/5m/IP · setup 5/5m · verify-code 5/60s · refresh 30/60s · forgot 5/5m · reset 10/5m · resend 1/m · send 40/m · edit 20/m · reactions 60/m · friend-req 20/h · user-search 30/m · nearby 30/m · location 10/m · space/channel 10/h · uploads 10/m · search 30/m · link-preview 30/m · call-token 20/m · status 10/day + feed 30/m + view 60/m · plus-claim 5/day · admin-login 5/15m · oauth-link 10/60s.</p>
+<h3>Security checklist (say this in interviews)</h3>
+<div class="grid3"><div class="mini"><b>Transport &amp; cookies</b><p>Helmet, CORS allowlist, httpOnly + sameSite strict cookies, trust proxy IPs.</p></div><div class="mini"><b>Input &amp; files</b><p>Zod everywhere; MIME allow-lists + 30MB caps + bucket extension lists; old files deleted on replace.</p></div><div class="mini"><b>Abuse &amp; privacy</b><p>Rate limits, block/ban guards on DM/wave/search/nearby/calls, fuzzed location, SSRF-guarded previews.</p></div></div>
+</section>
+
+<!-- FEATURES -->
+<section class="card" id="features">
+<span class="eyebrow">Features</span><h2>How each feature actually works</h2>
+<div class="plain"><b>In plain words:</b> one composer + one bubble menu everywhere. Differences are server rules (who can post/pin/promote) plus quiet-by-design threads and server-checked Plus limits.</div>
+<h3>👥 Friends · Find · Nearby</h3>
+<p style="color:var(--ink-muted);font-size:13.5px">Request by username/email/name + optional <b>welcome 280</b> (stored + 80-char notif snippet → Quote bubble). Blocked both-ways → <code>BLOCKED_USER</code>. Directed-unique; reverse auto-accepts. <b>Remove = shared edge deleted both sides</b> + <code>friend:removed</code> live; history stays. Find: debounced 30/min, blocked/banned filtered, <b>square cards</b> (<code>profile-preview-card.jsx</code>) + modal with/without message. <b>Nearby full-screen</b> (<code>nearby-screen.jsx</code> like Appearance; rail + Menu → Nearby; FriendsModal tab): default ON, Settings → Privacy OFF clears; one-shot <code>getCurrentPosition</code> 12s → <code>POST /me/location</code> 10/min (reject accuracy&gt;200/OFF) → Point + 2dsphere; <code>GET /nearby?radius=1/2/5/10km</code> 30/min <code>$geoNear</code> <b>fuzz &lt;1km→50m ≥1km→0.1km</b>, filters banned/blocked-both/friends+pending+declined/stale&gt;15m/hidden, nearest. Consent <code>kivo:nearbyConsent</code>; <code>Permissions-Policy geolocation=(self)</code>.</p>
+<h3>💬 Messaging core</h3>
+<p style="color:var(--ink-muted);font-size:13.5px">DM create-or-return (<code>$all</code>). List by <code>lastMessageAt</code> desc + unread (not-mine ∧ not-readBy) + online. Cursor newest-first + <code>hasMore</code>, scroll-up infinite, <code>around</code> jump, <code>after</code> catch-up. Optimistic sent→delivered→read + retry (<code>chat-panel.jsx</code> memoized <code>MessageRows</code>, O(1) byId). Menu: react strip, copy, save, profile, block, reply, thread, forward, pin, select (multi copy/forward/delete), Share mobile. ❤️ double-tap (500ms throttle). Edit own (Plus unlimited else 15m, history 10, ↑-on-empty), soft-delete (blanked, pin cleared). System chips never bump unread. <b>Remove from list</b> (DM either side, group admin, channels 403) = permanent both-sides + <code>conversation:removed</code> + confirm modal.</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Reply</b> <code>replyToMessageId</code> inline (deleted = placeholder). <b>Forward</b> bare <code>{forwardedFromId}</code> both-memberships-checked → <code>forwardedFromName</code> pill, no caption/mention-resolve, forwardCount. <b>Pin</b> any member <code>POST /:id/pin</code> timestamp, newest-first max10 banner, <code>pin-updated</code>. <b>Threads</b> <code>threadId=root</code> (roots null) excluded from timeline/cursors/search/pinned/unread/cache; <b>quiet</b> (no badge/bell, mentions still notify); content-required, no quote/forward inside, live root non-system non-reply only; list (root+count/last/participants → chips) + panel oldest-first 500; same <code>message:*</code> routed by threadId (<code>thread-panel.jsx</code>). <b>Saved</b> <code>POST /:id/save</code> → <code>savedBy</code>, flag at read, <code>GET /saved</code> newest-first 200 (Plus 1K), personal cross-device, deleted drops, jump. <b>Mentions</b> @-autocomplete participants-only → @username highlight (<code>mention-autocomplete.jsx</code>), override muted (if Mentions on).</p>
+<h3>📊 Polls · 🟢 Status · 📎 Files &amp; voice · 📞 Calls</h3>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Polls</b> (<code>polls/poll-card.jsx</code>): <code>type poll + poll{question140, opts 2–8×60, voters, multi, anon, expiry, closed, total}</code>. Free 5/24h/single; Plus 8/7d/multi+anon. vote/retract/end-early; <code>poll:updated/ended</code>; 60s sweep; searchable.</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Status 24h friends-only</b> (<code>status/*</code>): text280 + 6 backgrounds OR photo (jpg/png/webp/gif ≤30MB, 1/status) + caption280. Vertical tab My-top + grouped friends, green <code>#25D366</code>/grey rings, viewer 5s photo advance + caption + dots, 10/day, Appwrite attachments bucket, hourly file-then-doc sweep, <code>status:new/deleted/viewed</code> + isViewed. Mobile 5th tab.</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Attachments</b> (<code>chat/attachments.jsx</code>): browser → backend allow-list + 30MB → Appwrite bucket (images, docs pdf/doc(x)/xls(x)/ppt(x)/txt, audio webm/ogg/mp3/m4a/aac/wav — bucket extensions must include audio). 10/msg (Plus 20; 100MB). Progress + caption + lightbox (arrows/download) + doc cards + <b>Media/Files/Links drawer</b> (<code>chat-media-drawer.jsx</code>) with counts + jump + empty states. <b>Voice</b>: hold mic MediaRecorder→bare MIME (no transcode), slide-up cancel, timer, needs net; <b>32-bar deterministic pseudo-waveform</b> (fileId seed, CSS divs, no fetch), tabular-nums timer, shared &lt;audio&gt; singleton, slider seek (click, ←/→±5s, Home/End, Space), responsive, <code>audioDuration</code> preserved on forward.</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Calls — LiveKit SFU</b> (<code>calls/*</code>): deterministic rooms <code>kivo_&lt;conv&gt;</code>, 6h tokens <code>POST /calls/token</code> (membership/ban/block, 20/min), <code>GET /config</code> gates buttons, <code>GET /status</code> Join pill. Socket ring only (30s → missed chip + bell + <code>📞CALL:</code> history started/cancelled/declined/missed/ended + duration + Call back). Panel: mute/camera/devices/leave, voice→video upgrade, mirrored selfie, group grid+headcount, reconnect banner, iOS unlock; lazy client SSR-safe, manual themed tracks.</p>
+<h3>🔔 Notifications · 📱 Offline · 🔎 Search · 🔗 Previews · 📝 Polish</h3>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Bell</b> (<code>notifications/*</code>): DMs/groups/Spaces/announcements/mentions/requests+accepts/waves; cursor pages + mark-all; click deep-links. Prefs per category (Space OFF default; mentions break through; wave ungated 20s). Focus/blur suppression. Sounds Web Audio per category + master + preview (<code>lib/sound.js</code>, <code>kivo:sounds</code>). Perf: <code>insertMany</code> + batch prefs + async VAPID; 404/410 prune. <b>Push</b>: opt-in (bell first-ask), per-user subs, SW click → chat (<code>public/sw.js</code>, <code>lib/push.js</code>, <code>pwa-register.jsx</code>).</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>PWA/offline</b>: manifest + sw installable; precache shell + hashed <code>/_next/static</code> cache-first; navigations network-first → cached shell → styled offline (<code>public/offline.html</code>); API/Socket never intercepted. IndexedDB (<code>lib/cache.js</code>) lists + last-50/chat SWR + restore last open + Space expand. <b>Outbox</b> (<code>lib/outbox.js</code>) durable per-account text queue, survives reload, flushes on reconnect; attachments need net; dual-signal banner.</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Search Ctrl+K</b> (<code>dashboard/search-overlay.jsx</code>): messages+people+spaces + jump highlight (Plus 20/cat vs 5). Blocked/banned filtered. <b>Previews</b> (<code>chat/link-preview.jsx</code>, <code>lib/links.js</code>): first URL → card (image/title/2-line/domain); server 8s/1.5MB regex parse + relative resolve, 1h/500 cache, SSRF-guarded (http(s), no localhost/private/link-local on host + DNS + redirect); empty stays plain; client 200-cache, broken→text-only. <b>Polish (derived, zero schema)</b>: day dividers Today/Yesterday/weekday/date; big emoji 1–3 grapheme-aware (<code>lib/emoji.js</code>, Intl.Segmenter) 44/36/30px chromeless; jump pill (120px pin, 200px threshold, own sends pin); drafts per-conv (<code>lib/drafts.js</code> 250ms/50-chat/4000-clamp); paste-image→queue; swipe ~45px lock + haptics.</p>
+<h3>👤 Profiles · 👋 Wave · 🎨 Emoji · 👑 Plus</h3>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Profiles</b> (<code>dashboard/profile-edit-modal.jsx</code>, <code>profile/*</code>): name50/handle/bio280/status60 + chip8 (32 + 6 vibes) + photo4MB + 10 frames (Default, My-accent, solids, gradients) + banner (curated GIFs; <b>Plus custom 8MB</b> <code>PATCH /me/banner</code>, old retired) + effects none/glow/gradient-name/aura (<code>kivo-pfx-*</code>, server-clamped, downgrade→none) + flag + graph + social chips (<code>social-links.jsx</code>) + pronouns + auto-clear + privacy toggles. Public <code>/u/:username</code> (<code>app/u/[username]</code>): no-login, Plus flourishes, <b>owner-theme skin</b> (<code>lib/profile-skin.js</code>), Share + QR + copy + native Share, Join nudge, Message/Add/Accept/Block/Unfriend. Verified admin-granted + showBadge toggle; Google/GitHub chips.</p>
+<p style="color:var(--ink-muted);font-size:13.5px"><b>Wave</b>: notification not message. <code>POST /notifications/:id/wave</code> → wave + senderUsername, 20s cooldown, self/blocked rejected, in-app else VAPID, deep-links to sender, countdown button. <b>Emoji 3-tier</b> (<code>emoji-factory-panel.jsx</code>, <code>lib/custom-emoji.js</code>): Global admin 200 / Space Plus-admin 100 / Personal Plus 50 everywhere; →webp (gif kept) 2MB sharp; emoji bucket (fallback attachments); <code>:name:</code> + <code>custom:id</code> reactions; IDB SWR; <code>emoji:new/deleted</code>.</p>
+<div class="tw"><table><tr><th>Limit</th><th>Free → Plus</th></tr>
+<tr><td>Message length · edit window</td><td>4K · 15m → <b>8K · unlimited</b></td></tr>
+<tr><td>Attachments · file size</td><td>10 · 30MB → <b>20 · 100MB</b></td></tr>
+<tr><td>Pins · saved</td><td>10 · 200 → <b>50 · 1K</b></td></tr>
+<tr><td>Groups owned · members</td><td>5 · 20 → <b>20 · 100</b></td></tr>
+<tr><td>Spaces owned · members · channels</td><td>3 · 50 · 10 → <b>15 · 300 · 30</b></td></tr>
+<tr><td>Calls · search/cat · polls active · opts · duration</td><td>5 · 5 · 5 · 5 · 1d → <b>25 · 20 · 20 · 8 · 7d</b> (+multi+anon Plus-only)</td></tr>
+<tr><td>Forward · personal emoji</td><td>5 · 0 → <b>10 · 50</b></td></tr></table></div>
+<p style="color:var(--ink-muted);font-size:13px"><b>Plus UPI self-serve</b> (<code>plus/plus-screen.jsx</code>, <code>modules/plus/*</code>, <code>lib/plus.js</code> PLAN_LIMITS): pay published UPI ID ₹49 → paste 12-digit UTR (<code>POST /plus/claim</code> 5/day) → admin queue ≤24h → 30d grant (<code>PLUS_DURATION_MS</code>). <code>/plus</code> pricing+steps+status. Expired reads free (<code>getEffectivePlan</code>, never trust client); hourly <code>sweepPlus</code> lapses + scrubs effects. Admin <code>POST /admin/users/:id/plan</code> + audit.</p>
+<h3>🏠 Spaces detail</h3>
+<p style="color:var(--ink-muted);font-size:13.5px">Create → auto <code>#general</code> (each channel = own Conversation). Text (all) vs announcement (admin+; anyone may thread-reply). Admin+ channels (last protected). Roles member↔moderator (admin+), admin owner-only, no direct owner, last-owner protected, self-leave auto-promotes. Public → Discover (search/category, one-click); private hidden + single rotating 7d code (Privacy &amp; invites; New invalidates, Off closes; never in payloads; <code>/app?join=CODE</code> + Discover box). Space look (accent+tint+wallpaper+bubbles, live preview, per-field "Member's own", Reset→personal) scopes members' channel view. Owner-only delete kills channels+messages. Files: <code>spaces/*</code>.</p>
+</section>
+
+<!-- THEMES -->
+<section class="card" id="themesec">
+<span class="eyebrow">Signature · try it</span><h2>Theme system — live demo</h2>
+<div class="plain"><b>In plain words:</b> every color is a variable. A theme is one object of values. Tap below — this page re-skins exactly like Kivo, with zero reloads.</div>
+<div class="themes" id="themeRow" role="group" aria-label="Theme presets"></div>
+<p style="color:var(--ink-muted);font-size:13px"><b style="color:var(--ink)">Engine</b> (<code>lib/theme.js</code>): <code>derivePalette()</code> washes only surface tokens (base/surface/elevated/border/scrollbars/bubbleReceived) preserving lightness — contrast never breaks. <code>tintStrength</code> 0.2 dark / 0.14 light; <code>isChromatic</code> rejects near-gray; accent sets badge/soft/onAccent via luminance. <code>resolveChatLook()</code> (<code>lib/chat-style.js</code>): <b>conversation → Space → personal</b> per field, null = "Member's own". Wallpapers pure CSS <code>color-mix()</code> (none/dots/grid/diagonal/bubbles/wash); bubbles <code>kivo-bubbles-*</code> (rounded/pill/squared/outline-mine). Partial merges; <code>conversation:updated</code> repaints live; rings follow accent; <code>/u</code> wears owner skin (<code>profile-skin.js</code>).</p>
+<div class="tw"><table><tr><th>Theme</th><th>Family</th><th>Canvas</th></tr>
+<tr><td>Framer (default)</td><td>Dark near-black + blue</td><td><code>#090909</code></td></tr>
+<tr><td>Midnight</td><td>Dark navy</td><td><code>#0a0e16</code></td></tr>
+<tr><td>Graphite</td><td>Dark slate</td><td><code>#0d0f12</code></td></tr>
+<tr><td>Espresso</td><td>Dark warm brown</td><td><code>#130e0a</code></td></tr>
+<tr><td>Pine</td><td>Dark forest</td><td><code>#0a160f</code></td></tr>
+<tr><td>Plum</td><td>Dark aubergine</td><td><code>#100a14</code></td></tr>
+<tr><td>Porcelain</td><td>Light off-white</td><td><code>#faf9f7</code></td></tr>
+<tr><td>Linen</td><td>Light cream</td><td><code>#f8f4ec</code></td></tr>
+<tr><td>Mist</td><td>Light blue-gray</td><td><code>#f5f7fa</code></td></tr>
+<tr><td>Sage</td><td>Light green</td><td><code>#f5f7f1</code></td></tr></table></div>
+</section>
+
+<div class="spot v"><h2>One canvas. Every surface answers to it.</h2><p>Tokens flow through CSS variables — no hardcoded colors, no per-component overrides. That's why 10 themes + studio + Space palettes + conversation looks compose without conflicts.</p></div>
+
+<!-- PERF -->
+<section class="card" id="perf">
+<span class="eyebrow">Performance</span><h2>What keeps it fast (and what to measure)</h2>
+<div class="grid2">
+<div class="mini"><b>Single-agg unread</b><p><code>unreadCountsByConversation()</code> kills N+1 <code>countDocuments</code>. Measure: inbox latency vs conv count.</p></div>
+<div class="mini"><b>Bulk + async fan-out</b><p>One <code>insertMany</code> + batch prefs; sender never waits on VAPID. Measure: POST p95 vs recipients.</p></div>
+<div class="mini"><b>Memoized rows</b><p><code>React.memo MessageRows</code> + stable ctx + O(1) replies. Typing/scroll/presence skip re-renders.</p></div>
+<div class="mini"><b>Cheap media UI</b><p>useMemo 32-bar waveform (no canvas/fetch), tabular-nums timer (no CLS), shared audio; in-chat highlight client-only.</p></div>
+<div class="mini"><b>Pagination + indexes</b><p>Cursor + around + after; index per read pattern + text index. Don't optimize blind — measure first.</p></div>
+<div class="mini"><b>content-visibility</b><p>Off-screen rows skip layout/paint. No virtualization code to maintain.</p></div>
+</div>
+</section>
+
+<!-- DECISIONS -->
+<section class="card" id="decisions">
+<span class="eyebrow">Design decisions</span><h2>Why this, not that</h2>
+<div class="plain"><b>How to use in interviews:</b> pick 3 rows and defend both sides. The right answer always names the tradeoff and the moment you'd switch.</div>
+<div class="tw"><table><tr><th>Decision</th><th>Why this, not that</th></tr>
+<tr><td>WhatsApp + Discord, one identity</td><td>People live in both; one login beats two apps. Not Slack: enterprise bloat rejected on purpose.</td></tr>
+<tr><td>Mongo truth; Socket announces</td><td>Events-as-truth vanish on restart. Write-first makes events disposable + replayable.</td></tr>
+<tr><td>No Redis yet</td><td>Single instance; memory limiter+presence simpler. Explicit rule: don't add before needed. Later: adapter + shared limits — never canonical storage.</td></tr>
+<tr><td>Monorepo folders, no microservices</td><td>No version/deploy ceremony. Split only on real scale/org complexity.</td></tr>
+<tr><td>JS only, no TS</td><td>Focused learning surface; Zod at boundaries gives the safety that matters most.</td></tr>
+<tr><td>Messages own collection</td><td>Embedded arrays bloat unbounded; own collection = indexed cursors + threads-as-messages.</td></tr>
+<tr><td>Threads structurally quiet</td><td>Side talk must not punish main timeline — no badge/bell, only mentions.</td></tr>
+<tr><td>Pins &amp; saves = fields</td><td>One update + indexed query; delete clears pin free; no join table.</td></tr>
+<tr><td>Server-side unfurl</td><td>Client fetch leaks IP + mixed-content. One cached fetch/hour/URL.</td></tr>
+<tr><td>No server call state</td><td>Deterministic <code>kivo_id</code> rooms make late-join/reconnect trivial; only 30s ring timer.</td></tr>
+<tr><td>Optimistic UI</td><td>Round-trip waits feel laggy; paint → reconcile → retry.</td></tr>
+<tr><td>Drafts in localStorage</td><td>Half-typed text is device ephemera, not account data.</td></tr>
+<tr><td>Bulk + async push</td><td>Sender latency must not scale with recipient count.</td></tr>
+<tr><td>No refresh rotation</td><td>Rotation races strand clients; Session delete already revokes.</td></tr>
+<tr><td>Duplicate DM in service</td><td>Mongo unique on arrays ≠ pairwise; explicit <code>$all</code> is correct.</td></tr>
+<tr><td>Voice = attachment</td><td>MediaRecorder → existing upload → play URL. Only new state: duration + kind. No transcoding.</td></tr>
+<tr><td>Chat look CSS-first</td><td>color-mix + container classes re-tint dark/light/Space with zero extra state.</td></tr>
+<tr><td>Plus = flag + expiry</td><td>Client never trusted; <code>getEffectivePlan()</code> + caps + sweep.</td></tr>
+<tr><td>Wave = notification</td><td>No row/badge spam; same bell+push pipe, deep-links to profile.</td></tr>
+<tr><td>Receipts derived</td><td>readBy/deliveredTo + participants — no extra store.</td></tr>
+<tr><td>Nearby fuzzed one-shot</td><td>Distance-only + rounding + no tracking = discovery without surveillance.</td></tr>
+<tr><td>Emoji sparse-unique tiers</td><td>Same :name: across scopes, no collision; Plus funds expression.</td></tr>
+<tr><td>Sweep deletes files first</td><td>TTL alone orphans Appwrite files; explicit hourly cleanup.</td></tr>
+<tr><td>Appwrite not S3</td><td>Free tier + preview URLs + simple SDK for a solo dev; migrate when egress/cost demands.</td></tr>
+<tr><td>Bun not plain Node/npm</td><td>Speed of install/run; still Node-compatible at runtime.</td></tr></table></div>
+</section>
+
+<!-- DEPLOY -->
+<section class="card" id="deploy">
+<span class="eyebrow">Run</span><h2>Run yourself, configure &amp; deploy</h2>
+<pre><button onclick="copyCode(this)">Copy</button># backend (terminal 1)
+cd backend &amp;&amp; bun install
+cp .env.example .env   # fill MongoDB/JWT/Appwrite/VAPID/Gmail/LiveKit/ADMIN_*
+bun run dev            # http://localhost:4000  (prod: bun run start)
+
+# frontend (terminal 2)
+cd frontend &amp;&amp; bun install
+echo "NEXT_PUBLIC_API_URL=http://localhost:4000" &gt; .env.local
+bun run dev            # http://localhost:3000  (prod: build + start)
+bun run lint           # Biome check
+# push: npx web-push generate-vapid-keys  → VAPID_* in backend .env
+# calls stay hidden until LIVEKIT_* set; storage errors until APPWRITE_* set</pre>
+<h3>Environment variables</h3>
+<div class="tw"><table><tr><th>Var</th><th>Where</th><th>Purpose</th></tr>
+<tr><td><code>PORT</code> · <code>MONGODB_URI</code></td><td>backend</td><td>API/Socket port (4000) · Atlas/local connection</td></tr>
+<tr><td><code>ACCESS_TOKEN_SECRET/REFRESH_TOKEN_SECRET</code> · <code>ACCESS_TOKEN_TTL 15m</code> · <code>REFRESH_TOKEN_TTL 7d</code> · <code>REFRESH_COOKIE_SAMESITE</code></td><td>backend</td><td>JWT signing + lifetimes + cookie mode (strict; lax for cross-subdomain)</td></tr>
+<tr><td><code>CORS_ALLOWED_ORIGINS</code></td><td>backend</td><td>Allowed frontends (empty = allow any in dev)</td></tr>
+<tr><td><code>APPWRITE_ENDPOINT/PROJECT_ID/API_KEY</code> · <code>APPWRITE_BUCKET_ID</code> · <code>APPWRITE_ATTACHMENTS_BUCKET_ID</code> · <code>APPWRITE_EMOJI_BUCKET_ID</code></td><td>backend</td><td>Storage creds · avatars · attachments (fallback for emoji) · emoji (fallback = attachments)</td></tr>
+<tr><td><code>VAPID_PUBLIC/PRIVATE_KEY/SUBJECT</code></td><td>backend</td><td>Web-push keys (generate via web-push)</td></tr>
+<tr><td><code>LIVEKIT_URL/API_KEY/API_SECRET</code></td><td>backend</td><td>Calls; unset = call buttons hidden</td></tr>
+<tr><td><code>GMAIL_USER/APP_PASSWORD</code> · <code>EMAIL_FROM</code> · <code>FRONTEND_URL</code></td><td>backend</td><td>SMTP sender + From header + base URL for email links (default localhost:3000)</td></tr>
+<tr><td><code>ADMIN_EMAIL</code> · <code>ADMIN_PASSWORD_HASH</code> · <code>ADMIN_JWT_SECRET/TTL 30m</code> · <code>ADMIN_COOKIE_NAME</code></td><td>backend</td><td>Separate admin login (bcrypt hash, own JWT + cookie)</td></tr>
+<tr><td><code>GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI</code> · <code>GITHUB_*</code></td><td>backend</td><td>OAuth (redirect defaults <code>${FRONTEND_URL}/api/v1/auth/oauth/*/callback</code>)</td></tr>
+<tr><td><code>BACKEND_URL</code> · <code>NEXT_PUBLIC_API_URL</code></td><td>frontend</td><td>Rewrite target + direct Socket origin (both default localhost:4000)</td></tr>
+<tr><td><code>NEXT_PUBLIC_PLUS_UPI_ID</code> · <code>NEXT_PUBLIC_PLUS_PAYEE</code></td><td>frontend</td><td>Published UPI ID + payee name on /plus</td></tr></table></div>
+<h3>Deploy checklist</h3>
+<div class="grid2"><div class="mini"><b>✅ Ship</b><p>Frontend on Vercel-class host with rewrites → backend. Backend on single always-on host with <b>long-lived WebSockets</b>. Atlas + Appwrite + VAPID env set. <code>trust proxy</code> on behind LB. <code>*.env</code> gitignored, <code>.env.example</code> maintained.</p></div><div class="mini"><b>🔭 Later (only on real scale)</b><p>LB → N API/Socket servers → Redis (adapter, limits, counters) → Mongo. Split services only when org/scale forces it. Add metrics (p95 POST, socket fan-out, push success), log AdminActionLog longer, back up Mongo.</p></div></div>
+</section>
+
+<!-- QA -->
+<section class="card" id="qa">
+<span class="eyebrow">Interview bank</span><h2>Questions &amp; answers</h2>
+<p class="count" id="qaCount"></p>
+<div class="qa-tools">
+<input id="qaSearch" placeholder="Search… socket, jwt, thread, plus, index, oauth" oninput="renderQA()" aria-label="Search Q and A"/>
+<select id="qaCat" onchange="renderQA()" aria-label="Category"><option value="">All categories</option><option>General</option><option>Architecture</option><option>Frontend</option><option>Backend</option><option>Database</option><option>Realtime</option><option>Auth &amp; Security</option><option>Features</option><option>Themes</option><option>Scaling &amp; Tradeoffs</option><option>Behavioral</option></select>
+<button class="pill" onclick="expandQA(true)">Expand all</button>
+<button class="pill" onclick="expandQA(false)">Collapse</button>
+</div>
+<div class="catrow" id="catRow"></div>
+<div id="qaList"></div>
+</section>
+
+<!-- USERFAQ -->
+<section class="card" id="userfaq">
+<span class="eyebrow">For everyone</span><h2>🙋 Everyday FAQ (no jargon)</h2>
+<p class="count" id="uqCount"></p>
+<div class="qa-tools"><input id="uqSearch" placeholder="Search everyday answers… install, plus, block, offline" oninput="renderUQ()" aria-label="Search everyday FAQ"/></div>
+<div id="uqList"></div>
+</section>
+
+<!-- GLOSSARY -->
+<section class="card" id="glossary">
+<span class="eyebrow">Glossary</span><h2>Terms, plainly</h2>
+<div class="grid3">
+<div class="mini"><b>Realtime</b><p>Arrives the moment it's sent — no refresh.</p></div>
+<div class="mini"><b>WebSocket / Socket.IO</b><p>Two-way wire that stays open browser↔server.</p></div>
+<div class="mini"><b>Room</b><p>Broadcast group — e.g. one per chat. Only members hear it.</p></div>
+<div class="mini"><b>JWT (15m)</b><p>Signed tamper-proof ticket proving who you are.</p></div>
+<div class="mini"><b>httpOnly cookie</b><p>Cookie JavaScript can't read — holds your login session.</p></div>
+<div class="mini"><b>Optimistic UI</b><p>Show it instantly, confirm when server answers.</p></div>
+<div class="mini"><b>PWA / Service worker</b><p>Installable website / background script for offline + push.</p></div>
+<div class="mini"><b>IndexedDB / Outbox</b><p>Browser database for cache / queue of offline sends.</p></div>
+<div class="mini"><b>VAPID / Web Push</b><p>Standard letting servers ping browsers when closed.</p></div>
+<div class="mini"><b>Zod</b><p>Schema checker rejecting bad input on the server.</p></div>
+<div class="mini"><b>SSRF</b><p>Tricking a server into fetching internal URLs — Kivo guards previews against it.</p></div>
+<div class="mini"><b>SFU (LiveKit)</b><p>Media server forwarding audio/video without mixing — scales calls.</p></div>
+<div class="mini"><b>TOTP / 2FA</b><p>Time-based authenticator codes — second login step.</p></div>
+<div class="mini"><b>UTR</b><p>12-digit UPI payment reference you paste to claim Plus.</p></div>
+<div class="mini"><b>2dsphere / $geoNear</b><p>Mongo geo-index + nearest-first query powering Nearby.</p></div>
+</div>
+</section>
+
+<section class="card" id="roadmap">
+<span class="eyebrow">Honesty</span><h2>Roadmap &amp; limits</h2>
+<p style="color:var(--ink-muted);font-size:13.5px"><b style="color:var(--ink)">Shipped (Phase 1 + 1.5):</b> DMs, groups, Spaces/channels, notifications + prefs + push, PWA + offline + outbox, 10 themes + studio + Space palettes + chat look, attachments + voice waveform, profiles + badges + blocking + wave + QR, friends + welcome + Nearby, polls, Status text+photo, threads + saved + forward + pin, Ctrl+K search, link previews, LiveKit calls, 2FA, OAuth, custom emoji, Plus UPI, admin panel, media gallery, delete, Seen-by, drafts/swipe/jump/dividers/big-emoji.<br/><b style="color:var(--ink)">Next (Phase 2–4):</b> stronger search, video attachments, voice rooms, screen share, recording, bots/webhooks, dev platform, mini-apps, theme marketplace.<br/><b style="color:var(--ink)">Not / limits:</b> no E2E encryption (server sees plaintext) · offline history = last-50/chat · no video attachments yet · single-instance presence (needs shared adapter to scale) · <b>disappearing messages removed 2026-09-08</b>. If you demo this, say the limits out loud — interviewers trust it more.</p>
+</section>
+</main>
+</div>
+
+<div class="spot m" id="pitch" style="max-width:1280px;margin:0 auto 22px"><h2>Tell me about Kivo — 60-second answer.</h2><p>"Kivo is a realtime chat platform blending WhatsApp-style DMs and groups with Discord-style Spaces and channels, differentiated by deep theming. Next.js 16 + Express 5 + Socket.IO + MongoDB in a JS-only monorepo. Mongo is the source of truth; sockets only announce. Auth is 15-minute JWT plus session-backed httpOnly refresh with real revocation, bcrypt-12, Zod on every boundary, in-memory rate limits, scoped presence, gap-fill reconnects, IndexedDB plus an offline outbox, Appwrite files, VAPID push, LiveKit calls, and Plus as a server-checked entitlement. I kept it single-instance and CSS-driven on purpose — no Redis, no microservices, no call state — until real scale demands it."</p><p style="margin-top:10px"><span class="tag" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">Follow-up ready: scaling plan · E2E gap · why no TS · thread quietness</span></p></div>
+
+<footer class="minfoot">Made with care · Kivo — Chat your way · Student project for learning · This guide: <code>kivo.html</code> (single file, Framer design) · Also linked in the app footer → Resources → <b>How Kivo works</b> · <span id="yr"></span></footer>
+<button id="top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top">↑</button>
+<button id="tocFab" onclick="document.getElementById('toc').classList.toggle('open');document.getElementById('toc').scrollIntoView({behavior:'smooth',block:'nearest'})">☰ Contents</button>
+
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+function toggleDrawer(open){const d=document.getElementById('drawer');d.classList.toggle('open',open);d.setAttribute('aria-hidden',String(!open));document.body.style.overflow=open?'hidden':'';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleDrawer(false);});
+
+/* Message journey stepper */
+const STEPS=[
+["1 · Instant echo","Your bubble paints <b>immediately</b> (optimistic UI, clock state). No waiting — reconcile on confirm, retry button on fail. <i>File: chat-panel.jsx.</i>"],
+["2 · Request out","<b>POST /conversations/:id/messages</b> with text (≤4000, Plus 8000) + short <b>JWT 15m</b> Bearer. Auto-refreshed 60s early, single-flight dedup (<i>lib/api.js</i>)."],
+["3 · Backend checks","<b>Auth</b> JWT → <b>Zod</b> validate (never trust client) → <b>authorize</b> membership/ban/block → <b>rate-limit</b> 40/min + headers."],
+["4 · Saved truth","Written to <b>MongoDB</b> (sender/time/mentions/attachments/thread/poll). Only now does it count as sent. <i>messages.service createMessage.</i>"],
+["5 · News spreads","<b>message:new</b> into <b>conversation:{id}</b> room — members get it in ms + sound/bell per prefs."],
+["6 · Receipts","Acks <b>message:delivered</b>; open sends <b>message:read anchor</b> → ticks sent→delivered→read + Seen-by card."],
+["7 · Offline fan-out","Bulk <b>insertMany</b> + batch prefs + <b>fire-and-forget VAPID</b> (sender never waits). Focused DM suppressed; 404/410 pruned."],
+["8 · Offline you","No net? Durable <b>outbox</b> (survives reload) flushes on reconnect + <b>gap-fill</b> after=newest."]];
+let cur=0,stepTimer=null;
+function renderSteps(){const b=document.getElementById('stepBtns');if(!b)return;b.innerHTML=STEPS.map((s,i)=>`<button role="tab" aria-selected="${i===cur}" class="step-btn${i===cur?' on':''}" onclick="cur=${i};renderSteps();resetStepTimer()">${s[0].split('·')[0].trim()}</button>`).join('');document.getElementById('stepPanel').innerHTML=`<b>${STEPS[cur][0]}</b><br/>${STEPS[cur][1]}`;}
+function resetStepTimer(){if(stepTimer)clearInterval(stepTimer);stepTimer=setInterval(()=>{if(!document.hidden){cur=(cur+1)%STEPS.length;renderSteps();}},7000);}
+renderSteps();resetStepTimer();
+
+/* Interview Q&A bank */
+const QA=[
+["General","What is Kivo in one line?","WhatsApp-style DMs/groups + Discord-style Spaces/channels + deep customization, realtime, one identity. Deliberately not Slack.","Say it first, then expand."],
+["General","Who built it and is it usable?","Solo student project (Ayush) as a full-stack learning journey; messaging core is fully functional for everyday use.","Honesty + ownership."],
+["General","What are the 3 conversation kinds?","DMs (1:1 unique per pair), Groups (private multi-person + admins), Spaces → Channels (communities + roles + text/announcement).","Draw the tree."],
+["General","Why not a Slack replacement?","Scope discipline: speed, simplicity, personal chat over canvases/tasks/enterprise. Saying no is a feature.","Shows product judgment."],
+["General","How should a non-technical friend start?","Signup → Find friend → welcome request → Message; join a Space via Discover; pick a theme in Appearance. Point them to #user-manual.","User empathy."],
+["Architecture","Sketch the architecture?","Browser → Next.js → (REST) Express → Mongo; Socket.IO wire back. DB authoritative, sockets announce. Appwrite files, VAPID push, LiveKit media.","Draw boxes live."],
+["Architecture","Why DB-write-then-emit?","Events-as-truth vanish on restart. Persist first makes events disposable + replayable via gap-fill.","Reliability."],
+["Architecture","Why monorepo, no microservices?","One repo, two apps, folder separation. No version/deploy ceremony until scale/org forces it.","Pragmatism."],
+["Architecture","What is the 4-file backend pattern?","routes → controller → service → validation per domain (e.g. messages/, spaces/). Predictable navigation.","Name a module."],
+["Architecture","Why different URLs for REST vs sockets?","REST via Next rewrites stays same-origin (strict cookie, no CORS). Rewrites can't proxy WS upgrades, so sockets dial backend directly.","Favorite gotcha."],
+["Architecture","What does GET /health return?","{success:true, data:{status:'ok'}} for uptime checks.","Detail = credibility."],
+["Architecture","Walk me through POST /messages?","routes → auth → rateLimiter → controller → service (Zod → membership → plan limits → create → lastMessageAt → notifications bulk → emit) → 201.","End-to-end."],
+["Frontend","Why Next.js 16 + React 19 + JS only?","App Router routing/SEO/rewrites + React UI + Tailwind/shadcn/Motion/Socket/idb-keyval. JS-only focuses learning; Zod gives boundary strictness.","Constraint + rationale."],
+["Frontend","GuestGate vs AuthGate?","Authed bounced /login→/app; guests bounced /app→/login. (components/auth-guard.jsx).","Auth UX."],
+["Frontend","Instant paint offline?","IndexedDB caches lists + last-50/chat SWR; restores last open + Space expand; fresh streams behind. (lib/cache.js).","Perceived perf."],
+["Frontend","What is the outbox?","Durable per-account offline text queue; survives reload; flushes on reconnect. Attachments need net. (lib/outbox.js).","Offline correctness."],
+["Frontend","Mobile vs desktop shell?","Bottom tabs (Chats/Status/Groups/Spaces/Menu) vs icon rail + side panels; Menu/Appearance pushed full-screen; safe-area + edge-swipe.","Responsive."],
+["Backend","Why Express 5 + Mongoose + Zod?","Routing + schemas/indexes + validate every body/query/param. Client never trusted.","Defense in depth."],
+["Backend","Why Bun + nodemon? Real entry?","Fast install/run; nodemon watch dev, bun start prod. Real entry src/server.js (app in src/app.js); root server.js is legacy stub.","Repo quirks."],
+["Backend","Error envelope?","{success:false, error:{code,message}}; prod hides stacks/secrets/paths. (middleware/errorHandler.js).","Hygiene."],
+["Backend","Where does validation live?","*.validation.js per module (Zod). Example: updateMeSchema, conversationLookSchema, locationSchema.","Point to files."],
+["Database","Why messages in own collection?","Embedded arrays bloat unbounded; own collection = indexed cursors + threads-as-messages. (Conversation stays tiny.)","Schema design."],
+["Database","Duplicate DM prevention?","Service $all lookup. Mongo unique on arrays isn't pairwise — no index can do it.","Mongo limits."],
+["Database","Key Message indexes?","conv+created, conv+thread+created, conv+pinned, sender+created, savedBy, poll expiry, status+scheduled, text index (threads excluded).","Per-access-pattern."],
+["Database","Pins/saves as fields — why?","One update + indexed query; delete clears pin free; no join table. Saved mirrors reactions.","Simplicity."],
+["Database","Space embedding vs referencing?","Members/channels embedded (bounded, read together); messages referenced (unbounded). Classic embed-vs-reference call.","Data modeling."],
+["Database","What was removed 2026-09-08?","Disappearing messages (expireAt/disappearingDuration/status-expired + PATCH + events) — fully deleted.","History."],
+["Realtime","Rooms?","conversation:{id} + space:{id}, auto-joined on connect; emitToConversation targets exactly members. (socket/io.js).","Scoping."],
+["Realtime","Presence without O(N²)?","Map<user,Set<socket>> + only sharing peers (conversations+spaces) + 12s grace + snapshot for late joiners. (socket/index.js).","Scale thinking."],
+["Realtime","Gap-fill?","Reconnect → refetch list (single agg) + after=newest → merge into cache. No full download.","Resilience."],
+["Realtime","Typing?","start/stop {conversationId} re-broadcast excl. sender; pure signaling, no DB.","Ephemeral."],
+["Realtime","Precise receipts?","delivered ack → $addToSet → delivery-updated; read anchor {upTo…, readAt} → client groups Read/Delivered; portaled Seen-by flips/dismisses.","Detail."],
+["Realtime","Stateless call ring?","Relay ring/accept/decline/end; 30s activeRings → missed chip+bell; 3s spam guard; blocked → CALL_BLOCKED. Media = LiveKit.","Coord only."],
+["Auth & Security","Access vs refresh?","15m Bearer + httpOnly strict cookie backed by Session TTL. Refresh mints access, no rotation (race-safe). Single-flight + 60s early.","Token design."],
+["Auth & Security","Logout-everywhere / ban?","Delete Session docs (one vs all). Reset deletes all. Banned rejected at login + socket handshake.","Real revocation."],
+["Auth & Security","Verify + reset flows?","Verify 24h hashed + 1/min resend (API-only). Forgot 5/5min always-success 1h; reset 10/5min kills all. Fire-and-forget SMTP.","No enumeration."],
+["Auth & Security","2FA internals?","In-repo TOTP RFC6238 SHA1/30s constant-time (lib/totp.js), QR, pending secret, bcrypt-hashed single-use backups, 5m ticket, password to disable.","No TOTP dep."],
+["Auth & Security","OAuth end-to-end + badges?","providers flag → buttons; start 302 signed state → callback creates (pre-verified, derived username, provider avatar if unset) or auto-links by email; link-url embeds userId; double-claim blocked; sparse-unique; OAuth-only null password; both → native verified.","Full flow."],
+["Auth & Security","Password storage?","bcryptjs 12, select:false, comparePassword, never logged. (User.comparePassword/hashPassword).","Hashing."],
+["Auth & Security","Rate limiter internals?","In-memory fixed-window Map, prefer userId else IP, X-RateLimit-* + Retry-After, 5-min unref sweep; per-process.","Whiteboard it."],
+["Auth & Security","Blocking enforced where?","Server-side: DM/wave/search/nearby/call guards + friendship removed + banner states.","Privacy core."],
+["Auth & Security","Admin model?","Separate /admin login (ADMIN_* env, 30m JWT cookie); ban/unban, delete groups/spaces, Plus grant; AdminActionLog + IP.","Moderation."],
+["Auth & Security","SSRF guard on previews?","http(s) only; block localhost/private/link-local on hostname + DNS + post-redirect; 8s/1.5MB; 1h/500 cache.","Security."],
+["Features","Threads quiet — meaning?","threadId replies excluded from timeline/unread/search/pinned/cache; no category notif, only mentions; same message:* routed by threadId.","Differentiator."],
+["Features","Forward vs quote?","Quote = replyToMessageId inline; forward = copy with forwardedFromId/Name pill, both-memberships-checked, no caption/mention-resolve.","Attribution."],
+["Features","Poll limits?","Free 5 opts/1d/single; Plus 8/7d/multi+anon; vote/retract/end-early; poll:updated/ended; 60s sweep.","Entitlement."],
+["Features","Status lifecycle?","Text/photo friends-only 24h; 10/day; Appwrite file; hourly file-then-doc sweep; rings + live events; 5s photo advance.","Ephemeral."],
+["Features","Voice waveform trick?","MediaRecorder → existing upload (no transcode); duration stamped; deterministic 32-bar CSS, shared audio singleton, slider-seek.","No pipeline."],
+["Features","Why LiveKit?","Chat servers are bad at media; deterministic kivo_id rooms + 6h tokens + manual themed tracks + lazy client.","Delegate."],
+["Features","Notification perf?","Single insertMany + batch prefs + async VAPID; focus suppression; mentions override; wave ungated 20s.","Sender never waits."],
+["Features","PWA offline layers?","SW shell + hashed-static cache-first + navigation fallback; IndexedDB data + outbox; API/socket never intercepted.","Three layers."],
+["Features","Big emoji + dividers derived?","dayKey render-time, Intl.Segmenter count, scroll pill — zero schema/migration/socket.","Derived."],
+["Features","Drafts + swipe?","localStorage per-conv debounced capped; paste-image→queue; ↑ edits last; 45px lock swipe.","Craft."],
+["Features","Unified search?","Ctrl+K messages/people/spaces + jump highlight; blocked/banned filtered; Plus 20 vs 5/cat.","One palette."],
+["Features","Public profile skin?","/u/:username no-login + owner-theme vars (profile-skin.js) + QR share + wave cooldown + provider chips.","Shareable."],
+["Features","Emoji tiers?","Global admin 200 / Space Plus-admin 100 / Personal Plus 50 everywhere; sharp→webp (gif kept); :shortcode: + custom:id; IDB SWR; live sync.","Expression."],
+["Features","Plus UPI flow?","₹49 → 12-digit UTR 5/day → admin 24h → 30d grant; getEffectivePlan; hourly sweep; PLAN_LIMITS server-side.","No gateway."],
+["Features","Spaces roles + invites?","owner>admin>moderator>member; public Discover vs private hidden + rotating 7d code (never in payloads) + /app?join=CODE.","Safety."],
+["Features","Groups rules?","You+≥2, creator first admin, last-admin protected, system chips, live room rejoin.","Correctness."],
+["Features","Nearby privacy?","Fuzzed only (<1km→50m, ≥1km→0.1km), one-shot, default-ON toggle clears, stale>15m hidden, blocked/friends excluded.","No surveillance."],
+["Features","Saved messages scope?","Own/others/thread replies; personal cross-device; newest-save-first 200 (Plus 1K); deleted drops; jump.","Bookmarks."],
+["Features","Mark unread mechanics?","POST /:id/unread {messageId?} → message:unread → badge + New-messages separator; clears on scroll-bottom/read.","Unread."],
+["Themes","Name the 10 themes?","Framer/Midnight/Graphite/Espresso/Pine/Plum + Porcelain/Linen/Mist/Sage. One object → CSS vars; live; geometry global.","Recall."],
+["Themes","Studio + resolve order?","derivePalette washes surfaces preserving lightness; conversation>Space>personal per field, null=Member's own; color-mix + kivo-bubbles-*; partial merges; live repaint.","Composition."],
+["Themes","Wallpapers cheap — why?","Pure CSS fixed layer behind list; color-mix re-tints dark/light/Space; zero paint/scroll cost.","CSS-first."],
+["Scaling & Tradeoffs","Why no Redis?","Single instance; memory limiter+presence enough. Add adapter/limits/counters only on real scale. Never canonical.","YAGNI."],
+["Scaling & Tradeoffs","Scale-out plan?","LB → N servers + Redis adapter + shared limits → Mongo; Appwrite/VAPID unchanged. Presence + limiter move first.","Roadmap."],
+["Scaling & Tradeoffs","No E2E — how to say it?","Transport + auth hardened, but server sees plaintext. Say it plainly; it's the honest gap.","Integrity."],
+["Scaling & Tradeoffs","Biggest perf wins?","Single-agg unread + bulk fan-out + memoized rows — kills N+1, fan-out latency, re-render storms.","Prioritize."],
+["Scaling & Tradeoffs","What next after MVP?","Video attachments → voice rooms/screenshare → bots/webhooks → platform/mini-apps/marketplace.","Vision."],
+["Scaling & Tradeoffs","If traffic 100x tomorrow?","1) Redis adapter + shared limiter 2) read replicas/capped lists 3) CDN static + Appwrite cache 4) push batching. Measure first.","Incident thinking."],
+["Behavioral","Why did you build Kivo?","To learn full-stack properly by shipping something real people can use — auth, realtime, data, media, payments-lite, theming — solo, scoped, honest about limits.","Motivation."],
+["Behavioral","Hardest bug/tradeoff?","Presence flapping → 12s grace + scoped fan-out + snapshot; or threads-spam → structurally quiet design. Name symptom → options → fix → verify.","STAR story."],
+["Behavioral","What would you do differently?","Earlier load testing on fan-out, contract tests on socket events, and metrics from day one (p95 POST, push success).","Growth."],
+["Behavioral","How do you handle scope?","PRD gates scope (no Slack-enterprise); roadmap phases; disappearing-messages fully removed rather than half-kept.","Discipline."],
+["General","60-second pitch?","Use the violet panel: one identity, truth-vs-announce, real revocation, deliberate single-instance simplicity.","Close strong."]
+];
+const CATS=["General","Architecture","Frontend","Backend","Database","Realtime","Auth & Security","Features","Themes","Scaling & Tradeoffs","Behavioral"];
+function renderCats(){document.getElementById('catRow').innerHTML=`<button class="pill${!document.getElementById('qaCat').value?' on':''}" onclick="setCat('')">All</button>`+CATS.map(c=>`<button class="pill${document.getElementById('qaCat').value===c?' on':''}" onclick="setCat('${c}')">${c}</button>`).join('');}
+function setCat(c){document.getElementById('qaCat').value=c;renderQA();}
+function renderQA(){
+const q=document.getElementById('qaSearch').value.toLowerCase(),c=document.getElementById('qaCat').value;
+const list=QA.map((x,i)=>({x,i})).filter(o=>(!c||o.x[0]===c)&&(!q||(o.x[1]+o.x[2]+o.x[0]).toLowerCase().includes(q)));
+document.getElementById('qaCount').textContent=`Showing ${list.length} of ${QA.length} — tap to expand. Tip: try "socket", "jwt", "thread", "plus", "oauth", "index".`;
+document.getElementById('qaList').innerHTML=list.map(o=>`<details class="qa"><summary><span class="n">${o.i+1}</span><span>${o.x[1]}<br/><span style="font-weight:400;color:var(--ink-muted);font-size:12px">${o.x[0]}</span></span></summary><div class="body"><p>${o.x[2]}</p><div class="why">🎯 <b>Interview tip:</b> ${o.x[3]}</div><div style="margin-top:8px"><span class="tag blue">${o.x[0]}</span><span class="tag">kivo</span></div></div></details>`).join('')||'<p style="color:var(--ink-muted)">No matches — try "socket", "plus", "thread", "jwt".</p>';
+renderCats();
+}
+renderQA();
+function expandQA(open){document.querySelectorAll('#qaList details').forEach(d=>d.open=open);}
+
+/* Everyday FAQ */
+const UQ=[
+["Do I need to install anything?","No. It runs in any modern browser. To make it feel native: Chrome/Edge → install icon in address bar; Android → Add to Home Screen; iPhone → Share → Add to Home Screen."],
+["Is Kivo free?","Yes — signup needs name, username, email, password (≥8). You land in chat instantly. Plus (₹49/mo) is optional for extras."],
+["How is Kivo different from WhatsApp/Discord?","Both styles under one login: private DMs/groups (WhatsApp-like) + community Spaces with channels (Discord-like), plus deep theming. Not a work tool like Slack."],
+["I forgot my password?","Login → Forgot password → email link (1h) → new password. You'll be signed out everywhere — log in again."],
+["How do I chat with someone?","New → Friends → Find → search → Send Request (optionally with a hello message) → once accepted, Message. Or open their /u/ profile → Message."],
+["Someone is bothering me?","Open their chat/profile → Block. Friendship removed, chat hidden, they can't DM/wave/find you. Manage in Settings → Blocked users → Unblock anytime."],
+["Will I get notified when the app is closed?","Yes, after you Allow notifications (first bell tap). Offline pings arrive as system notifications; tapping opens the exact chat. Mute categories in Settings → Notification preferences."],
+["Does it work offline?","Partly: recent lists + last-50 messages paint instantly; texts you send offline queue and auto-send on reconnect. Photos/voice need connection; full history needs connection."],
+["What is Kivo Plus?","₹49/month via UPI. /plus → pay the shown UPI ID → paste 12-digit UTR → approved within 24h → 30 days of custom banners, profile effects, personal emoji, bigger limits."],
+["What are Spaces vs Groups?","Groups = small private circles (friends/team). Spaces = communities with channels (e.g. Design Club → #general, #inspiration) + roles + discovery/invites."],
+["How do themes work?","Appearance → pick 1 of 10 → optionally recolor accent/canvas → Save to my account. Spaces/chats can add their own look; 'Member's own' keeps yours."],
+["Can people see my exact location in Nearby?","Never. Only fuzzed distance (e.g. 250 m, 1.2 km). Sharing is one-tap (not tracking), ON by default but one toggle off hides + clears you."],
+["What disappears? Statuses? Deleted messages?","Statuses vanish after 24h (photos deleted too). Deleted messages blank but keep order so replies stay sane. Remove-from-list deletes a whole chat for everyone (permanent, confirm twice)."],
+["Calls?","DMs/groups have voice/video via LiveKit (ring → join → mute/camera → history with Call back). Buttons appear only when calling is configured."],
+["My message failed to send?","You'll see retry on the bubble. Check connection (offline banner?), then retry. Offline texts auto-send when back."],
+["How do I look verified?","Admin-granted badge (toggle visibility in Settings) or link both Google + GitHub in Settings → Account verification → native Kivo Verified automatically."],
+["Is my account secure?","Passwords are one-way hashed; logins use short tickets + revocable sessions; 2FA available; reset signs out all devices. No system is perfect — use a strong unique password + 2FA."],
+["Who sees my profile?","Everyone can open /u/you (banner, name, status, bio, links). Control online/last-active, joined date, socials via Settings → Profile privacy. Email is never public."],
+["How do I report abuse?","Block the user, leave/report the Space to its admins, and contact the instance admin (Admin panel handles bans + audit). Keep screenshots/IDs."],
+["Where do I learn more?","In-app /docs (how-to), /learn (visual story), this page (/kivo.html — deep guide), README/PRD/TECH-STACK in repo, GitHub source."]
+];
+function renderUQ(){
+const q=(document.getElementById('uqSearch').value||'').toLowerCase();
+const list=UQ.map((x,i)=>({x,i})).filter(o=>!q||(o.x[0]+o.x[1]).toLowerCase().includes(q));
+document.getElementById('uqCount').textContent=`${list.length} of ${UQ.length} everyday answers — written for sharing with friends & family.`;
+document.getElementById('uqList').innerHTML=list.map(o=>`<details class="qa"><summary><span class="n">${o.i+1}</span><span>${o.x[0]}</span></summary><div class="body"><p>${o.x[1]}</p></div></details>`).join('');
+}
+renderUQ();
+
+function copyCode(btn){const t=btn.parentElement.innerText.replace(/^Copy\n?/,'');(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy',1200);}).catch(()=>{btn.textContent='Copy';});}
+
+/* Theme demo */
+const THEMES=[["Framer","#090909","#141414"],["Midnight","#0a0e16","#121826"],["Graphite","#0d0f12","#171a1f"],["Espresso","#130e0a","#201811"],["Pine","#0a160f","#12261a"],["Plum","#100a14","#1c1222"],["Porcelain","#faf9f7","#ffffff"],["Linen","#f8f4ec","#fffdf8"],["Mist","#f5f7fa","#ffffff"],["Sage","#f5f7f1","#fbfdf7"]];
+let curT=0;
+function renderThemes(){const el=document.getElementById('themeRow');if(!el)return;el.innerHTML=THEMES.map((t,i)=>`<button class="th${i===curT?' on':''}" onclick="setTheme(${i})" aria-pressed="${i===curT}"><span class="sw" style="background:${t[2]}"></span>${t[0]}</button>`).join('');}
+function setTheme(i){curT=i;const t=THEMES[i];const light=i>=6;document.documentElement.style.setProperty('--canvas',t[1]);document.documentElement.style.setProperty('--surface-1',t[2]);document.body.style.color=light?'#161615':'#fff';document.body.style.background=t[1];try{localStorage.setItem('kivo:learn-theme',t[0])}catch(e){}renderThemes();}
+try{const saved=localStorage.getItem('kivo:learn-theme');const idx=THEMES.findIndex(t=>t[0]===saved);if(idx>0){curT=idx;const t=THEMES[idx];const light=idx>=6;document.documentElement.style.setProperty('--canvas',t[1]);document.documentElement.style.setProperty('--surface-1',t[2]);document.body.style.color=light?'#161615':'#fff';document.body.style.background=t[1];}}catch(e){}
+renderThemes();
+
+/* TOC + scrollspy + progress */
+function filterToc(v){v=(v||'').toLowerCase();document.querySelectorAll('#tocLinks a').forEach(a=>a.style.display=a.textContent.toLowerCase().includes(v)?'':'none');}
+const secs=[...document.querySelectorAll('main section[id]')];
+let ticking=false;
+window.addEventListener('scroll',()=>{
+if(ticking)return;ticking=true;requestAnimationFrame(()=>{
+const h=document.documentElement;const max=h.scrollHeight-h.clientHeight;const p=max>0?(h.scrollTop/max*100):0;document.getElementById('progress').style.width=p+'%';
+document.getElementById('top').style.display=h.scrollTop>700?'block':'none';
+let cur='';secs.forEach(s=>{if(h.scrollTop>=s.offsetTop-160)cur=s.id;});
+document.querySelectorAll('#tocLinks a, #deskLinks a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
+ticking=false;});
+},{passive:true});
+if(window.matchMedia('(max-width: 960px)').matches){document.getElementById('toc').classList.remove('open');}
+</script>
+</body>
+</html>
