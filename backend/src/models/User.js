@@ -40,6 +40,21 @@ const userSchema = new mongoose.Schema(
       default: null,
       maxlength: 8,
     },
+    // Pronouns shown on public profile (e.g. "he/him", "they/them", "she/her").
+    // Free-form but validated; null = not set.
+    pronouns: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 20,
+    },
+    // When the current status+emoji should auto-clear. Null = don't clear.
+    // Set via profile edit modal; cleared by hourly sweep + on-read check.
+    statusExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     // Avatar border customization, broadcast to friends in the sidebar. One of
     // the AVATAR_STYLE_IDS values (see users.validation.js), or null for the
     // default border. Stored as an id so rendering stays client-driven.
@@ -273,6 +288,9 @@ const userSchema = new mongoose.Schema(
     locationUpdatedAt: { type: Date, default: null },
     privacyPreferences: {
       discoverableByNearby: { type: Boolean, default: true },
+      showOnline: { type: Boolean, default: true }, // controls online dot + lastActiveAt visibility to others
+      showJoinedDate: { type: Boolean, default: true },
+      showSocialLinks: { type: Boolean, default: true },
     },
     onboardingCompletedAt: { type: Date, default: null },
 
