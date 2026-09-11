@@ -45,10 +45,12 @@
 - ✅ **Verification badges** — verified users can show a badge on their public profile (toggle in Settings).
 - 👑 **Kivo Plus (with UPI payments)** — self-serve **₹49/month** via UPI: pay to the published UPI ID, paste your 12-digit UTR reference, admin reviews within 24h and grants 30 days of Plus. Includes **custom banner uploads** (own GIF/image up to 8 MB), **profile effects** (`none`/`glow`/`gradient-name`/`aura`), **custom emoji** (personal library usable everywhere), and **higher limits** (8K messages, 20 attachments, 100MB files, more groups/spaces/polls). Admin panel has a Plus claims review queue. `/plus` page shows pricing, UPI steps, and claim status.
 - 🚫 **Blocking** — block another user from any DM or profile; **Blocked users** manager in Settings shows your list with one-tap unblock. Blocked chats are hidden and friendships are removed.
-- 🤝 **Complete friends system** — send, accept, decline, **remove** (mutual — both lists update live), search, and jump straight into a DM.
+- 🤝 **Complete friends system** — send, accept, decline, **remove** (mutual — both lists update live), search with **square profile preview cards**, and **welcome messages** (280 chars shown before accept); jump straight into a DM.
+- 📍 **Nearby users (full-screen)** — discover people near you by fuzzed distance only (`250 m` / `1.2 km`, never exact location). Opt-in **ON by default**, toggle in **Settings → Privacy → Nearby discovery**. Share location one-shot → `GET /users/nearby` with `1/2/5/10km` radius, blocked/banned/friends filtered, `2dsphere` index. Desktop: icon rail **Nearby** (full-screen like Appearance); mobile: **Menu → Nearby users**.
 - 📊 **Polls** — create 2-8 option polls in any DM/group/Space channel with live tallies, anonymous + multi-choice (Plus), 1h/24h/3d/7d/never expiry, end-early, `poll:updated/ended` realtime
 - 🟢 **Status (WhatsApp-style, 24h)** — text (6 backgrounds) **or photo** (jpg/png/webp/gif ≤30 MB, 1 per status, caption 280) — friends-only vertical feed (My status on top), green/grey rings, viewer with auto-advance (photo 5s) + caption overlay, 10/day limit, hourly Appwrite file cleanup, live `status:new/deleted/viewed`
-- 📱 **Mobile-first polish** — a bottom tab bar (Chats / **Status** / Groups / Spaces / Menu) with Profile, Settings, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
+- 📍 **Nearby discovery** — full-screen page (desktop: icon rail **Nearby**; mobile: Menu → Nearby) with radius chips and privacy consent sheet.
+- 📱 **Mobile-first polish** — a bottom tab bar (Chats / **Status** / Groups / Spaces / Menu) with Profile, Settings, **Nearby**, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
 - 🗄️ **Offline caching** — conversations, Spaces, friends, friend requests, and the latest 50 messages per chat cached in IndexedDB for instant paint on reload.
 - 🔎 **Global search (Ctrl+K)** — command palette searching messages, people, and spaces with jump-to-message support.
 - 🛡️ **Admin panel** — standalone `/admin` dashboard with user management, ban/unban, group & space moderation, and audit logging.
@@ -119,7 +121,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Public profile pages** (`/u/:username`) with verified badge, country flag, GitHub contribution graph, **social link chips**, **Wave 👋** button (20 s cooldown, `wave` notification), **Share sheet + QR code**, and **owner-theme skin** (`profile-skin.js`)
 - **Verification badges** (admin-granted `verified`, visibility toggled by the user in Settings)
 - **Blocking** (block from DMs/profiles; **Blocked users manager in Settings** — list + one-tap unblock; relationships & wave/ping respected server-side)
-- Friends system (request / accept / decline / list / search / **remove** — mutual, both sides update live via `friend:removed`)
+- Friends system (request / accept / decline / list / search with **square preview cards** + **welcome messages (280)** / **remove** — mutual, both sides update live via `friend:removed`; Nearby `GET /users/nearby` with fuzzed distance, `2dsphere`, blocked/banned filtered, `30/min`; Nearby discovery **ON by default** in `privacyPreferences.discoverableByNearby` + `Settings → Privacy` toggle + full-screen `NearbyScreen` like Appearance)
 - DM conversations (create, list, history, unread counts — list uses a **single aggregation** for unread badges; **Remove from list** permanently deletes a DM/group via confirm modal with live `conversation:removed` fan-out)
 - Text messaging (send, **reply** + **mobile swipe-to-reply**, **@mentions**, edit, soft-delete, reactions, double-click ❤️, emoji picker, **per-message Seen-by receipts**)
 - **Message actions** — right-click / long-press any bubble: quick-reaction strip, **copy**, **view profile**, **block**, reply, edit/delete (own), **forward**, **pin**, **select mode** (multi-copy/forward/delete), and native **Share…** on mobile; bubble list is **memoized** (`MessageRows`) with O(1) reply map and throttled double-tap like
@@ -353,7 +355,7 @@ Registration / Login
 - **Registration is instant** — no OTP or verification barrier; you land in `/app`. Sessions are server-backed (`Session` documents with a TTL index).
 - **GuestGate** redirects logged-in users away from `/login`, `/signup`, and the landing page.
 - **AuthGate** redirects unauthenticated users from `/app/*` to `/login`.
-- **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, link previews `30/min`, admin login `5/15min`.
+  - **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, `user-search 30/min`, `nearby 30/min`, `location 10/min`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, link previews `30/min`, admin login `5/15min`.
 
 ### Email verification & password reset
 

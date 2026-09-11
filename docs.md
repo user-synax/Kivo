@@ -120,7 +120,7 @@ That ends the current session. There is also a server endpoint to log out of **a
 
 ### Desktop & tablet (md+)
 
-A **icon rail** on the far left switches between four panels — **Chats**, **Groups**, **Spaces**, and **Settings** — with your **avatar at the bottom** for the profile editor. Unread dots appear on the rail icons whenever a category has unread activity.
+A **icon rail** on the far left switches between panels — **Chats**, **Nearby**, **Status**, **Groups**, **Spaces**, **Emoji Factory**, and **Settings** — with your **avatar at the bottom** for the profile editor. **Nearby** opens full-screen like Appearance. Unread dots appear on the rail icons whenever a category has unread activity.
 
 Inside the active panel:
 
@@ -135,7 +135,7 @@ The open conversation or channel. For DMs on very wide screens a **right panel**
 
 ### Mobile
 
-On a phone, Kivo shows a **bottom tab bar** with four destinations — **Chats**, **Groups**, **Spaces**, and **Menu** — so navigation feels native. The **Menu** tab opens your profile, **Appearance** (a full-screen theme page), and **Settings** as pushed screens with a back button to the Menu. Open a chat to see messages; use **Back** (header or edge-swipe) to return to the list. Safe-area insets are handled on notched devices.
+On a phone, Kivo shows a **bottom tab bar** with four destinations — **Chats**, **Groups**, **Spaces**, and **Menu** — so navigation feels native. The **Menu** tab opens **Nearby users**, **Discover spaces**, your profile, **Appearance** (a full-screen theme page), and **Settings** as pushed screens with a back button to the Menu. Open a chat to see messages; use **Back** (header or edge-swipe) to return to the list. Safe-area insets are handled on notched devices.
 
 **Remembered state & instant paint:** the last open conversation is restored after refresh, Space expand state is saved, and your conversations, Spaces, friends, and friend requests are cached in the browser (IndexedDB), so lists paint instantly while fresh data loads. The latest 50 messages of each chat are cached too.
 
@@ -145,22 +145,36 @@ On a phone, Kivo shows a **bottom tab bar** with four destinations — **Chats**
 
 **Open:** the **New** menu (Chats panel) → **Friends** — or, in the app, the people control that opens the friends modal.
 
-The modal has three tabs: **Requests**, **Friends**, **Add**.
+The modal has four tabs: **Requests**, **Friends**, **Find**, **Nearby**. The icon rail **Nearby** (desktop) and **Menu → Nearby users** (mobile) open the same Nearby view full-screen like Appearance. **Find** is a dedicated friends-modal tab; Nearby is also reachable from the rail.
 
-### Add a friend
+### Find — square profile previews + welcome message
 
-1. Open **Friends** → **Add**.
-2. Search by **username**, **email**, or **display name** (search is debounced).
-3. Click **Add** on a result.
+1. Open **Friends** → **Find**.
+2. Search by **username**, **email**, or **display name** (300 ms debounce). Results appear as **square responsive profile cards** (avatar, name, handle, flag, bio/status, Plus chip) in a grid — not the old pill list. Tap **View profile** to open `/u/username`.
+3. Click **Send Request** on a card → a modal with a preview header opens. You have **two options**:
+   - **Send with welcome message** — type up to **280** characters (counter shown) and send. The message is stored as `welcomeMessage` and shown to the recipient before they accept. Keep it friendly — it’s private and visible only to them.
+   - **Send without message** — sends a plain request instantly.
 
-You cannot friend yourself or send a duplicate request. If they already requested you, accepting makes you friends immediately.
+You cannot friend yourself, send to someone who blocked you / you blocked, or create a duplicate pending request. If they already requested you, you’ll see `Incoming` and should accept instead. Search is blocked-aware and `isBanned` filtered, rate-limited `30/min`; requests are `20/hour`.
 
-### Incoming requests
+### Nearby users — full-screen discovery
+
+A full-screen page (desktop: icon rail **Nearby**; mobile: **Menu → Nearby users**) that shows **nearby Kivo users by distance only** — e.g. `250 m away` or `1.2 km away`. Exact coordinates are never exposed and are fuzzed server-side (`<1km` rounded to nearest `50m`, `≥1km` to `0.1km`).
+
+**How it works:**
+- **Opt-in by default ON.** Control lives in **Settings → Privacy → Nearby discovery** (`Switch`). Turning **OFF** clears your stored location and hides you from others; turning **ON** re-enables.
+- **Share location:** tap **Share location** (or **Refresh**). The browser asks for geolocation permission via `navigator.geolocation.getCurrentPosition` (one-shot, not continuous). The client posts `{lat, lng, accuracy}` to `POST /api/v1/users/me/location` (rate `10/min`, rejected if `accuracy>200m` or discovery OFF). Your location is stored as a GeoJSON `Point` with `locationUpdatedAt` and a `2dsphere` index.
+- **View nearby:** `GET /api/v1/users/nearby?radius=1000/2000/5000/10000&limit=20` (rate `30/min`) returns nearby discoverable users sorted nearest, filtered to exclude `blockedUsers` both ways, already-friends / pending / declined, stale locations (`>15 min`), and `isBanned`. Empty state shows radius tips.
+- **Privacy:** radius chips `1km / 2km / 5km / 10km`; first-time opens show a consent sheet explaining fuzzed distance + default ON + how to turn off. Realtime location is not tracked — only updated when you tap **Share/Refresh**.
+
+From a nearby card you can **Send Request** (same welcome-message modal as Find) or **View profile**.
+
+### Incoming requests (with welcome messages)
 
 1. Open **Friends** → **Requests**.
-2. **Accept** or **Decline**.
+2. Each request shows the sender’s avatar + name/handle + a **Welcome message** bubble (`“...”` with `Quote` icon) when the sender included one. **Accept** or **Decline**.
 
-The other person gets an in-app (and possibly push) notification.
+The sender gets an in-app (and possibly push) notification; the notification body is the welcome message snippet (first 80 chars) when present.
 
 ### Start a DM from a friend
 

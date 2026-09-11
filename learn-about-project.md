@@ -35,7 +35,8 @@ This document explains the project for **anyone** — no coding knowledge requir
 Think of Kivo as one app with three kinds of conversation:
 
 ### 1. Direct messages (DMs) — private 1:1 chats
-- Add someone by **username, email, or display name**, or become friends first.
+- Add someone by **username, email, or display name** — search shows **square profile cards** (avatar, banner wash, bio/status, Plus), and you can send a **welcome message (280 chars)** that the other person sees before accepting.
+- Discover **Nearby users** full-screen (icon rail **Nearby**, mobile **Menu → Nearby users**) by fuzzed distance only (`250 m` / `1.2 km`, never exact) — opt-in **ON by default**, toggle off in **Settings → Privacy**; share location one-shot to see people within `1/2/5/10km`.
 - See when they're **online** (green dot) or "active 5m ago" when not.
 - Messages show **sent → delivered → read** ticks; tap the ticks to see a **"Seen by"** card with exact times.
 
@@ -199,11 +200,11 @@ This is the part most projects never explain. Each choice here was made *against
 
 | Model | What it holds |
 |---|---|
-| **User** | email, username, display name, bio, status, avatar/banner, country, social links, `plan` (free/plus) + `planExpiresAt`, 2FA secrets, blocked users, notification preferences, appearance (accent, tint, wallpaper, bubble style) |
+| **User** | email, username, display name, bio, status, avatar/banner, country, social links, `plan` (free/plus) + `planExpiresAt`, 2FA secrets, blocked users, **location Point + locationUpdatedAt + `2dsphere` + privacyPreferences.discoverableByNearby (ON default, Settings toggle, full-screen NearbyScreen)**, notification preferences, appearance (accent, tint, wallpaper, bubble style) |
 | **Session** | one row per refresh token, with an expiry date — deleting the row *is* logging out |
 | **Conversation** | type `dm` / `group` / `space_channel`, participants, admins, per-chat look |
 | **Message** | content (4000), sender, reply/thread links, reactions, `readBy`/`deliveredTo` receipts, mentions, embedded attachments, `pinnedAt`, `savedBy`, forwarding attribution |
-| **FriendRequest** | from → to + status (an accepted row *is* the friendship) |
+| **FriendRequest** | from → to + status (an accepted row *is* the friendship) + **welcomeMessage 280** + welcomeMessageAt |
 | **Space** | embedded members with roles, embedded channels, category, visibility, invite code |
 | **Notification** | recipient, type, delivery flags — fan-out per recipient |
 | **PushSubscription** | per-user browser push endpoint |

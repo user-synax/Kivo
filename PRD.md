@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 3.0
-**Last Updated:** September 8, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls Complete · Disappearing Messages Removed)
+**Version:** 3.1
+**Last Updated:** September 11, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls + Nearby Discovery + Find Square Cards + Welcome Messages · Disappearing Messages Removed)
 
 ---
 
@@ -73,8 +73,9 @@ Kivo
 | Authentication & Sessions | **Complete** | JWT access + httpOnly refresh cookie, session-backed |
 | Email Verification | **Backend wired** | Link flow (`/verify-email`, resend API); no auto-email at signup since the OTP step was removed |
 | Password Reset | **Complete** | Forgot/reset via emailed token (1h), invalidates all sessions |
-| User Profiles | **Complete** | Display name, username, bio, status + emoji chip (32 emoji + 6 vibe presets), avatar + frames, banner (curated + Plus custom 8 MB), country, GitHub username, **X/Instagram/YouTube/website social links**, **profileEffect** (4 Plus presets) |
-| Friends System | **Complete** | Request/accept/decline, friend list, search |
+| User Profiles | **Complete** | Display name, username, bio, status + emoji chip (32 emoji + 6 vibe presets), avatar + frames, banner (curated + Plus custom 8 MB), country, GitHub username, **X/Instagram/YouTube/website social links**, **profileEffect** (4 Plus presets), **privacyPreferences.discoverableByNearby** (default `true`, Settings → Privacy toggle + `NearbyScreen` full-screen) |
+| Friends System | **Complete** | Request/accept/decline, friend list, search (square `ProfilePreviewCard` grid + **welcomeMessage 280** shown before accept + **Nearby** `GET /users/nearby` fuzzed distance `2dsphere`) |
+| Nearby Discovery | **Complete** | Full-screen `NearbyScreen` (desktop icon rail **Nearby** + mobile **Menu → Nearby users**, like Appearance). One-shot `navigator.geolocation` → `POST /users/me/location` (`lat/lng/accuracy`, `10/min`, reject `accuracy>200` or `discoverable OFF`) ↔ `DELETE /me/location` clears, `PATCH /me/privacy {discoverableByNearby}`, `GET /nearby?radius=1/2/5/10km&limit=20` (`30/min`, `$geoNear` + `2dsphere`, fuzz `<1km→50m, ≥1km→0.1km`, filtered blocked both-ways / friends/pending / isBanned / stale `>15min`, `Permissions-Policy geolocation=(self)`) |
 | DM Conversations | **Complete** | Create, list, message history, unread counts (single-aggregation unread badge) |
 | Messaging (text) | **Complete** | Send, edit, soft-delete, reactions, read/delivery receipts (**"Seen by" modal** — tap ticks on own message → avatar + `Read · time` / Delivered per participant, DMs/groups/Space channels, flip-positioned card, Escape/scroll dismiss), copy, select mode, **swipe-to-reply** (mobile) |
 | **@Mentions** | **Complete** | Autocomplete + mention notifications |
@@ -284,8 +285,8 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 
 | Action | Endpoint | Description |
 |---|---|---|
-| Send request | `POST /api/v1/friends/request` | By username or email |
-| List incoming | `GET /api/v1/friends/requests` | Pending requests addressed to current user |
+| Send request | `POST /api/v1/friends/request` | By username or email + optional `welcomeMessage` (max 280, shown before accept) |
+| List incoming | `GET /api/v1/friends/requests` | Pending requests with `welcomeMessage`/`welcomeMessageAt` + sender avatar — addressed to current user |
 | Accept | `POST /api/v1/friends/requests/:id/accept` | Creates bidirectional friendship |
 | Decline | `POST /api/v1/friends/requests/:id/decline` | Rejects the request |
 
@@ -298,16 +299,24 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 
 #### 2.3 Constraints
 
-- Self-friending is blocked.
+- Self-friending is blocked; blockedUsers both-ways blocked (checked in `sendRequest` via `blockedUsers` sets, returns `BLOCKED_USER`).
 - One active request per directed pair (enforced by unique index).
 - Reverse-request conflict handling (if target already sent you a request, accept auto-mutual).
 - "Already friends" detected before creating new request.
+- `welcomeMessage` is trimmed, max 280, stored as `FriendRequest.welcomeMessage` + `welcomeMessageAt`; notification body is 80-char snippet when present.
 
 #### 2.4 Frontend UX
 
-- `FriendsModal` with three tabs: Requests, Friends, Add Friend.
+- `FriendsModal` with four tabs: **Requests** (shows welcome bubble `Quote` when present), **Friends**, **Find** (square `ProfilePreviewCard` grid, debounced `GET /users/search?q` `30/min`, blocked/isBanned filtered, bio/status/country/Plus), **Nearby** (embeds `NearbyTab` with radius chips). `SendRequestModal` (profile preview header + textarea 280 + counter) offers **Send with welcome message** (enabled only if text) and **Send without message**.
 - Search with debounced API calls.
 - "Message" button on friend cards creates or opens existing DM.
+
+#### 2.5 Nearby Discovery (full-screen like Appearance)
+
+- **Desktop:** icon rail **Nearby** (`MapPin`) → `NearbyScreen` (`fixed inset-0 z-50`) like `AppearanceScreen`; **Mobile:** **Menu → Nearby users** → pushed full-screen with back button.
+- **Privacy:** `User.privacyPreferences.discoverableByNearby` default `true` (`Users.privacySchema`); toggle in **Settings → Privacy → Nearby discovery** via `PATCH /api/v1/users/me/privacy`; OFF clears `location` + `locationUpdatedAt` (fuzzed distance only, never exact).
+- **Location:** one-shot `navigator.geolocation.getCurrentPosition` (12s, highAccuracy) → `POST /api/v1/users/me/location {lat,lng,accuracy}` (`locationSchema`, `10/min`, reject `accuracy>200` or `discoverable OFF`) stores GeoJSON `Point` + `locationUpdatedAt`, `2dsphere` index; `DELETE /api/v1/users/me/location` clears; `GET /api/v1/users/me` returns `privacyPreferences` + `location {hasLocation, updatedAt}`; `Permissions-Policy: geolocation=(self)` (`next.config.mjs:59`).
+- **Nearby query:** `GET /api/v1/users/nearby?radius=1000/2000/5000/10000&limit=20` (`nearbyQuerySchema`, `30/min`) uses `$geoNear` with `maxDistance=radius`, fuzz (`<1km→50m, ≥1km→0.1km` via `fuzzDistanceMeters`), filtered `isBanned`, `blockedUsers` both-ways, already friends/pending/declined, stale `locationUpdatedAt>15min`, `discoverableByNearby!=false`, sorted nearest. Consent sheet (`kivo:nearbyConsent` in `localStorage`) on first open explains privacy.
 
 ---
 
