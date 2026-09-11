@@ -18,7 +18,7 @@ const COLUMNS = [
     title: "Resources",
     links: [
       { label: "Docs", href: "/docs" },
-      { label: "Learn", href: "/learn" },
+      { label: "Deep Dive", href: "/kivo.html" },
       { label: "Author", href: "/author" },
       { label: "Open app", href: "/app" },
       { label: "Log in", href: "/login" },
