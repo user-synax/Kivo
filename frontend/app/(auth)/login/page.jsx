@@ -177,7 +177,11 @@ export function LoginForm() {
         }
 
         setSession(body.user, body.accessToken);
-        router.push("/app");
+        // If new user hasn't onboarded, send to onboarding (checked via isNew + flag in GuestGate, but also direct)
+        const isNew = body.user?.createdAt ? Date.now() - new Date(body.user.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000 : false;
+        const needsOnboarding = !body.user?.onboardingCompleted && !body.user?.onboardingCompletedAt && isNew;
+        if (needsOnboarding) router.push("/onboarding");
+        else router.push("/app");
         return;
       }
 
@@ -206,7 +210,10 @@ export function LoginForm() {
 
       const session = data.data || data;
       setSession(session.user, session.accessToken);
-      router.push("/app");
+      const isNew2 = session.user?.createdAt ? Date.now() - new Date(session.user.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000 : false;
+      const needsOnboarding2 = !session.user?.onboardingCompleted && !session.user?.onboardingCompletedAt && isNew2;
+      if (needsOnboarding2) router.push("/onboarding");
+      else router.push("/app");
     } catch {
       setServerError("Network error. Please try again.");
     } finally {

@@ -160,6 +160,8 @@ export function publicUser(user) {
     googleVerified: Boolean(user.googleVerified),
     githubVerified: Boolean(user.githubVerified),
     isEmailVerified: user.isEmailVerified || false,
+    onboardingCompleted: Boolean(user.onboardingCompletedAt),
+    onboardingCompletedAt: user.onboardingCompletedAt ? new Date(user.onboardingCompletedAt).toISOString() : null,
     createdAt: user.createdAt,
     // Appearance customization ships with every session user so the client can
     // re-apply the user's colors + chat look on login without a round-trip.

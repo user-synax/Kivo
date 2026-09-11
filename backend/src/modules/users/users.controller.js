@@ -186,3 +186,8 @@ export const getNearby = asyncHandler(async (req, res) => {
   const users = await usersService.getNearbyUsers({ userId: req.user.userId, radius, limit });
   res.status(200).json({ success: true, data: users });
 });
+
+export const completeOnboarding = asyncHandler(async (req, res) => {
+  const result = await usersService.completeOnboarding({ userId: req.user.userId });
+  res.status(200).json({ success: true, data: result });
+});

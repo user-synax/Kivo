@@ -32,6 +32,7 @@ router.patch("/me/privacy", usersController.updatePrivacy);
 router.post("/me/location", locationLimiter, usersController.updateLocation);
 router.delete("/me/location", usersController.deleteLocation);
 router.get("/nearby", nearbyLimiter, usersController.getNearby);
+router.post("/me/onboarding", usersController.completeOnboarding);
 router.get("/search", userSearchLimiter, usersController.search);
 router.get("/blocked", usersController.listBlocked);
 router.post("/:id/block", usersController.blockUser);

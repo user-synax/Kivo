@@ -274,6 +274,7 @@ const userSchema = new mongoose.Schema(
     privacyPreferences: {
       discoverableByNearby: { type: Boolean, default: true },
     },
+    onboardingCompletedAt: { type: Date, default: null },
 
     notificationPreferences: {
       directMessages: { type: Boolean, default: true },

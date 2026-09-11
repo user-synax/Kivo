@@ -9,6 +9,16 @@ import { getEffectivePlan } from "../../lib/plus.js";
 import { emitToUser } from "../../socket/io.js";
 import { getIO } from "../../socket/index.js";
 
+export async function completeOnboarding({ userId }) {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { onboardingCompletedAt: new Date() },
+    { new: true }
+  ).select("onboardingCompletedAt");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  return { onboardingCompletedAt: user.onboardingCompletedAt ? new Date(user.onboardingCompletedAt).toISOString() : null, onboardingCompleted: true };
+}
+
 // Public user shape returned in search/friend results and self profile.
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
@@ -323,12 +333,14 @@ export async function getNearbyUsers({ userId, radius = 5000, limit = 20 }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt privacyPreferences location locationUpdatedAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt privacyPreferences location locationUpdatedAt onboardingCompletedAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   const base = selfUser(user);
   return {
     ...base,
+    onboardingCompleted: Boolean(user.onboardingCompletedAt),
+    onboardingCompletedAt: user.onboardingCompletedAt ? new Date(user.onboardingCompletedAt).toISOString() : null,
     privacyPreferences: {
       discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
     },

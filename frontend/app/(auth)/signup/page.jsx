@@ -138,7 +138,9 @@ export function SignUpForm() {
       // Session is issued immediately on registration.
       const session = data.data || data;
       setSession(session.user, session.accessToken);
-      router.push("/app");
+      // New users go through onboarding (avatar + nearby + first friend) — 60s funnel
+      // Always send brand-new accounts to onboarding; GuestGate will also handle it
+      router.push("/onboarding");
     } catch {
       setServerError("Network error. Please try again.");
     } finally {
