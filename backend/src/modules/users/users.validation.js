@@ -15,6 +15,19 @@ export const AVATAR_STYLE_IDS = [
   "grad-aurora",
 ];
 
+export const PRONOUN_MAX = 20;
+// Allow letters, slash, spaces, hyphen, dot — e.g. "he/him", "they/them", "she/her", "any"
+export const PRONOUN_REGEX = /^[a-zA-Z\/\s.\-]{2,20}$/;
+
+// Status expiry presets map to durations — used by frontend dropdown
+export const STATUS_EXPIRY_PRESETS = {
+  "30m": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "4h": 4 * 60 * 60 * 1000,
+  today: null, // expires at end of local day — computed client-side as ISO, server just checks future
+  never: null,
+};
+
 export const searchQuerySchema = z.object({
   q: z.string().trim().max(50).optional(),
 });
@@ -111,6 +124,25 @@ export const updateMeSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal("")),
+  pronouns: z
+    .string()
+    .trim()
+    .max(20)
+    .regex(/^[a-zA-Z\/\s.\-]+$/, "Pronouns may only contain letters, slash, spaces, hyphen, dot")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+  statusExpiresAt: z
+    .string()
+    .refine((v) => {
+      if (v === null || v === "") return true;
+      const d = new Date(v);
+      return !Number.isNaN(d.getTime()) && d.getTime() > Date.now();
+    }, "Expiry must be a future ISO date")
+    .nullable()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v === "" ? null : v)),
   showBadge: z.boolean().optional(),
 
   // Per-user appearance customization (theme studio + chat look). Colors are
@@ -143,8 +175,11 @@ export const updateMeSchema = z.object({
 });
 
 export const privacySchema = z.object({
-  discoverableByNearby: z.boolean(),
-});
+  discoverableByNearby: z.boolean().optional(),
+  showOnline: z.boolean().optional(),
+  showJoinedDate: z.boolean().optional(),
+  showSocialLinks: z.boolean().optional(),
+}).refine((d) => Object.keys(d).length > 0, "At least one preference required");
 
 export const locationSchema = z.object({
   lat: z.number().min(-90).max(90),
