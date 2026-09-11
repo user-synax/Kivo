@@ -36,6 +36,7 @@ import { SettingsPanel } from "@/components/dashboard/settings-panel";
 import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
 import { StatusTab } from "@/components/status/status-tab";
 import { EmojiFactoryPanel } from "@/components/emoji-factory-panel";
+import { NearbyScreen } from "@/components/dashboard/nearby-screen";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -455,6 +456,7 @@ export function NestedSidebar({
   const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState("chats");
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [nearbyOpen, setNearbyOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -499,11 +501,20 @@ export function NestedSidebar({
     "emoji-factory": "Search emoji",
   };
 
+  // Nearby is full-screen like Appearance — intercept rail click
+  const handleTabChange = (id) => {
+    if (id === "nearby") {
+      setNearbyOpen(true);
+      return;
+    }
+    setActiveTab(id);
+  };
+
   return (
     <div className="flex h-full w-full min-w-0">
       <IconRail
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         currentUser={currentUser}
         onProfileClick={() => setProfileOpen(true)}
         unread={unread}
@@ -577,7 +588,7 @@ export function NestedSidebar({
             </div>
           </div>
 
-          {/* Search bar — scoped to active tab. Keep as-is styling. */}
+          {/* Search bar — scoped to active tab. Hide for status full-screen. */}
           {activeTab !== "status" && (
             <label className="flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
               <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" strokeWidth={1.6} aria-hidden="true" />
@@ -770,6 +781,9 @@ export function NestedSidebar({
 
       {appearanceOpen && (
         <AppearanceScreen onClose={() => setAppearanceOpen(false)} />
+      )}
+      {nearbyOpen && (
+        <NearbyScreen onClose={() => setNearbyOpen(false)} />
       )}
     </div>
   );

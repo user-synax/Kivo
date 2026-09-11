@@ -4,7 +4,9 @@ import {
   Check,
   Inbox,
   Loader2,
+  MapPin,
   MessageCircle,
+  Quote,
   Search,
   SearchX,
   UserMinus,
@@ -25,6 +27,9 @@ import {
 } from "@/lib/cache";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { motion, useReducedMotion } from "motion/react";
+import { ProfilePreviewCard } from "@/components/dashboard/profile-preview-card";
+import { SendRequestModal } from "@/components/dashboard/send-request-modal";
+import { NearbyTab } from "@/components/dashboard/nearby-tab";
 
 const btnPrimary =
   "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] transition-opacity duration-150 hover:opacity-90 disabled:pointer-events-none disabled:opacity-40";
@@ -38,7 +43,8 @@ const tagPill =
 const TABS = [
   { id: "requests", label: "Requests" },
   { id: "friends", label: "Friends" },
-  { id: "add", label: "Add" },
+  { id: "find", label: "Find" },
+  { id: "nearby", label: "Nearby" },
 ];
 
 function PersonRow({ person, subtitle, children }) {
@@ -83,6 +89,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
   const [results, setResults] = useState([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [sendModalUser, setSendModalUser] = useState(null);
   const timer = useRef(null);
 
   const [render, setRender] = useState(open);
@@ -220,7 +227,40 @@ export function FriendsModal({ open, onClose, onStartChat }) {
   const fullName = (u) => u.displayName || u.username || u.email;
   const handle = (u) => (u.username ? `@${u.username}` : u.email);
 
+  const openSendModal = (user) => setSendModalUser(user);
+  const handleSendWithMessage = async (welcomeMessage, withMessage, targetUser) => {
+    const u = targetUser || sendModalUser;
+    if (!u) return;
+    const identifier = u.username || u.email;
+    setBusyId(u.id);
+    try {
+      await apiPost("/api/v1/friends/request", {
+        identifier,
+        welcomeMessage: withMessage ? welcomeMessage : undefined,
+      });
+      setSendModalUser(null);
+      if (query.trim()) {
+        const d = await apiGet(
+          `/api/v1/users/search?q=${encodeURIComponent(query.trim())}`,
+        );
+        setResults(d || []);
+      }
+      loadRequests();
+    } catch (err) {
+      window.alert(err?.message || "Could not send request");
+      throw err;
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const sendRequest = async (identifier, id) => {
+    // Legacy direct path — now opens modal instead
+    const user = results.find((u) => u.id === id);
+    if (user) {
+      setSendModalUser(user);
+      return;
+    }
     setBusyId(id);
     try {
       await apiPost("/api/v1/friends/request", { identifier });
@@ -282,6 +322,11 @@ export function FriendsModal({ open, onClose, onStartChat }) {
     }
   };
 
+  // Default tab handling: old clients had "add" as tab — map to "find"
+  useEffect(() => {
+    if (tab === "add") setTab("find");
+  }, [tab]);
+
   if (!render) return null;
 
   const tabsNode = (
@@ -315,15 +360,30 @@ export function FriendsModal({ open, onClose, onStartChat }) {
         <div className="flex flex-col gap-2">
           {requests.length === 0 && <EmptyState icon={Inbox} title="No pending requests" />}
           {requests.map((r) => (
-            <PersonRow key={r.id} person={{ ...r.from, name: fullName(r.from) }} subtitle={handle(r.from)}>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button type="button" disabled={busyId === r.id} onClick={() => accept(r.id)} className={btnPrimary}>
-                  {busyId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <Check className="h-3.5 w-3.5" strokeWidth={2.2} />}
-                  Accept
-                </button>
-                <button type="button" disabled={busyId === r.id} onClick={() => decline(r.id)} className={btnGhost}>Decline</button>
+            <div key={r.id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-3">
+              <div className="flex items-center gap-3">
+                <Avatar name={fullName(r.from)} avatarStyle={r.from.avatarStyle} url={r.from.avatarUrl} isPlus={Boolean(r.from.isPlus)} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{fullName(r.from)}</p>
+                  <p className="truncate text-xs text-[var(--text-muted)]">{handle(r.from)}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" disabled={busyId === r.id} onClick={() => accept(r.id)} className={btnPrimary}>
+                    {busyId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <Check className="h-3.5 w-3.5" strokeWidth={2.2} />}
+                    Accept
+                  </button>
+                  <button type="button" disabled={busyId === r.id} onClick={() => decline(r.id)} className={btnGhost}>Decline</button>
+                </div>
               </div>
-            </PersonRow>
+              {r.welcomeMessage && (
+                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                    <Quote className="h-3 w-3" /> Welcome message
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words">“{r.welcomeMessage}”</p>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -361,7 +421,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
           ))}
         </div>
       )}
-      {tab === "add" && (
+      {tab === "find" && (
         <div className="flex flex-col gap-3">
           <div>
             <label className="flex items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2.5 shadow-[inset_0_1px_1px_var(--glass-highlight)] transition-colors duration-150 focus-within:border-[var(--accent)]">
@@ -375,7 +435,7 @@ export function FriendsModal({ open, onClose, onStartChat }) {
                 className="w-full min-w-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
               />
             </label>
-            <p className="mt-1.5 px-1 text-[12px] text-[var(--text-muted)]">Find people by their username or email address.</p>
+            <p className="mt-1.5 px-1 text-[12px] text-[var(--text-muted)]">Find people by username or email — preview their profile in a card.</p>
           </div>
           <div className="min-h-24" aria-live="polite">
             {loadingSearch && (
@@ -384,46 +444,81 @@ export function FriendsModal({ open, onClose, onStartChat }) {
               </div>
             )}
             {!loadingSearch && query.trim() && results.length === 0 && <EmptyState icon={SearchX} title="No users found" hint="Try a different name, @username, or email." />}
-            {!query.trim() && !loadingSearch && <EmptyState icon={Search} title="Start typing to find people to add." />}
-            <div className="flex flex-col gap-2">
+            {!query.trim() && !loadingSearch && <EmptyState icon={Search} title="Start typing to find people to add." hint="Enter a username or email to see a rich preview card." />}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {results.map((u) => (
-                <PersonRow key={u.id} person={{ ...u, name: fullName(u) }} subtitle={handle(u)}>
-                  {u.relationship === "friends" ? (
-                    <button type="button" onClick={() => startChat(u.id)} className={btnSecondary}>
-                      <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.8} /> Message
-                    </button>
-                  ) : u.relationship === "outgoing" ? (
-                    <span className={tagPill}>Requested</span>
-                  ) : (
-                    <button type="button" disabled={busyId === u.id} onClick={() => sendRequest(u.username || u.email, u.id)} className={btnPrimary}>
-                      {busyId === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <UserPlus className="h-3.5 w-3.5" strokeWidth={2} />} Add
-                    </button>
-                  )}
-                </PersonRow>
+                <ProfilePreviewCard
+                  key={u.id}
+                  user={u}
+                  relationship={u.relationship}
+                  busy={busyId === u.id}
+                  onAdd={(usr) => openSendModal(usr)}
+                  onMessage={(usr) => startChat(usr.id)}
+                  onViewProfile={(usr) => {
+                    // Open drawer via window event or via onStartChat fallback — for now just Message
+                    if (usr.username) window.open(`/u/${usr.username}`, "_blank");
+                  }}
+                />
               ))}
             </div>
           </div>
         </div>
       )}
+      {tab === "nearby" && (
+        <NearbyTab onStartChat={startChat} onViewProfile={(u) => u.username && window.open(`/u/${u.username}`, "_blank")} />
+      )}
     </div>
   );
 
+  // Modal width needs to be larger for card grids (find/nearby)
+  const isWideTab = tab === "find" || tab === "nearby";
   if (!isDesktop) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center">
-        <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-        <motion.div
+      <>
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Friends"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={reduce ? { duration: 0 } : { duration: 0.28, ease: EASE }}
+            className="relative z-10 flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] pb-[max(env(safe-area-inset-bottom),1rem)]"
+          >
+            <div className="mx-auto mt-3 h-1.5 w-9 shrink-0 rounded-full bg-[var(--border)]" aria-hidden="true" />
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3.5">
+              <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">Friends</h2>
+              <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="border-b border-[var(--border)] px-3 py-2.5">{tabsNode}</div>
+            {bodyNode}
+          </motion.div>
+        </div>
+        <SendRequestModal
+          open={!!sendModalUser}
+          user={sendModalUser}
+          onClose={() => setSendModalUser(null)}
+          onSend={(msg, withMsg) => handleSendWithMessage(msg, withMsg, sendModalUser)}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+        <button type="button" aria-label="Close" onClick={onClose} className={`t-modal-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm ${show ? "is-open" : ""}`} />
+        <div
           role="dialog"
           aria-modal="true"
           aria-label="Friends"
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          transition={reduce ? { duration: 0 } : { duration: 0.28, ease: EASE }}
-          className="relative z-10 flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] pb-[max(env(safe-area-inset-bottom),1rem)]"
+          className={`t-modal relative z-10 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] ${show ? "is-open" : "is-closing"} ${isWideTab ? "max-w-2xl" : "max-w-md"}`}
         >
-          <div className="mx-auto mt-3 h-1.5 w-9 shrink-0 rounded-full bg-[var(--border)]" aria-hidden="true" />
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3.5">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-8 py-3.5">
             <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">Friends</h2>
             <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)]">
               <X className="w-5 h-5" />
@@ -431,30 +526,15 @@ export function FriendsModal({ open, onClose, onStartChat }) {
           </div>
           <div className="border-b border-[var(--border)] px-3 py-2.5">{tabsNode}</div>
           {bodyNode}
-        </motion.div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
-      <button type="button" aria-label="Close" onClick={onClose} className={`t-modal-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm ${show ? "is-open" : ""}`} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Friends"
-        className={`t-modal relative z-10 flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)] ${show ? "is-open" : "is-closing"}`}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-8 py-3.5">
-          <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">Friends</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)]">
-            <X className="w-5 h-5" />
-          </button>
         </div>
-        <div className="border-b border-[var(--border)] px-3 py-2.5">{tabsNode}</div>
-        {bodyNode}
       </div>
-    </div>
+      <SendRequestModal
+        open={!!sendModalUser}
+        user={sendModalUser}
+        onClose={() => setSendModalUser(null)}
+        onSend={(msg, withMsg) => handleSendWithMessage(msg, withMsg, sendModalUser)}
+      />
+    </>
   );
 }
 

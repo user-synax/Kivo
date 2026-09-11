@@ -125,30 +125,215 @@ export async function searchUsers({ userId, q }) {
   const trimmed = q.trim();
   const regex = new RegExp(trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
+  // Fetch requester blocked sets to filter
+  const [me, blockers] = await Promise.all([
+    User.findById(userId).select("blockedUsers").lean(),
+    User.find({ blockedUsers: userId }).select("_id").lean(),
+  ]);
+  const myBlocked = new Set((me?.blockedUsers || []).map((id) => id.toString()));
+  const blockedByOthers = new Set(blockers.map((u) => u._id.toString()));
+
   const users = await User.find({
     _id: { $ne: userId },
+    isBanned: { $ne: true },
     $or: [{ username: regex }, { email: regex }, { displayName: regex }],
   })
-    .select("displayName username email verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt")
+    .select("displayName username email bio status statusEmoji avatarStyle avatarUrl banner country verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt")
     .limit(20)
     .lean();
 
+  const filtered = users.filter((u) => {
+    const id = u._id.toString();
+    return !myBlocked.has(id) && !blockedByOthers.has(id);
+  });
+
   const withRel = await Promise.all(
-    users.map(async (u) => ({
+    filtered.map(async (u) => ({
       ...publicUser(u),
+      bio: u.bio || null,
+      status: u.status || null,
+      statusEmoji: u.statusEmoji || null,
+      banner: u.banner || null,
+      country: u.country || null,
       relationship: await relationship(userId, u._id.toString()),
     }))
   );
   return withRel;
 }
 
+// Helpers for nearby distance fuzzing (privacy — never expose exact meters)
+function fuzzDistanceMeters(meters) {
+  if (meters < 1000) {
+    // round to nearest 50m, min 50m
+    const rounded = Math.max(50, Math.round(meters / 50) * 50);
+    return rounded;
+  }
+  // 1km+ -> 0.1km steps
+  const km = Math.round((meters / 1000) * 10) / 10;
+  return Math.round(km * 1000);
+}
+function formatDistance(meters) {
+  const d = fuzzDistanceMeters(meters);
+  if (d < 1000) return `${d} m away`;
+  return `${(d / 1000).toFixed(1)} km away`;
+}
+
+// Update privacy toggle for nearby discovery
+export async function updatePrivacy({ userId, discoverableByNearby }) {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { "privacyPreferences.discoverableByNearby": discoverableByNearby },
+    { new: true, runValidators: true }
+  ).select("privacyPreferences location locationUpdatedAt");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  // If turning off, clear stored location for privacy
+  if (!discoverableByNearby && user.location?.coordinates) {
+    user.location = undefined;
+    user.locationUpdatedAt = null;
+    await user.save();
+  }
+  return {
+    discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
+    locationUpdatedAt: user.locationUpdatedAt ? new Date(user.locationUpdatedAt).toISOString() : null,
+    hasLocation: Boolean(user.location?.coordinates),
+  };
+}
+
+export async function updateLocation({ userId, lat, lng, accuracy }) {
+  const user = await User.findById(userId).select("privacyPreferences");
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  if (user.privacyPreferences?.discoverableByNearby === false) {
+    throw forbidden("Nearby discovery is disabled — enable it in Settings to share location", "DISCOVERY_DISABLED");
+  }
+  if (accuracy != null && accuracy > 200) {
+    throw badRequest("Location accuracy too low — please try again in an open area", "LOW_ACCURACY");
+  }
+  const updated = await User.findByIdAndUpdate(
+    userId,
+    {
+      location: { type: "Point", coordinates: [lng, lat] },
+      locationUpdatedAt: new Date(),
+    },
+    { new: true }
+  ).select("location locationUpdatedAt privacyPreferences");
+  return {
+    hasLocation: true,
+    locationUpdatedAt: updated.locationUpdatedAt ? new Date(updated.locationUpdatedAt).toISOString() : null,
+    discoverableByNearby: updated.privacyPreferences?.discoverableByNearby ?? true,
+  };
+}
+
+export async function clearLocation({ userId }) {
+  const user = await User.findById(userId);
+  if (!user) throw notFound("User not found", "USER_NOT_FOUND");
+  user.location = undefined;
+  user.locationUpdatedAt = null;
+  await user.save();
+  return { hasLocation: false, locationUpdatedAt: null };
+}
+
+export async function getNearbyUsers({ userId, radius = 5000, limit = 20 }) {
+  const me = await User.findById(userId).select("location blockedUsers privacyPreferences locationUpdatedAt");
+  if (!me) throw notFound("User not found", "USER_NOT_FOUND");
+  if (!me.location?.coordinates) {
+    throw badRequest("Share your location first to see nearby people", "NO_LOCATION");
+  }
+  if (me.privacyPreferences?.discoverableByNearby === false) {
+    throw forbidden("Nearby discovery is disabled", "DISCOVERY_DISABLED");
+  }
+  // Stale check: location older than 30 min requires refresh
+  if (me.locationUpdatedAt && Date.now() - new Date(me.locationUpdatedAt).getTime() > 30 * 60 * 1000) {
+    throw badRequest("Your location is stale — please refresh", "STALE_LOCATION");
+  }
+  const fifteenAgo = new Date(Date.now() - 15 * 60 * 1000);
+  // Gather blocked sets both ways + friend/pending ids to exclude
+  const [blockers, pendingEdges, acceptedEdges] = await Promise.all([
+    User.find({ blockedUsers: userId }).select("_id").lean(),
+    FriendRequest.find({ $or: [{ from: userId }, { to: userId }], status: { $in: ["pending", "declined"] } }).select("from to").lean(),
+    FriendRequest.find({ $or: [{ from: userId }, { to: userId }], status: "accepted" }).select("from to").lean(),
+  ]);
+  const blockedByOthers = new Set(blockers.map((u) => u._id.toString()));
+  const myBlocked = new Set((me.blockedUsers || []).map((id) => id.toString()));
+  const excludeIds = new Set([userId.toString()]);
+  for (const e of [...pendingEdges, ...acceptedEdges]) {
+    excludeIds.add(e.from.toString());
+    excludeIds.add(e.to.toString());
+  }
+  for (const id of myBlocked) excludeIds.add(id);
+  for (const id of blockedByOthers) excludeIds.add(id);
+
+  // Use $geoNear via aggregation for distance sorting
+  const pipeline = [
+    {
+      $geoNear: {
+        near: { type: "Point", coordinates: me.location.coordinates },
+        distanceField: "dist",
+        maxDistance: Number(radius),
+        spherical: true,
+        query: {
+          _id: { $nin: Array.from(excludeIds).map((id) => new mongoose.Types.ObjectId(id)) },
+          location: { $exists: true, $ne: null },
+          locationUpdatedAt: { $gt: fifteenAgo },
+          "privacyPreferences.discoverableByNearby": { $ne: false },
+          isBanned: { $ne: true },
+        },
+      },
+    },
+    { $limit: Number(limit) },
+    {
+      $project: {
+        displayName: 1,
+        username: 1,
+        bio: 1,
+        status: 1,
+        statusEmoji: 1,
+        avatarStyle: 1,
+        avatarUrl: 1,
+        banner: 1,
+        country: 1,
+        verified: 1,
+        showBadge: 1,
+        googleVerified: 1,
+        githubVerified: 1,
+        profileEffect: 1,
+        usernameColor: 1,
+        plan: 1,
+        planExpiresAt: 1,
+        createdAt: 1,
+        lastActiveAt: 1,
+        dist: 1,
+      },
+    },
+  ];
+  const results = await User.aggregate(pipeline);
+  // Fallback if geo index missing or no results but allow empty
+  return results.map((u) => {
+    const base = publicUser({ ...u, _id: u._id });
+    const raw = Math.round(u.dist || 0);
+    const fuzzed = fuzzDistanceMeters(raw);
+    return {
+      ...base,
+      distanceMeters: fuzzed,
+      distanceLabel: formatDistance(raw),
+      rawDistance: raw,
+    };
+  }).sort((a, b) => a.distanceMeters - b.distanceMeters);
+}
+
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt",
+    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt privacyPreferences location locationUpdatedAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
-  return selfUser(user);
+  const base = selfUser(user);
+  return {
+    ...base,
+    privacyPreferences: {
+      discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
+    },
+    location: user.location?.coordinates ? { hasLocation: true, updatedAt: user.locationUpdatedAt ? new Date(user.locationUpdatedAt).toISOString() : null } : { hasLocation: false, updatedAt: null },
+  };
 }
 
 // Public profile of any user by id — used by the conversation detail panel.

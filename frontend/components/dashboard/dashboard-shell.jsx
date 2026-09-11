@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Palette, Search, Settings, Smile } from "lucide-react";
+import { ChevronLeft, ChevronRight, Compass, MapPin, Palette, Search, Settings, Smile } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
@@ -54,6 +54,7 @@ import { useTheme } from "@/components/theme-provider";
 import { StatusTab } from "@/components/status/status-tab";
 import { StatusCreateModal } from "@/components/status/status-create-modal";
 import { StatusViewer } from "@/components/status/status-viewer";
+import { NearbyTab } from "@/components/dashboard/nearby-tab";
 import { createStatus, fetchStatusFeed, fetchMyStatuses, viewStatus as viewStatusApi, deleteStatus as deleteStatusApi } from "@/lib/status";
 
 function isPlusUser(user) {
@@ -370,7 +371,7 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
 
 // Mobile hamburger tab: the bottom bar stays to Chats / Groups / Spaces / Menu;
 // Profile, Appearance and Settings open as pushed screens from here.
-function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch, onOpenEmojiFactory }) {
+function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch, onOpenEmojiFactory, onOpenNearby, onOpenDiscover }) {
   const displayName =
     currentUser?.displayName || currentUser?.username || currentUser?.email || "Account";
   return (
@@ -449,6 +450,36 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
               <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
                 Badge, 2FA, blocked users, notifications &amp; sounds
               </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenNearby}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-white">
+              <MapPin className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Nearby users</span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Discover people near you — distance only</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenDiscover}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-white">
+              <Compass className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Discover spaces</span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Find and join public communities</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>
@@ -2143,7 +2174,22 @@ export function DashboardShell() {
                     onOpenSettings={() => setMobileTab("settings")}
                     onOpenSearch={() => setSearchOpen(true)}
                     onOpenEmojiFactory={() => setMobileTab("emoji-factory")}
+                    onOpenNearby={() => setMobileTab("nearby")}
+                    onOpenDiscover={() => setShowDiscover(true)}
                   />
+                )}
+                {mobileTab === "nearby" && (
+                  <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+                    <div className="flex shrink-0 items-center gap-1 border-b border-[var(--border)] px-3 py-2.5">
+                      <button type="button" onClick={() => setMobileTab("menu")} aria-label="Back to menu" className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]">
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <span className="truncate font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Nearby users</span>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-[calc(64px+env(safe-area-inset-bottom))]" style={{ overscrollBehavior: "contain" }}>
+                      <NearbyTab onStartChat={(id) => { /* Nearby handles request via API */ }} onViewProfile={(u) => u.username && window.open(`/u/${u.username}`, "_blank")} />
+                    </div>
+                  </div>
                 )}
                 {mobileTab === "settings" && (
                   <MobileSettingsTab onBack={() => setMobileTab("menu")} />

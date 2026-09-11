@@ -3,8 +3,8 @@ import { parseBody, sendRequestSchema } from "./friends.validation.js";
 import * as friendsService from "./friends.service.js";
 
 export const sendRequest = asyncHandler(async (req, res) => {
-  const { identifier } = parseBody(sendRequestSchema, req.body);
-  const result = await friendsService.sendRequest({ userId: req.user.userId, identifier });
+  const { identifier, welcomeMessage } = parseBody(sendRequestSchema, req.body);
+  const result = await friendsService.sendRequest({ userId: req.user.userId, identifier, welcomeMessage });
   res.status(result.alreadySent ? 200 : 201).json({ success: true, data: result.request });
 });
 

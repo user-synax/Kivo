@@ -142,6 +142,22 @@ export const updateMeSchema = z.object({
     .optional(),
 });
 
+export const privacySchema = z.object({
+  discoverableByNearby: z.boolean(),
+});
+
+export const locationSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracy: z.number().min(0).max(100000).optional(),
+});
+
+export const nearbyQuerySchema = z.object({
+  radius: z.coerce.number().min(500).max(20000).optional().default(5000),
+  limit: z.coerce.number().min(1).max(20).optional().default(20),
+  cursor: z.string().optional(),
+});
+
 export const usernameParamSchema = z.object({
   username: z
     .string()

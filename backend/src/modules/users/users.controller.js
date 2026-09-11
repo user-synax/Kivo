@@ -2,9 +2,12 @@ import multer from "multer";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { badRequest } from "../../utils/errors.js";
 import {
+  locationSchema,
+  nearbyQuerySchema,
   parseBody,
   parseParams,
   parseQuery,
+  privacySchema,
   searchQuerySchema,
   updateMeSchema,
   usernameParamSchema,
@@ -159,4 +162,27 @@ export const blockUser = asyncHandler(async (req, res) => {
 export const unblockUser = asyncHandler(async (req, res) => {
   const result = await usersService.unblockUser({ userId: req.user.userId, targetId: req.params.id });
   res.status(200).json({ success: true, data: result });
+});
+
+export const updatePrivacy = asyncHandler(async (req, res) => {
+  const { discoverableByNearby } = parseBody(privacySchema, req.body);
+  const result = await usersService.updatePrivacy({ userId: req.user.userId, discoverableByNearby });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const updateLocation = asyncHandler(async (req, res) => {
+  const { lat, lng, accuracy } = parseBody(locationSchema, req.body);
+  const result = await usersService.updateLocation({ userId: req.user.userId, lat, lng, accuracy });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const deleteLocation = asyncHandler(async (req, res) => {
+  const result = await usersService.clearLocation({ userId: req.user.userId });
+  res.status(200).json({ success: true, data: result });
+});
+
+export const getNearby = asyncHandler(async (req, res) => {
+  const { radius, limit } = parseQuery(nearbyQuerySchema, req.query);
+  const users = await usersService.getNearbyUsers({ userId: req.user.userId, radius, limit });
+  res.status(200).json({ success: true, data: users });
 });

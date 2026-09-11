@@ -8,6 +8,9 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  MapPin,
+  MapPinned,
+  Navigation,
   Palette,
   Play,
   ShieldBan,
@@ -889,6 +892,95 @@ function BlockedUsersSection() {
   );
 }
 
+function PrivacyNearbySection() {
+  const [pref, setPref] = useState(null);
+  const [hasLocation, setHasLocation] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    apiGet("/api/v1/users/me")
+      .then((data) => {
+        if (!active) return;
+        setPref(data?.privacyPreferences?.discoverableByNearby ?? true);
+        setHasLocation(Boolean(data?.location?.hasLocation));
+      })
+      .catch((err) => {
+        if (active) setError(err?.message || "Could not load privacy");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const handleToggle = async (nextVal) => {
+    const prev = pref;
+    setPref(nextVal);
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiPatch("/api/v1/users/me/privacy", { discoverableByNearby: nextVal });
+      setPref(res?.discoverableByNearby ?? nextVal);
+      setHasLocation(Boolean(res?.hasLocation));
+      // Mirror to local session
+      try {
+        const me = getSession();
+        if (me) {
+          me.privacyPreferences = { ...(me.privacyPreferences || {}), discoverableByNearby: res?.discoverableByNearby ?? nextVal };
+          setSession(me, getToken());
+        }
+      } catch {}
+    } catch (err) {
+      setPref(prev);
+      setError(err?.message || "Could not update privacy");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SectionCard icon={MapPin} title="Nearby discovery" description="Share fuzzed distance with people near you.">
+        <div className="h-14 animate-pulse rounded-lg bg-[var(--hover)]" />
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard
+      icon={MapPinned}
+      title="Nearby discovery"
+      description="Appear to nearby people as distance only (~250m or 1.2km away). Never your exact location. Default is ON — turn off anytime."
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+              Allow nearby discovery
+              <span className="ml-2 text-[11px] font-normal text-[var(--text-muted)]">{pref ? "ON" : "OFF"}</span>
+            </p>
+            <p className="mt-0.5 text-[11px] leading-tight text-[var(--text-muted)]">Others see distance only — never your exact spot</p>
+          </div>
+          <Switch checked={Boolean(pref)} ariaLabel="Nearby discovery" disabled={saving} onCheckedChange={handleToggle} />
+        </div>
+        {!pref && (
+          <p className="px-1 text-[11px] text-amber-600">Discovery off — you won’t appear in others’ Nearby and you can’t see nearby people.</p>
+        )}
+        {pref && (
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+            <Navigation className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+            <span className="text-[12px] text-[var(--text-muted)]">{hasLocation ? "Location sharing active" : "Location not yet shared — open Friends → Nearby and tap Share location"}</span>
+          </div>
+        )}
+        {error && <p className="px-1 text-[12px] text-[var(--destructive)]">{error}</p>}
+      </div>
+    </SectionCard>
+  );
+}
+
 function isPlusUser(user) {
   if (typeof isPlusUserLib === "function") return isPlusUserLib(user);
   if (!user || user.plan !== "plus") return false;
@@ -951,6 +1043,7 @@ export function SettingsPanel({ onOpenAppearance }) {
           <BadgeSection />
           <VerificationSection />
           <TwoFactorSection />
+          <PrivacyNearbySection />
           <BlockedUsersSection />
           <NotificationsSection />
           <SoundsSection />

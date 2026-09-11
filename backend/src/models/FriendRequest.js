@@ -14,6 +14,14 @@ const friendRequestSchema = new mongoose.Schema(
       default: "pending",
       required: true,
     },
+    // Optional welcome message shown to recipient before accepting
+    welcomeMessage: {
+      type: String,
+      trim: true,
+      maxlength: 280,
+      default: null,
+    },
+    welcomeMessageAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

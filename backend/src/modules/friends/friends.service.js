@@ -33,11 +33,13 @@ function publicRequest(req, user) {
     status: req.status,
     createdAt: req.createdAt,
     from: publicUser(user),
+    welcomeMessage: req.welcomeMessage || null,
+    welcomeMessageAt: req.welcomeMessageAt ? new Date(req.welcomeMessageAt).toISOString() : null,
   };
 }
 
 // Send a friend request to a user identified by username or email.
-export async function sendRequest({ userId, identifier }) {
+export async function sendRequest({ userId, identifier, welcomeMessage }) {
   if (!mongoose.Types.ObjectId.isValid(identifier)) {
     // identifier is a username/email, not an id
   } else if (identifier === userId) {
@@ -46,12 +48,30 @@ export async function sendRequest({ userId, identifier }) {
 
   const target = await User.findOne({
     $or: [{ username: identifier }, { email: identifier.toLowerCase() }],
-  }).select("_id");
+  }).select("_id blockedUsers");
   if (!target) {
     throw notFound("User not found", "USER_NOT_FOUND");
   }
   if (target._id.toString() === userId) {
     throw badRequest("You cannot add yourself", "SELF_FRIEND");
+  }
+
+  // Block guards — either side blocked should not allow request
+  const [me, targetBlocked] = await Promise.all([
+    User.findById(userId).select("blockedUsers").lean(),
+    User.findById(target._id).select("blockedUsers").lean(),
+  ]);
+  const myBlocked = new Set((me?.blockedUsers || []).map((id) => id.toString()));
+  const theyBlocked = new Set((targetBlocked?.blockedUsers || []).map((id) => id.toString()));
+  if (myBlocked.has(target._id.toString()) || theyBlocked.has(userId.toString())) {
+    throw badRequest("You cannot send a request to this user", "BLOCKED_USER");
+  }
+
+  // Sanitize welcome message
+  let cleanWelcome = null;
+  if (welcomeMessage && String(welcomeMessage).trim()) {
+    cleanWelcome = String(welcomeMessage).trim().slice(0, 280);
+    if (cleanWelcome.length === 0) cleanWelcome = null;
   }
 
   // Already friends?
@@ -77,13 +97,19 @@ export async function sendRequest({ userId, identifier }) {
     throw conflict("This user already sent you a request", "INCOMING_REQUEST");
   }
 
-  const created = await FriendRequest.create({ from: userId, to: target._id, status: "pending" });
+  const created = await FriendRequest.create({
+    from: userId,
+    to: target._id,
+    status: "pending",
+    welcomeMessage: cleanWelcome,
+    welcomeMessageAt: cleanWelcome ? new Date() : null,
+  });
 
   // In-app notification: friend_request (fire-and-forget, Phase 1 no push)
   try {
     const sender = await User.findById(userId).select("displayName username avatarUrl").lean();
     const title = sender?.displayName || sender?.username || "New friend request";
-    const body = `${sender?.displayName || sender?.username || "Someone"} sent you a friend request`;
+    const body = cleanWelcome ? cleanWelcome.slice(0, 80) : `${sender?.displayName || sender?.username || "Someone"} sent you a friend request`;
     await notificationsService.createFriendNotification({
       recipientId: target._id,
       senderId: userId,
@@ -103,17 +129,23 @@ export async function sendRequest({ userId, identifier }) {
 export async function listRequests({ userId }) {
   const requests = await FriendRequest.find({ to: userId, status: "pending" })
     .sort({ createdAt: -1 })
-    .populate("from", "displayName username email")
+    .populate("from", "displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt")
     .lean();
   return requests.map((r) => ({
     id: r._id.toString(),
     status: r.status,
     createdAt: r.createdAt,
+    welcomeMessage: r.welcomeMessage || null,
+    welcomeMessageAt: r.welcomeMessageAt ? new Date(r.welcomeMessageAt).toISOString() : null,
     from: {
       id: r.from._id.toString(),
       displayName: r.from.displayName || null,
       username: r.from.username || null,
       email: r.from.email,
+      avatarStyle: r.from.avatarStyle || null,
+      avatarUrl: r.from.avatarUrl || null,
+      usernameColor: r.from.usernameColor || null,
+      isPlus: r.from.plan === "plus",
     },
   }));
 }

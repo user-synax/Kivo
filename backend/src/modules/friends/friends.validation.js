@@ -3,6 +3,8 @@ import { z } from "zod";
 export const sendRequestSchema = z.object({
   // The target user, identified by username or email (case-insensitive).
   identifier: z.string().trim().min(1, "identifier is required").max(120),
+  // Optional welcome message shown to recipient before accepting
+  welcomeMessage: z.string().trim().max(280).optional().nullable().or(z.literal("")),
 });
 
 export function parseBody(schema, body) {

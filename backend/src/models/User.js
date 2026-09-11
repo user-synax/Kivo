@@ -257,6 +257,24 @@ const userSchema = new mongoose.Schema(
     bannedAt: { type: Date, default: null },
     bannedReason: { type: String, default: null, maxlength: 500 },
 
+    // Nearby discovery — opt-in location sharing (default ON, privacy by design)
+    // Exact coordinates never leave the server; clients only see fuzzed distance.
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: undefined,
+      },
+      coordinates: {
+        type: [Number], // [lng, lat]
+        default: undefined,
+      },
+    },
+    locationUpdatedAt: { type: Date, default: null },
+    privacyPreferences: {
+      discoverableByNearby: { type: Boolean, default: true },
+    },
+
     notificationPreferences: {
       directMessages: { type: Boolean, default: true },
       groupMessages: { type: Boolean, default: true },
@@ -297,6 +315,11 @@ userSchema.methods.comparePassword = function (candidatePlain) {
 userSchema.statics.hashPassword = function (plain) {
   return bcrypt.hash(plain, 12);
 };
+
+// Geospatial index for nearby discovery (only users with location)
+userSchema.index({ location: "2dsphere" });
+userSchema.index({ locationUpdatedAt: 1 });
+userSchema.index({ "privacyPreferences.discoverableByNearby": 1 });
 
 // Indexes for search lookups.
 userSchema.index({ username: 1 });
