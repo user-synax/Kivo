@@ -45,6 +45,36 @@ const VIBE_PRESETS = [
   { label: "Sleepy", emoji: "🌙", status: "sleepy" },
 ];
 
+const PRONOUN_OPTIONS = ["he/him", "she/her", "they/them", "he/they", "she/they", "any"];
+const STATUS_EXPIRY_OPTIONS = [
+  { id: "", label: "Don't clear" },
+  { id: "30m", label: "30 minutes" },
+  { id: "1h", label: "1 hour" },
+  { id: "4h", label: "4 hours" },
+  { id: "today", label: "End of today" },
+];
+function expiryToISO(optionId) {
+  if (!optionId) return null;
+  const now = Date.now();
+  if (optionId === "30m") return new Date(now + 30*60*1000).toISOString();
+  if (optionId === "1h") return new Date(now + 60*60*1000).toISOString();
+  if (optionId === "4h") return new Date(now + 4*60*60*1000).toISOString();
+  if (optionId === "today") {
+    const d = new Date(); d.setHours(23,59,59,999);
+    return d.toISOString();
+  }
+  return null;
+}
+function isoToOption(iso) {
+  if (!iso) return "";
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return "";
+  if (diff <= 35*60*1000) return "30m";
+  if (diff <= 70*60*1000) return "1h";
+  if (diff <= 5*60*60*1000) return "4h";
+  return "today";
+}
+
 function Field({ label, hint, counter, children }) {
     return (
         <div className="block">
@@ -107,6 +137,8 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
     const [status, setStatus] = useState("");
     const [statusEmoji, setStatusEmoji] = useState("");
     const [showStatusEmojis, setShowStatusEmojis] = useState(false);
+    const [pronouns, setPronouns] = useState("");
+    const [statusExpiry, setStatusExpiry] = useState(""); // option id
     const [avatarStyle, setAvatarStyle] = useState("default");
     const [profileEffect, setProfileEffect] = useState("none");
     const [usernameColor, setUsernameColor] = useState(null);
@@ -217,6 +249,8 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
             setBio(me?.bio || "");
             setStatus(me?.status || "");
             setStatusEmoji(me?.statusEmoji || "");
+            setPronouns(me?.pronouns || "");
+            setStatusExpiry(isoToOption(me?.statusExpiresAt));
             setAvatarStyle(me?.avatarStyle || "default");
             setProfileEffect(me?.profileEffect || "none");
             setUsernameColor(me?.usernameColor || null);
@@ -269,8 +303,10 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                 displayName: displayName.trim(),
                 username: username.trim(),
                 bio: bio.trim(),
+                pronouns: pronouns.trim(),
                 status: status.trim(),
                 statusEmoji: statusEmoji.trim(),
+                statusExpiresAt: expiryToISO(statusExpiry),
                 avatarStyle,
                 profileEffect,
                 usernameColor: isValidHex(usernameColor) ? usernameColor.toLowerCase() : null,
@@ -517,6 +553,12 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                     );
                                 })}
                             </div>
+                            <div className="mt-2 flex items-center gap-2">
+                                <span className="text-[11px] text-[var(--text-muted)]">Clear after</span>
+                                <select value={statusExpiry} onChange={e=>setStatusExpiry(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-2 py-1 text-[12px]">
+                                    {STATUS_EXPIRY_OPTIONS.map(o=> <option key={o.id} value={o.id}>{o.label}</option>)}
+                                </select>
+                            </div>
                         </Field>
 
                         <Field
@@ -530,6 +572,16 @@ export function ProfileEditModal({ open, currentUser, onClose, onSaved }) {
                                 onChange={(e) => setBio(e.target.value)}
                                 placeholder="A little about you"
                             />
+                        </Field>
+
+                        <Field label="Pronouns" hint="Shown next to your name. e.g. he/him">
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                {PRONOUN_OPTIONS.map(p => (
+                                    <button key={p} type="button" onClick={() => setPronouns(p)} aria-pressed={pronouns===p}
+                                        className={`rounded-full border px-2.5 py-1 text-[11px] ${pronouns===p?"border-[var(--accent)] bg-[var(--accent)]/15":"border-[var(--border)] bg-[var(--bg-base)]"}`}>{p}</button>
+                                ))}
+                            </div>
+                            <input className={inputCls} value={pronouns} maxLength={20} onChange={e=>setPronouns(e.target.value)} placeholder="he/him · she/her · they/them · any" />
                         </Field>
                     </Section>
 
