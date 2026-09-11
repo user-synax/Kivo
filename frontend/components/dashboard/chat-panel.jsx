@@ -1324,6 +1324,10 @@ export function ChatPanel({
     for (const e of customEmojis) m.set(e.id, e);
     return m;
   }, [customEmojis]);
+  // Only own personal emojis are usable in picker/autocomplete; global/space are open, others' personal are render-only
+  const usableCustomEmojis = useMemo(() => {
+    return customEmojis.filter((e) => !e.ownerId || e.ownerId === userId);
+  }, [customEmojis, userId]);
 
   // Custom emoji : autocomplete (reuses mention infra keyboard nav)
   const [emojiAutocompleteOpen, setEmojiAutocompleteOpen] = useState(false);
@@ -1641,8 +1645,8 @@ export function ChatPanel({
 
   const getFilteredEmojis = (queryStr) => {
     const q = (queryStr || "").toLowerCase();
-    if (!q) return customEmojis.slice(0, 8);
-    return customEmojis.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 8);
+    if (!q) return usableCustomEmojis.slice(0, 8);
+    return usableCustomEmojis.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 8);
   };
 
   const checkEmojiTrigger = (val, cursorPosition) => {
@@ -1660,8 +1664,8 @@ export function ChatPanel({
           return { open: true, query: sub, pos: lastColon, filtered: matching };
         }
         // Even if no match but user typed :, show empty? keep closed to avoid spam
-        if (sub.length === 0 && customEmojis.length > 0) {
-          return { open: true, query: "", pos: lastColon, filtered: customEmojis.slice(0, 8) };
+        if (sub.length === 0 && usableCustomEmojis.length > 0) {
+          return { open: true, query: "", pos: lastColon, filtered: usableCustomEmojis.slice(0, 8) };
         }
       }
     }
@@ -4102,7 +4106,7 @@ export function ChatPanel({
                     <>
                       {emojiAutocompleteOpen && (
                         <CustomEmojiAutocomplete
-                          emojis={customEmojis}
+                          emojis={usableCustomEmojis}
                           query={emojiQuery}
                           selectedIndex={emojiIndex}
                           onSelect={handleSelectEmoji}
@@ -4118,7 +4122,7 @@ export function ChatPanel({
                       )}
                       {showEmoji && (
                           <EmojiPicker
-                            customEmojis={customEmojis}
+                            customEmojis={usableCustomEmojis}
                             onSelect={(emoji) => {
                               const el = textareaRef.current;
                               const start = el ? el.selectionStart : text.length;

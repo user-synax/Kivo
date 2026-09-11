@@ -4,6 +4,7 @@ import Conversation from "../../models/Conversation.js";
 import Message from "../../models/Message.js";
 import User from "../../models/User.js";
 import Space from "../../models/Space.js";
+import CustomEmoji from "../../models/CustomEmoji.js";
 import { getRequesterPlan } from "../../lib/plus.js";
 import { emitToConversation, roomName } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
@@ -268,6 +269,35 @@ async function resolveMentions(content, participantIds) {
   return resolvedIds;
 }
 
+// Enforce personal emoji ownership: only owner can SEND :name: that is a personal emoji.
+// Global/space emojis are open. This blocks `:otherPersonPersonal:` usage while still
+// allowing recipients to SEE it when the owner sends it (they receive the rendered image
+// via the message payload, no preloading needed beyond the owner's send).
+const SHORTCODE_RE = /:([a-z0-9_]{2,32}):/g;
+async function assertPersonalEmojiUsage(content, userId) {
+  if (!content) return;
+  const names = [...content.matchAll(SHORTCODE_RE)].map((m) => m[1].toLowerCase());
+  if (names.length === 0) return;
+  const uniqueNames = [...new Set(names)];
+  const personalEmojis = await CustomEmoji.find({ name: { $in: uniqueNames }, ownerId: { $ne: null } })
+    .select("name ownerId")
+    .lean();
+  if (personalEmojis.length === 0) return;
+  const byName = new Map();
+  for (const e of personalEmojis) {
+    const key = e.name;
+    if (!byName.has(key)) byName.set(key, []);
+    byName.get(key).push(e.ownerId.toString());
+  }
+  for (const name of uniqueNames) {
+    const owners = byName.get(name);
+    if (!owners) continue; // not a personal emoji, it's global/space or unknown
+    if (!owners.includes(userId.toString())) {
+      throw forbidden(`You can only use your own personal emoji :${name}:`, "PERSONAL_EMOJI_FORBIDDEN");
+    }
+  }
+}
+
 export async function createMessage({
   conversationId,
   userId,
@@ -523,6 +553,11 @@ export async function createMessage({
     mentions = await resolveMentions(finalContent, conversation.participants);
   }
 
+  // Personal emoji ownership check (skip for forwards — they copy source content)
+  if (!forwardedFromId && finalContent) {
+    await assertPersonalEmojiUsage(finalContent, userId);
+  }
+
   if (scheduledAt) {
     const when = new Date(scheduledAt);
     if (Number.isNaN(when.getTime())) throw badRequest("Invalid scheduledAt", "BAD_SCHEDULED");
@@ -651,6 +686,7 @@ export async function editMessage({ messageId, userId, content }) {
   }
 
   const mentionIds = await resolveMentions(content, conversation.participants);
+  await assertPersonalEmojiUsage(content, userId);
 
   if (message.content !== content) {
     message.editHistory.push({ content: message.content, editedAt: new Date(), editedBy: new mongoose.Types.ObjectId(userId) });
@@ -998,15 +1034,17 @@ export async function toggleReaction({ messageId, userId, emoji }) {
     throw badRequest("Polls can't be reacted to", "POLL_REACTION");
   }
 
-  // Custom emoji reactions: validate the referenced emoji exists
+  // Custom emoji reactions: validate the referenced emoji exists + ownership
   if (emoji.startsWith("custom:")) {
     const cid = emoji.slice(7);
     if (!mongoose.Types.ObjectId.isValid(cid)) {
       throw badRequest("Invalid custom emoji", "INVALID_EMOJI");
     }
-    const CustomEmoji = (await import("../../models/CustomEmoji.js")).default;
-    const exists = await CustomEmoji.findById(cid).select("_id").lean();
+    const exists = await CustomEmoji.findById(cid).select("_id ownerId").lean();
     if (!exists) throw notFound("Custom emoji not found", "EMOJI_NOT_FOUND");
+    if (exists.ownerId && exists.ownerId.toString() !== userId.toString()) {
+      throw forbidden("You can only use your own personal emoji", "PERSONAL_EMOJI_FORBIDDEN");
+    }
   }
 
   const existing = message.reactions.find(
