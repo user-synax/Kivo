@@ -175,7 +175,9 @@ export function ProfileContent({
   // passes `ownerAppearance`; in-app drawers leave it null so the profile
   // inherits the surrounding dashboard theme.
   const skinVars = ownerAppearance ? ownerSkin(ownerAppearance) : null;
-  const isSelf = rel === "self" || getSession()?.username === profile?.username;
+  const session = getSession();
+  const isAuthed = Boolean(session);
+  const isSelf = rel === "self" || session?.username === profile?.username;
   const isBlockedByMe = Boolean(profile?.isBlockedByMe);
   const isBlockedByOther = Boolean(profile?.isBlockedByOther);
   const isBlocked = isBlockedByMe || isBlockedByOther;
@@ -730,7 +732,7 @@ export function ProfileContent({
           )}
 
           {/* ── Action buttons ───────────────────────────────────────────── */}
-          {!isSelf && (
+          {!isSelf && isAuthed && (
             <motion.div
               variants={item}
               className="mt-5 flex flex-wrap items-center gap-2"
