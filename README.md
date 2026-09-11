@@ -245,12 +245,6 @@ kivo/
 │       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
 │       └── utils/            # errors & async handlers
 │
-├── mobile/                   # Expo SDK 57 + React Native + NativeWind (JS only)
-│   ├── app/                  # Expo Router: index gate, (auth)/login+signup,
-│   │                         #   (tabs)/chats+groups+spaces+menu, chat/[id]
-│   ├── components/           # auth-provider (SecureStore session)
-│   └── lib/                  # config, api, auth, socket, theme (backend reuse)
-│
 ├── README.md                 # This file
 ├── docs.md                   # Full features & how-to-use guide
 ├── PRD.md                    # Product requirements, API reference, schema
@@ -330,7 +324,6 @@ bun run lint  # biome check
 | `NEXT_PUBLIC_API_URL` | frontend | Backend origin for the Socket.IO connection (default `http://localhost:4000`) |
 | `NEXT_PUBLIC_PLUS_UPI_ID` | frontend | Published UPI ID for Kivo Plus payments (shown on `/plus` page) |
 | `NEXT_PUBLIC_PLUS_PAYEE` | frontend | Payee name for UPI payments (default "Kivo") |
-| `NEXT_PUBLIC_APP_DOWNLOAD_URL` | frontend | Direct mobile-app download link for the landing page "Download App" section (the section stays hidden until set) |
 
 > See `backend/.env.example` for the full list with comments. Never commit real secrets — `*.env` is gitignored.
 
