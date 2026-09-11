@@ -165,8 +165,8 @@ export const unblockUser = asyncHandler(async (req, res) => {
 });
 
 export const updatePrivacy = asyncHandler(async (req, res) => {
-  const { discoverableByNearby } = parseBody(privacySchema, req.body);
-  const result = await usersService.updatePrivacy({ userId: req.user.userId, discoverableByNearby });
+  const prefs = parseBody(privacySchema, req.body);
+  const result = await usersService.updatePrivacy({ userId: req.user.userId, ...prefs });
   res.status(200).json({ success: true, data: result });
 });
 

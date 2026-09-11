@@ -57,6 +57,21 @@ function startPollSweep() {
   if (typeof timer.unref === "function") timer.unref();
 }
 
+function startStatusExpirySweep() {
+  const run = async () => {
+    try {
+      const { clearExpiredStatuses } = await import("./modules/users/users.service.js");
+      const n = await clearExpiredStatuses();
+      if (n > 0) console.log(`[status-expiry] cleared ${n} expired status(es)`);
+    } catch (err) {
+      console.error("[status-expiry] sweep failed:", err?.message || err);
+    }
+  };
+  run();
+  const timer = setInterval(run, 60 * 60 * 1000);
+  if (typeof timer.unref === "function") timer.unref();
+}
+
 async function start() {
   await connectDb();
 
@@ -68,6 +83,7 @@ async function start() {
   startPlusSweep();
   startStatusSweep();
   startPollSweep();
+  startStatusExpirySweep();
   startScheduledJob();
 
   server.listen(env.port, () => {
