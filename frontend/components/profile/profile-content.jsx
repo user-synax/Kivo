@@ -164,9 +164,11 @@ export function ProfileContent({
     : username
       ? `@${username}`
       : "";
-  // Social chips (GitHub included when present) — the contribution graph card
-  // further down still renders separately when githubUsername is set.
-  const socialLinks = socialLinksFor(profile);
+  const pronouns = profile?.pronouns || null;
+  const showJoined = profile?.privacyPreferences?.showJoinedDate !== false; // server already nulls joinedAt when hidden, but double-guard
+  const showSocial = profile?.privacyPreferences?.showSocialLinks !== false;
+  const showPresence = profile?.privacyPreferences?.showOnline !== false;
+  const socialLinks = showSocial ? socialLinksFor(profile) : [];
   const joined = formatJoined(profile?.joinedAt);
   // Owner-skin (public /u pages only): the card renders in the OWNER's
   // accent/canvas-tint instead of the viewer's theme. Only the /u route
@@ -483,6 +485,11 @@ export function ProfileContent({
                 )}
               >
                 {name}
+                {pronouns && (
+                  <span className="rounded-full bg-[var(--surface-1)] border border-[var(--hairline)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
+                    {pronouns}
+                  </span>
+                )}
                 {profile.verified && profile.showBadge !== false && (
                   <VerifiedBadge size="sm" decorative />
                 )}
@@ -574,7 +581,7 @@ export function ProfileContent({
             variants={item}
             className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--hairline-soft)] pt-4 text-[12px] text-[var(--ink-muted)]"
           >
-            {joined && (
+            {showJoined && joined && (
               <motion.span
                 initial={reduce ? false : { opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -592,6 +599,11 @@ export function ProfileContent({
                 <CalendarDays className="h-3.5 w-3.5" />
                 Joined {joined}
               </motion.span>
+            )}
+            {!showJoined && (
+              <span className="text-[11px] text-[var(--ink-muted)]">
+                Joined date hidden
+              </span>
             )}
             {rel === "friends" && (
               <motion.span
