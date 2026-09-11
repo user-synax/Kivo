@@ -552,8 +552,13 @@ You can set:
 | Instagram | Optional username (max 60, letters/numbers/dots/underscores). |
 | YouTube | Optional full URL (`https://…`, max 500). |
 | Website | Optional full URL (`https://…`, max 500). |
+| Pronouns | Optional (max 20, e.g. `he/him`). Shown as a chip next to your name; empty clears it. Validation `PRONOUN_REGEX`. |
+| Status expiry | Optional `Clear after` (Don't clear / 30m / 1h / 4h / End of today). Stored as `statusExpiresAt` ISO (future-only); expired status is hidden on read and cleared hourly via `clearExpiredStatuses`. |
+| Profile privacy | **Settings → Profile privacy:** `Show online & last active` / `Show joined date` / `Show social links & graph` → `privacyPreferences.{showOnline,showJoinedDate,showSocialLinks}` via `PATCH /users/me/privacy`; public `/u/:username` hides accordingly. |
 
 The four social-link fields plus GitHub render as **icon chips** on your public profile (GitHub/X/Instagram build URLs from handles, YouTube/website use the full URL). Each chip links out safely (`target=_blank rel=noopener`). Save to apply. Email is **not** editable here. Username validation re-checks uniqueness server-side and the `plan` field is never accepted from clients.
+
+> **Privacy & pronouns:** `privacyPreferences` defaults all `true`; toggling OFF hides online dot/lastActive, joined date, or social chips + contribution graph on `/u/:username`. Pronouns and `statusExpiresAt` are editable via **Profile Edit Modal** (pronoun chips + expiry dropdown); empty strings clear to `null` server-side.
 
 ### Account verification (Google / GitHub)
 

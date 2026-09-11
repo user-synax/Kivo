@@ -267,6 +267,9 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 | verified / showBadge | Boolean | No / Yes | Admin grants `verified`; the user toggles `showBadge` visibility in Settings |
 | avatarStyle | String | Yes | One of 10 presets: Default + My accent (follows the theme token) + 6 solid colors + 2 gradient rings (`AVATAR_STYLE_IDS`) |
 | avatarUrl | String | Via upload | Hosted on Appwrite Storage (`PATCH /users/me/avatar`, 4 MB) |
+| pronouns | String | Yes | Optional max 20 (`he/him`, `they/them`, etc., `PRONOUN_REGEX`); shown as chip on `/u/:username`; empty → `null` |
+| statusExpiresAt | Date | Yes | Optional ISO future date via `Clear after` (30m/1h/4h/today/never); `isStatusExpired` hides on read, `clearExpiredStatuses` hourly sweep clears `status`/`statusEmoji`/`statusExpiresAt` |
+| privacyPreferences | Object | Yes | `{ discoverableByNearby, showOnline, showJoinedDate, showSocialLinks }` defaults `true`; `PATCH /users/me/privacy` + `privacySchema`; public profile hides online/lastActive, joinedAt, social chips/graph when false |
 | email | String | No | Read-only |
 | role | String | No | `user` or `admin` |
 
@@ -275,7 +278,7 @@ All transactional email (verification, password reset) is sent via **nodemailer*
 - Avatar: `PATCH /api/v1/users/me/avatar` — Appwrite Storage, max **4 MB**, types `png/jpeg/webp/gif`, old file deleted on re-upload, removal `DELETE /api/v1/users/me/avatar` (`users.service.js` `deleteAvatar`).
 - Banner (Kivo Plus): `PATCH /api/v1/users/me/banner` — same Appwrite bucket, **image/*, max 8 MB** (`users.service.js` `updateBanner`, `PLUS_REQUIRED` if not plus). Curated covers still via `PATCH /users/me` `{ banner: url | "" }`; switching from a custom upload to a curated/empty value retires the Appwrite file (`bannerFileId` cleared).
 - Profile effects: `PATCH /api/v1/users/me` `{ profileEffect }` — `none`/`glow`/`gradient-name`/`aura` (`PROFILE_EFFECT_IDS`). Server clamps free users to `none`; downgrade via admin `setUserPlan` also clears.
-- Validation in `users.validation.js`: `updateMeSchema` (`statusEmoji` max 8, `profileEffect` enum, `xUsername`/`instagramUsername` regexes, `youtubeUrl`/`websiteUrl` `^https?`, `country` `^[A-Z]{2}$`, `appearance` hex + enum).
+- Validation in `users.validation.js`: `updateMeSchema` (`statusEmoji` max 8, `profileEffect` enum, `pronouns` max 20 `PRONOUN_REGEX` nullable, `statusExpiresAt` future ISO nullable transform `""→null`, `xUsername`/`instagramUsername` regexes, `youtubeUrl`/`websiteUrl` `^https?`, `country` `^[A-Z]{2}$`, `appearance` hex + enum); `privacySchema` requires ≥1 of 4 booleans; `STATUS_EXPIRY_PRESETS` 30m/1h/4h.
 
 ---
 

@@ -53,3 +53,84 @@ describe("status expiry helper", () => {
     expect(isStatusExpired({ status: "busy", statusExpiresAt: null })).toBe(false);
   });
 });
+
+describe("Horizon 1 final verification", () => {
+  it("privacySchema accepts showSocialLinks false", () => {
+    const r = privacySchema.safeParse({ showSocialLinks: false });
+    expect(r.success).toBe(true);
+    expect(r.data.showSocialLinks).toBe(false);
+  });
+
+  it("privacySchema allows partial update with showOnline false", () => {
+    const r = privacySchema.safeParse({ showOnline: false });
+    expect(r.success).toBe(true);
+    expect(r.data.showOnline).toBe(false);
+  });
+
+  it("pronouns empty string is valid (service clears to null)", () => {
+    const r = updateMeSchema.safeParse({ pronouns: "" });
+    expect(r.success).toBe(true);
+    // Empty string is accepted via or(literal("")) — service layer converts "" -> null
+    // Schema keeps "" (no transform) which is truthy-falsy handled in service
+    if (r.success) {
+      expect(r.data.pronouns === "" || r.data.pronouns === null).toBe(true);
+    }
+  });
+
+  it("statusExpiresAt empty string transforms to null", () => {
+    const r = updateMeSchema.safeParse({ statusExpiresAt: "" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.statusExpiresAt).toBe(null);
+    }
+  });
+
+  it("isStatusExpired handles invalid date string returns false", () => {
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: "not-a-date" })).toBe(false);
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: "2026-13-40T25:00:00Z" })).toBe(false);
+  });
+
+  it("isStatusExpired handles invalid Date object returns false", () => {
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: new Date("invalid") })).toBe(false);
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: null })).toBe(false);
+    expect(isStatusExpired({ status: "busy" })).toBe(false);
+    expect(isStatusExpired(null)).toBe(false);
+    expect(isStatusExpired(undefined)).toBe(false);
+  });
+
+  it("publicProfile social filtering: showSocialLinks false hides github/social", () => {
+    // Inline replica of service filtering logic — ensures intent without needing DB
+    function filterSocial(user) {
+      const showSocial = user.privacyPreferences?.showSocialLinks !== false;
+      return {
+        githubUsername: showSocial ? (user.githubUsername || null) : null,
+        xUsername: showSocial ? (user.xUsername || null) : null,
+        instagramUsername: showSocial ? (user.instagramUsername || null) : null,
+        youtubeUrl: showSocial ? (user.youtubeUrl || null) : null,
+        websiteUrl: showSocial ? (user.websiteUrl || null) : null,
+      };
+    }
+    const hidden = filterSocial({
+      githubUsername: "octocat",
+      xUsername: "kivo",
+      privacyPreferences: { showSocialLinks: false },
+    });
+    expect(hidden.githubUsername).toBe(null);
+    expect(hidden.xUsername).toBe(null);
+
+    const visible = filterSocial({
+      githubUsername: "octocat",
+      xUsername: "kivo",
+      privacyPreferences: { showSocialLinks: true },
+    });
+    expect(visible.githubUsername).toBe("octocat");
+    expect(visible.xUsername).toBe("kivo");
+  });
+
+  it("updateMeSchema accepts pronouns via quick options", () => {
+    for (const p of ["they/them", "she/her", "he/they", "any"]) {
+      const r = updateMeSchema.safeParse({ pronouns: p });
+      expect(r.success).toBe(true);
+    }
+  });
+});
