@@ -9,6 +9,21 @@ import { getEffectivePlan } from "../../lib/plus.js";
 import { emitToUser } from "../../socket/io.js";
 import { getIO } from "../../socket/index.js";
 
+export function isStatusExpired(user) {
+  if (!user?.statusExpiresAt) return false;
+  const exp = new Date(user.statusExpiresAt).getTime();
+  return Number.isFinite(exp) && exp <= Date.now();
+}
+
+export async function clearExpiredStatuses() {
+  const now = new Date();
+  const res = await User.updateMany(
+    { statusExpiresAt: { $lte: now } },
+    { $set: { status: null, statusEmoji: null, statusExpiresAt: null } }
+  );
+  return res.modifiedCount || 0;
+}
+
 export async function completeOnboarding({ userId }) {
   const user = await User.findByIdAndUpdate(
     userId,
@@ -22,6 +37,8 @@ export async function completeOnboarding({ userId }) {
 // Public user shape returned in search/friend results and self profile.
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
+  // Clear expired status in-memory (DB sweep is hourly; this keeps reads fresh)
+  const expired = isStatusExpired(u);
   const io = getIO();
   const online = io?.isUserOnline ? io.isUserOnline(u._id.toString()) : false;
   const isPlus = getEffectivePlan(u) === "plus";
@@ -31,8 +48,10 @@ function publicUser(user) {
     username: u.username || null,
     email: u.email,
     bio: u.bio || null,
-    status: u.status || null,
-    statusEmoji: u.statusEmoji || null,
+    pronouns: u.pronouns || null,
+    status: expired ? null : (u.status || null),
+    statusEmoji: expired ? null : (u.statusEmoji || null),
+    statusExpiresAt: expired ? null : (u.statusExpiresAt ? new Date(u.statusExpiresAt).toISOString() : null),
     avatarStyle: u.avatarStyle || null,
     avatarUrl: u.avatarUrl || null,
     banner: u.banner || null,
@@ -100,8 +119,13 @@ function mergeAppearance(existing = {}, incoming = {}) {
 function selfUser(user) {
   const base = publicUser(user);
   const u = user.toObject ? user.toObject() : user;
+  const expired = isStatusExpired(u);
   return {
     ...base,
+    pronouns: u.pronouns || null,
+    status: expired ? null : (u.status || null),
+    statusEmoji: expired ? null : (u.statusEmoji || null),
+    statusExpiresAt: expired ? null : (u.statusExpiresAt ? new Date(u.statusExpiresAt).toISOString() : null),
     plan: getEffectivePlan(u),
     planExpiresAt: u.planExpiresAt
       ? new Date(u.planExpiresAt).toISOString()
@@ -112,6 +136,12 @@ function selfUser(user) {
     googleEmail: u.googleEmail || null,
     githubEmail: u.githubEmail || null,
     appearance: flatAppearance(user.appearance),
+    privacyPreferences: {
+      discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
+      showOnline: user.privacyPreferences?.showOnline ?? true,
+      showJoinedDate: user.privacyPreferences?.showJoinedDate ?? true,
+      showSocialLinks: user.privacyPreferences?.showSocialLinks ?? true,
+    },
   };
 }
 
@@ -148,7 +178,7 @@ export async function searchUsers({ userId, q }) {
     isBanned: { $ne: true },
     $or: [{ username: regex }, { email: regex }, { displayName: regex }],
   })
-    .select("displayName username email bio status statusEmoji avatarStyle avatarUrl banner country verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt")
+    .select("displayName username email bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt privacyPreferences")
     .limit(20)
     .lean();
 
@@ -160,11 +190,6 @@ export async function searchUsers({ userId, q }) {
   const withRel = await Promise.all(
     filtered.map(async (u) => ({
       ...publicUser(u),
-      bio: u.bio || null,
-      status: u.status || null,
-      statusEmoji: u.statusEmoji || null,
-      banner: u.banner || null,
-      country: u.country || null,
       relationship: await relationship(userId, u._id.toString()),
     }))
   );
@@ -188,24 +213,39 @@ function formatDistance(meters) {
   return `${(d / 1000).toFixed(1)} km away`;
 }
 
-// Update privacy toggle for nearby discovery
-export async function updatePrivacy({ userId, discoverableByNearby }) {
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { "privacyPreferences.discoverableByNearby": discoverableByNearby },
-    { new: true, runValidators: true }
-  ).select("privacyPreferences location locationUpdatedAt");
+// Update privacy toggles (discovery + profile visibility)
+export async function updatePrivacy({ userId, ...prefs }) {
+  const user = await User.findById(userId).select("privacyPreferences location locationUpdatedAt");
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
-  // If turning off, clear stored location for privacy
-  if (!discoverableByNearby && user.location?.coordinates) {
-    user.location = undefined;
-    user.locationUpdatedAt = null;
-    await user.save();
+  const update = {};
+  for (const k of ["discoverableByNearby", "showOnline", "showJoinedDate", "showSocialLinks"]) {
+    if (prefs[k] !== undefined) update[`privacyPreferences.${k}`] = prefs[k];
+  }
+  if (Object.keys(update).length === 0) {
+    return {
+      discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
+      showOnline: user.privacyPreferences?.showOnline ?? true,
+      showJoinedDate: user.privacyPreferences?.showJoinedDate ?? true,
+      showSocialLinks: user.privacyPreferences?.showSocialLinks ?? true,
+      locationUpdatedAt: user.locationUpdatedAt ? new Date(user.locationUpdatedAt).toISOString() : null,
+      hasLocation: Boolean(user.location?.coordinates),
+    };
+  }
+  const updated = await User.findByIdAndUpdate(userId, { $set: update }, { new: true, runValidators: true }).select("privacyPreferences location locationUpdatedAt");
+  if (!updated) throw notFound("User not found", "USER_NOT_FOUND");
+  // If turning off nearby discovery, clear stored location for privacy
+  if (prefs.discoverableByNearby === false && updated.location?.coordinates) {
+    updated.location = undefined;
+    updated.locationUpdatedAt = null;
+    await updated.save();
   }
   return {
-    discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
-    locationUpdatedAt: user.locationUpdatedAt ? new Date(user.locationUpdatedAt).toISOString() : null,
-    hasLocation: Boolean(user.location?.coordinates),
+    discoverableByNearby: updated.privacyPreferences?.discoverableByNearby ?? true,
+    showOnline: updated.privacyPreferences?.showOnline ?? true,
+    showJoinedDate: updated.privacyPreferences?.showJoinedDate ?? true,
+    showSocialLinks: updated.privacyPreferences?.showSocialLinks ?? true,
+    locationUpdatedAt: updated.locationUpdatedAt ? new Date(updated.locationUpdatedAt).toISOString() : null,
+    hasLocation: Boolean(updated.location?.coordinates),
   };
 }
 
@@ -333,7 +373,7 @@ export async function getNearbyUsers({ userId, radius = 5000, limit = 20 }) {
 // Return the current user's own profile (self view).
 export async function getMe({ userId }) {
   const user = await User.findById(userId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt privacyPreferences location locationUpdatedAt onboardingCompletedAt",
+    "displayName username email bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt privacyPreferences location locationUpdatedAt onboardingCompletedAt",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   const base = selfUser(user);
@@ -343,6 +383,9 @@ export async function getMe({ userId }) {
     onboardingCompletedAt: user.onboardingCompletedAt ? new Date(user.onboardingCompletedAt).toISOString() : null,
     privacyPreferences: {
       discoverableByNearby: user.privacyPreferences?.discoverableByNearby ?? true,
+      showOnline: user.privacyPreferences?.showOnline ?? true,
+      showJoinedDate: user.privacyPreferences?.showJoinedDate ?? true,
+      showSocialLinks: user.privacyPreferences?.showSocialLinks ?? true,
     },
     location: user.location?.coordinates ? { hasLocation: true, updatedAt: user.locationUpdatedAt ? new Date(user.locationUpdatedAt).toISOString() : null } : { hasLocation: false, updatedAt: null },
   };
@@ -354,7 +397,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio status statusEmoji avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect usernameColor plan planExpiresAt createdAt lastActiveAt",
+    "displayName username email bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect usernameColor plan planExpiresAt createdAt lastActiveAt privacyPreferences",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -364,22 +407,27 @@ export async function getUserById({ otherId }) {
 // Explicitly omits email, role, avatarFileId, passwordHash.
 function publicProfile(user) {
   const u = user.toObject ? user.toObject() : user;
+  const expired = isStatusExpired(u);
   const io = getIO();
   const online = io?.isUserOnline ? io.isUserOnline(u._id.toString()) : false;
   const isPlus = getEffectivePlan(u) === "plus";
+  const showOnline = u.privacyPreferences?.showOnline !== false;
+  const showJoined = u.privacyPreferences?.showJoinedDate !== false;
+  const showSocial = u.privacyPreferences?.showSocialLinks !== false;
   return {
     id: u._id.toString(),
     username: u.username || null,
     displayName: u.displayName || null,
+    pronouns: u.pronouns || null,
     avatarUrl: u.avatarUrl || null,
     avatarStyle: u.avatarStyle || null,
     banner: u.banner || null,
     country: u.country || null,
-    githubUsername: u.githubUsername || null,
-    xUsername: u.xUsername || null,
-    instagramUsername: u.instagramUsername || null,
-    youtubeUrl: u.youtubeUrl || null,
-    websiteUrl: u.websiteUrl || null,
+    githubUsername: showSocial ? (u.githubUsername || null) : null,
+    xUsername: showSocial ? (u.xUsername || null) : null,
+    instagramUsername: showSocial ? (u.instagramUsername || null) : null,
+    youtubeUrl: showSocial ? (u.youtubeUrl || null) : null,
+    websiteUrl: showSocial ? (u.websiteUrl || null) : null,
     verified: Boolean(u.verified),
     showBadge: Boolean(u.showBadge),
     googleVerified: Boolean(u.googleVerified),
@@ -391,17 +439,18 @@ function publicProfile(user) {
     // in *their* theme (accent + canvas tint). Colors only; never plan/tier.
     appearance: flatAppearance(u.appearance),
     bio: u.bio || null,
-    status: u.status || null,
-    statusEmoji: u.statusEmoji || null,
-    joinedAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
-    lastActiveAt: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
-    online,
+    status: expired ? null : (u.status || null),
+    statusEmoji: expired ? null : (u.statusEmoji || null),
+    statusExpiresAt: expired ? null : (u.statusExpiresAt ? new Date(u.statusExpiresAt).toISOString() : null),
+    joinedAt: showJoined && u.createdAt ? new Date(u.createdAt).toISOString() : null,
+    lastActiveAt: showOnline && u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
+    online: showOnline ? online : false,
   };
 }
 
 export async function getProfileByUsername({ requesterId, username }) {
   const user = await User.findOne({ username }).select(
-    "displayName username bio status statusEmoji avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect usernameColor plan planExpiresAt createdAt blockedUsers lastActiveAt",
+    "displayName username bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner appearance country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified profileEffect usernameColor plan planExpiresAt createdAt blockedUsers lastActiveAt privacyPreferences",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
 
@@ -715,12 +764,24 @@ export async function updateMe({ userId, data }) {
       update[key] = data[key] ? String(data[key]).trim() : null;
     }
   }
+  if (data.pronouns !== undefined) {
+    update.pronouns = data.pronouns ? String(data.pronouns).trim() : null;
+  }
+  if (data.statusExpiresAt !== undefined) {
+    // Empty/null = clear; otherwise future ISO (validated)
+    if (!data.statusExpiresAt) update.statusExpiresAt = null;
+    else update.statusExpiresAt = new Date(data.statusExpiresAt);
+  }
+  // When status is cleared but expiry remains, clear expiry too
+  if (data.status === "" && data.statusEmoji === "") {
+    update.statusExpiresAt = null;
+  }
 
   const user = await User.findByIdAndUpdate(userId, update, {
     new: true,
     runValidators: true,
   }).select(
-    "displayName username email bio status statusEmoji avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt",
+    "displayName username email bio pronouns status statusEmoji statusExpiresAt avatarStyle banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified googleEmail githubEmail role plan planExpiresAt profileEffect usernameColor appearance bannerFileId createdAt lastActiveAt privacyPreferences",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return selfUser(user);

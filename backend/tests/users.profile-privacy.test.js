@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { User } from "../src/models/User.js";
 import { updateMeSchema, privacySchema } from "../src/modules/users/users.validation.js";
+import { isStatusExpired } from "../src/modules/users/users.service.js";
 
 describe("User Horizon 1 fields", () => {
   it("has pronouns and statusExpiresAt with defaults", () => {
@@ -38,5 +39,17 @@ describe("updateMe validation Horizon 1", () => {
   it("accepts privacy flags", () => {
     const r = privacySchema.safeParse({ discoverableByNearby: true, showOnline: false, showJoinedDate: false, showSocialLinks: true });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("status expiry helper", () => {
+  it("returns true when statusExpiresAt in past", () => {
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: new Date(Date.now()-1000) })).toBe(true);
+  });
+  it("returns false when future", () => {
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: new Date(Date.now()+100000) })).toBe(false);
+  });
+  it("returns false when null", () => {
+    expect(isStatusExpired({ status: "busy", statusExpiresAt: null })).toBe(false);
   });
 });
