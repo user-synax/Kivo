@@ -981,6 +981,125 @@ function PrivacyNearbySection() {
   );
 }
 
+function ProfilePrivacySection() {
+  const [prefs, setPrefs] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    apiGet("/api/v1/users/me")
+      .then((d) => {
+        if (!active) return;
+        setPrefs({
+          showOnline: d?.privacyPreferences?.showOnline ?? true,
+          showJoinedDate: d?.privacyPreferences?.showJoinedDate ?? true,
+          showSocialLinks: d?.privacyPreferences?.showSocialLinks ?? true,
+        });
+      })
+      .catch((err) => {
+        if (active) setError(err?.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const toggle = async (key, val) => {
+    const prev = prefs[key];
+    setPrefs((p) => ({ ...p, [key]: val }));
+    setSavingKey(key);
+    try {
+      const res = await apiPatch("/api/v1/users/me/privacy", { [key]: val });
+      setPrefs((p) => ({ ...p, [key]: res[key] ?? val }));
+      const me = getSession();
+      if (me) {
+        me.privacyPreferences = {
+          ...(me.privacyPreferences || {}),
+          [key]: res[key] ?? val,
+        };
+        setSession(me, getToken());
+      }
+    } catch (err) {
+      setPrefs((p) => ({ ...p, [key]: prev }));
+      setError(err?.message);
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  if (loading)
+    return (
+      <SectionCard
+        icon={Eye}
+        title="Profile privacy"
+        description="Choose what others see on your public profile."
+      >
+        <div className="h-14 animate-pulse rounded-lg bg-[var(--hover)]" />
+      </SectionCard>
+    );
+
+  const defs = [
+    {
+      key: "showOnline",
+      label: "Show online & last active",
+      hint: "Others see 'Online' or 'active X ago'",
+    },
+    {
+      key: "showJoinedDate",
+      label: "Show joined date",
+      hint: "'Joined June 2024' on your profile",
+    },
+    {
+      key: "showSocialLinks",
+      label: "Show social links & GitHub graph",
+      hint: "X, Instagram, YouTube, website chips + contribution graph",
+    },
+  ];
+  return (
+    <SectionCard
+      icon={Eye}
+      title="Profile privacy"
+      description="Control what’s visible to anyone visiting your profile."
+    >
+      <div className="space-y-2">
+        {defs.map((d) => {
+          const checked = Boolean(prefs?.[d.key]);
+          return (
+            <div
+              key={d.key}
+              className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                  {d.label}{" "}
+                  <span className="ml-2 text-[11px] font-normal text-[var(--text-muted)]">
+                    {checked ? "ON" : "OFF"}
+                  </span>
+                </p>
+                <p className="text-[11px] text-[var(--text-muted)]">{d.hint}</p>
+              </div>
+              <Switch
+                checked={checked}
+                ariaLabel={d.label}
+                disabled={savingKey === d.key}
+                onCheckedChange={(v) => toggle(d.key, v)}
+              />
+            </div>
+          );
+        })}
+        {error && (
+          <p className="text-[12px] text-[var(--destructive)]">{error}</p>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 function isPlusUser(user) {
   if (typeof isPlusUserLib === "function") return isPlusUserLib(user);
   if (!user || user.plan !== "plus") return false;
@@ -1044,6 +1163,7 @@ export function SettingsPanel({ onOpenAppearance }) {
           <VerificationSection />
           <TwoFactorSection />
           <PrivacyNearbySection />
+          <ProfilePrivacySection />
           <BlockedUsersSection />
           <NotificationsSection />
           <SoundsSection />
