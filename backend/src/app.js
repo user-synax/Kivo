@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 
 import env from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { requestLogger } from "./middleware/requestLogger.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 import conversationRoutes from "./modules/conversations/conversations.routes.js";
@@ -76,6 +77,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(requestLogger);
 
 // Health check.
 app.get("/health", (req, res) => res.json({ success: true, data: { status: "ok" } }));

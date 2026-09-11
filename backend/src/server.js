@@ -7,6 +7,8 @@ import { sweepPlus } from "./modules/plus/plus.service.js";
 import { cleanupExpiredStatuses } from "./modules/status/status.service.js";
 import { closeExpiredPolls } from "./modules/messages/messages.service.js";
 import { startScheduledJob } from "./jobs/scheduledMessages.js";
+import { startDailyReportJob } from "./jobs/dailyReport.js";
+import logger from "./lib/logger.js";
 import "./config/webpush.js";
 
 // Hourly sweep (plus a run at boot): lapse Plus claims past their 24h review
@@ -18,12 +20,10 @@ function startPlusSweep() {
     try {
       const r = await sweepPlus();
       if (r.expiredClaims > 0 || r.scrubbedEffects > 0) {
-        console.log(
-          `[plus] sweep: expired ${r.expiredClaims} claim(s), scrubbed ${r.scrubbedEffects} effect(s)`,
-        );
+        logger.info({ expiredClaims: r.expiredClaims, scrubbedEffects: r.scrubbedEffects }, "[plus] sweep");
       }
     } catch (err) {
-      console.error("[plus] sweep failed:", err?.message || err);
+      logger.error({ err: err?.message || err }, "[plus] sweep failed");
     }
   };
   run();
@@ -36,7 +36,7 @@ function startStatusSweep() {
     try {
       await cleanupExpiredStatuses();
     } catch (err) {
-      console.error("[status] sweep failed:", err?.message || err);
+      logger.error({ err: err?.message || err }, "[status] sweep failed");
     }
   };
   run();
@@ -48,9 +48,9 @@ function startPollSweep() {
   const run = async () => {
     try {
       const n = await closeExpiredPolls();
-      if (n > 0) console.log(`[poll] closed ${n} expired poll(s)`);
+      if (n > 0) logger.info({ closed: n }, "[poll] closed expired polls");
     } catch (err) {
-      console.error("[poll] sweep failed:", err?.message || err);
+      logger.error({ err: err?.message || err }, "[poll] sweep failed");
     }
   };
   const timer = setInterval(run, 60 * 1000);
@@ -62,9 +62,9 @@ function startStatusExpirySweep() {
     try {
       const { clearExpiredStatuses } = await import("./modules/users/users.service.js");
       const n = await clearExpiredStatuses();
-      if (n > 0) console.log(`[status-expiry] cleared ${n} expired status(es)`);
+      if (n > 0) logger.info({ cleared: n }, "[status-expiry] cleared expired statuses");
     } catch (err) {
-      console.error("[status-expiry] sweep failed:", err?.message || err);
+      logger.error({ err: err?.message || err }, "[status-expiry] sweep failed");
     }
   };
   run();
@@ -87,11 +87,12 @@ async function start() {
   startScheduledJob();
 
   server.listen(env.port, () => {
-    console.log(`[server] listening on http://localhost:${env.port} (${env.nodeEnv})`);
+    logger.info({ port: env.port, env: env.nodeEnv }, "[server] listening");
   });
+  startDailyReportJob();
 }
 
 start().catch((err) => {
-  console.error("[server] failed to start:", err);
+  logger.error({ err: err?.message || err }, "[server] failed to start");
   process.exit(1);
 });

@@ -1,5 +1,6 @@
 import { ErrorCodes } from "../utils/errors.js";
 import env from "../config/env.js";
+import logger from "../lib/logger.js";
 
 // Express 5 error-handling middleware (4 args required).
 // Always responds with { success: false, error: { code, message } }.
@@ -26,7 +27,13 @@ export function errorHandler(err, req, res, next) {
 
   if (statusCode >= 500) {
     // Log server errors for observability; never the stack to the client.
-    console.error("[error]", err.code || "INTERNAL_ERROR", "-", err.message);
+    logger.error({
+      code: err.code || "INTERNAL_ERROR",
+      message: err.message,
+      method: req.method,
+      url: req.originalUrl,
+      userId: req.user?.userId || "anonymous",
+    }, "[error] 5xx");
   }
 
   res.status(statusCode).json({
