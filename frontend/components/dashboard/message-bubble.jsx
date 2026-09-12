@@ -6,6 +6,7 @@ import {
   BookmarkCheck,
   Check,
   CheckCheck,
+  ChevronDown,
   Clock,
   Copy,
   FaceGrinning,
@@ -211,6 +212,69 @@ function QuickReactionButton({ emoji, onReact, className, children, ...props }) 
     >
       {children}
     </button>
+  );
+}
+
+// "More reactions" — an inline expandable section inside the menu showing the
+// unicode set plus the custom library. Self-contained (local expanded state +
+// closes the menu via context), so it works everywhere the bubble renders
+// without any parent picker state.
+function MoreReactionsSection({ customs = [], onReact }) {
+  const ctx = useContext(ContextMenuContext);
+  const [expanded, setExpanded] = useState(false);
+  if (!customs || customs.length === 0) return null;
+  const reactAndClose = (emoji) => {
+    onReact?.(emoji);
+    ctx?.setOpen(false);
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="relative isolate flex w-full select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-foreground outline-none transition-colors hover:bg-foreground/[0.065] focus-visible:ring-2 focus-visible:ring-foreground/15"
+      >
+        <FaceGrinning className="h-4 w-4 shrink-0" />
+        More reactions
+        <ChevronDown
+          className={cn(
+            "ml-auto h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform",
+            expanded && "rotate-180",
+          )}
+          aria-hidden
+        />
+      </button>
+      {expanded && (
+        <div className="max-h-40 overflow-y-auto px-1.5 pb-1.5">
+          <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1.5">
+            {REACTION_EMOJIS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => reactAndClose(e)}
+                aria-label={`React ${e}`}
+                className="rounded px-1 text-base transition-colors hover:bg-[var(--hover)]"
+              >
+                {e}
+              </button>
+            ))}
+            {customs.map((ce) => (
+              <button
+                key={ce.id}
+                type="button"
+                onClick={() => reactAndClose(`custom:${ce.id}`)}
+                title={`:${ce.name}:`}
+                aria-label={`React with :${ce.name}:`}
+                className="rounded p-0.5 transition-colors hover:bg-[var(--hover)]"
+              >
+                <img src={ce.url} alt={`:${ce.name}:`} width={22} height={22} className="size-[22px]" loading="lazy" decoding="async" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -501,13 +565,11 @@ export function MessageBubble({
   message,
   mine,
   showMeta = true,
-  reactionOpen = false,
   isEditing = false,
   editText = "",
   onEditTextChange,
   onSaveEdit,
   onCancelEdit,
-  onToggleReactionPicker,
   onReact,
   onEdit,
   onDelete,
@@ -734,6 +796,12 @@ export function MessageBubble({
   // Sent messages use the primary (accent) bubble, received use the secondary.
   const bubbleVariant = variant ?? (isBig ? "ghost" : mine ? "default" : "secondary");
 
+  // Customs available for the "More reactions" section (up to 48).
+  const customReactionList =
+    customEmojiById && customEmojiById.size > 0
+      ? [...customEmojiById.values()].slice(0, 48)
+      : [];
+
   return (
     <ContextMenu>
       <ContextMenuTrigger disabled={deleted || isEditing || selectMode}>
@@ -921,71 +989,27 @@ export function MessageBubble({
             </span>
           )}
 
-          {/* Reaction picker */}
-          {reactionOpen && (
-            <div
-              className={cn(
-                "absolute bottom-full z-10 mb-1 flex max-w-[280px] flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1",
-                mine ? "right-0" : "left-0",
-              )}
-            >
-              {REACTION_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => onReact?.(e)}
-                  className="rounded px-1 text-base transition-colors hover:bg-[var(--hover)]"
-                >
-                  {e}
-                </button>
-              ))}
-              {customEmojiById && [...customEmojiById.values()].slice(0, 20).map((ce) => (
-                <button
-                  key={ce.id}
-                  type="button"
-                  onClick={() => onReact?.(`custom:${ce.id}`)}
-                  className="rounded p-0.5 transition-colors hover:bg-[var(--hover)]"
-                  title={`:${ce.name}:`}
-                  aria-label={`React with :${ce.name}:`}
-                >
-                  <img src={ce.url} alt={`:${ce.name}:`} width={22} height={22} className="size-[22px]" loading="lazy" decoding="async" />
-                </button>
-              ))}
-            </div>
-          )}
         </Bubble>
       </ContextMenuTrigger>
 
       <ContextMenuContent ariaLabel="Message actions">
-        {/* One-tap quick reactions — no extra tap to open the picker (hidden for polls) */}
+        {/* One-tap quick reactions — fixed 6 unicode only, so the row never
+            grows with the custom library (hidden for polls). Customs live in
+            "More reactions" below. */}
         {message.type !== "poll" && (
-          <>
-            <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
-              {REACTION_EMOJIS.map((e) => (
-                <QuickReactionButton
-                  key={e}
-                  emoji={e}
-                  onReact={onReact}
-                  aria-label={`React ${e}`}
-                  className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
-                >
-                  {e}
-                </QuickReactionButton>
-              ))}
-              {customEmojiById && [...customEmojiById.values()].slice(0, 6).map((ce) => (
-                <QuickReactionButton
-                  key={ce.id}
-                  emoji={`custom:${ce.id}`}
-                  onReact={onReact}
-                  aria-label={`React :${ce.name}:`}
-                  className="rounded-lg p-0.5 transition-transform hover:scale-110"
-                  title={`:${ce.name}:`}
-                >
-                  <img src={ce.url} alt={`:${ce.name}:`} width={20} height={20} className="size-5" loading="lazy" decoding="async" />
-                </QuickReactionButton>
-              ))}
-            </div>
-          </>
+          <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
+            {REACTION_EMOJIS.map((e) => (
+              <QuickReactionButton
+                key={e}
+                emoji={e}
+                onReact={onReact}
+                aria-label={`React ${e}`}
+                className="rounded-lg py-0.5 text-[17px] leading-none transition-transform hover:scale-125"
+              >
+                {e}
+              </QuickReactionButton>
+            ))}
+          </div>
         )}
         {onCopy && (
           <ContextMenuItem onSelect={() => onCopy?.()}>
@@ -1016,10 +1040,7 @@ export function MessageBubble({
           </ContextMenuItem>
         )}
         {message.type !== "poll" && (
-          <ContextMenuItem onSelect={() => onToggleReactionPicker?.()}>
-            <FaceGrinning className="h-4 w-4" />
-            More reactions
-          </ContextMenuItem>
+          <MoreReactionsSection customs={customReactionList} onReact={onReact} />
         )}
         <ContextMenuSeparator />
         {onForward && message.type !== "poll" && (

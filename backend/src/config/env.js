@@ -69,6 +69,11 @@ const env = {
     process.env.GITHUB_REDIRECT_URI ||
     `${process.env.FRONTEND_URL || "http://localhost:3000"}/api/v1/auth/oauth/github/callback`,
 
+  // Separate signing secret for OAuth state JWTs (CSRF protection). Never
+  // reuse the access-token secret — generate with: openssl rand -base64 48.
+  // TODO: set OAUTH_STATE_SECRET in deployment env (no default on purpose).
+  oauthStateSecret: required("OAUTH_STATE_SECRET", process.env.OAUTH_STATE_SECRET),
+
   // LiveKit (voice & video calls via LiveKit Cloud). Optional like
   // Appwrite — the server boots without them; POST /api/v1/calls/token
   // reports CALLS_NOT_CONFIGURED until they're set. Get keys at
@@ -80,7 +85,7 @@ const env = {
   // Admin panel — standalone credential pair, NOT a DB user account.
   adminEmail: process.env.ADMIN_EMAIL || "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",
-  adminJwtSecret: process.env.ADMIN_JWT_SECRET || process.env.ACCESS_TOKEN_SECRET + "_admin",
+  adminJwtSecret: required("ADMIN_JWT_SECRET", process.env.ADMIN_JWT_SECRET),
   adminJwtTtl: process.env.ADMIN_JWT_TTL || "30m",
   adminCookieName: process.env.ADMIN_COOKIE_NAME || "admin_token",
 };

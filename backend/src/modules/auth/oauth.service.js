@@ -55,7 +55,7 @@ export function signOAuthState({ provider, mode, userId = null, returnTo = null,
       redirectUri: resolveProviderRedirectUri(provider, redirectUri),
       nonce,
     },
-    env.accessTokenSecret,
+    env.oauthStateSecret,
     { expiresIn: OAUTH_STATE_TTL },
   );
 }
@@ -118,7 +118,7 @@ export function verifyOAuthState(state, expectedProvider) {
   if (!state) throw badRequest("Missing OAuth state", "OAUTH_STATE_MISSING");
   let payload;
   try {
-    payload = jwt.verify(state, env.accessTokenSecret);
+    payload = jwt.verify(state, env.oauthStateSecret);
   } catch {
     throw badRequest(
       "OAuth session expired. Please try again.",

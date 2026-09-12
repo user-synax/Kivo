@@ -373,7 +373,6 @@ const MessageRows = React.memo(function MessageRows({
   firstUnreadId,
   editingId,
   editText,
-  reactionFor,
   replyingToId,
   selectMode,
   selectedIds,
@@ -552,13 +551,11 @@ const MessageRows = React.memo(function MessageRows({
                   message={m}
                   mine={mine}
                   showMeta={groupLast}
-                  reactionOpen={reactionFor === m.id}
                   isEditing={editingId === m.id}
                   editText={editText}
                   onEditTextChange={a.setEditText}
                   onSaveEdit={() => a.saveEdit(m.id)}
                   onCancelEdit={() => a.setEditingId(null)}
-                  onToggleReactionPicker={() => a.toggleReactionPicker(m.id)}
                   onReact={(emoji) => a.toggleReaction(m.id, emoji)}
                   onEdit={() => {
                     a.setEditingId(m.id);
@@ -1330,7 +1327,6 @@ export function ChatPanel({
   const [typing, setTyping] = useState(false);
   const [typerName, setTyperName] = useState(null);
   const [otherOnline, setOtherOnline] = useState(online);
-  const [reactionFor, setReactionFor] = useState(null); // messageId with open picker
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [replyingTo, setReplyingTo] = useState(null); // message being replied to
@@ -2877,7 +2873,6 @@ export function ChatPanel({
   }, [convId]);
 
   const toggleReaction = async (id, emoji) => {
-    setReactionFor(null);
     try {
       const data = await apiPost(`/api/v1/messages/${id}/reactions`, {
         emoji,
@@ -3294,8 +3289,6 @@ export function ChatPanel({
     setProfileUsername,
     setEditingId,
     setEditText,
-    toggleReactionPicker: (id) =>
-      setReactionFor((cur) => (cur === id ? null : id)),
     toggleReaction,
     saveEdit,
     removeMessage,
@@ -3780,7 +3773,6 @@ export function ChatPanel({
             firstUnreadId={firstUnreadId}
             editingId={editingId}
             editText={editText}
-            reactionFor={reactionFor}
             replyingToId={replyingTo ? replyingTo.id : null}
             selectMode={selectMode}
             selectedIds={selectedIds}

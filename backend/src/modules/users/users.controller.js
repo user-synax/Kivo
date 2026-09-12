@@ -80,7 +80,7 @@ export const getProfileByUsername = asyncHandler(async (req, res) => {
 
 // Avatar upload. multer parses multipart; we then hand the buffer to the
 // service which stores it in Appwrite and returns the updated public profile.
-export const updateAvatar = (req, res) => {
+export const updateAvatar = (req, res, next) => {
   uploadAvatarMulter(req, res, async (err) => {
     try {
       if (err) {
@@ -102,18 +102,14 @@ export const updateAvatar = (req, res) => {
       });
       res.status(200).json({ success: true, data: user });
     } catch (e) {
-      const status = e.statusCode || 500;
-      res.status(status).json({
-        success: false,
-        error: { message: e.message, code: e.code || "SERVER_ERROR" },
-      });
+      next(e);
     }
   });
 };
 
 // Custom banner upload (Kivo Plus). Mirrors the avatar upload shape; the
 // service rejects non-plus plans with PLUS_REQUIRED.
-export const updateBanner = (req, res) => {
+export const updateBanner = (req, res, next) => {
   uploadBannerMulter(req, res, async (err) => {
     try {
       if (err) {
@@ -135,11 +131,7 @@ export const updateBanner = (req, res) => {
       });
       res.status(200).json({ success: true, data: user });
     } catch (e) {
-      const status = e.statusCode || 500;
-      res.status(status).json({
-        success: false,
-        error: { message: e.message, code: e.code || "SERVER_ERROR" },
-      });
+      next(e);
     }
   });
 };

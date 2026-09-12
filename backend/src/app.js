@@ -25,6 +25,9 @@ import emojiRoutes from "./modules/emoji/emoji.routes.js";
 
 const app = express();
 
+// Hide the Express fingerprint header (helmet does not remove it).
+app.disable("x-powered-by");
+
 // Trust the first proxy (Render/Railway/Heroku LB) so req.ip respects
 // X-Forwarded-For. Required for correct IP fallback when rate-limiting
 // pre-auth routes (login, refresh, etc.).

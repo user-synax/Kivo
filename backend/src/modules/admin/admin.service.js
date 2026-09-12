@@ -192,6 +192,13 @@ export async function banUser({ userId, reason, ip }) {
     }
   }
 
+  // Mid-call ban: actively eject the user from every LiveKit room instead of
+  // waiting for their call token to expire.
+  try {
+    const calls = await import("../calls/calls.service.js");
+    await calls.ejectUserFromAllCalls({ userId }).catch(() => {});
+  } catch {}
+
   await logAction({
     action: "ban_user",
     targetType: "user",

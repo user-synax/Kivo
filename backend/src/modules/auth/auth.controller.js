@@ -11,6 +11,7 @@ import {
   loginTwoFactorSchema,
 } from "./auth.validation.js";
 import * as authService from "./auth.service.js";
+import { disconnectUserSockets } from "../../socket/index.js";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
 
@@ -101,6 +102,10 @@ export const logout = asyncHandler(async (req, res) => {
     sessionId: req.user.sessionId,
     userId: req.user.userId,
   });
+  // Drop this session's live sockets so a revoked token can't linger until expiry.
+  try {
+    disconnectUserSockets(req.user.userId, req.user.sessionId);
+  } catch {}
   clearRefreshCookie(res);
   res.status(200).json({ success: true, data: null });
 });
@@ -108,6 +113,10 @@ export const logout = asyncHandler(async (req, res) => {
 export const logoutAll = asyncHandler(async (req, res) => {
   // Always derive the target user from the verified token.
   await authService.logoutAllSessions({ userId: req.user.userId });
+  // Drop every live socket for this user across all sessions/devices.
+  try {
+    disconnectUserSockets(req.user.userId);
+  } catch {}
   clearRefreshCookie(res);
   res.status(200).json({ success: true, data: null });
 });

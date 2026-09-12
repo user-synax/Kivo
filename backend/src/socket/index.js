@@ -4,6 +4,7 @@ import env from "../config/env.js";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
 import Space from "../models/Space.js";
 import { unauthorized } from "../utils/errors.js";
 import { roomName } from "./io.js";
@@ -38,6 +39,40 @@ const activeRings = new Map();
 // client could strobe everyone's overlay.
 const RING_MIN_INTERVAL_MS = 3_000;
 const lastRingAt = new Map(); // `${userId}:${conversationId}` -> timestamp
+
+// Per-event authorization: verify the socket owner is a participant of the
+// conversation before allowing any emit into its room or any DB write scoped
+// to it. Returns true when allowed, false otherwise (caller must silently
+// drop the event — no emit, no write).
+async function assertSocketMembership(userId, conversationId) {
+  try {
+    if (!userId || !conversationId) return false;
+    const conv = await Conversation.findById(conversationId)
+      .select("participants")
+      .lean();
+    if (!conv) return false;
+    const ids = (conv.participants || []).map((p) => p.toString());
+    return ids.includes(String(userId));
+  } catch {
+    return false;
+  }
+}
+
+// Typing-event spam guard — max 5 typing events per second per socket.
+// Prevents a malicious client from strobing recipients' typing indicators.
+const TYPING_WINDOW_MS = 1000;
+const TYPING_MAX_PER_WINDOW = 5;
+const typingBuckets = new Map(); // socketId -> { start, count }
+function allowTyping(socketId) {
+  const now = Date.now();
+  const entry = typingBuckets.get(socketId);
+  if (!entry || now - entry.start > TYPING_WINDOW_MS) {
+    typingBuckets.set(socketId, { start: now, count: 1 });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= TYPING_MAX_PER_WINDOW;
+}
 
 function clearRing(callId) {
   const ring = activeRings.get(callId);
@@ -170,6 +205,8 @@ async function emitPresenceScoped(userId, event, payload) {
 // Verify the access token presented during the Socket.IO handshake. We reuse
 // the exact same secret/algorithm as the HTTP `authenticate` middleware so the
 // auth surface is single-source. Re-runs on every (re)connection automatically.
+// Also verifies the backing Session still exists (revoked on logout/logout-all,
+// password reset, or admin ban) — not just the JWT signature.
 async function verifyHandshakeToken(socket, next) {
   try {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -182,7 +219,7 @@ async function verifyHandshakeToken(socket, next) {
     } catch {
       throw unauthorized("Invalid socket auth token", "SOCKET_UNAUTHENTICATED");
     }
-    if (!payload.userId) {
+    if (!payload.userId || !payload.sessionId) {
       throw unauthorized("Invalid socket auth token", "SOCKET_UNAUTHENTICATED");
     }
     // Defense in depth: reject banned users at reconnect time.
@@ -193,12 +230,39 @@ async function verifyHandshakeToken(socket, next) {
     if (user.isBanned) {
       throw unauthorized("Account has been suspended", "ACCOUNT_BANNED");
     }
+    // Session revocation: a deleted/expired session must not hold a socket open.
+    const session = await Session.findById(payload.sessionId).select("expiresAt").lean();
+    if (!session) {
+      throw unauthorized("Session revoked", "SOCKET_SESSION_REVOKED");
+    }
+    if (session.expiresAt && new Date(session.expiresAt).getTime() < Date.now()) {
+      throw unauthorized("Session expired", "SOCKET_SESSION_REVOKED");
+    }
     socket.userId = payload.userId;
     socket.sessionId = payload.sessionId || null;
     next();
   } catch (err) {
     next(err);
   }
+}
+
+// Disconnect live sockets for a user. Single-session logout passes sessionId
+// to drop only that session's sockets; logout-all omits it to drop them all.
+// Called from the auth controllers after the Session document(s) are deleted.
+export function disconnectUserSockets(userId, sessionId = null) {
+  if (!io || !userId) return 0;
+  let dropped = 0;
+  for (const [, sock] of io.sockets.sockets) {
+    if (String(sock.userId) !== String(userId)) continue;
+    if (sessionId && sock.sessionId && String(sock.sessionId) !== String(sessionId)) continue;
+    try {
+      sock.disconnect(true);
+      dropped += 1;
+    } catch {
+      // ignore disconnect errors
+    }
+  }
+  return dropped;
 }
 
 export function initSocket(server) {
@@ -284,22 +348,27 @@ export function initSocket(server) {
 
     // Typing indicator. Client emits { conversationId } with start/stop; we
     // re-broadcast to the room (excluding sender) so recipients can render it.
-    socket.on("typing:start", (data) => {
+    socket.on("typing:start", async (data) => {
       const conversationId = data?.conversationId;
       if (!conversationId) return;
+      if (!allowTyping(socket.id)) return;
+      if (!(await assertSocketMembership(userId, conversationId))) return;
       socket.to(roomName(conversationId)).emit("typing:start", { conversationId, userId });
     });
-    socket.on("typing:stop", (data) => {
+    socket.on("typing:stop", async (data) => {
       const conversationId = data?.conversationId;
       if (!conversationId) return;
+      if (!allowTyping(socket.id)) return;
+      if (!(await assertSocketMembership(userId, conversationId))) return;
       socket.to(roomName(conversationId)).emit("typing:stop", { conversationId, userId });
     });
 
     // Focused DM tracking for notification suppression.
     // Client emits when it opens/closes a conversation; we keep the latest per user.
-    socket.on("conversation:focus", (data) => {
+    socket.on("conversation:focus", async (data) => {
       const conversationId = data?.conversationId;
       if (!conversationId) return;
+      if (!(await assertSocketMembership(userId, conversationId))) return;
       setFocusedConversation(userId, String(conversationId));
     });
     socket.on("conversation:blur", () => {
@@ -381,10 +450,11 @@ export function initSocket(server) {
         console.error("[socket] call:ring failed", err);
       }
     });
-    socket.on("call:accept", (data) => {
+    socket.on("call:accept", async (data) => {
       const callId = data?.callId ? String(data.callId) : null;
       const conversationId = data?.conversationId;
       if (!callId || !conversationId) return;
+      if (!(await assertSocketMembership(userId, conversationId))) return;
       const ring = activeRings.get(callId);
       if (ring) {
         ring.answered = true;
@@ -401,6 +471,7 @@ export function initSocket(server) {
       const callId = data?.callId ? String(data.callId) : null;
       const conversationId = data?.conversationId;
       if (!callId || !conversationId) return;
+      if (!(await assertSocketMembership(userId, conversationId))) return;
       const ring = activeRings.get(callId);
       // Explicit decline ends the ring for 1:1 (no missed chip); in groups
       // the ring continues for the remaining members.
@@ -427,6 +498,7 @@ export function initSocket(server) {
       const callId = data?.callId ? String(data.callId) : null;
       const conversationId = data?.conversationId;
       if (!callId || !conversationId) return;
+      if (!(await assertSocketMembership(userId, conversationId))) return;
       const ring = activeRings.get(callId);
       if (ring) {
         ring.answered = true;
@@ -472,6 +544,9 @@ export function initSocket(server) {
       const messageId = data?.messageId;
       if (!messageId) return;
       try {
+        const existing = await Message.findById(messageId).select("conversationId");
+        if (!existing) return;
+        if (!(await assertSocketMembership(userId, existing.conversationId.toString()))) return;
         const msg = await Message.findByIdAndUpdate(
           messageId,
           { $addToSet: { deliveredTo: userId } },
@@ -489,6 +564,7 @@ export function initSocket(server) {
     });
 
     socket.on("disconnect", async () => {
+      typingBuckets.delete(socket.id);
       const set = onlineUsers.get(userId);
       if (!set) return;
       set.delete(socket.id);

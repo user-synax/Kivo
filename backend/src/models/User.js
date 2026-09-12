@@ -260,6 +260,9 @@ const userSchema = new mongoose.Schema(
     // stored as bcrypt hashes (one-time use).
     twoFactorEnabled: { type: Boolean, default: false, index: true },
     twoFactorSecret: { type: String, default: null, select: false },
+    // Expiry for the *pending* (not yet enabled) secret from /2fa/setup.
+    // Checked lazily on /2fa/enable — expired setups must start over.
+    twoFactorSetupExpires: { type: Date, default: null, select: false },
     twoFactorBackupCodes: {
       type: [String],
       default: [],

@@ -5,6 +5,7 @@ import Message from "../../models/Message.js";
 import User from "../../models/User.js";
 import Space from "../../models/Space.js";
 import CustomEmoji from "../../models/CustomEmoji.js";
+import env from "../../config/env.js";
 import { getRequesterPlan } from "../../lib/plus.js";
 import { emitToConversation, roomName } from "../../socket/io.js";
 import * as notificationsService from "../notifications/notifications.service.js";
@@ -16,6 +17,63 @@ function genPollOptionId() {
 function isPollExpired(poll) {
   if (!poll || !poll.expiresAt) return false;
   return new Date(poll.expiresAt).getTime() < Date.now();
+}
+
+// Attachment URL trust: client-submitted `url` values are never stored
+// verbatim. The hostname must match the configured Appwrite endpoint and the
+// bucket must be one of ours; the canonical URL is then re-derived
+// server-side from fileId/bucketId so query-string tampering can't smuggle
+// arbitrary hosts or params into rendered attachment bubbles.
+function canonicalAttachmentUrl(attachment) {
+  const endpoint = (env.appwriteEndpoint || "").replace(/\/$/, "");
+  const projectId = env.appwriteProjectId || "";
+  if (!endpoint || !projectId) {
+    throw badRequest("Attachments are not configured yet", "BUCKET_NOT_CONFIGURED");
+  }
+  const allowedBuckets = new Set(
+    [env.appwriteAttachmentsBucketId, env.appwriteBucketId, env.appwriteEmojiBucketId].filter(Boolean),
+  );
+  if (!allowedBuckets.has(attachment.bucketId)) {
+    throw badRequest("Unknown attachment bucket", "INVALID_ATTACHMENT");
+  }
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(attachment.fileId || "")) {
+    throw badRequest("Invalid attachment file id", "INVALID_ATTACHMENT");
+  }
+  let submitted;
+  try {
+    submitted = new URL(attachment.url);
+  } catch {
+    throw badRequest("Invalid attachment URL", "INVALID_ATTACHMENT");
+  }
+  let expectedHost;
+  try {
+    expectedHost = new URL(endpoint).hostname;
+  } catch {
+    throw badRequest("Attachments are not configured yet", "BUCKET_NOT_CONFIGURED");
+  }
+  if (submitted.hostname !== expectedHost) {
+    throw badRequest("Attachment URL host is not allowed", "INVALID_ATTACHMENT");
+  }
+  const fileId = encodeURIComponent(attachment.fileId);
+  const bucketId = encodeURIComponent(attachment.bucketId);
+  const project = encodeURIComponent(projectId);
+  if (attachment.kind === "image") {
+    return `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/preview?project=${project}&width=800&height=800`;
+  }
+  return `${endpoint}/storage/buckets/${bucketId}/files/${fileId}/view?project=${project}`;
+}
+
+function sanitizeAttachments(attachments) {
+  if (!attachments || attachments.length === 0) return [];
+  return attachments.map((a) => ({
+    fileId: a.fileId,
+    bucketId: a.bucketId,
+    fileName: a.fileName,
+    mimeType: a.mimeType,
+    size: a.size,
+    kind: a.kind,
+    url: canonicalAttachmentUrl(a),
+  }));
 }
 
 // Public message shape returned to clients and used as the socket payload base.
@@ -551,6 +609,9 @@ export async function createMessage({
     forwardedSourceForwardCount = source.forwardCount || 0;
   } else {
     mentions = await resolveMentions(finalContent, conversation.participants);
+    // Validate + re-derive attachment URLs so arbitrary client URLs can never
+    // be stored or rendered as trusted files.
+    finalAttachments = sanitizeAttachments(finalAttachments);
   }
 
   // Personal emoji ownership check (skip for forwards — they copy source content)

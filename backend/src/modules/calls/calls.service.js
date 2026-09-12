@@ -90,7 +90,8 @@ async function assertCallAllowed(conversationId, userId) {
 
 // Mint a short-lived LiveKit join token for a call room. Membership, ban,
 // and block guards run on every mint (including mid-call token refresh), so a
-// blocked/banned user can't rejoin by holding an old room name.
+// blocked/banned user can't rejoin by holding an old room name. TTL is 45m —
+// the client silently re-mints before expiry so active calls never drop.
 export async function issueCallToken({ userId, conversationId, kind }) {
   if (!isCallsConfigured()) {
     throw badRequest("Voice & video calls are not configured yet", "CALLS_NOT_CONFIGURED");
@@ -102,10 +103,7 @@ export async function issueCallToken({ userId, conversationId, kind }) {
   const at = new AccessToken(env.livekitApiKey, env.livekitApiSecret, {
     identity: userId,
     name: me.displayName || me.username || "Someone",
-    // Long-lived join token: rejoin/late-join/group calls must not drop
-    // mid-call for a refresh round-trip. Membership, ban, and block guards
-    // run at every mint; a mid-call block takes effect on rejoin (v1 scope).
-    ttl: "6h",
+    ttl: "45m",
   });
   at.addGrant({
     roomJoin: true,
@@ -138,6 +136,35 @@ export async function assertRingAllowed({ userId, conversationId, kind }) {
       avatarUrl: me.avatarUrl || null,
     },
   };
+}
+
+// Active ejection: remove a participant from a LiveKit room immediately
+// (block/ban mid-call) instead of waiting for their token to expire.
+// Best-effort — failures are logged, never thrown.
+export async function ejectParticipantFromRoom({ conversationId, userId }) {
+  if (!isCallsConfigured()) return;
+  try {
+    const svc = new RoomServiceClient(env.livekitUrl, env.livekitApiKey, env.livekitApiSecret);
+    await svc.removeParticipant(roomNameFor(conversationId), String(userId));
+  } catch (err) {
+    console.error("[calls] eject failed:", err?.message || err);
+  }
+}
+
+// Eject a user from every LiveKit room for conversations they participate in.
+// Used on admin ban (ban must drop active calls at once).
+export async function ejectUserFromAllCalls({ userId }) {
+  if (!isCallsConfigured()) return;
+  try {
+    const conversations = await Conversation.find({ participants: userId }).select("_id").lean();
+    await Promise.all(
+      (conversations || []).map((c) =>
+        ejectParticipantFromRoom({ conversationId: c._id.toString(), userId }),
+      ),
+    );
+  } catch (err) {
+    console.error("[calls] eject-all failed:", err?.message || err);
+  }
 }
 
 // Authoritative "is a call ongoing?" check straight from LiveKit Cloud —

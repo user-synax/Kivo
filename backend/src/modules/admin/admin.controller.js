@@ -1,6 +1,15 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import env from "../../config/env.js";
 import * as adminService from "./admin.service.js";
+import {
+  banUserBodySchema,
+  listUsersQuerySchema,
+  objectIdParamSchema,
+  parseBody,
+  parseParams,
+  parseQuery,
+  setUserPlanBodySchema,
+} from "./admin.validation.js";
 
 function getClientIp(req) {
   return req.ip || req.headers["x-forwarded-for"] || null;
@@ -56,20 +65,22 @@ export const getStats = asyncHandler(async (req, res) => {
 // ── Users ───────────────────────────────────────────────────────────────────
 
 export const listUsers = asyncHandler(async (req, res) => {
-  const { page, limit, q, banned } = req.query;
+  const { page, limit, q, banned } = parseQuery(listUsersQuerySchema, req.query);
   const data = await adminService.listUsers({ page, limit, q, banned });
   res.status(200).json({ success: true, data });
 });
 
 export const getUserDetail = asyncHandler(async (req, res) => {
-  const data = await adminService.getUserDetail(req.params.id);
+  const { id } = parseParams(objectIdParamSchema, req.params);
+  const data = await adminService.getUserDetail(id);
   res.status(200).json({ success: true, data });
 });
 
 export const banUser = asyncHandler(async (req, res) => {
-  const { reason } = req.body || {};
+  const { id } = parseParams(objectIdParamSchema, req.params);
+  const { reason } = parseBody(banUserBodySchema, req.body);
   const data = await adminService.banUser({
-    userId: req.params.id,
+    userId: id,
     reason,
     ip: getClientIp(req),
   });
@@ -85,9 +96,10 @@ export const unbanUser = asyncHandler(async (req, res) => {
 });
 
 export const setUserPlan = asyncHandler(async (req, res) => {
-  const { plan, expiresAt } = req.body || {};
+  const { id } = parseParams(objectIdParamSchema, req.params);
+  const { plan, expiresAt } = parseBody(setUserPlanBodySchema, req.body);
   const data = await adminService.setUserPlan({
-    userId: req.params.id,
+    userId: id,
     plan,
     expiresAt: expiresAt || null,
     ip: getClientIp(req),

@@ -1,9 +1,14 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { z } from "zod";
 import { badRequest, forbidden, notFound } from "../../utils/errors.js";
 import Conversation from "../../models/Conversation.js";
 import User from "../../models/User.js";
 import { getRequesterPlan } from "../../lib/plus.js";
 import { uploadAttachment, ALLOWED_MIMES } from "../../lib/attachments.js";
+
+const uploadBodySchema = z.object({
+  conversationId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid conversation id"),
+});
 
 /**
  * POST /api/v1/attachments/upload
@@ -11,10 +16,14 @@ import { uploadAttachment, ALLOWED_MIMES } from "../../lib/attachments.js";
  * Returns: { files: [{ fileId, bucketId, fileName, mimeType, size, kind, url }] }
  */
 export const uploadFiles = asyncHandler(async (req, res) => {
-  const { conversationId } = req.body;
-  if (!conversationId) {
-    throw badRequest("conversationId is required", "MISSING_CONVERSATION_ID");
+  const parsed = uploadBodySchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    throw badRequest(
+      parsed.error.issues[0]?.message || "Invalid conversation id",
+      "INVALID_CONVERSATION",
+    );
   }
+  const { conversationId } = parsed.data;
 
   // Verify conversation membership (reuses the same check as message send)
   const conversation = await Conversation.findById(conversationId).select("participants");

@@ -34,7 +34,8 @@ export async function completeOnboarding({ userId }) {
   return { onboardingCompletedAt: user.onboardingCompletedAt ? new Date(user.onboardingCompletedAt).toISOString() : null, onboardingCompleted: true };
 }
 
-// Public user shape returned in search/friend results and self profile.
+// Public user shape returned in search/friend results and other-user views.
+// Never includes email — see selfUser() for the own-profile shape.
 function publicUser(user) {
   const u = user.toObject ? user.toObject() : user;
   // Clear expired status in-memory (DB sweep is hourly; this keeps reads fresh)
@@ -46,7 +47,6 @@ function publicUser(user) {
     id: u._id.toString(),
     displayName: u.displayName || null,
     username: u.username || null,
-    email: u.email,
     bio: u.bio || null,
     pronouns: u.pronouns || null,
     status: expired ? null : (u.status || null),
@@ -122,6 +122,7 @@ function selfUser(user) {
   const expired = isStatusExpired(u);
   return {
     ...base,
+    email: u.email || null,
     pronouns: u.pronouns || null,
     status: expired ? null : (u.status || null),
     statusEmoji: expired ? null : (u.statusEmoji || null),
@@ -176,9 +177,9 @@ export async function searchUsers({ userId, q }) {
   const users = await User.find({
     _id: { $ne: userId },
     isBanned: { $ne: true },
-    $or: [{ username: regex }, { email: regex }, { displayName: regex }],
+    $or: [{ username: regex }, { displayName: regex }],
   })
-    .select("displayName username email bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt privacyPreferences")
+    .select("displayName username bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country verified showBadge googleVerified githubVerified lastActiveAt usernameColor plan planExpiresAt privacyPreferences")
     .limit(20)
     .lean();
 
@@ -397,7 +398,7 @@ export async function getUserById({ otherId }) {
     throw badRequest("Invalid user id", "INVALID_ID");
   }
   const user = await User.findById(otherId).select(
-    "displayName username email bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect usernameColor plan planExpiresAt createdAt lastActiveAt privacyPreferences",
+    "displayName username bio pronouns status statusEmoji statusExpiresAt avatarStyle avatarUrl banner country githubUsername xUsername instagramUsername youtubeUrl websiteUrl verified showBadge googleVerified githubVerified role profileEffect usernameColor plan planExpiresAt createdAt lastActiveAt privacyPreferences",
   );
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   return publicUser(user);
@@ -505,7 +506,7 @@ export async function updateAvatar({ userId, buffer, contentType }) {
 // bucket like display pictures; switching away later (curated/none) retires
 // the file through the updateMe banner branch.
 export async function updateBanner({ userId, buffer, contentType }) {
-  const user = await User.findById(userId).select("plan planExpiresAt banner bannerFileId");
+  const user = await User.findById(userId).select("email plan planExpiresAt banner bannerFileId");
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   if (getEffectivePlan(user) !== "plus") {
     throw forbidden(
@@ -546,7 +547,7 @@ export async function deleteAvatar({ userId }) {
 
 async function emitBlockSync({ blockerId, blockedId }) {
   const dms = await Conversation.find({ type: "dm", participants: { $all: [blockerId, blockedId] } })
-    .populate("participants", "id displayName username email avatarStyle avatarUrl usernameColor plan planExpiresAt")
+    .populate("participants", "id displayName username avatarStyle avatarUrl usernameColor plan planExpiresAt")
     .lean();
   if (dms.length === 0) return;
   // Fetch fresh blockedUsers for both to compute flags
@@ -579,7 +580,6 @@ function normalizeParticipantForBlock(p) {
     id,
     displayName: populated ? (p.displayName ?? null) : null,
     username: populated ? (p.username ?? null) : null,
-    email: populated ? (p.email ?? null) : null,
     avatarStyle: populated ? (p.avatarStyle ?? null) : null,
     avatarUrl: populated ? (p.avatarUrl ?? null) : null,
     usernameColor: populated && isPlus ? p.usernameColor || null : null,
@@ -660,6 +660,22 @@ export async function blockUser({ userId, targetId }) {
   });
 
   await emitBlockSync({ blockerId: userId, blockedId: targetId });
+
+  // Mid-call block: actively eject the blocked user from shared DM call rooms
+  // instead of waiting for their LiveKit token to expire.
+  try {
+    const dms = await Conversation.find({ type: "dm", participants: { $all: [userId, targetId] } })
+      .select("_id")
+      .lean();
+    if (dms.length) {
+      const calls = await import("../calls/calls.service.js");
+      await Promise.all(
+        dms.map((d) =>
+          calls.ejectParticipantFromRoom({ conversationId: d._id.toString(), userId: targetId }).catch(() => {}),
+        ),
+      );
+    }
+  } catch {}
 
   return { blocked: true };
 }

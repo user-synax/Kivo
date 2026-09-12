@@ -284,8 +284,12 @@ export async function setupTwoFactor({ userId }) {
   const accountName = user.email || user.username || userId;
   const uri = buildProvisioningUri({ issuer: TWO_FACTOR_ISSUER, accountName, secret });
 
-  // Persist the pending secret so /2fa/enable can verify a code against it.
-  await User.updateOne({ _id: userId }, { $set: { twoFactorSecret: secret } });
+  // Persist the pending secret with a 15-minute setup window so abandoned
+  // enrollments can't leave a live secret indefinitely.
+  await User.updateOne(
+    { _id: userId },
+    { $set: { twoFactorSecret: secret, twoFactorSetupExpires: new Date(Date.now() + 15 * 60 * 1000) } },
+  );
 
   // Render the QR server-side (qrcode) and ship a ready-to-display PNG.
   const qrDataUrl = await QRCode.toDataURL(uri, {
@@ -301,7 +305,7 @@ export async function setupTwoFactor({ userId }) {
 // for a current TOTP code. On success, enable 2FA and generate backup codes
 // (shown exactly once — only bcrypt hashes are stored).
 export async function enableTwoFactor({ userId, code }) {
-  const user = await User.findById(userId).select("+twoFactorSecret twoFactorEnabled");
+  const user = await User.findById(userId).select("+twoFactorSecret +twoFactorSetupExpires twoFactorEnabled");
   if (!user) throw notFound("User not found", "USER_NOT_FOUND");
   if (user.twoFactorEnabled) {
     throw badRequest(
@@ -313,6 +317,15 @@ export async function enableTwoFactor({ userId, code }) {
     throw badRequest(
       "Start the setup first — there is no pending secret to verify against.",
       "TWO_FACTOR_SETUP_REQUIRED"
+    );
+  }
+  if (user.twoFactorSetupExpires && new Date(user.twoFactorSetupExpires).getTime() < Date.now()) {
+    user.twoFactorSecret = null;
+    user.twoFactorSetupExpires = null;
+    await user.save();
+    throw badRequest(
+      "Setup session expired — start the setup again to get a fresh code.",
+      "TWO_FACTOR_SETUP_EXPIRED"
     );
   }
 
@@ -330,6 +343,7 @@ export async function enableTwoFactor({ userId, code }) {
 
   user.twoFactorEnabled = true;
   user.twoFactorBackupCodes = hashedCodes;
+  user.twoFactorSetupExpires = null;
   await user.save();
 
   return { enabled: true, backupCodes };

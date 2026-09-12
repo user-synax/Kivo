@@ -1,0 +1,5 @@
+# Second line of defense — nested .gitignores already cover these,
+# but a root-level guard catches stray files added at the repo root.
+.env*
+!.env.example
+*.pem
