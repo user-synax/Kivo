@@ -85,7 +85,7 @@ export function PublicProfileView({ username, serverProfile = null }) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-            </svg>
+            </svg>  
             Back to home
           </Link>
           <span className="h-3 w-px bg-[var(--hairline)]" aria-hidden="true" />

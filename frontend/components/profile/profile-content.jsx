@@ -488,7 +488,7 @@ export function ProfileContent({
               >
                 {name}
                 {pronouns && (
-                  <span className="rounded-full bg-[var(--surface-1)] border border-[var(--hairline)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
+                  <span className="rounded-full bg-[var(--surface-1)] border border-[var(--hairline)] px-2 py-0.5 text-[11px] text-white font-medium">
                     {pronouns}
                   </span>
                 )}
