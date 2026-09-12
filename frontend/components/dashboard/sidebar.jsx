@@ -738,6 +738,15 @@ export function Sidebar({
     );
   }, [conversations, query]);
 
+  const selfConv = useMemo(
+    () => filtered.find((c) => c.type === "self" || c.isSelf) || null,
+    [filtered],
+  );
+  const nonSelfCount = useMemo(
+    () => conversations.filter((c) => c.type !== "self" && !c.isSelf).length,
+    [conversations],
+  );
+
   const dms = useMemo(
     () => filtered.filter((c) => c.type === "dm"),
     [filtered],
@@ -848,7 +857,60 @@ export function Sidebar({
 
       {/* Conversation list */}
       <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar" style={{ overscrollBehavior: "contain" }}>
-        {conversations.length === 0 ? (
+        {selfConv && !hideDMs && (
+          collapsed ? (
+            <div className="flex justify-center pb-1">
+              <button
+                type="button"
+                onClick={() => onSelect(selfConv.id)}
+                aria-label="Saved Messages"
+                title="Saved Messages"
+                className={`flex size-11 items-center justify-center rounded-xl transition-colors ${
+                  selectedId === selfConv.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)]"
+                >
+                  <Bookmark className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+              </button>
+            </div>
+          ) : (
+          <button
+            type="button"
+            onClick={() => onSelect(selfConv.id)}
+            aria-current={selectedId === selfConv.id ? "true" : undefined}
+            className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left select-none touch-manipulation transition-colors duration-150 hover:cursor-pointer ${
+              selectedId === selfConv.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)]"
+            >
+              <Bookmark className="h-5 w-5" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                  Saved Messages
+                </span>
+                {selfConv.time && (
+                  <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+                    {selfConv.time}
+                  </span>
+                )}
+              </span>
+              <span className="block truncate text-[13px] text-[var(--text-muted)]">
+                {selfConv.lastMessage || "Your private space"}
+              </span>
+            </span>
+          </button>
+          )
+        )}
+        {nonSelfCount === 0 && !selfConv ? (
           <>
             <RichEmptyState
               icon={MessageCircle}

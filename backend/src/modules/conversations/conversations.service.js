@@ -66,18 +66,20 @@ function publicConversation(conversation, userId, onlineLookup, blockFlags) {
   const admins = (conversation.admins || []).map(toId).filter(Boolean);
 
   const isDm = conversation.type === "dm";
+  const isSelf = conversation.type === "self";
   const isBlockedByMe = isDm ? Boolean(blockFlags?.isBlockedByMe) : false;
   const isBlockedByOther = isDm ? Boolean(blockFlags?.isBlockedByOther) : false;
 
   return {
     id: conversation._id.toString(),
     type: conversation.type,
-    name: conversation.type === "group" || conversation.type === "space_channel" ? (conversation.name || null) : null,
+    name: isSelf ? "Saved Messages" : conversation.type === "group" || conversation.type === "space_channel" ? (conversation.name || null) : null,
     participants,
     otherParticipantIds,
     admins,
     createdBy: conversation.createdBy ? toId(conversation.createdBy) : null,
     isAdmin: conversation.type === "group" ? admins.includes(userId) : false,
+    isSelf,
     avatarUrl: conversation.avatarUrl || null,
     // Shared chat look for this DM/group (wallpaper + bubble style). Null per
     // field = fall back to each member's own look.
@@ -164,6 +166,28 @@ export async function createOrGetDm({ userId, participantId }) {
   joinUserToRoom(participantId, created._id.toString());
 
   return publicConversation(created, userId, onlineSnapshot(), blockFlags);
+}
+
+// Get or create the current user's private self-chat ("Saved Messages").
+// A single-participant conversation that works like a normal DM with yourself:
+// text, images, files, voice, links — same upload limits, no notifications,
+// no unread badge, never deletable. Lazy-created so existing users get one on
+// first open without a migration.
+export async function getOrCreateSelf({ userId }) {
+  const existing = await Conversation.findOne({
+    type: "self",
+    participants: userId,
+  }).populate("participants", "id displayName username email avatarStyle avatarUrl usernameColor lastActiveAt plan planExpiresAt");
+  if (existing) {
+    return publicConversation(existing, userId, onlineSnapshot(), null);
+  }
+  const created = await Conversation.create({
+    type: "self",
+    participants: [userId],
+  });
+  await created.populate("participants", "id displayName username email avatarStyle avatarUrl usernameColor lastActiveAt plan planExpiresAt");
+  joinUserToRoom(userId, created._id.toString());
+  return publicConversation(created, userId, onlineSnapshot(), null);
 }
 
 // Per-conversation unread counts for a user, computed in ONE aggregation.
@@ -396,17 +420,20 @@ export async function updateGroup({ conversationId, userId, name, avatar }) {
 
 // Set a conversation's shared chat look (wallpaper + bubble style). Either DM
 // participant may set it; group changes are admin-only. Space channels are
-// rejected — their Space owns the look members see.
+// rejected — their Space owns the look members see. Self-chats are rejected —
+// they always use the member's personal look.
 export async function updateConversationLook({ conversationId, userId, wallpaper, bubbleStyle }) {
   const conversation = await assertMembership(conversationId, userId);
   if (conversation.type === "space_channel") {
     throw badRequest("Space channels use their Space's look", "NOT_ALLOWED");
   }
+  if (conversation.type === "self") {
+    throw badRequest("Saved Messages uses your personal look", "NOT_ALLOWED");
+  }
   if (conversation.type === "group") {
     assertAdmin(conversation, userId);
   }
 
-  // Partial merge: absent keys are kept, null clears a field back to inherit.
   const update = {
     appearance: {
       wallpaper:
@@ -657,8 +684,15 @@ export async function demoteMember({ conversationId, userId, targetUserId }) {
 // participant (the thread is shared, so both sides lose it — the client
 // confirm modal says so explicitly). Groups: admin only. Space channels are
 // rejected — channels are deleted through Space settings instead.
+// Self-chats ("Saved Messages") can never be deleted.
 export async function deleteConversation({ conversationId, userId }) {
   const conversation = await assertMembership(conversationId, userId);
+  if (conversation.type === "self") {
+    throw forbidden(
+      "Saved Messages cannot be deleted",
+      "NOT_ALLOWED",
+    );
+  }
   if (conversation.type === "space_channel") {
     throw forbidden(
       "Space channels can only be deleted from Space settings",

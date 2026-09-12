@@ -5,6 +5,7 @@ import {
   ArrowUp,
   Ban,
   BarChart3,
+  Bookmark,
   CheckCheck,
   ChevronLeft,
   Clock,
@@ -255,6 +256,28 @@ function EmptyState() {
         title="Select a conversation to start chatting"
         hint="Pick a chat from the list — or find a friend and say hello."
       />
+    </div>
+  );
+}
+
+// Simple Telegram-style empty state for the Saved Messages self-chat. Renders
+// over the wallpaper (transparent so the cozy background shows through).
+function SavedSelfEmpty({ username }) {
+  return (
+    <div className="flex flex-col items-center px-6 py-14 text-center">
+      <span
+        aria-hidden="true"
+        className="flex size-16 items-center justify-center rounded-full bg-black/55 text-white shadow-xl ring-1 ring-white/15 backdrop-blur-md"
+      >
+        <Bookmark className="h-7 w-7" strokeWidth={1.6} />
+      </span>
+      <h3 className="mt-4 text-[19px] font-semibold tracking-tight text-[var(--text-primary)] [text-shadow:0_1px_12px_rgba(0,0,0,0.45)]">
+        Saved Messages
+      </h3>
+      <p className="mt-1.5 max-w-[300px] text-[13px] leading-relaxed text-[var(--text-muted)] [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]">
+        Save notes, links, and reminders for yourself
+        {username ? `, ${username}` : ""}.
+      </p>
     </div>
   );
 }
@@ -699,6 +722,7 @@ export function ChatPanel({
     ? conversation.online.some(Boolean)
     : Boolean(conversation?.online);
   const isDm = Boolean(conversation && conversation.type === "dm");
+  const isSelf = Boolean(conversation && (conversation.type === "self" || conversation.isSelf));
   const isBlockedByMe = Boolean(conversation?.isBlockedByMe);
   const isBlockedByOther = Boolean(conversation?.isBlockedByOther);
 
@@ -3184,11 +3208,13 @@ export function ChatPanel({
 
   if (!conversation) return <EmptyState />;
 
-  const headerName = isChannel
-    ? `#${conversation.name || "general"}`
-    : isGroup
-      ? conversation.name || "Group"
-      : otherName;
+  const headerName = isSelf
+    ? "Saved Messages"
+    : isChannel
+      ? `#${conversation.name || "general"}`
+      : isGroup
+        ? conversation.name || "Group"
+        : otherName;
   const headerAvatar = isChannel
     ? {
         name: `#${conversation.name || "general"}`,
@@ -3227,7 +3253,7 @@ export function ChatPanel({
   // vars, so they compose with per-Space palettes automatically.
   const chatLook = resolveChatLook({
     conversationAppearance:
-      isChannel || !conversation?.appearance ? null : conversation.appearance,
+      isChannel || isSelf || !conversation?.appearance ? null : conversation.appearance,
     spaceAppearance: isChannel ? spaceAppearance : null,
     personalAppearance: currentUser?.appearance,
   });
@@ -3321,17 +3347,26 @@ export function ChatPanel({
             <ChevronLeft />
           </button>
         )}
-        <Avatar
-          name={headerAvatar.name}
-          online={isGroup || isChannel ? false : otherOnline}
-          avatarStyle={headerAvatar.avatarStyle}
-          url={headerAvatar.avatarUrl}
-          size="xl"
-          isPlus={Boolean(headerAvatar.isPlus)}
-        />
+        {isSelf ? (
+          <span
+            aria-hidden="true"
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)] text-[var(--on-accent)]"
+          >
+            <Bookmark className="h-5 w-5" strokeWidth={1.8} />
+          </span>
+        ) : (
+          <Avatar
+            name={headerAvatar.name}
+            online={isGroup || isChannel ? false : otherOnline}
+            avatarStyle={headerAvatar.avatarStyle}
+            url={headerAvatar.avatarUrl}
+            size="xl"
+            isPlus={Boolean(headerAvatar.isPlus)}
+          />
+        )}
         <div className="min-w-0 flex-1">
           {(() => {
-            const isDmHeader = !isGroup && !isChannel;
+            const isDmHeader = !isGroup && !isChannel && !isSelf;
             const hStyle = isDmHeader ? usernameColorStyle(other) : {};
             const hClass = isDmHeader ? usernameColorClass(other) : "";
             return (
@@ -3344,7 +3379,9 @@ export function ChatPanel({
             );
           })()}
           <p className="truncate text-[12px] text-[var(--text-muted)]">
-            {isGroup || isChannel ? (
+            {isSelf ? (
+              <span>Private space · only you can see this</span>
+            ) : isGroup || isChannel ? (
               <span>
                 {conversation.participants?.length || 0} members
                 {isChannel ? " • Space channel" : ""}
@@ -3362,6 +3399,7 @@ export function ChatPanel({
         {callsEnabled &&
           conversation &&
           !isChannel &&
+          !isSelf &&
           !isBlockedByMe &&
           !isBlockedByOther && (
             <>
@@ -3387,7 +3425,7 @@ export function ChatPanel({
               </button>
             </>
           )}
-        {conversation && !isChannel && (
+        {conversation && !isChannel && !isSelf && (
           <button
             type="button"
             onClick={() => setLookOpen(true)}
@@ -3732,6 +3770,9 @@ export function ChatPanel({
           key={convId}
           className="t-panel-in mx-auto flex max-w-3xl flex-col"
         >
+          {isSelf && messages.length === 0 && !loadingHistory && (
+            <SavedSelfEmpty username={currentUser?.username || currentUser?.displayName} />
+          )}
           <MessageRows
             messages={messages}
             threadSummaries={threadSummaries}

@@ -7,7 +7,6 @@ import { sweepPlus } from "./modules/plus/plus.service.js";
 import { cleanupExpiredStatuses } from "./modules/status/status.service.js";
 import { closeExpiredPolls } from "./modules/messages/messages.service.js";
 import { startScheduledJob } from "./jobs/scheduledMessages.js";
-import { startDailyReportJob } from "./jobs/dailyReport.js";
 import logger from "./lib/logger.js";
 import "./config/webpush.js";
 
@@ -89,7 +88,6 @@ async function start() {
   server.listen(env.port, () => {
     logger.info({ port: env.port, env: env.nodeEnv }, "[server] listening");
   });
-  startDailyReportJob();
 }
 
 start().catch((err) => {

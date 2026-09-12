@@ -43,6 +43,9 @@ async function assertCallAllowed(conversationId, userId) {
   if (conversation.type === "space_channel") {
     throw forbidden("Calls are not available in Space channels yet", "NOT_ALLOWED");
   }
+  if (conversation.type === "self") {
+    throw forbidden("Calls are not available in Saved Messages", "NOT_ALLOWED");
+  }
   const me = await User.findById(userId)
     .select("isBanned displayName username avatarUrl blockedUsers")
     .lean();

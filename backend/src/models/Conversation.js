@@ -9,7 +9,7 @@ const conversationSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["dm", "group", "space_channel"],
+      enum: ["dm", "group", "space_channel", "self"],
       default: "dm",
       required: true,
     },
@@ -29,6 +29,7 @@ const conversationSchema = new mongoose.Schema(
       validate: {
         validator(arr) {
           if (this.type === "space_channel") return Array.isArray(arr) && arr.length >= 1;
+          if (this.type === "self") return Array.isArray(arr) && arr.length === 1;
           return Array.isArray(arr) && arr.length >= 2;
         },
         message: "A conversation needs at least two participants",

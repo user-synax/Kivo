@@ -472,6 +472,11 @@ export function NestedSidebar({
     [filteredConversations]
   );
 
+  const selfConv = useMemo(
+    () => filteredConversations.find((c) => c.type === "self" || c.isSelf) || null,
+    [filteredConversations]
+  );
+
   const groupsItems = useMemo(
     () => filteredConversations.filter((c) => c.type === "group"),
     [filteredConversations]
@@ -517,6 +522,7 @@ export function NestedSidebar({
         onTabChange={handleTabChange}
         currentUser={currentUser}
         onProfileClick={() => setProfileOpen(true)}
+        onAppearanceClick={() => setAppearanceOpen(true)}
         unread={unread}
       />
 
@@ -634,6 +640,38 @@ export function NestedSidebar({
                 className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
+                {selfConv && (
+                  <button
+                    type="button"
+                    onClick={() => onSelect(selfConv.id)}
+                    aria-current={selectedId === selfConv.id ? "true" : undefined}
+                    className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left select-none touch-manipulation transition-colors duration-150 hover:cursor-pointer ${
+                      selectedId === selfConv.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)]"
+                    >
+                      <Bookmark className="h-5 w-5" strokeWidth={1.8} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                          Saved Messages
+                        </span>
+                        {selfConv.time && (
+                          <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+                            {selfConv.time}
+                          </span>
+                        )}
+                      </span>
+                      <span className="block truncate text-[13px] text-[var(--text-muted)]">
+                        {selfConv.lastMessage || "Your private space"}
+                      </span>
+                    </span>
+                  </button>
+                )}
                 {conversations.filter((c) => c.type === "dm").length === 0 ? (
                   <>
                     <RichEmptyState
@@ -731,7 +769,7 @@ export function NestedSidebar({
                 style={{ overscrollBehavior: "contain" }}
               >
                 {/* Skip search for settings if filtered — but keep panel consistent */}
-                <SettingsPanel onOpenAppearance={() => setAppearanceOpen(true)} />
+                <SettingsPanel />
               </motion.div>
             )}
             {activeTab === "status" && (

@@ -58,6 +58,15 @@ export const listConversations = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: conversations });
 });
 
+// Get or create the current user's "Saved Messages" self-chat. Lazy-created so
+// no migration is needed for existing users.
+export const getSelfConversation = asyncHandler(async (req, res) => {
+  const conversation = await conversationsService.getOrCreateSelf({
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: conversation });
+});
+
 // Create a group. Accepts multipart form data: `name`, `participantIds` (a JSON
 // array string), and an optional `avatar` file.
 export const createGroup = [

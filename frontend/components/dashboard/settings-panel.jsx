@@ -3,7 +3,6 @@
 import {
   Bell,
   Check,
-  ChevronRight,
   Crown,
   Eye,
   EyeOff,
@@ -11,7 +10,6 @@ import {
   MapPin,
   MapPinned,
   Navigation,
-  Palette,
   Play,
   ShieldBan,
   Sparkles,
@@ -458,32 +456,6 @@ export function ChatStyleSection() {
         )}
       </div>
     </div>
-  );
-}
-
-// Launcher row shown at the top of Settings when the host surface can open the
-// full-screen Appearance page (desktop settings column). Appearance is a page
-// of its own now — Settings only points at it.
-function AppearanceLinkCard({ onOpenAppearance }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpenAppearance}
-      className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
-    >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
-        <Palette className="h-4 w-4" strokeWidth={1.8} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-[var(--text-primary)]">
-          Appearance
-        </span>
-        <span className="mt-0.5 block text-[12px] leading-snug text-[var(--text-muted)]">
-          Theme, colors, chat wallpaper &amp; bubble style
-        </span>
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-    </button>
   );
 }
 
@@ -1150,15 +1122,12 @@ function UpgradeToProCard() {
   );
 }
 
-export function SettingsPanel({ onOpenAppearance }) {
+export function SettingsPanel() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-3">
           <UpgradeToProCard />
-          {onOpenAppearance ? (
-            <AppearanceLinkCard onOpenAppearance={onOpenAppearance} />
-          ) : null}
           <BadgeSection />
           <VerificationSection />
           <TwoFactorSection />

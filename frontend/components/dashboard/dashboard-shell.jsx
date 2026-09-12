@@ -516,6 +516,25 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
 function toListItem(c, currentUser, spaces) {
   const isGroup = c.type === "group";
   const isChannel = c.type === "space_channel";
+  const isSelf = c.type === "self" || c.isSelf;
+  if (isSelf) {
+    return {
+      id: c.id,
+      name: "Saved Messages",
+      type: "self",
+      spaceId: null,
+      channelId: null,
+      lastMessage: c.lastMessagePreview || "Your private space",
+      time: formatTime(c.lastMessageAt),
+      unread: 0,
+      online: false,
+      avatarStyle: null,
+      avatarUrl: null,
+      isPlus: false,
+      usernameColor: null,
+      isSelf: true,
+    };
+  }
   const other = otherParticipant(c, currentUser?.id);
   const online = Array.isArray(c.online) ? c.online.some(Boolean) : false;
   let name = isGroup ? c.name || "Group" : participantName(other);
@@ -1173,9 +1192,19 @@ export function DashboardShell() {
         .catch(() => {});
     }
     loadConversations()
-      .then((data) => {
+      .then(async (data) => {
         if (!active) return;
-        const list = Array.isArray(data) ? data : [];
+        let list = Array.isArray(data) ? data : [];
+        // Saved Messages self-chat: ensure it exists so every user sees it.
+        // Lazy-provision here (in addition to the mount effect below) so a
+        // fresh fetch that resolves after the provision can't drop it.
+        if (!list.some((c) => c.type === "self" || c.isSelf)) {
+          try {
+            const self = await apiPost("/api/v1/conversations/self", {});
+            if (self?.id) list = [self, ...list];
+          } catch {}
+        }
+        if (!active) return;
         setConversations(list);
         if (uid) setCachedConversations(uid, list).catch(() => {});
         // The open conversation may have been restored from localStorage before
@@ -1216,6 +1245,27 @@ export function DashboardShell() {
       })
       .catch(() => {});
   }, [reconnectNonce, loadConversations]);
+
+  // Saved Messages self-chat: lazy-provision on first app open so every user
+  // gets a private space for notes/files/links. No-op when it already exists.
+  useEffect(() => {
+    let active = true;
+    apiPost("/api/v1/conversations/self", {})
+      .then((self) => {
+        if (!active || !self?.id) return;
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === self.id)) return prev;
+          const next = [self, ...prev];
+          const uid = getSession()?.id;
+          if (uid) setCachedConversations(uid, next).catch(() => {});
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Load the "other" participant's full profile whenever the open DM changes,
   // so the right-hand detail panel stays in sync. Group conversations have no
@@ -1805,6 +1855,7 @@ export function DashboardShell() {
 
   const handleRemoveConversation = (conversation) => {
     if (!conversation || conversation.type === "space_channel") return;
+    if (conversation.type === "self" || conversation.isSelf) return;
     setRemoveError(null);
     setRemoveTarget(conversation);
   };
@@ -1875,8 +1926,13 @@ export function DashboardShell() {
         participants: c.participants,
       };
     });
-    // pinned first, preserve original order otherwise (stable sort)
+    // pinned first, preserve original order otherwise (stable sort).
+    // Saved Messages self-chat always sits at the very top like Telegram.
     return [...items].sort((a, b) => {
+      const aSelf = a.type === "self" || a.isSelf;
+      const bSelf = b.type === "self" || b.isSelf;
+      if (aSelf && !bSelf) return -1;
+      if (!aSelf && bSelf) return 1;
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       return 0;

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDashed, Layers, LogOut, MapPin, MessageCircle, Settings, Smile, Users } from "lucide-react";
+import { CircleDashed, Layers, LogOut, MapPin, MessageCircle, Palette, Settings, Smile, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/dashboard/avatar";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ const RAIL_ITEMS = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, unread }) {
+export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, onAppearanceClick, unread }) {
   const router = useRouter();
   const profileLabel = currentUser?.displayName || currentUser?.email || "Profile";
 
@@ -37,7 +37,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
   return (
     <nav
       aria-label="Primary"
-      className="flex h-full w-[64px] shrink-0 flex-col items-center border-r border-[var(--border)] bg-[var(--bg-elevated)] py-3"
+      className="flex h-full w-16 shrink-0 flex-col items-center border-r border-[var(--border)] bg-[var(--bg-elevated)] py-3"
     >
       <div className="flex w-full flex-col items-center gap-1">
         {RAIL_ITEMS.map((item) => {
@@ -78,7 +78,7 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
 
       <div className="mt-auto flex w-full flex-col items-center gap-2 pt-3">
         <div className="h-px w-8 bg-[var(--border)]" aria-hidden="true" />
-        {/* Sign out — directly above profile */}
+        {/* Sign out — above appearance */}
         <div className="group relative flex justify-center">
           <button
             type="button"
@@ -94,6 +94,25 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
             role="tooltip"
           >
             Sign out
+          </span>
+        </div>
+        {/* Appearance — directly above the profile */}
+        <div className="group relative flex justify-center">
+          <button
+            type="button"
+            aria-label="Appearance"
+            title="Appearance"
+            onClick={onAppearanceClick}
+            className="flex size-11 min-h-11 min-w-11 items-center justify-center rounded-xl text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <Palette className="h-5 w-5" strokeWidth={1.8} />
+          </button>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            role="tooltip"
+          >
+            Appearance
           </span>
         </div>
         <div className="group relative flex justify-center">

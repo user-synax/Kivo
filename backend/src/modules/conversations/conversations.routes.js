@@ -22,6 +22,11 @@ router.post("/", conversationsController.createConversation);
 router.post("/group", conversationsController.createGroup);
 router.get("/", conversationsController.listConversations);
 
+// Saved Messages self-chat (must sit before /:id routes so "self" is not
+// parsed as a conversation id).
+router.get("/self", conversationsController.getSelfConversation);
+router.post("/self", conversationsController.getSelfConversation);
+
 // Conversation-scoped message endpoints live under the conversation id.
 router.get("/:id/messages", messagesController.listMessages);
 router.get("/:id/threads", messagesController.listThreads);
