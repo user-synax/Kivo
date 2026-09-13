@@ -88,6 +88,8 @@ export function publicPlayers(session) {
 
 // Public (client-safe) view of a session. The passage is only revealed once the
 // race is active — and only to people who can see the conversation.
+// `countdownMs` is the single source of truth for the 3-2-1 window so clients
+// never hand-mirror COUNTDOWN_MS (see games.rules.js).
 export function publicGame(session, { includePassage = false } = {}) {
   const view = {
     id: session._id.toString(),
@@ -101,6 +103,7 @@ export function publicGame(session, { includePassage = false } = {}) {
     finishedAt: session.finishedAt ? new Date(session.finishedAt).toISOString() : null,
     expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : null,
     winnerId: session.winnerId ? session.winnerId.toString() : null,
+    countdownMs: COUNTDOWN_MS,
   };
   if (includePassage) view.passage = session.passage || null;
   return view;
@@ -250,10 +253,11 @@ export async function inviteToGame({ userId, targetUserId, kind = "typing" }) {
   if (!target) throw notFound("Player not found", "USER_NOT_FOUND");
 
   // Per-plan cap on concurrent sessions, server-side (client never trusted).
+  // Only sessions I'm still in count — declined/left ones are already dead.
   const { limits } = await getRequesterPlan(User, userId);
   const open = await GameSession.countDocuments({
     status: { $in: ["pending", "active"] },
-    "players.userId": userId,
+    players: { $elemMatch: { userId, status: { $in: ["invited", "joined"] } } },
   });
   if (open >= limits.gamesPerConversationActive) {
     throw forbidden(
@@ -368,6 +372,21 @@ export async function declineGame({ gameId, userId }) {
   if (!player) throw forbidden("You were not invited to this game", "NOT_INVITED");
   player.status = "declined";
   player.progress = 0;
+
+  // A declined 1v1 can never start — cancel it so the chip stops saying
+  // "waiting", the arena frees the pair for a fresh invite (GAME_EXISTS), and
+  // the abandonment sweep never has to reap it 30 min later.
+  const joined = session.players.filter((p) => p.status === "joined");
+  const hasDeclined = session.players.some((p) => p.status === "declined");
+  if (hasDeclined && joined.length < MIN_PLAYERS) {
+    session.status = "cancelled";
+    session.finishedAt = new Date();
+    await session.save();
+    await syncCard(session);
+    emitToConversation(session.conversationId.toString(), "game:cancelled", publicGame(session));
+    return publicGame(session);
+  }
+
   await session.save();
   await syncCard(session);
   emitToConversation(session.conversationId.toString(), "game:updated", publicGame(session));
@@ -515,10 +534,12 @@ export async function listInvites({ userId }) {
 }
 
 // Arena: games I am currently part of (waiting or racing).
+// Excludes sessions I already declined/left so a dead invite never blocks the
+// arena list or the per-pair GAME_EXISTS guard from the client's perspective.
 export async function listMyGames({ userId }) {
   const sessions = await GameSession.find({
     status: { $in: ["pending", "active"] },
-    "players.userId": userId,
+    players: { $elemMatch: { userId, status: { $in: ["invited", "joined"] } } },
   })
     .sort({ createdAt: -1 })
     .limit(20);

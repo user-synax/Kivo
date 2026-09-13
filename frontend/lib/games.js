@@ -4,25 +4,30 @@
 // values from the public payloads the API and socket events already send.
 // Everything is null-safe because a card can render from a partial snapshot.
 
-// Mirror of COUNTDOWN_MS in backend/src/modules/games/games.rules.js. The server
-// stamps `startedAt` this far in the future, so the countdown both players see is
-// anchored to one shared absolute moment — and the race clock only starts on
-// "GO". Kept in sync by hand because it is a race *rule*, not a display detail.
+// Fallback for the 3-2-1 window. The server is the source of truth and sends
+// `countdownMs` on every session payload (see games.rules.js COUNTDOWN_MS) —
+// use getCountdownMs(game) so a future rule change never desyncs clients.
 export const RACE_COUNTDOWN_MS = 3000;
+
+export function getCountdownMs(game) {
+  const v = Number(game?.countdownMs);
+  return Number.isFinite(v) && v > 0 && v <= 10000 ? v : RACE_COUNTDOWN_MS;
+}
 
 // A player is "nearly done" from here on — the point where a race gets tense.
 export const RACE_DANGER_PCT = 80;
 
+// No emojis here — game icons are lucide components at the call site
+// (Keyboard for typing, Gamepad2 fallback). Keep this metadata text-only.
 export const GAME_KINDS = Object.freeze({
   typing: {
     label: "Typing Race",
-    emoji: "⌨️",
     blurb: "Type the passage fastest",
   },
 });
 
 export function gameKindMeta(kind) {
-  return GAME_KINDS[kind] || { label: "Game", emoji: "🎮", blurb: "" };
+  return GAME_KINDS[kind] || { label: "Game", blurb: "" };
 }
 
 export function gameKindLabel(kind) {

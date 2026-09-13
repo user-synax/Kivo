@@ -1,15 +1,17 @@
 "use client";
 
+import { HeartCrack, Trophy } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { playGameResult } from "@/lib/sound";
 
 // Kivo Games — the one-second "Game finished" flash.
 //
-// A full-screen wash of colour (green for a win, red for a loss) plus a
-// synthesised stinger, shown the instant a race ends and then gone. The whole
-// thing is aria-live so screen readers announce the outcome, and keeps
-// `motion-reduce` in mind by falling back to a plain fade. Tapping dismisses it
-// early instead of making the user wait out the animation.
+// A flat full-screen wash of colour (green for a win, red for a loss) plus a
+// synthesised stinger, shown the instant a race ends and then gone. Flat
+// surfaces + lucide icons only — no gradients, no emojis. The whole thing is
+// aria-live so screen readers announce the outcome, and keeps `motion-reduce`
+// in mind by falling back to a plain fade. Tapping dismisses it early instead
+// of making the user wait out the animation.
 
 export const GAME_FLASH_MS = 1200;
 
@@ -28,17 +30,15 @@ const KEYFRAMES = `@keyframes kivo-game-flash-wash {
 const OUTCOMES = {
   win: {
     headline: "You Win",
-    emoji: "\u{1F3C6}",
+    Icon: Trophy,
     // A saturated green, deliberately brighter than the app's own success
     // colour so the flash reads as an event rather than a UI state.
     wash: "bg-[#12b886]",
-    glow: "radial-gradient(circle at 50% 42%, rgba(255,255,255,0.42), transparent 62%)",
   },
   lose: {
     headline: "You Lose",
-    emoji: "\u{1F494}",
+    Icon: HeartCrack,
     wash: "bg-[#e03131]",
-    glow: "radial-gradient(circle at 50% 42%, rgba(255,255,255,0.34), transparent 62%)",
   },
 };
 
@@ -70,16 +70,11 @@ export function GameResultFlash({ outcome, onDone, subtitle }) {
     >
       <style>{KEYFRAMES}</style>
       <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: meta.glow }}
-      />
-      <span
         aria-live="assertive"
         className="pointer-events-none relative flex flex-col items-center gap-3 px-6 text-center animate-[kivo-game-flash-burst_320ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none"
       >
-        <span className="text-[52px] leading-none drop-shadow-lg md:text-[68px]">
-          {meta.emoji}
+        <span className="flex size-20 items-center justify-center rounded-3xl bg-black/20 md:size-24">
+          <meta.Icon className="h-10 w-10 md:h-12 md:w-12" />
         </span>
         <span className="text-[13px] font-semibold uppercase tracking-[0.22em] text-white/85">
           Game finished

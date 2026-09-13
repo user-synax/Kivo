@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2, Trophy } from "lucide-react";
+import { ArrowLeft, Keyboard, Loader2, Trophy, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiPost } from "@/lib/api";
 import {
@@ -13,32 +13,26 @@ import {
   gameIsCancelled,
   gameIsFinished,
   gameResults,
+  getCountdownMs,
   initialsFor,
   isInGame,
   joinedPlayers,
   playerFor,
   progressPercent,
-  RACE_COUNTDOWN_MS,
   RACE_DANGER_PCT,
   raceMarginMs,
   runnerUpProgress,
 } from "@/lib/games";
-import { playCountdownCue } from "@/lib/sound";
+import { playClick, playCountdownCue, playTypeTick } from "@/lib/sound";
 
-// Kivo Games — full-screen Typing Race.
-//
-// The server owns the passage, the start time, and finish places. This view only
-// renders that state and reports the player's own progress; it never decides who
-// won. Accuracy is derived locally for the live readout, and the server
-// re-derives WPM from its own clock when the race finishes.
+// Kivo Arena — Typing Race stage.
+// Server owns passage/clock/places; this view renders + reports progress.
+// Countdown is anchored to server `startedAt` + server `countdownMs`.
+// NOTE: no gradients, no emojis here — flat surfaces + lucide icons only.
 
-// Progress is paced, not per-keystroke: the viewer's own bar renders locally, so
-// these pings only need to keep the opponent's bar reasonably honest.
 const PROGRESS_STEP = 0.05;
 const PROGRESS_MIN_INTERVAL_MS = 250;
 
-// The countdown number pops in on every step, and a bar that is nearly finished
-// breathes so a tight endgame reads as tense instead of as a static percentage.
 const KEYFRAMES = `@keyframes kivo-race-count-in {
   0% { opacity: 0; transform: scale(0.55); }
   45% { opacity: 1; transform: scale(1.14); }
@@ -47,6 +41,10 @@ const KEYFRAMES = `@keyframes kivo-race-count-in {
 @keyframes kivo-race-nearly {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+@keyframes kivo-race-pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }`;
 
 function longestMatchPrefix(typed, passage) {
@@ -65,14 +63,14 @@ function PassageDisplay({ passage, typed }) {
         if (i < typed.length) {
           cls =
             i < matched
-              ? "text-[var(--accent)]"
-              : "rounded-sm bg-[var(--destructive)]/25 text-[var(--destructive)]";
+              ? "text-[var(--text-primary)] bg-emerald-500/15 rounded-[3px]"
+              : "rounded-[3px] bg-[var(--destructive)]/25 text-[var(--destructive)]";
         }
         const isCursor = i === typed.length;
         return (
           <span
             key={`${i}-${char}`}
-            className={`${cls} ${isCursor ? "rounded-sm bg-[var(--accent)]/30" : ""}`}
+            className={`${cls} ${isCursor ? "rounded-[3px] bg-[var(--accent)]/30 outline outline-1 outline-[var(--accent)]/50" : ""}`}
           >
             {char}
           </span>
@@ -92,25 +90,15 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
 
   const sessionId = session?.id || null;
   const startedAt = session?.startedAt || null;
+  const countdownMs = getCountdownMs(session);
 
-  // The server stamps `startedAt` RACE_COUNTDOWN_MS in the future, so both players
-  // count down to the same absolute moment and the race clock, the live WPM and
-  // the input all begin together on "GO". Deriving it from that timestamp — rather
-  // than from a local timer — means opening a race that is already running shows no
-  // countdown, and a late joiner gets exactly the time that is left.
   const goAtMs = startedAt ? new Date(startedAt).getTime() : 0;
-  // Clamped to the real countdown length, so a device clock that is badly out of
-  // step with the server can never turn this into a minute-long wait.
-  const countdownMsLeft = goAtMs
-    ? Math.min(RACE_COUNTDOWN_MS, goAtMs - now)
-    : 0;
+  const countdownMsLeft = goAtMs ? Math.min(countdownMs, goAtMs - now) : 0;
   const countdownActive = countdownMsLeft > 0 && gameIsActive(session);
   const countdownStep = countdownActive ? Math.ceil(countdownMsLeft / 1000) : 0;
 
   const lastStepRef = useRef(null);
 
-  // A new race (or a restart) resets local typing state. Keyed on race identity:
-  // the effect deliberately reads nothing, it only reacts to the identity change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on race identity, not on values read inside.
   useEffect(() => {
     setTyped("");
@@ -119,8 +107,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     lastStepRef.current = null;
   }, [sessionId, startedAt]);
 
-  // Tick the clock while a race runs so the timer and live WPM stay honest — and
-  // tick faster through the countdown so the numbers land on the beat.
   useEffect(() => {
     if (!gameIsActive(session)) return undefined;
     const timer = setInterval(
@@ -130,9 +116,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     return () => clearInterval(timer);
   }, [session, countdownActive]);
 
-  // Countdown audio: one blip per number, then a brighter "GO" on the transition.
-  // `lastStepRef` starts null, so merely opening an in-progress race stays silent —
-  // the cue only fires when this client actually watched the countdown run.
   useEffect(() => {
     if (!gameIsActive(session)) {
       lastStepRef.current = null;
@@ -146,7 +129,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     else if (previous !== null && previous > 0) playCountdownCue("go");
   }, [session, countdownActive, countdownStep]);
 
-  // Focus only once typing is actually unlocked, so no keystroke can land before GO.
   useEffect(() => {
     if (
       countdownActive ||
@@ -162,7 +144,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
   const passage = session?.passage || "";
   const iAmIn = isInGame(session, viewerId);
   const active = gameIsActive(session);
-  // Typing is unlocked by the countdown finishing, not by the race merely existing.
   const canType = active && iAmIn && !countdownActive;
 
   const matched = useMemo(
@@ -170,14 +151,10 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     [typed, passage],
   );
   const accuracy = typed.length ? (matched / typed.length) * 100 : 100;
-  // Local progress drives the viewer's own bar so typing feels instant; the
-  // server pings below only keep the opponent's bar honest.
   const progress = passage ? Math.min(1, matched / passage.length) : 0;
   const myPlayer = playerFor(session, viewerId);
   const iFinished = Boolean(myPlayer?.finishedAt);
 
-  // Clamped at 0 through the countdown, so the clock and live WPM read 0:00 / 0
-  // until typing actually unlocks.
   const elapsedMs = startedAt
     ? Math.max(0, now - new Date(startedAt).getTime())
     : 0;
@@ -191,17 +168,17 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
   const reportProgress = useCallback(
     (value) => {
       if (!sessionId) return;
-      const now = Date.now();
+      const nowMs = Date.now();
       const isFinal = value >= 1;
       if (
         !isFinal &&
         (Math.abs(value - lastSentRef.current) < PROGRESS_STEP ||
-          now - lastSentAtRef.current < PROGRESS_MIN_INTERVAL_MS)
+          nowMs - lastSentAtRef.current < PROGRESS_MIN_INTERVAL_MS)
       ) {
         return;
       }
       lastSentRef.current = value;
-      lastSentAtRef.current = now;
+      lastSentAtRef.current = nowMs;
       apiPost(`/api/v1/games/${sessionId}/progress`, {
         progress: Number(value.toFixed(3)),
       }).catch(() => {});
@@ -216,6 +193,7 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     setTyped(next);
 
     const nextMatched = longestMatchPrefix(next, passage);
+    if (nextMatched > matched && nextMatched % 4 === 0) playTypeTick();
     reportProgress(passage ? nextMatched / passage.length : 0);
 
     if (
@@ -233,10 +211,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
       })
         .then((updated) => onSession?.(updated))
         .catch(() => {
-          // The server refused it — normally a device clock that has run ahead of
-          // the 3-2-1 window (the server will not accept a finish before its own
-          // `startedAt`). Unlatch so the finisher can retry instead of being
-          // stranded on a full passage the server never heard about.
           finishedRef.current = false;
         });
     }
@@ -248,8 +222,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
   const results = gameResults(session);
   const winner = results[0] || null;
   const iWon = Boolean(winner && winner.userId === viewerId);
-  // Finishers first (by place), then anyone who never crossed the line — so the
-  // runner-up still sees their own outcome instead of an empty result screen.
   const finishedIds = new Set(results.map((p) => p.userId));
   const resultRows = [
     ...results,
@@ -264,9 +236,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
       progressPercent(opponent) >= RACE_DANGER_PCT,
   );
 
-  // How the race was decided. A recorded margin only exists on a genuine photo
-  // finish (both players finished); otherwise the runner-up's progress at the
-  // moment the winner crossed is the honest answer to "how close was it?".
   const margin = raceMarginMs(session);
   const runnerUp = runnerUpProgress(session);
   const runnerUpPct = runnerUp ? Math.round(runnerUp.progress * 100) : 0;
@@ -284,26 +253,33 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
   return (
     <div className="fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
       <style>{KEYFRAMES}</style>
-      <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 pt-[max(env(safe-area-inset-top),0.75rem)] md:px-5 md:pt-3">
+
+      <div className="relative flex shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/90 px-3 py-2.5 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-md md:px-5">
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            playClick();
+            onClose?.();
+          }}
           aria-label="Back to arena"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-all hover:bg-[var(--hover)] hover:text-[var(--text-primary)] active:scale-95"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/12 text-base">
-          ⌨️
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
+          <Keyboard className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
-            Typing Race
+          <h1
+            className="truncate text-[15px] font-semibold leading-tight tracking-tight text-[var(--text-primary)]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            TYPING RACE
           </h1>
           <p className="truncate text-[11px] leading-tight text-[var(--text-muted)]">
             {gameIsFinished(session)
               ? iWon
-                ? "You won"
+                ? "You won — loud."
                 : `${winner?.displayName || "Opponent"} won`
               : gameIsCancelled(session)
                 ? "Cancelled"
@@ -315,38 +291,47 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
           </p>
         </div>
         {active && (
-          <span className="shrink-0 font-mono text-[13px] tabular-nums text-[var(--text-muted)]">
-            {formatClock(elapsedMs)}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border)] px-2.5 py-1 font-mono text-[12px] tabular-nums text-[var(--text-primary)]">
+              <Zap className="h-3 w-3 text-amber-500" />
+              {liveWpm}
+            </span>
+            <span className="rounded-full bg-[var(--bg-surface)] border border-[var(--border)] px-2.5 py-1 font-mono text-[12px] tabular-nums text-[var(--text-muted)]">
+              {formatClock(elapsedMs)}
+            </span>
+          </div>
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto flex w-full max-w-3xl flex-col px-4 py-5 md:px-6 md:py-8">
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto flex w-full max-w-3xl flex-col px-4 py-5 md:px-6 md:py-7">
           {gameIsCancelled(session) ? (
             <p className="py-10 text-center text-sm text-[var(--text-muted)]">
               This race was cancelled.
             </p>
           ) : gameIsFinished(session) ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col items-center gap-1 py-6 text-center">
+            <div className="t-panel-in flex flex-col gap-3">
+              <div className="relative flex flex-col items-center gap-1 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-7 text-center shadow-xl">
                 {photoFinish && (
-                  <span className="mb-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-600">
+                  <span className="mb-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                     Photo finish
                   </span>
                 )}
-                <Trophy className="h-9 w-9 text-amber-500" />
-                <p className="text-lg font-semibold text-[var(--text-primary)]">
-                  {iWon
-                    ? "You won \u{1F3C6}"
-                    : `${winner?.displayName || "Someone"} won`}
+                <span className="flex size-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] text-amber-500">
+                  <Trophy className="h-7 w-7" />
+                </span>
+                <p
+                  className="text-[24px] font-semibold tracking-tight text-[var(--text-primary)]"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {iWon ? "You won" : `${winner?.displayName || "Someone"} won`}
                 </p>
                 <p className="text-[13px] text-[var(--text-muted)]">
                   {formatWpm(winner?.wpm)} · {formatAccuracy(winner?.accuracy)}{" "}
                   · {formatMs(winner?.elapsedMs)}
                 </p>
                 {closenessText && (
-                  <p className="mt-1 text-[13px] font-semibold text-amber-600">
+                  <p className="mt-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1 text-[13px] font-bold text-[var(--text-primary)]">
                     {closenessText}
                   </p>
                 )}
@@ -356,16 +341,22 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                 return (
                   <div
                     key={p.userId}
-                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${
                       p.userId === viewerId
-                        ? "border-[var(--accent)]/40 bg-[var(--accent)]/5"
+                        ? "border-[var(--accent)]/40 bg-[var(--accent)]/[0.07]"
                         : "border-[var(--border)] bg-[var(--bg-surface)]"
                     }`}
                   >
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[12px] font-semibold text-[var(--accent)]">
+                    <span
+                      className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
+                        finished && p.place === 1
+                          ? "bg-amber-500/20 text-amber-600"
+                          : "bg-[var(--accent)]/15 text-[var(--accent)]"
+                      }`}
+                    >
                       {finished ? p.place : "–"}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-[var(--text-primary)]">
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--text-primary)]">
                       {p.displayName || "Player"}
                       {p.userId === viewerId ? " (you)" : ""}
                     </span>
@@ -380,7 +371,13 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
             </div>
           ) : (
             <>
-              <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 md:p-5">
+              <div
+                className={`relative rounded-[24px] border bg-[var(--bg-surface)] p-4 transition-colors md:p-5 ${
+                  countdownActive
+                    ? "border-[var(--border)]"
+                    : "border-[var(--accent)]/30 shadow-[0_0_40px_-12px_rgba(106,76,245,0.5)]"
+                }`}
+              >
                 <div
                   className={
                     countdownActive
@@ -396,24 +393,22 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                     </p>
                   )}
                 </div>
-                {/* Decorative only: the disabled input's "Get ready…" placeholder
-                    already tells assistive tech what is happening, and announcing
-                    a number every second would just be noise. */}
                 {countdownActive && (
                   <div
                     aria-hidden
                     className="absolute inset-0 flex flex-col items-center justify-center gap-1.5"
                   >
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-muted)]">
                       Get ready
                     </span>
                     <span
                       key={countdownStep}
-                      className="text-[64px] font-extrabold leading-none tabular-nums text-[var(--accent)] animate-[kivo-race-count-in_360ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none"
+                      className="text-[68px] font-semibold leading-none tabular-nums text-[var(--text-primary)] animate-[kivo-race-count-in_360ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none"
+                      style={{ fontFamily: "var(--font-display)" }}
                     >
                       {countdownStep}
                     </span>
-                    <span className="text-[11px] text-[var(--text-muted)]">
+                    <span className="rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] px-3 py-1 text-[11px] text-[var(--text-muted)]">
                       Typing unlocks on GO
                     </span>
                   </div>
@@ -440,20 +435,30 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                           ? "Start typing…"
                           : "Waiting for your opponent…"
                 }
-                className="mt-4 w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] px-4 py-3 font-mono text-[15px] text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] disabled:opacity-60"
+                className="mt-4 w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] px-4 py-3.5 font-mono text-[15px] text-[var(--text-primary)] outline-none transition-all placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft,rgba(75,169,225,0.15))] disabled:opacity-60"
               />
 
               <div className="mt-2 flex items-center justify-between text-[12px] tabular-nums text-[var(--text-muted)]">
-                <span>Accuracy {Math.round(accuracy)}%</span>
-                <span>{liveWpm} wpm</span>
+                <span>
+                  Accuracy{" "}
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {Math.round(accuracy)}%
+                  </span>
+                </span>
+                <span>
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {liveWpm}
+                  </span>{" "}
+                  wpm · {Math.round(progress * 100)}%
+                </span>
               </div>
             </>
           )}
 
           {!gameIsFinished(session) && !gameIsCancelled(session) && (
             <div className="mt-6">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                Players
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Racers
               </p>
               <div className="flex flex-col gap-2">
                 {joined.map((p) => {
@@ -462,8 +467,6 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                     isMe && active
                       ? Math.round(progress * 100)
                       : progressPercent(p);
-                  // The endgame cue: anyone this close to the line turns their
-                  // whole row tense, so a race never looks like two static bars.
                   const nearlyDone =
                     active &&
                     !countdownActive &&
@@ -472,30 +475,35 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                   return (
                     <div
                       key={p.userId}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2 ${
-                        isMe ? "bg-[var(--accent)]/8" : ""
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${
+                        isMe
+                          ? "border-[var(--accent)]/30 bg-[var(--accent)]/[0.06]"
+                          : "border-[var(--border)] bg-[var(--bg-surface)]"
                       }`}
                     >
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[11px] font-semibold text-[var(--accent)]">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[11px] font-bold text-[var(--accent)]">
                         {initialsFor(p.displayName)}
                       </span>
-                      <span className="w-28 shrink-0 truncate text-[13px] text-[var(--text-primary)]">
+                      <span className="w-28 shrink-0 truncate text-[13px] font-medium text-[var(--text-primary)]">
                         {p.displayName || "Player"}
+                        {isMe ? " (you)" : ""}
                       </span>
-                      <span className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--bg-elevated)]">
+                      <span className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--bg-elevated)]">
                         <span
-                          className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+                          className={`absolute inset-y-0 left-0 rounded-full transition-all duration-200 ${
                             nearlyDone
                               ? "bg-amber-500 animate-[kivo-race-nearly_1s_ease-in-out_infinite] motion-reduce:animate-none"
-                              : "bg-[var(--accent)]"
+                              : isMe
+                                ? "bg-[var(--text-primary)]"
+                                : "bg-[var(--text-muted)]"
                           }`}
                           style={{ width: `${pct}%` }}
                         />
                       </span>
                       <span
-                        className={`w-10 shrink-0 text-right text-[12px] tabular-nums ${
+                        className={`w-11 shrink-0 text-right text-[12px] tabular-nums font-semibold ${
                           nearlyDone
-                            ? "font-semibold text-amber-600"
+                            ? "text-amber-600"
                             : "text-[var(--text-muted)]"
                         }`}
                       >
@@ -511,7 +519,7 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
       </div>
 
       {active && iAmIn && (
-        <div className="shrink-0 border-t border-[var(--border)] px-4 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 text-center text-[11px] text-[var(--text-muted)]">
+        <div className="relative shrink-0 border-t border-[var(--border)] bg-[var(--bg-elevated)]/60 px-4 pb-[max(env(safe-area-inset-bottom),0.6rem)] pt-2.5 text-center text-[11.5px] text-[var(--text-muted)] backdrop-blur-md">
           {iFinished || finishedRef.current ? (
             <span className="flex items-center justify-center gap-1.5">
               <Loader2 className="h-3 w-3 animate-spin" /> Waiting for your
@@ -520,12 +528,12 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
           ) : countdownActive ? (
             "Go the instant the passage clears"
           ) : opponentNearlyDone ? (
-            <span className="font-semibold text-amber-600">
+            <span className="font-bold text-amber-600 animate-[kivo-race-pulse_1s_ease-in-out_infinite] motion-reduce:animate-none">
               {opponent?.displayName || "Your opponent"} is nearly there — keep
               typing!
             </span>
           ) : (
-            "Type the passage exactly — mistakes stall your progress"
+            "Type exactly — mistakes stall your progress"
           )}
         </div>
       )}

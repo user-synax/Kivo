@@ -26,6 +26,7 @@ export const SOUND_CATEGORY_KEYS = [
   "friendRequests",
   "spaceMessages",
   "gameResults",
+  "arenaMusic",
 ];
 
 export const SOUND_DEFAULTS = {
@@ -36,6 +37,7 @@ export const SOUND_DEFAULTS = {
   friendRequests: true,
   spaceMessages: false,
   gameResults: true,
+  arenaMusic: true,
 };
 
 // Kivo Games cues: a bright ascending major arpeggio for a win, a descending fall
@@ -62,6 +64,21 @@ const GAME_CUES = {
     [880.0, 0.0, 0.09], // A5
     [1318.51, 0.07, 0.22], // E6
   ],
+  // Arena UI: tiny tactile blip for every tap — dry, ultra-short, quiet.
+  click: [[1250.0, 0.0, 0.045]],
+  // Invite sent: warm two-note lift (C5 -> G5).
+  invite: [
+    [523.25, 0.0, 0.1],
+    [783.99, 0.08, 0.18],
+  ],
+  // Join / accept: confident three-note rise (E5 -> A5 -> E6).
+  join: [
+    [659.25, 0.0, 0.09],
+    [880.0, 0.07, 0.09],
+    [1318.51, 0.14, 0.2],
+  ],
+  // Keystroke tick: barely-there tick, caller throttles to avoid spam.
+  tick: [[2093.0, 0.0, 0.025]],
 };
 
 // Each cue is a tiny melody: [frequency, start offset (s), duration (s)].
@@ -188,6 +205,10 @@ export function playCue(category) {
 // Play regardless of the master/category toggles — used by the "Test" button
 // in Settings so a muted category can still be auditioned.
 export function previewCue(category) {
+  if (category === "arenaMusic") {
+    previewArenaMusic();
+    return;
+  }
   playCueRaw(category);
 }
 
@@ -205,7 +226,89 @@ function playPattern(pattern, opts = {}) {
 }
 
 function playCueRaw(category) {
+  if (category === "arenaMusic") {
+    playPattern(GAME_CUES.join, { type: "triangle", peak: 0.12 });
+    return;
+  }
   playPattern(CUES[category]);
+}
+
+// ── Arena background music ─────────────────────────────────────────────
+// Tiny synth loop, no assets: an 8-step bass + sparse lead at ~132 BPM,
+// scheduled with a lightweight interval. Quiet by design (peak ~0.035) so it
+// sits under typing, countdowns and stingers. Respects master + arenaMusic.
+let musicTimer = null;
+let musicStep = 0;
+const MUSIC_STEP_MS = 228;
+const MUSIC_BASS = [110.0, 0, 110.0, 0, 130.81, 0, 98.0, 123.47];
+const MUSIC_LEAD = [440.0, 0, 523.25, 0, 587.33, 659.25, 0, 523.25];
+
+function musicAudible() {
+  const prefs = getSoundPrefs();
+  return prefs.enabled && prefs.arenaMusic !== false;
+}
+
+function scheduleMusicStep() {
+  if (!musicAudible()) return;
+  const c = getCtx();
+  if (!c) return;
+  try {
+    if (c.state === "suspended") c.resume().catch(() => {});
+    const t = c.currentTime + 0.02;
+    const bass = MUSIC_BASS[musicStep % MUSIC_BASS.length];
+    if (bass) tone(bass, t, 0.2, { type: "sine", peak: 0.045 });
+    // Hat-like shimmer every other step — very quiet.
+    if (musicStep % 2 === 0) tone(6000, t, 0.03, { type: "sine", peak: 0.008 });
+    const lead = MUSIC_LEAD[musicStep % MUSIC_LEAD.length];
+    if (lead) tone(lead, t + 0.02, 0.18, { type: "triangle", peak: 0.028 });
+  } catch {}
+  musicStep += 1;
+}
+
+export function isArenaMusicPlaying() {
+  return Boolean(musicTimer);
+}
+
+export function startArenaMusic() {
+  if (typeof window === "undefined" || musicTimer) return;
+  if (!musicAudible()) return;
+  try {
+    const c = getCtx();
+    if (!c) return;
+    if (c.state === "suspended") c.resume().catch(() => {});
+  } catch {}
+  musicStep = 0;
+  scheduleMusicStep();
+  musicTimer = setInterval(scheduleMusicStep, MUSIC_STEP_MS);
+}
+
+export function stopArenaMusic() {
+  if (musicTimer) {
+    clearInterval(musicTimer);
+    musicTimer = null;
+  }
+}
+
+// Short music taster for Settings preview — 8 steps then auto-stop.
+let previewTimer = null;
+export function previewArenaMusic() {
+  const c = getCtx();
+  if (!c) return;
+  try {
+    if (c.state === "suspended") c.resume().catch(() => {});
+    const now = c.currentTime + 0.02;
+    for (let i = 0; i < 8; i += 1) {
+      const b = MUSIC_BASS[i % MUSIC_BASS.length];
+      const l = MUSIC_LEAD[i % MUSIC_LEAD.length];
+      if (b) tone(b, now + i * 0.228, 0.2, { type: "sine", peak: 0.05 });
+      if (l)
+        tone(l, now + i * 0.228 + 0.02, 0.18, { type: "triangle", peak: 0.03 });
+    }
+  } catch {}
+  if (previewTimer) return;
+  previewTimer = setTimeout(() => {
+    previewTimer = null;
+  }, 2200);
 }
 
 // Win/lose stinger for a finished Kivo Game. Respects the master switch and the
@@ -231,4 +334,31 @@ export function playCountdownCue(kind) {
     type: "triangle",
     peak: isGo ? 0.15 : 0.09,
   });
+}
+
+// Arena UI taps — every button in /games. Same master + Game Results gate so
+// one toggle silences the whole arena (music has its own toggle).
+export function playClick() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  playPattern(GAME_CUES.click, { type: "sine", peak: 0.06 });
+}
+
+export function playInvite() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  playPattern(GAME_CUES.invite, { type: "triangle", peak: 0.11 });
+}
+
+export function playJoin() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  playPattern(GAME_CUES.join, { type: "triangle", peak: 0.13 });
+}
+
+// Faint keystroke tick while racing — caller throttles (every N chars).
+export function playTypeTick() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  playPattern(GAME_CUES.tick, { type: "sine", peak: 0.022 });
 }

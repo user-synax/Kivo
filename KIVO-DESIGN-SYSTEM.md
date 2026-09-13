@@ -12,8 +12,9 @@
 5. **Hierarchy via surface lift** (`canvas → surface-1 → surface-2`), NOT via extra colors or font-weight ramps.
 6. **Typography:** Display `Outfit`, Body `Inter` with OpenType features on. Keep aggressive negative tracking on display sizes.
 7. **Motion:** use only the `t-*` classes + duration/ease tokens below. Always honor `prefers-reduced-motion`.
-8. **Gradients are cards, never section backgrounds.** Max 1–2 spotlight cards per viewport.
-9. If a token you need does not exist below, reuse the closest existing one. Do NOT invent new palette entries.
+8. **NO GRADIENT SLOP — BANNED.** No `bg-gradient-*`, no `spotlight-*` washes, no violet/magenta/orange linear/radial gradient cards anywhere in this app. Flat monochrome surfaces only (`canvas → surface-1 → surface-2` + hairline borders). The old "1–2 spotlight cards" allowance is REVOKED for Kivo — do not reintroduce it.
+9. **NO EMOJIS AS UI — lucide icons only.** Never render `⌨️ 🏆 🎮 🎶` or any emoji glyph as an icon, badge, tile, or empty-state art. Use `lucide-react` (`Keyboard`, `Trophy`, `Gamepad2`, `Music`, …) at stroke 1.6–2.
+10. If a token you need does not exist below, reuse the closest existing one. Do NOT invent new palette entries.
 
 ---
 
@@ -263,8 +264,8 @@ Use `motion` (Framer Motion) for JS-driven staggers/panels; CSS `t-*` for the re
 
 ## 9. Do / Don't
 
-Do: anchor on canvas/white; negative-track display; blue only for links/focus/selection; 1–2 spotlights per page; pill CTAs; Inter variants on; surface-lift for hierarchy; `content-visibility:auto` for long lists.
-Don't: light marketing page; mid-gray text outside muted; blue fills; squared CTAs; reduced tracking "for a11y" (reduce size instead); section-wide gradients; second chromatic accent; hardcoded hex; new radius/color tokens.
+Do: anchor on canvas/white; negative-track display; blue only for links/focus/selection; pill CTAs; Inter variants on; surface-lift for hierarchy; `content-visibility:auto` for long lists; lucide icons only.
+Don't: light marketing page; mid-gray text outside muted; blue fills; squared CTAs; reduced tracking "for a11y" (reduce size instead); ANY gradients (no `bg-gradient-*`, no `spotlight-*`, no violet/magenta/orange washes — gradient slop is banned app-wide); emoji-as-UI (no `⌨️ 🏆 🎮 🎶` glyphs — use lucide); second chromatic accent; hardcoded hex; new radius/color tokens.
 
 ## 10. Quick start for a new project
 

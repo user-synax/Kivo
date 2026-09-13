@@ -615,7 +615,12 @@ const SOUND_CATEGORY_DEFS = [
   {
     key: "gameResults",
     label: "Game Results",
-    hint: "Win and lose stingers when a Kivo Game ends",
+    hint: "Clicks, countdown, join, win and lose sounds in the arena",
+  },
+  {
+    key: "arenaMusic",
+    label: "Arena Music",
+    hint: "Soft synth loop while you're in /games",
   },
 ];
 
