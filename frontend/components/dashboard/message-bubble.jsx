@@ -64,6 +64,7 @@ import { cn } from "@/lib/utils";
 import { AttachmentBubble } from "@/components/chat/attachments";
 import { LinkPreview } from "@/components/chat/link-preview";
 import { Avatar } from "@/components/dashboard/avatar";
+import { GameChip } from "@/components/games/game-chip";
 import { MentionToken } from "@/components/mentions/mention-token";
 import { PollCard } from "@/components/polls/poll-card";
 import {
@@ -680,6 +681,7 @@ export function MessageBubble({
     !deleted &&
     !isEditing &&
     message?.type !== "poll" &&
+    message?.type !== "game" &&
     message?.type !== "system" &&
     Boolean(message?.content?.trim());
   const runTranslate = useCallback(
@@ -780,7 +782,7 @@ export function MessageBubble({
     };
   }, []);
 
-  const isPollForLike = message.type === "poll";
+  const isPollForLike = message.type === "poll" || message.type === "game";
   const triggerLike = useCallback(() => {
     if (deleted || isEditing || selectMode || isPollForLike) return;
     const now = Date.now();
@@ -855,10 +857,14 @@ export function MessageBubble({
 
   // Polls never render big emoji or link previews
   const isPoll = message.type === "poll" && !!message.poll;
+  const isGame = message.type === "game" && !!message.game;
+  // Card messages (polls + games) are interactive widgets: they opt out of the
+  // text-message affordances (copy/forward/thread/translate/big-emoji).
+  const isCardType = isPoll || isGame;
   // WhatsApp-style big emoji: 1-3 emoji, no text/attachments/quote/forward.
   // Renders chromeless (ghost) at large size instead of inside a bubble.
   const bigEmojiCount =
-    !deleted && !isEditing && !isPoll && message.content && !replyTo
+    !deleted && !isEditing && !isCardType && message.content && !replyTo
       ? emojiCount(message.content)
       : 0;
   const isBigEmoji =
@@ -871,7 +877,7 @@ export function MessageBubble({
   const customBigInfo =
     !deleted &&
     !isEditing &&
-    !isPoll &&
+    !isCardType &&
     message.content &&
     !replyTo &&
     customEmojiMap
@@ -976,6 +982,8 @@ export function MessageBubble({
                 searchQuery={searchQuery}
                 isActiveSearch={isActiveSearch}
               />
+            ) : isGame ? (
+              <GameChip game={message.game} viewerId={viewerId} />
             ) : (
               <>
                 {message.forwardedFromName && (
@@ -1213,7 +1221,7 @@ export function MessageBubble({
         {/* One-tap quick reactions — fixed 6 unicode only, so the row never
             grows with the custom library (hidden for polls). Customs live in
             "More reactions" below. */}
-        {message.type !== "poll" && (
+        {!isCardType && (
           <div className="flex items-center justify-between gap-0.5 border-b border-[var(--border)] px-1.5 py-1">
             {REACTION_EMOJIS.map((e) => (
               <QuickReactionButton
@@ -1250,26 +1258,26 @@ export function MessageBubble({
             {message?.saved ? "Unsave" : "Save message"}
           </ContextMenuItem>
         )}
-        {message.type !== "poll" && (
+        {!isCardType && (
           <ContextMenuItem onSelect={() => onReply?.(message)}>
             <Reply className="h-4 w-4" />
             Reply
           </ContextMenuItem>
         )}
-        {onThread && message.type !== "poll" && (
+        {onThread && !isCardType && (
           <ContextMenuItem onSelect={() => onThread?.(message)}>
             <MessageSquare className="h-4 w-4" />
             Thread
           </ContextMenuItem>
         )}
-        {message.type !== "poll" && (
+        {!isCardType && (
           <MoreReactionsSection
             customs={customReactionList}
             onReact={onReact}
           />
         )}
         <ContextMenuSeparator />
-        {onForward && message.type !== "poll" && (
+        {onForward && !isCardType && (
           <ContextMenuItem onSelect={() => onForward?.(message)}>
             <Forward className="h-4 w-4" />
             Forward
@@ -1329,7 +1337,7 @@ export function MessageBubble({
             )}
           </>
         )}
-        {mine && message.type !== "poll" && (
+        {mine && !isCardType && (
           <>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={() => onEdit?.()}>
@@ -1357,7 +1365,7 @@ export function MessageBubble({
           so they never overlap the corner. Hidden for polls */}
       {message.reactions &&
         message.reactions.length > 0 &&
-        message.type !== "poll" && (
+        !isCardType && (
           <div
             className={cn(
               "mt-1 flex max-w-[78%] flex-wrap gap-1",

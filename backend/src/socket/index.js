@@ -159,6 +159,79 @@ function isOnline(userId) {
   return onlineUsers.has(userId);
 }
 
+// ── Kivo Games arena ────────────────────────────────────────────────────────
+// Who currently has the /games surface open. In-memory and single-instance, the
+// same constraint as presence. Each entry caches the member's public profile and
+// block list at enter time, so broadcasting the roster needs no per-broadcast DB
+// reads and blocked users never see each other in the lobby.
+// Map<userId, { sockets: Set<socketId>, profile, blocked: Set<userId> }>
+const arenaUsers = new Map();
+
+function arenaRosterFor(viewerId) {
+  const key = String(viewerId);
+  const viewer = arenaUsers.get(key);
+  const viewerBlocked = viewer?.blocked || new Set();
+  const members = [];
+  for (const [id, entry] of arenaUsers) {
+    if (id === key) continue;
+    // Respect blocking in both directions.
+    if (viewerBlocked.has(id)) continue;
+    if (entry.blocked.has(key)) continue;
+    members.push(entry.profile);
+  }
+  return members;
+}
+
+function broadcastArenaRoster() {
+  if (!io) return;
+  for (const [id, entry] of arenaUsers) {
+    const members = arenaRosterFor(id);
+    for (const socketId of entry.sockets) {
+      io.to(socketId).emit("arena:roster", { members });
+    }
+  }
+}
+
+async function enterArena(userId, socketId) {
+  const key = String(userId);
+  let entry = arenaUsers.get(key);
+  if (!entry) {
+    let profile = { userId: key, displayName: null, username: null, avatarUrl: null };
+    let blocked = new Set();
+    try {
+      const user = await User.findById(userId)
+        .select("displayName username avatarUrl blockedUsers")
+        .lean();
+      if (user) {
+        profile = {
+          userId: key,
+          displayName: user.displayName || user.username || "Player",
+          username: user.username || null,
+          avatarUrl: user.avatarUrl || null,
+        };
+        blocked = new Set((user.blockedUsers || []).map((b) => b.toString()));
+      }
+    } catch (err) {
+      console.error("[socket] arena profile load failed", err?.message || err);
+    }
+    entry = { sockets: new Set(), profile, blocked };
+    arenaUsers.set(key, entry);
+  }
+  const wasAbsent = entry.sockets.size === 0;
+  entry.sockets.add(socketId);
+  return wasAbsent; // true = roster membership changed
+}
+
+function leaveArena(userId, socketId) {
+  const key = String(userId);
+  const entry = arenaUsers.get(key);
+  if (!entry) return false;
+  entry.sockets.delete(socketId);
+  if (entry.sockets.size > 0) return false;
+  arenaUsers.delete(key);
+  return true; // roster membership changed
+}
+
 // Compute the set of peer userIds who share at least one conversation or
 // space with the given user. Used to scope presence broadcasts so a mass
 // reconnect (deploy/restart) does not fan-out O(N²) globally.
@@ -345,6 +418,18 @@ export function initSocket(server) {
     if (onlinePeers.length) {
       socket.emit("presence:snapshot", { online: onlinePeers });
     }
+
+    // Kivo Games arena presence — opt-in while /games is open. The client emits
+    // arena:enter on mount and arena:leave on unmount; the roster is re-broadcast
+    // to every member whenever it changes.
+    socket.on("arena:enter", async () => {
+      const changed = await enterArena(userId, socket.id);
+      socket.emit("arena:roster", { members: arenaRosterFor(userId) });
+      if (changed) broadcastArenaRoster();
+    });
+    socket.on("arena:leave", () => {
+      if (leaveArena(userId, socket.id)) broadcastArenaRoster();
+    });
 
     // Typing indicator. Client emits { conversationId } with start/stop; we
     // re-broadcast to the room (excluding sender) so recipients can render it.
@@ -565,6 +650,8 @@ export function initSocket(server) {
 
     socket.on("disconnect", async () => {
       typingBuckets.delete(socket.id);
+      // Leave the games arena irrespective of the presence grace period below.
+      if (leaveArena(userId, socket.id)) broadcastArenaRoster();
       const set = onlineUsers.get(userId);
       if (!set) return;
       set.delete(socket.id);

@@ -40,6 +40,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollAllowAnonymous: false,
     forwardLimitPerMessage: 5,
     personalEmojiMax: 0, // free cannot create personal emoji
+    gamesPerConversationActive: 2, // Kivo Games sessions live in one chat at a time
     aiDailyMax: 30, // AI assist calls/day (cloud fallback; on-device is unlimited)
   }),
   plus: Object.freeze({
@@ -63,6 +64,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollAllowAnonymous: true,
     forwardLimitPerMessage: 10,
     personalEmojiMax: 50, // Plus personal library usable everywhere
+    gamesPerConversationActive: 10, // run multiple games per chat + tournaments later
     aiDailyMax: 100, // headroom for heavy AI users
   }),
 });

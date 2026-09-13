@@ -67,6 +67,49 @@ const pollSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Game card — a thin snapshot of a Kivo Games session (see GameSession.js).
+// Live progress is announced over Socket.IO; this snapshot is what the timeline
+// card renders on load, refreshed whenever the session transitions state so a
+// reload still shows the invite/waiting/result correctly.
+const gameCardPlayerSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    displayName: { type: String, default: null },
+    status: { type: String, enum: ["invited", "joined", "declined", "left"], default: "joined" },
+    place: { type: Number, default: null },
+    wpm: { type: Number, default: null },
+    accuracy: { type: Number, default: null },
+    elapsedMs: { type: Number, default: null },
+  },
+  { _id: false }
+);
+
+const gameCardSchema = new mongoose.Schema(
+  {
+    sessionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GameSession",
+      required: true,
+    },
+    kind: { type: String, enum: ["typing"], required: true, default: "typing" },
+    // "invite" is the session card created when the game is proposed (it tracks
+    // waiting → in progress). "result" is the separate card posted into the chat
+    // when the race concludes, so a finished game is shared with a notification.
+    role: { type: String, enum: ["invite", "result"], default: "invite" },
+    status: {
+      type: String,
+      enum: ["pending", "active", "finished", "cancelled"],
+      default: "pending",
+    },
+    players: { type: [gameCardPlayerSchema], default: [] },
+    winnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    winnerName: { type: String, default: null },
+    startedAt: { type: Date, default: null },
+    finishedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 // A single chat message. Messages are stored in their own collection (not
 // embedded in the Conversation) and referenced by conversationId so a thread can
 // grow without bloating the conversation document.
@@ -94,7 +137,8 @@ const messageSchema = new mongoose.Schema(
     // (e.g. a member was removed from a group). System messages render as a
     // non-interactive chip and never bump unread counts.
     // "poll" for interactive voting messages — poll payload holds question/options.
-    type: { type: String, enum: ["text", "system", "poll"], default: "text" },
+    // "game" for a Kivo Games card pointing at a GameSession (invite + results).
+    type: { type: String, enum: ["text", "system", "poll", "game"], default: "text" },
 
     // Optional reference to the message this one replies to with an inline
     // quote (rendered flat in the main timeline). Distinct from threads.
@@ -200,6 +244,9 @@ const messageSchema = new mongoose.Schema(
 
     // Poll payload — only when type === "poll"
     poll: { type: pollSchema, default: null },
+
+    // Game card payload — only when type === "game"
+    game: { type: gameCardSchema, default: null },
   },
   { timestamps: true }
 );

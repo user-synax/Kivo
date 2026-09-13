@@ -4,7 +4,8 @@
 //
 // Preferences live in localStorage["kivo:sounds"] as JSON:
 //   { enabled: true, directMessages: true, groupMessages: true,
-//     mentions: true, friendRequests: true, spaceMessages: false }
+//     mentions: true, friendRequests: true, spaceMessages: false,
+//     gameResults: true }
 // The legacy single-flag key localStorage["kivo:sound"] ("off"/"false"/"0")
 // is migrated into `enabled` on first read, then ignored.
 //
@@ -24,6 +25,7 @@ export const SOUND_CATEGORY_KEYS = [
   "mentions",
   "friendRequests",
   "spaceMessages",
+  "gameResults",
 ];
 
 export const SOUND_DEFAULTS = {
@@ -33,6 +35,25 @@ export const SOUND_DEFAULTS = {
   mentions: true,
   friendRequests: true,
   spaceMessages: false,
+  gameResults: true,
+};
+
+// Kivo Games win/lose stingers: a bright ascending major arpeggio for a win and
+// a descending fall for a loss. Both share the single `gameResults` preference
+// so Settings keeps one toggle for game sounds.
+const GAME_CUES = {
+  win: [
+    [523.25, 0.0, 0.13], // C5
+    [659.25, 0.09, 0.13], // E5
+    [783.99, 0.18, 0.13], // G5
+    [1046.5, 0.27, 0.45], // C6 (held)
+  ],
+  lose: [
+    [440.0, 0.0, 0.17], // A4
+    [349.23, 0.15, 0.17], // F4
+    [293.66, 0.3, 0.2], // D4
+    [220.0, 0.48, 0.55], // A3 (falling tail)
+  ],
 };
 
 // Each cue is a tiny melody: [frequency, start offset (s), duration (s)].
@@ -58,6 +79,9 @@ const CUES = {
     [329.63, 0.0, 0.18], // soft low E4 -> A4
     [440.0, 0.16, 0.3],
   ],
+  // Representative cue for the Settings preview button; the real game sound
+  // depends on win/lose (see playGameResult).
+  gameResults: GAME_CUES.win,
 };
 
 const LEGACY_MUTED = new Set(["off", "false", "0", "muted"]);
@@ -128,15 +152,16 @@ export function setSoundsEnabled(enabled) {
   return setSoundPrefs({ enabled: Boolean(enabled) });
 }
 
-// Play one note of a cue.
-function tone(freq, when, dur) {
+// Play one note of a cue. `opts` lets the game stingers pick a brighter waveform
+// and a higher peak without changing the gentle notification chimes.
+function tone(freq, when, dur, opts = {}) {
   if (!ctx) return;
   try {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = opts.type || "sine";
     osc.frequency.value = freq;
-    const peak = 0.12;
+    const peak = typeof opts.peak === "number" ? opts.peak : 0.12;
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.linearRampToValueAtTime(peak, when + 0.008);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + dur);
@@ -158,8 +183,7 @@ export function previewCue(category) {
   playCueRaw(category);
 }
 
-function playCueRaw(category) {
-  const pattern = CUES[category];
+function playPattern(pattern, opts = {}) {
   if (!pattern) return;
   const c = getCtx();
   if (!c) return;
@@ -167,7 +191,23 @@ function playCueRaw(category) {
     if (c.state === "suspended") c.resume().catch(() => {});
     const now = c.currentTime + 0.02;
     for (const [freq, offset, dur] of pattern) {
-      tone(freq, now + offset, dur);
+      tone(freq, now + offset, dur, opts);
     }
   } catch {}
+}
+
+function playCueRaw(category) {
+  playPattern(CUES[category]);
+}
+
+// Win/lose stinger for a finished Kivo Game. Respects the master switch and the
+// "Game results" toggle, exactly like the notification chimes.
+export function playGameResult(outcome) {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  const won = outcome === "win";
+  playPattern(
+    won ? GAME_CUES.win : GAME_CUES.lose,
+    won ? { type: "triangle", peak: 0.18 } : { type: "triangle", peak: 0.15 },
+  );
 }

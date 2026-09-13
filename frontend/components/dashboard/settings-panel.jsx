@@ -612,6 +612,11 @@ const SOUND_CATEGORY_DEFS = [
     label: "Friend Requests",
     hint: "Incoming requests and acceptances",
   },
+  {
+    key: "gameResults",
+    label: "Game Results",
+    hint: "Win and lose stingers when a Kivo Game ends",
+  },
 ];
 
 function SoundsSection() {

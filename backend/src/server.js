@@ -6,6 +6,7 @@ import { initSocket } from "./socket/index.js";
 import { sweepPlus } from "./modules/plus/plus.service.js";
 import { cleanupExpiredStatuses } from "./modules/status/status.service.js";
 import { closeExpiredPolls } from "./modules/messages/messages.service.js";
+import { abandonStaleGames } from "./modules/games/games.service.js";
 import { startScheduledJob } from "./jobs/scheduledMessages.js";
 import logger from "./lib/logger.js";
 import "./config/webpush.js";
@@ -56,6 +57,22 @@ function startPollSweep() {
   if (typeof timer.unref === "function") timer.unref();
 }
 
+// Kivo Games sweep — expire pending invites and abandon races past their
+// deadline so timeline cards never sit in a stale "waiting" state.
+function startGameSweep() {
+  const run = async () => {
+    try {
+      const n = await abandonStaleGames();
+      if (n > 0) logger.info({ cancelled: n }, "[games] cancelled stale sessions");
+    } catch (err) {
+      logger.error({ err: err?.message || err }, "[games] sweep failed");
+    }
+  };
+  run();
+  const timer = setInterval(run, 5 * 60 * 1000);
+  if (typeof timer.unref === "function") timer.unref();
+}
+
 function startStatusExpirySweep() {
   const run = async () => {
     try {
@@ -84,6 +101,7 @@ async function start() {
   startPollSweep();
   startStatusExpirySweep();
   startScheduledJob();
+  startGameSweep();
 
   server.listen(env.port, () => {
     logger.info({ port: env.port, env: env.nodeEnv }, "[server] listening");

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Compass, MapPin, Palette, Search, Settings, Smile } from "lucide-react";
+import { ChevronLeft, ChevronRight, Compass, Gamepad2, MapPin, Palette, Search, Settings, Smile } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
@@ -372,6 +372,7 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
 // Mobile hamburger tab: the bottom bar stays to Chats / Groups / Spaces / Menu;
 // Profile, Appearance and Settings open as pushed screens from here.
 function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch, onOpenEmojiFactory, onOpenNearby, onOpenDiscover }) {
+  const router = useRouter();
   const displayName =
     currentUser?.displayName || currentUser?.username || currentUser?.email || "Account";
   return (
@@ -465,6 +466,21 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Nearby users</span>
               <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Discover people near you — distance only</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/games")}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white">
+              <Gamepad2 className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Kivo Games</span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Play a Typing Race with someone</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>

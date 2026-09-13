@@ -1261,7 +1261,6 @@ export function ChatPanel({
       socket.off("poll:ended", onPollUpdate);
     };
   }, [socket, convId]);
-
   // Composer + menu — close on outside click / Escape, reset per conversation
   useEffect(() => {
     if (!composerMenuOpen) return undefined;

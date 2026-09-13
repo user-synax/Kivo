@@ -1,11 +1,22 @@
 "use client";
 
-import { CircleDashed, Layers, LogOut, MapPin, MessageCircle, Palette, Settings, Smile, Users } from "lucide-react";
+import {
+  CircleDashed,
+  Gamepad2,
+  Layers,
+  LogOut,
+  MapPin,
+  MessageCircle,
+  Palette,
+  Settings,
+  Smile,
+  Users,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/dashboard/avatar";
-import { cn } from "@/lib/utils";
-import { isPlusUser } from "@/lib/plus";
 import { clearSession, getToken } from "@/lib/auth";
+import { isPlusUser } from "@/lib/plus";
+import { cn } from "@/lib/utils";
 
 const RAIL_ITEMS = [
   { id: "chats", label: "Chats", icon: MessageCircle },
@@ -13,13 +24,24 @@ const RAIL_ITEMS = [
   { id: "status", label: "Status", icon: CircleDashed },
   { id: "groups", label: "Groups", icon: Users },
   { id: "spaces", label: "Spaces", icon: Layers },
+  // Games lives on its own route (/games) rather than a shell tab — the arena is
+  // a full-screen surface with its own provider shell.
+  { id: "games", label: "Games", icon: Gamepad2, route: "/games" },
   { id: "emoji-factory", label: "Emoji Factory", icon: Smile },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, onAppearanceClick, unread }) {
+export function IconRail({
+  activeTab,
+  onTabChange,
+  currentUser,
+  onProfileClick,
+  onAppearanceClick,
+  unread,
+}) {
   const router = useRouter();
-  const profileLabel = currentUser?.displayName || currentUser?.email || "Profile";
+  const profileLabel =
+    currentUser?.displayName || currentUser?.email || "Profile";
 
   async function handleSignOut() {
     const token = getToken();
@@ -45,22 +67,30 @@ export function IconRail({ activeTab, onTabChange, currentUser, onProfileClick, 
           const isActive = activeTab === item.id;
           const hasUnread = Boolean(unread?.[item.id]);
           return (
-            <div key={item.id} className="group relative flex w-full justify-center">
+            <div
+              key={item.id}
+              className="group relative flex w-full justify-center"
+            >
               <button
                 type="button"
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() => onTabChange?.(item.id)}
+                onClick={() =>
+                  item.route ? router.push(item.route) : onTabChange?.(item.id)
+                }
                 className={cn(
                   "relative flex size-12 min-h-12 min-w-12 hover:cursor-pointer items-center justify-center rounded-xl transition-colors duration-200",
                   isActive
                     ? "text-[var(--accent)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                    : "text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]",
                 )}
               >
                 <Icon className="h-5 w-5" strokeWidth={isActive ? 2.2 : 1.8} />
                 {hasUnread && (
-                  <span className="absolute right-1 top-1 size-2.5 rounded-full bg-[#ff3b30] ring-2 ring-[var(--bg-elevated)]" aria-hidden="true" />
+                  <span
+                    className="absolute right-1 top-1 size-2.5 rounded-full bg-[#ff3b30] ring-2 ring-[var(--bg-elevated)]"
+                    aria-hidden="true"
+                  />
                 )}
               </button>
               {/* hover tooltip — icons only in rail, label on hover */}

@@ -162,6 +162,29 @@ export function publicMessage(message, viewerId = null) {
           isExpired: obj.poll.expiresAt ? new Date(obj.poll.expiresAt).getTime() < Date.now() : false,
         }
       : null,
+    // Game card snapshot (Kivo Games) — only when type === "game". Live progress
+    // is announced over Socket.IO; this is what the timeline card renders.
+    game: !isDeleted && obj.game
+      ? {
+          sessionId: obj.game.sessionId ? obj.game.sessionId.toString() : null,
+          kind: obj.game.kind,
+          role: obj.game.role || "invite",
+          status: obj.game.status,
+          players: (obj.game.players || []).map((p) => ({
+            userId: p.userId ? p.userId.toString() : null,
+            displayName: p.displayName || null,
+            status: p.status,
+            place: p.place ?? null,
+            wpm: p.wpm ?? null,
+            accuracy: p.accuracy ?? null,
+            elapsedMs: p.elapsedMs ?? null,
+          })),
+          winnerId: obj.game.winnerId ? obj.game.winnerId.toString() : null,
+          winnerName: obj.game.winnerName || null,
+          startedAt: obj.game.startedAt ? new Date(obj.game.startedAt).toISOString() : null,
+          finishedAt: obj.game.finishedAt ? new Date(obj.game.finishedAt).toISOString() : null,
+        }
+      : null,
   };
   return base;
 }
