@@ -1,8 +1,8 @@
 # Kivo — Product Requirements Document
 
-**Version:** 3.1
-**Last Updated:** September 11, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls + Nearby Discovery + Find Square Cards + Welcome Messages + AI Assist · Disappearing Messages Removed)
+**Version:** 3.2
+**Last Updated:** September 13, 2026
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls + Nearby Discovery + Find Square Cards + Welcome Messages + AI Assist + Kivo Games · Disappearing Messages Removed)
 
 ---
 
@@ -61,6 +61,7 @@ Kivo
 | **Attachment** | Image/document/voice file attached to a message | ✅ Complete |
 | **Thread** | Message-level side discussion in a dedicated panel | ✅ Complete |
 | **Status** | 24h ephemeral text + photo updates (WhatsApp Desktop: vertical Status tab, My status on top, friends grouped) | ✅ Complete |
+| **Kivo Game** | 1v1 Typing Race played on its own full-screen surface (`/games`); the host conversation carries only an invite/result chip | ✅ Complete |
 
 ---
 
@@ -131,6 +132,7 @@ Kivo
 | **Custom Emoji** | **Complete** | `CustomEmoji` model (global/space/personal), `emoji` module (CRUD + Appwrite upload), personal emoji (Plus-only, 50 max, usable everywhere), Space emoji (Plus/admin, 100 max), global emoji (admin-only, 200 max), `:name:` shortcode parsing, `customReactionKey` for reactions, IndexedDB caching with stale-while-revalidate, `emoji:new`/`emoji:deleted` realtime events |
 | **Kivo Plus (UPI payments)** | **Complete** | Self-serve ₹49/month via UPI, `/plus` page with pricing + claim form + status cards, `PlusRequest` model (pending/approved/rejected/expired), admin review queue, 24h review window, 30-day grants, hourly sweep for expired claims + scrubbing Plus-only effects, per-plan caps in `PLAN_LIMITS` |
 | Voice / Video Calls | **Complete** | LiveKit Cloud SFU; `POST /api/v1/calls/token` + `GET /calls/status`; Socket.IO ring coordination; incoming overlay + floating call panel; in-chat call history |
+| **Kivo Games** | **Complete** | Full-screen `/games` arena (live lobby presence `arena:enter/leave` → `arena:roster`, friend online dots, per-plan-concurrent invites) + 1v1 **Typing Race**: server-picked passage, server-owned clock (WPM clamped to 400) and finish places, throttled monotonic live progress, auto-start on accept, result chip posted as its own message, win/lose flash + Web Audio stinger, 30-min invite TTL / 10-min extended race deadline + 5-min `abandonStaleGames()` sweep |
 
 ---
 
@@ -1039,6 +1041,38 @@ Response: `{ attachments: [{ fileId, bucketId, fileName, mimeType, size, kind, u
 
 ---
 
+### 12. Kivo Games (Typing Race)
+
+Games are played on their **own full-screen surface** at `/games`, never inside the chat timeline. A conversation only receives a thin **chip** message that deep-links back to the arena.
+
+#### 12.1 Arena
+
+- **Live lobby presence:** opening `/games` emits `arena:enter` (unmounting emits `arena:leave`); the server keeps an in-memory roster (`Map<userId, { sockets, profile, blocked }>`) and re-broadcasts `arena:roster` to every member on any change. Each entry caches the member's public profile and block list at enter time, so a broadcast needs no DB reads and **blocked pairs never see each other** (filtered in both directions).
+- **Three lists:** *In the arena* (everyone with the page open, each with an Invite button), *Friends* (with online dots from the existing presence snapshot), and *Your games* (pending invites with Accept/Decline, then sessions already waiting or racing).
+- **Invite is the only entry point:** `POST /api/v1/games/invite { targetUserId, kind }` resolves-or-creates the pair's DM, posts the invite chip there, emits `game:invited` to the target, and fans out a notification/push through the existing pipeline.
+- **Caps:** one live game per pair at a time (`GAME_EXISTS`), `PLAN_LIMITS.gamesPerConversationActive` = **2 free / 10 Plus** enforced server-side on invite (`GAME_LIMIT`), and blocking is enforced both ways (`BLOCKED_USER`) — the same rule the DM path uses.
+
+#### 12.2 Typing Race (1v1)
+
+- **Server picks the passage** from 6 built-in passages, and the passage is only revealed in `game:started` / `GET /games/:id` while the session is `active` — a client can neither choose it nor read it early.
+- **Auto-start on accept:** once everyone invited has joined (minimum 2 players), the race activates immediately — accepting the invite *is* the start. `POST /:id/start` remains as a host-only fallback.
+- **Live progress:** the client reports `progress` (0–1) via `POST /:id/progress`, clamped and forced monotonic server-side, and **never written to the chip message** — it is broadcast only (`game:progress`). Pings are throttled client-side to every ~5% and at most one per 250 ms, and the viewer's own bar renders locally from keystrokes so typing itself stays instant.
+- **Finish:** the first player to complete the passage **ends the race**. `POST /:id/finish` is idempotent — a retry cannot claim two places, and a finish arriving after the opponent already won returns the authoritative result instead of erroring. WPM is derived from the **server's clock** (characters ÷ 5 per minute, clamped to 400) and finish places are server-assigned; the client's claimed `elapsedMs` is clamped to the server-observed elapsed time.
+- **Result card:** a **new** `type: "game"` message with `role: "result"` is posted, attributed to the winner and guarded by `GameSession.resultMessageId`, so the outcome earns its own notification and unread badge rather than being invisible history. The invite chip is kept current with `message:edited`, so it flips waiting → live → finished with no refetch.
+- **Win/lose flash:** a full-screen green **You Win** / red **You Lose** takeover (~1.2 s) with a synthesized Web Audio stinger (ascending arpeggio / descending fall), gated by the **Game Results** sound preference (`localStorage["kivo:sounds"].gameResults`, default on). Fires only for players in the game — a bystander in the same chat gets the result chip and no takeover.
+- **Expiry:** pending invites expire after **30 minutes**; a race's **10-minute deadline is extended by every progress ping**, so only genuinely abandoned sessions are reaped — a slow typist is never cut off mid-race. A 5-minute `abandonStaleGames()` sweep (mirroring `closeExpiredPolls()`) cancels stale sessions and emits `game:cancelled`.
+
+#### 12.3 Realtime events
+
+| Event | Direction | Description |
+|---|---|---|
+| `arena:enter` / `arena:leave` | Client → Server | Join/leave the games lobby roster while `/games` is open |
+| `arena:roster` | Server → Client | Current lobby members (profiles cached at enter time, blocked pairs filtered both ways) |
+| `game:invited` | Server → User | Dedicated nudge so an open arena surfaces an invite immediately |
+| `game:updated` / `game:started` / `game:progress` / `game:finished` / `game:cancelled` | Server → Room | Session lifecycle; `game:started` is the **only** event carrying the passage, and every emit with players uses the same full `publicPlayers()` shape |
+
+---
+
 ## API Reference
 
 ### Base URL
@@ -1258,6 +1292,23 @@ Room names are deterministic per conversation (`kivo_<conversationId>`) so late 
 
 **Realtime:** `emoji:new` and `emoji:deleted` events broadcast to space rooms or globally.
 
+#### Kivo Games (Typing Race)
+
+| Method | Path | Auth | Rate Limit | Body |
+|---|---|---|---|---|
+| GET | `/api/v1/games/invites` | Yes | — | — (pending invitations waiting on me) |
+| GET | `/api/v1/games/mine` | Yes | — | — (my waiting + in-flight sessions) |
+| POST | `/api/v1/games/invite` | Yes | 10/min | `{ targetUserId, kind: "typing" }` → session (resolves-or-creates the DM, posts the invite chip, emits `game:invited`) |
+| GET | `/api/v1/games/:id` | Yes | — | — (the passage is included only while the session is `active`) |
+| POST | `/api/v1/games/:id/join` | Yes | 30/min | — (auto-starts a 1v1 once everyone invited is in) |
+| POST | `/api/v1/games/:id/decline` | Yes | 30/min | — |
+| POST | `/api/v1/games/:id/start` | Yes | 30/min | — (host-only fallback when the invitee already accepted) |
+| POST | `/api/v1/games/:id/progress` | Yes | 120/min | `{ progress: 0..1 }` (monotonic, broadcast-only, extends the race deadline) |
+| POST | `/api/v1/games/:id/finish` | Yes | 30/min | `{ accuracy?, elapsedMs? }` → session (idempotent; WPM and place server-derived) |
+| POST | `/api/v1/games/:id/cancel` | Yes | 30/min | — (host only) |
+
+Error codes: `SELF_INVITE`, `INVALID_PLAYER`, `USER_NOT_FOUND`, `GAME_LIMIT`, `GAME_EXISTS`, `BLOCKED_USER`, `GAME_NOT_PENDING`, `NOT_INVITED`, `NOT_HOST`, `GAME_NEED_PLAYERS`, `GAME_NOT_ACTIVE`, `NOT_IN_GAME`, `GAME_NOT_FOUND`, `INVALID_ID`.
+
 #### Kivo Plus (UPI payments)
 
 | Method | Path | Auth | Rate Limit | Body |
@@ -1373,7 +1424,8 @@ backend/src/
 │   ├── FriendRequest.js
 │   ├── Space.js
 │   ├── Notification.js
-│   └── PushSubscription.js
+│   ├── PushSubscription.js
+│   └── GameSession.js
 ├── modules/
 │   ├── auth/              # Register, login, refresh, logout
 │   ├── users/             # Profile, avatar, search
@@ -1384,6 +1436,7 @@ backend/src/
 │   ├── notifications/     # In-app + push notification service
 │   ├── push/              # VAPID push subscriptions
 │   ├── attachments/       # File/image upload to Appwrite
+│   ├── games/             # Kivo Games sessions + arena (invite, join, progress, finish)
 │   └── admin/             # Force logout, user listing
 ├── socket/
 │   ├── index.js           # Socket.IO init, presence, focus tracking, events
@@ -1462,12 +1515,18 @@ Each module follows a 4-file pattern:
   conversationId:      ObjectId → Conversation (indexed)
   senderId:            ObjectId → User (indexed)
   content:             String (max 4000, blanked on soft-delete)
+  type:                String (enum: ["text", "system", "poll", "game"], default "text")
   replyToMessageId:    ObjectId → Message (nullable)
   reactions:           [{ userId, emoji, _id }]
   deliveredTo:         [ObjectId → User]
   readBy:              [{ userId, readAt }]
   isEdited:            Boolean (default: false)
   isDeleted:           Boolean (default: false)
+  poll:                Poll (when type = "poll": question, options[{id,text,voters}],
+                       allowMultiple, anonymous, expiresAt, isClosed, totalVotes)
+  game:                GameCard (when type = "game": sessionId, kind, role "invite"|"result",
+                       status, players[{userId,displayName,status,place,wpm,accuracy,elapsedMs}],
+                       winnerId, winnerName, startedAt, finishedAt)
   createdAt:           Date
   updatedAt:           Date
 }
@@ -1553,6 +1612,28 @@ Each module follows a 4-file pattern:
 ```
 **Index:** `{ targetType, targetId }`.
 
+#### GameSession
+```
+{
+  kind:               String (enum: ["typing"], default "typing")
+  status:             String (enum: ["pending", "active", "finished", "cancelled"], default "pending")
+  conversationId:     ObjectId → Conversation (indexed — the chat that hosts the chip)
+  messageId:          ObjectId → Message (the invite chip)
+  resultMessageId:    ObjectId → Message (the result chip; guards against posting it twice)
+  createdBy:          ObjectId → User
+  players:            [{ userId, displayName, status: "invited"|"joined"|"declined"|"left",
+                         progress: 0..1, place, wpm, accuracy, elapsedMs, finishedAt }]
+  passage:            String (server-picked at activation, only revealed while active)
+  startedAt:          Date (nullable)
+  finishedAt:         Date (nullable)
+  expiresAt:          Date (nullable — invite TTL, or the race deadline extended by progress pings)
+  winnerId:           ObjectId → User (nullable)
+  createdAt:          Date
+  updatedAt:          Date
+}
+```
+**Indexes:** `{ conversationId, status, createdAt -1 }` (conversation-scoped listing), `{ status, expiresAt }` (abandonment sweep), `{ "players.userId", status, updatedAt -1 }` (my active games).
+
 ### Frontend Pages
 
 | Route | File | Purpose | Auth |
@@ -1565,6 +1646,7 @@ Each module follows a 4-file pattern:
 | `/verify-email` | `app/(auth)/verify-email/page.jsx` | Verify email from emailed link | GuestGate |
 | `/app` | `app/app/page.jsx` | Main dashboard | AuthGate |
 | `/app/profile` | `app/app/profile/page.jsx` | User profile | AuthGate |
+| `/games` | `app/games/page.jsx` | **Kivo Games arena** — full-screen Typing Race lobby + race | AuthGate |
 | `/docs` | `app/docs/page.jsx` | How-to-use guide | Anyone |
 | `/admin` | `app/admin/page.jsx` | Admin login | Admin cookie |
 | `/admin/dashboard` | `app/admin/dashboard/page.jsx` | Admin dashboard | Admin cookie |
@@ -1616,12 +1698,17 @@ components/
 │   └── channel-list.jsx      # Channels within a space
 ├── docs/
 │   └── docs-screen.jsx       # In-app how-to-use guide
+├── games/
+│   ├── games-arena.jsx       # /games lobby: arena roster, invites, friends, refresh
+│   ├── typing-race-view.jsx  # Full-screen race: passage, live bars, results
+│   ├── game-chip.jsx         # Timeline chip (role "invite" | "result") → /games
+│   └── game-result-flash.jsx # Full-screen win/lose takeover + stinger
 └── ui/
     ├── button.jsx            # shadcn Button
     └── bubble.jsx            # shadcn Bubble primitive
 ```
 
-**Note:** `lib/` also includes `push.js` (web push helpers), `sound.js` (notification sounds), `pwa.js`, `banners.js` (animated GIF profile banners), `avatar-styles.js`, `use-file-upload.js` (attachment upload hook), and `chat.js` (message send helpers).
+**Note:** `lib/` also includes `push.js` (web push helpers), `sound.js` (notification sounds + `playGameResult()` win/lose stingers), `games.js` (Kivo Games payload metadata + display helpers), `pwa.js`, `banners.js` (animated GIF profile banners), `avatar-styles.js`, `use-file-upload.js` (attachment upload hook), and `chat.js` (message send helpers).
 
 ---
 
@@ -1648,7 +1735,7 @@ components/
 ### Rate Limiting
 
 - In-memory fixed-window rate limiter.
-- Applied to: login (10/15min), refresh (30/60s).
+- Applied to: login (10/15min), refresh (30/60s), game invite (10/min), game progress (120/min), other game actions (30/min).
 - Sets `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After` headers.
 
 ### Upload Validation
@@ -1767,6 +1854,7 @@ These may be considered after the core communication experience is stable.
 - **Email verification** (instant signup — no OTP; `/verify-email` link + resend API) and **password reset** (forgot/reset via email).
 - **Last online status**, **Mark as unread / New messages separator**, and **reconnect gap-fill**.
 - **Global search (Ctrl+K)**, **admin panel**, **public profiles** (`/u/:username`, badges, GitHub graphs), **blocking**, **notification preferences**, and **rate limiting**.
+- **Kivo Games** — the `/games` arena and the 1v1 **Typing Race** (the first mini-app): server-authoritative sessions, live lobby presence, invite/result chips in chat, win/lose flash + stinger.
 
 ### Phase 1.5 — Voice Foundations (Shipped)
 
@@ -1780,6 +1868,7 @@ These may be considered after the core communication experience is stable.
 - Advanced permissions.
 - Scheduled messages.
 - Stronger search (message, conversation, space).
+- **Kivo Games depth:** rematch/"play again" + best-of series, a persistent win/loss record, and letting the runner-up finish for their own time.
 
 ### Phase 3 — Rich Communication
 
@@ -1792,7 +1881,7 @@ These may be considered after the core communication experience is stable.
 ### Phase 4 — Platform
 
 - Developer platform.
-- Mini-apps.
+- Mini-apps — more Kivo Games (Chess, Ludo, multi-player tables, tournaments, spectators).
 - Automation.
 - Marketplace themes & theme sharing.
 

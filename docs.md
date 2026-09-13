@@ -43,6 +43,7 @@ Next.js rewrites proxy `/api/*` and `/socket.io` to the backend (see `BACKEND_UR
 | `/verify-email?token=…` | Anyone | Validate an email-verification link. |
 | `/app` | Signed-in users | Main chat: conversation lists, Spaces, Settings. |
 | `/app/profile` | Signed-in users | Read-only profile summary and **Log out**. |
+| `/games` | Signed-in users | **Kivo Games arena** — full-screen Typing Race lobby: who's here, invites, and the race itself. |
 | `/u/:username` | Anyone | **Public profile** — shareable page for any user (badge, country, GitHub graph, actions). |
 | `/docs` | Anyone | In-app "How to use Kivo" guide. |
 | `/admin`, `/admin/dashboard` | Admins | Standalone admin panel (separate login). |
@@ -742,7 +743,7 @@ You are never notified of your **own** messages. **System** messages (joins/leav
 
 **Notification preferences (Settings → Notification preferences):** choose which categories you receive — Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages, and Announcements. Space Messages are **off by default**; `@mentions` override a muted category (but still respect your Mentions toggle). Friend requests/acceptances are gated on `friendRequests`; lightweight pings like **Waves** flow ungated with their own 20 s server cooldown. Toggles apply to both in-app (`notification:new`) and push delivery.
 
-**Sound cues (Settings → Sounds):** every category has its own audio toggle — Direct Messages, Mentions, Group Messages, Space Messages, and Friend Requests — under a master **Notification sounds** switch, each with a **▶ preview** button so you can hear a cue before enabling it. Cues fire only when a message/request deserves attention: DMs chime when the tab is hidden or that DM isn't focused; **@mentions** chime when the conversation isn't focused (they override the group/space categories, like the server preferences); group and Space messages only chime while the tab is in the background; friend requests/acceptances chime unless the notification center is open. Cues are synthesized in-browser with the Web Audio API (no audio assets), and preferences live in `localStorage["kivo:sounds"]` — the old `kivo:sound` flag is migrated into the master switch on first read.
+**Sound cues (Settings → Sounds):** every category has its own audio toggle — Direct Messages, Mentions, Group Messages, Space Messages, Friend Requests, and Game Results — under a master **Notification sounds** switch, each with a **▶ preview** button so you can hear a cue before enabling it. Cues fire only when a message/request deserves attention: DMs chime when the tab is hidden or that DM isn't focused; **@mentions** chime when the conversation isn't focused (they override the group/space categories, like the server preferences); group and Space messages only chime while the tab is in the background; friend requests/acceptances chime unless the notification center is open. Cues are synthesized in-browser with the Web Audio API (no audio assets), and preferences live in `localStorage["kivo:sounds"]` — the old `kivo:sound` flag is migrated into the master switch on first read.
 
 **Under the hood (performance):** message fan-out now groups recipients in one `insertMany` (~1 DB round-trip) instead of sequential creates, batch-loads per-recipient preferences in one query, and fire-and-forgets web-push so the sender's `POST /messages` never waits on VAPID HTTP. Offline push results are persisted asynchronously (`delivery.pushDelivered / pushError`), expired endpoints (404/410) are pruned, and DM-focused suppression (`isUserFocusedOnConversation`) still skips notifications for the DM you are actively viewing.
 
@@ -1059,6 +1060,7 @@ Kivo Plus is a premium plan that unlocks higher limits, custom emoji, profile ef
 | Multi-choice polls | No | Yes |
 | Anonymous polls | No | Yes |
 | Forward limit/message | 5 | 10 |
+| Concurrent Kivo Games | 2 | 10 |
 | Personal emoji | 0 | 50 |
 | Custom banner upload | No | Yes (8 MB) |
 | Profile effects | No | Yes (glow/gradient/aura) |
@@ -1101,6 +1103,56 @@ Kivo can polish what you type and translate what you read. Nothing AI-generated 
 
 ---
 
+## 26. Kivo Games (Typing Race)
+
+Kivo Games is a full-screen arena at **`/games`** — its own surface, deliberately separate from chat. You play there; a conversation only ever receives a one-line **chip** that links back to it.
+
+### Open the arena
+
+- **Desktop:** click **Games** in the icon rail (left edge, gamepad icon).
+- **Mobile:** **Menu → Kivo Games**.
+- Or go straight to **`/games`**.
+
+### See who is in the arena
+
+The arena has three lists:
+
+- **In the arena** — everyone with `/games` open right now, kept live over Socket.IO. Blocked users never see each other here (filtered in both directions).
+- **Friends** — your friend list with a green dot for anyone currently online.
+- **Your games** — pending invites at the top with **Accept** / **Decline**, then anything already waiting or racing.
+
+### Invite someone
+
+1. Find the player under **In the arena** or **Friends** and click **Invite**.
+2. Kivo resolves — or creates — your **DM** with them and posts a **chip** there (*"Typing Race invite"*).
+3. They open `/games` and hit **Accept** on the card under **Your games**.
+4. **The race starts immediately.** A 1v1 needs no separate start step, so both players drop straight into the full-screen race.
+
+Inviting from the arena is the only way to start a game, and there can be only one live game per pair at a time. Free accounts can have **2** games going at once; Plus accounts **10**.
+
+### Race
+
+- The **server picks** one of 6 passages. Nobody sees it until the race is active and no client can choose it.
+- Type the passage exactly — matched characters turn **accent-colored** (blue in the default theme) and a wrong character shows in **red** until you correct it.
+- Your own progress bar follows your keystrokes instantly; your opponent's bar is synced from the server.
+- A live **WPM** readout and **accuracy** sit under the input, with a race clock in the header.
+- **The first person to finish the passage ends the race** — the winner is decided on the spot and both players get the result screen.
+
+### Result
+
+- **You Win** flashes the screen **green** with a trophy; **You Lose** flashes it **red** with a broken heart — about a second each, with a synthesized stinger. Tap the flash to dismiss it early, and turn the sound off in **Settings → Sounds → Game Results**.
+- The result screen lists **both** players: finishers with **place, WPM, accuracy and time**, and anyone who didn't cross the line with **how far they got** (`78% typed`).
+- The outcome is also shared to the chat as a **result chip** — a **new message** attributed to the winner, so it arrives with its own notification and unread badge. Tapping it opens `/games`.
+
+### Rules and limits
+
+- **Server-authoritative by design:** the passage is picked server-side, the start time is stamped server-side, **WPM is derived from the server's clock** (characters ÷ 5 per minute, clamped to 400), and finish places are assigned by the server. Clients only report "I typed this far" and "I finished".
+- **A pending invite expires after 30 minutes.** An **abandoned race is cancelled after 10 minutes** — and every progress ping pushes that deadline back, so a slow typist is never cut off mid-race.
+- **Cancel** is host-only (from **Your games**) and leaves the chip reading "Race finished".
+- Games ride your existing **Socket.IO** connection — no extra setup and no media server (that's calls, not games).
+
+---
+
 ## What is not in the product yet
 
 Do not expect these in the current MVP:
@@ -1110,6 +1162,7 @@ Do not expect these in the current MVP:
 - Theme template sharing (per-Space palettes are built; sharing them as saved templates is not)
 - Full offline **message** history in the PWA (lists + last 50 messages are cached; full history still needs the network)
 - Video attachments (voice messages are built; video is not)
+- More Kivo Games — only the **1v1 Typing Race** ships today; Chess, Ludo, 4-player tables, tournaments and spectators are not built yet
 - **Disappearing messages (24h/7d auto-delete)** — **removed 2026-09-08** from frontend & backend (`disappearingDuration`/`expireAt`/`message:expired`/`conversation:disappearing` deleted) — messages now persist until soft-deleted by sender
 
 ---
@@ -1172,6 +1225,7 @@ Do not expect these in the current MVP:
 | Health check (ops) | `GET /health` on the API |
 | Custom emoji (global/Space/personal) | Type `:name:` in composer; Space admins create Space emoji; Plus users create personal emoji; admin creates global emoji |
 | Kivo Plus (₹49/month UPI) | `/plus` page → pay UPI → paste 12-digit UTR → admin reviews within 24h → 30 days of Plus |
+| Kivo Games — arena, invites, Typing Race, result chip | Icon rail **Games** (mobile: Menu → Kivo Games) → invite someone from **In the arena** / **Friends** → tap **Accept** in **Your games** to race |
 | Plus claims review (admin) | Admin → Plus Claims tab → approve/reject pending claims |
 | Public pages | `/plus`, `/learn`, `/author`, `/privacy`, `/terms`, `/cookie` |
 

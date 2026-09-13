@@ -32,7 +32,7 @@ This document explains the project for **anyone** — no coding knowledge requir
 
 ## ✨ What can you do with Kivo?
 
-Think of Kivo as one app with three kinds of conversation:
+Think of Kivo as one app with three kinds of conversation — plus a place to play:
 
 ### 1. Direct messages (DMs) — private 1:1 chats
 - Add someone by **username, email, or display name** — search shows **square profile cards** (avatar, banner wash, bio/status, Plus), and you can send a **welcome message (280 chars)** that the other person sees before accepting.
@@ -50,6 +50,12 @@ Think of Kivo as one app with three kinds of conversation:
 - Roles: **owner → admin → moderator → member**, all enforced by the server.
 - **Public Spaces** appear in Discover — browse by category (Technology, Gaming, Art…) and join in one click. **Private Spaces** are hidden and joinable only via a rotating **invite link** that expires after 7 days.
 - Owners/admins can even give a Space its own colors and chat wallpaper.
+
+### 4. Kivo Games — play instead of just chatting
+- **`/games`** is a full-screen games arena (desktop: icon rail **Games**; mobile: **Menu → Kivo Games**). It shows who is in there right now, your friends and who's online, and any invites waiting on you.
+- Pick someone and hit **Invite** — they get a **1v1 Typing Race**, and the race starts the moment they accept.
+- Your chat only ever gets a **one-line chip** (*"Priya invited you"*, *"You won — 62 wpm"*). The game itself is played on its own screen.
+- **The server is the referee:** it picks the passage, starts the clock, and decides who won. You just type — and a green **You Win** / red **You Lose** flash tells you how it went.
 
 ### And on every conversation…
 - 📎 **Attachments** — up to 10 images/PDFs/documents per message (30 MB each), plus **voice messages** (hold the mic, release to send).
@@ -158,6 +164,14 @@ That's the whole trick: *instant paint, verified truth, instant delivery, quiet 
 - Calls run on **LiveKit** (a dedicated real-time media network) — chat servers are bad at streaming audio/video, so Kivo delegates.
 - There's *no call state stored on Kivo's server*: rooms are named deterministically per conversation (`kivo_<conversationId>`), so everyone — including late joiners — lands in the same room. The only server memory is a 30-second "ringing" timer that turns into a missed call.
 
+### 🎮 Kivo Games
+- A game is its **own little record** (`GameSession`), not a chat message. The chat only holds a thin **chip** pointing at it, so the invite and the result show up in your conversation (with a notification) while the playing happens full-screen at `/games`.
+- **The server is the referee — the browser is only a screen.** The server picks the passage, stamps the start time, works out WPM from *its* clock (characters ÷ 5 per minute, capped at 400), and assigns 1st and 2nd place. Your browser is only allowed to say *"I've typed this far"* and *"I'm done"* — the same never-trust-the-client rule used everywhere else in Kivo.
+- **Typing itself is instant** because your own progress bar is drawn locally from your keystrokes; the server is only pinged every ~5% (at most four times a second) to keep your opponent's bar honest. Type a wrong letter and it shows **red** until you fix it.
+- **The first person to finish ends the race.** In a 1v1 there's nothing left to wait for, so the winner is decided right there and the outcome is posted back into the chat as a **new result chip** — which is why you get a notification instead of silently noticing a score.
+- **Nobody can be left stranded:** a pending invite expires after 30 minutes, and a race nobody is typing in is cancelled after 10 minutes — but every progress ping pushes that deadline back, so a slow typist is never cut off mid-race.
+- **No new infrastructure.** Games run entirely on the socket connection chat already uses — no media server (that's calls), no extra service, no polling.
+
 ### 👤 Accounts, security & trust
 - **Passwords** are hashed with bcrypt (12 rounds) — even the database can't read them.
 - **Sessions:** a 15-minute access token (in the request header) + a refresh cookie that is `httpOnly` (JavaScript can't touch it) and backed by a real **Session** row in the database — which means "log out everywhere" and "admin bans user" *actually* revoke access, instantly.
@@ -210,24 +224,25 @@ This is the part most projects never explain. Each choice here was made *against
 | **PushSubscription** | per-user browser push endpoint |
 | **CustomEmoji** | name, spaceId (global/space/personal), ownerId (personal Plus-only), url, animated — three-tiered emoji system |
 | **PlusRequest** | userId, UTR (12-digit UPI ref), status (pending/approved/rejected/expired), 24h review window |
+| **GameSession** | one row per Kivo Game: kind (`typing`), status (pending/active/finished/cancelled), the conversation that hosts its chip, `messageId` (invite chip) + `resultMessageId` (result chip), embedded players with live `progress`/`place`/`wpm`/`accuracy`/`elapsedMs`, the server-picked `passage`, `startedAt`/`finishedAt`/`winnerId`, and `expiresAt` for the abandonment sweep |
 | **AdminActionLog** | who banned/granted/deleted what, and when |
 
 Messages are heavily **indexed** for the ways they're read: by conversation + time, by thread, by pinned state, by who saved them, plus a text index for search.
 
 ### The API surface
-Versioned REST under `/api/v1`, one mount per domain — `auth`, `users`, `friends`, `conversations`, `messages`, `spaces`, `notifications`, `push`, `attachments`, `search`, `link-preview`, `calls` — plus a separate `/api/admin`. Every backend module follows the same 4-file shape: **routes → controller → service → validation**, so navigating the code is predictable.
+Versioned REST under `/api/v1`, one mount per domain — `auth`, `users`, `friends`, `conversations`, `messages`, `spaces`, `notifications`, `push`, `attachments`, `search`, `link-preview`, `calls`, `games` — plus a separate `/api/admin`. Every backend module follows the same 4-file shape: **routes → controller → service → validation**, so navigating the code is predictable.
 
 ### The repository map
 
 ```
 kivo/
 ├── frontend/    Next.js 16 web app (React 19, Tailwind v4, JS only)
-│   ├── app/         routes: / landing, /learn, /docs, /login…, /app chat, /u/<name>,
-│   │                /plus, /author, /privacy, /terms, /cookie, /admin
+│   ├── app/         routes: / landing, /learn, /docs, /login…, /app chat, /games arena,
+│   │                /u/<name>, /plus, /author, /privacy, /terms, /cookie, /admin
 │   ├── components/  chat shell, bubbles, spaces, calls, notifications, profile, ui,
-│   │                plus, learn, author
+│   │                games (arena, typing race, chip, win/lose flash), plus, learn, author
 │   └── lib/         api client, themes, cache (IndexedDB), socket, drafts, push, sounds,
-│                    custom-emoji, plus, polls, profile-effects, social-links, status
+│                    custom-emoji, games, plus, polls, profile-effects, social-links, status
 ├── backend/     Express 5 + Socket.IO + Mongoose (JS only)
 │   └── src/         modules/ (one folder per domain), models/, middleware/, socket/, lib/
 ├── README.md        full feature list & setup
@@ -282,7 +297,7 @@ For web push, generate keys with `npx web-push generate-vapid-keys`. For calls, 
 
 ## 🚧 What's *not* in Kivo (yet)
 
-Honesty is part of the design docs, so: no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. The roadmap in the [README](README.md) tracks everything.
+Honesty is part of the design docs, so: no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. **Kivo Games ships with exactly one game today** — the 1v1 Typing Race; Chess, Ludo, tournaments and spectating are still roadmap. The roadmap in the [README](README.md) tracks everything.
 
 ---
 
@@ -304,6 +319,8 @@ Honesty is part of the design docs, so: no E2E encryption, full offline history 
 | **SSRF** | Server-Side Request Forgery — a trick Kivo's link-preview fetcher guards against |
 | **SFU** | Selective Forwarding Unit — the media server topology LiveKit uses for calls |
 | **TOTP** | Time-based one-time passwords — the standard behind authenticator apps |
+| **Arena** | The full-screen `/games` lobby — who's around, your invites, and where a race is started and played |
+| **Server-authoritative** | The server, not your browser, decides the truth — here: the passage, the timing, and who won |
 
 ---
 

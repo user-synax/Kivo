@@ -22,6 +22,7 @@ const TOC = [
   { id: "notifications", label: "Notifications & install" },
   { id: "keyboard", label: "Keyboard shortcuts" },
   { id: "calls", label: "Voice & video calls" },
+  { id: "games", label: "Kivo Games" },
   { id: "not-yet", label: "Not built yet" },
 ];
 
@@ -798,6 +799,10 @@ export function DocsScreen() {
 
                 <Bullet>Video attachments (voice messages are built; video is not)</Bullet>
                 <Bullet>
+                  More Kivo Games — only the 1v1 Typing Race ships today;
+                  Chess, Ludo, tournaments and spectating are not built yet
+                </Bullet>
+                <Bullet>
                   Full offline message history — only the latest 50 messages
                   per chat are cached (text you send while offline is queued
                   and delivered automatically when you're back)
@@ -820,6 +825,49 @@ export function DocsScreen() {
                 Calls need mic/camera permission and are unavailable in Space
                 channels and blocked chats.
               </p>
+            </Section>
+
+            <Section id="games" title="Kivo Games">
+              <p>
+                Kivo Games lives on its own full-screen surface at
+                <span className="text-ink"> /games</span>, separate from chat
+                — open it from <span className="text-ink">Games</span> in the
+                desktop icon rail, or <span className="text-ink">Menu → Kivo
+                Games</span> on mobile. There you see everyone who has the
+                arena open right now, your friends and who's online, and any
+                invites waiting on you.
+              </p>
+              <Steps
+                items={[
+                  "Find someone under In the arena or Friends and tap Invite. Kivo opens (or creates) your DM with them and drops a one-line chip there.",
+                  "They open /games and tap Accept on the card under Your games — the race starts immediately, with no separate start step.",
+                  "Type the passage exactly. Matched letters turn blue, a wrong letter shows red until you fix it, your own progress bar follows your keystrokes instantly, and a live WPM readout plus race clock run alongside.",
+                  "The first person to finish ends the race. You get a green You Win or red You Lose flash, then a result screen showing both players' place, WPM, accuracy and time — and the outcome is shared back to the chat as a new result chip.",
+                ]}
+              />
+              <ul className="mt-2 flex flex-col gap-2">
+                <Bullet>
+                  The server picks the passage and times the race — nobody can
+                  choose the text or claim a WPM.
+                </Bullet>
+                <Bullet>
+                  Chat never hosts the game: the timeline only ever shows the
+                  invite chip and the result chip, and tapping either opens
+                  /games.
+                </Bullet>
+                <Bullet>
+                  One live game per person at a time. Free accounts can keep 2
+                  games going, Plus accounts 10.
+                </Bullet>
+                <Bullet>
+                  Turn the win/lose sound off (or preview it) in Settings →
+                  Sounds → Game Results.
+                </Bullet>
+                <Bullet>
+                  A pending invite expires after 30 minutes, and a race nobody
+                  is typing in is cancelled after 10 minutes.
+                </Bullet>
+              </ul>
             </Section>
 
             <section

@@ -48,6 +48,7 @@
 - 🤝 **Complete friends system** — send, accept, decline, **remove** (mutual — both lists update live), search with **square profile preview cards**, and **welcome messages** (280 chars shown before accept); jump straight into a DM.
 - 📍 **Nearby users (full-screen)** — discover people near you by fuzzed distance only (`250 m` / `1.2 km`, never exact location). Opt-in **ON by default**, toggle in **Settings → Privacy → Nearby discovery**. Share location one-shot → `GET /users/nearby` with `1/2/5/10km` radius, blocked/banned/friends filtered, `2dsphere` index. Desktop: icon rail **Nearby** (full-screen like Appearance); mobile: **Menu → Nearby users**.
 - 📊 **Polls** — create 2-8 option polls in any DM/group/Space channel with live tallies, anonymous + multi-choice (Plus), 1h/24h/3d/7d/never expiry, end-early, `poll:updated/ended` realtime
+- 🎮 **Kivo Games** — a full-screen arena at **`/games`** with a 1v1 **Typing Race**: see who is in the arena right now, invite a friend, and race the same server-picked passage with live progress bars. Fully server-authoritative (the server picks the passage, times the race, computes WPM and assigns places), chat carries only a one-line chip that deep-links back to the arena, and a green/red takeover flash + synthesized stinger announces the result.
 - 🟢 **Status (WhatsApp-style, 24h)** — text (6 backgrounds) **or photo** (jpg/png/webp/gif ≤30 MB, 1 per status, caption 280) — friends-only vertical feed (My status on top), green/grey rings, viewer with auto-advance (photo 5s) + caption overlay, 10/day limit, hourly Appwrite file cleanup, live `status:new/deleted/viewed`
 - 📍 **Nearby discovery** — full-screen page (desktop: icon rail **Nearby**; mobile: Menu → Nearby) with radius chips and privacy consent sheet.
 - 📱 **Mobile-first polish** — a bottom tab bar (Chats / **Status** / Groups / Spaces / Menu) with Profile, Settings, **Nearby**, and a full-screen Appearance page behind the Menu, plus an icon-rail navigation on desktop that work beautifully from phone to XL desktop.
@@ -167,6 +168,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Two-factor authentication (2FA)** — TOTP via authenticator apps (QR setup in Settings), one-time backup codes, two-step login challenge
 - **OAuth / social login** — Google & GitHub signup/login (`GET/POST /api/v1/auth/oauth/:provider*`), account linking in Settings (Verify with Google/GitHub), provider verification badges (Google Verified, GitHub Verified) on public profiles, native Kivo verified badge earned by linking both providers; OAuth-only accounts have no password and continue via the provider button
 - **Status (24h) — text + photo** — WhatsApp Desktop-style vertical tab (My status on top + friends grouped), 6 text backgrounds **or photo (Appwrite `APPWRITE_ATTACHMENTS_BUCKET_ID`, `STATUS_ALLOWED_MIMES` image, 30MB)**, friends+block filtered, `Status` model `{text,background,media{fileId,bucketId,url,kind,size}}` + `expiresAt` hourly sweep (file delete then doc), `POST /` multipart `media` 10/day + `GET /feed` + `status:new/deleted/viewed`, viewer photo 5s auto-advance, unread dot
+- **Kivo Games (Typing Race)** — full-screen `/games` arena with live lobby presence (`arena:enter/leave` → `arena:roster`), 1v1 invites that resolve-or-create the pair's DM and post a chip there, a **server-authoritative** typing race (server-picked passage of 6, server-observed start time, WPM derived from the server clock and clamped to 400, server-assigned finish places), live progress over `game:progress`, and a **result chip posted as its own message** — plus a full-screen win/lose flash with a Web Audio stinger (`Settings → Sounds → Game Results`)
 - Animated landing page
 
 ### 🚧 Planned / Not Started
@@ -222,13 +224,14 @@ kivo/
 │   ├── app/                  # Routes: /, login, signup, verify-email, forgot/reset
 │   │   │                     #   password, /app (chat), /app/profile, /u/[username],
 │   │   │                     #   /plus, /learn, /author, /privacy, /terms, /cookie,
-│   │   │                     #   /docs, /admin + /admin/dashboard
+│   │   │                     #   /docs, /games (Kivo Games arena), /admin + /admin/dashboard
 │   ├── components/           # dashboard (chat shell, panels), spaces, notifications,
 │   │   │                     #   profile, chat, ui, motion, navbar, admin, docs,
-│   │   │                     #   plus, learn, author
+│   │   │                     #   plus, learn, author, games (arena, typing race,
+│   │   │                     #   chat chip, win/lose flash)
 │   ├── lib/                  # api, auth, cache, chat, theme, push, sound, spaces,
 │   │   │                     #   avatar-styles, banners, countries, last-active, links,
-│   │   │                     #   emoji, custom-emoji, drafts, hooks, plus, polls,
+│   │   │                     #   emoji, custom-emoji, drafts, hooks, games, plus, polls,
 │   │   │                     #   profile-effects, profile-skin, social-links, status
 │   └── Design.md             # Visual design system & tokens
 │
@@ -240,10 +243,10 @@ kivo/
 │       ├── middleware/       # auth, adminAuth, errorHandler, rateLimiter (in-memory)
 │       ├── models/           # User, Session, Conversation, Message, FriendRequest,
 │       │                     #   Space, Notification, PushSubscription, AdminActionLog,
-│       │                     #   Status, CustomEmoji, PlusRequest
+│       │                     #   Status, CustomEmoji, PlusRequest, GameSession
 │       ├── modules/          # auth, users, friends, conversations, messages, spaces,
 │       │                     #   notifications, push, attachments, search, link-preview, ai,
-│       │                     #   admin, status, emoji, plus, calls, crypto, billing, voice
+│       │                     #   admin, status, emoji, plus, games, calls, crypto, billing, voice
 │       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
 │       └── utils/            # errors & async handlers
 │
@@ -388,6 +391,10 @@ Registration / Login
 | `call:missed` / `call:failed` | Server → Room / Caller | No-answer timeout / blocked-call rejection |
 | `emoji:new` / `emoji:deleted` | Server → Space / Global | Custom emoji created or deleted (Space-scoped or global broadcast) |
 | `status:new` / `status:deleted` / `status:viewed` | Server → Friends | Status updates for friends-only feed |
+| `arena:enter` / `arena:leave` | Client → Server | Join/leave the Kivo Games lobby roster while `/games` is open |
+| `arena:roster` | Server → Client | Who is currently in the games arena (cached profiles, blocked pairs filtered both ways) |
+| `game:invited` | Server → User | A dedicated nudge so an open arena surfaces the invite immediately |
+| `game:updated` / `game:started` / `game:progress` / `game:finished` / `game:cancelled` | Server → Room | Kivo Games session lifecycle — waiting, race begins (passage revealed), live progress, result, cancel |
 
 > Every connection is **authenticated** via JWT handshake (banned users are rejected at reconnect), and the server verifies conversation/space membership before accepting sensitive events. All socket rooms are joined automatically on connect. After a reconnect the client **gap-fills**: it refetches the conversation list and fetches messages newer than the newest known message in the open chat, so nothing is missed while offline.
 
@@ -494,7 +501,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
 - Covers DMs, group & Space messages (incl. announcements), mentions, friend requests & accepts; cursor-paginated with "mark all read"
 - **Notification preferences** (Settings) — per-category toggles for Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages (off by default), and Announcements; `@mentions` always override a muted category
 - **DM-focused suppression** — if you're actively viewing a DM, notifications for it are skipped server-side
-- **Sound cues** per notification category (Settings → Sounds): Direct Messages, Mentions, Group Messages, Space Messages, and Friend Requests each have their own toggle plus a one-tap preview — chimes are synthesized in-browser (Web Audio), so no audio files ship with the app
+- **Sound cues** per notification category (Settings → Sounds): Direct Messages, Mentions, Group Messages, Space Messages, Friend Requests, and Game Results each have their own toggle plus a one-tap preview — chimes are synthesized in-browser (Web Audio), so no audio files ship with the app
 - Realtime delivery via socket (`notification:new`) with per-recipient fan-out
 - **Unread dots** on the Chats/Groups/Spaces navigation icons when a category has unread activity
 
@@ -538,9 +545,21 @@ Themes share one geometry — corner radius, elevation, and layout languages are
   - Multi-choice + anonymous polls (Plus only)
   - Forward limit per message: 5 → 10
   - Personal emoji: 0 → 50
+  - Concurrent Kivo Games: 2 → 10
   - AI assist cloud calls: 30/day → 100/day (on-device AI is always unlimited)
 - **Admin review queue** — admin panel lists Plus claims with approve/reject actions
 - **Hourly sweep** — expired claims and Plus-only effects on expired accounts are cleaned up automatically
+
+### 🎮 Kivo Games
+- **Its own surface, not a chat feature** — games live in a full-screen arena at **`/games`** (desktop: icon-rail **Games**; mobile: **Menu → Kivo Games**), with the same theme, auth gate, and socket connection as the chat app
+- **Who's here, invite them** — the arena lists everyone with the page open (live over Socket.IO), your friends with online dots, and your pending invites + games in flight; pick someone and hit **Invite**
+- **1v1 Typing Race** — invites are 1v1: the backend resolves (or creates) your DM, posts a chip there, and the race **auto-starts the moment your opponent accepts** — no separate start step
+- **Chat carries only a chip** — a one-line entry that reads "Invited you — tap to accept", "Waiting for Priya", "Race in progress" or "You won", and deep-links to `/games`. Join/start/cancel never happen inside the chat timeline
+- **Server-authoritative** — the server picks one of 6 passages, stamps the start time, derives WPM from its own clock (clamped to 400), and assigns finish places; clients only report "I typed this far" and "I finished"
+- **Crossing the line ends the race** — the winner is decided immediately and a **result chip is posted as its own message** (fresh timeline entry, own notification and unread badge) with WPM, accuracy and time
+- **Win/lose takeover** — a full-screen green **You Win** / red **You Lose** flash with a synthesized stinger (`Settings → Sounds → Game Results`)
+- **Safety nets** — pending invites expire after 30 minutes, an abandoned race is reaped after 10 minutes idle (every progress ping extends it, so a slow typist is never cut off), and a 5-minute sweep cancels stale sessions so chips never sit in a stale state
+- **Per-plan caps** — 2 concurrent games on free, 10 on Plus; one live game per pair at a time; blocking is enforced both ways for invites and in the arena lobby
 
 ---
 
@@ -574,11 +593,11 @@ Browser  ──HTTPS──►  Next.js frontend  ──REST──►  Express ba
 
 | Phase | Focus |
 |---|---|
-| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, voice messages, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA, media gallery, conversation delete |
+| **Phase 1** (current) | DMs, groups, realtime, friends, spaces & channels, notifications + preferences, PWA, 10 themes, mobile UX, offline caching, attachments, voice messages, public profiles & badges, blocking, message forwarding & pinning, threads, global search, 2FA, media gallery, conversation delete, **Kivo Games (Typing Race arena)** |
 | **Phase 1.5** (shipped) | Voice & video calls (LiveKit: DMs + groups, missed calls) |
 | **Phase 2** | Stronger search, video attachments |
 | **Phase 3** | Voice rooms, screen sharing, call recording, bots & webhooks |
-| **Phase 4** | Developer platform, mini-apps, marketplace theme sharing |
+| **Phase 4** | Developer platform, more mini-apps (Chess, Ludo), marketplace theme sharing |
 
 ---
 
