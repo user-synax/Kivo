@@ -1,11 +1,20 @@
 "use client";
 
-import { CornerDownLeft, Loader2, MessageSquareText, X } from "lucide-react";
+import {
+  CornerDownLeft,
+  Loader2,
+  MessageSquareText,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/dashboard/avatar";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
-import { RichEmptyState } from "@/components/ui/empty-state";
 import { useSocket } from "@/components/socket-provider";
+import { RichEmptyState } from "@/components/ui/empty-state";
+import { StreamingText } from "@/components/ui/streaming-text";
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
+import { summarizeMessages } from "@/lib/ai";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { formatTime } from "@/lib/chat";
@@ -35,6 +44,10 @@ export function ThreadPanel({
   const [copiedId, setCopiedId] = useState(null);
   const listRef = useRef(null);
   const copiedTimerRef = useRef(null);
+  const [sumBusy, setSumBusy] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [sumSource, setSumSource] = useState(null);
+  const [sumError, setSumError] = useState(null);
 
   // Index members so sender names/avatars render without extra fetches.
   const membersById = useMemo(() => {
@@ -205,9 +218,7 @@ export function ThreadPanel({
       );
     } catch {
       setReplies((prev) =>
-        prev.map((r) =>
-          r.id === reply.id ? { ...r, saved: !next } : r,
-        ),
+        prev.map((r) => (r.id === reply.id ? { ...r, saved: !next } : r)),
       );
     }
   };
@@ -227,6 +238,37 @@ export function ThreadPanel({
     if (sender?.username) onOpenProfile?.(sender.username);
   };
 
+  const summarizeThread = async () => {
+    if (sumBusy) return;
+    if (summary) {
+      setSummary(null);
+      setSumSource(null);
+      setSumError(null);
+      return;
+    }
+    setSumBusy(true);
+    setSumError(null);
+    try {
+      const texts = [
+        root?.content ? `Original: ${root.content}` : null,
+        ...replies
+          .filter((r) => !r.isDeleted && r.content)
+          .map((r) => `${senderName(r.senderId)}: ${r.content}`),
+      ].filter(Boolean);
+      if (texts.length < 2) {
+        setSumError("Not enough messages to summarize yet.");
+        return;
+      }
+      const out = await summarizeMessages(texts, "bullets");
+      setSummary(out?.text || "");
+      setSumSource(out?.source || null);
+    } catch (e) {
+      setSumError(e?.message || "Summary failed. Try again.");
+    } finally {
+      setSumBusy(false);
+    }
+  };
+
   return (
     <section
       aria-label="Thread"
@@ -235,7 +277,10 @@ export function ThreadPanel({
       {/* Panel header */}
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--bg-base)] px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <MessageSquareText className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
+          <MessageSquareText
+            className="h-4 w-4 shrink-0 text-[var(--text-muted)]"
+            aria-hidden
+          />
           <h2 className="truncate font-sans text-[14px] font-semibold text-[var(--text-primary)]">
             Thread
           </h2>
@@ -287,6 +332,46 @@ export function ThreadPanel({
                   : `📎 ${root.attachments.length}{" "}
                 ${root.attachments.length === 1 ? "attachment" : "attachments"}`}
               </p>
+            )}
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={summarizeThread}
+                disabled={sumBusy || loading}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-2.5 py-1 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                {summary ? "Hide summary" : "Summarize thread"}
+              </button>
+            </div>
+            {(sumBusy || summary || sumError) && (
+              <div className="mt-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-2.5">
+                {sumBusy && (
+                  <ThinkingIndicator
+                    words={["Reading thread…", "Summarizing…"]}
+                    className="text-[12px]"
+                  />
+                )}
+                {!sumBusy && sumError && (
+                  <p className="text-[12px] text-[var(--destructive)]">
+                    {sumError}
+                  </p>
+                )}
+                {!sumBusy && !sumError && summary && (
+                  <>
+                    <StreamingText
+                      text={summary}
+                      speed={40}
+                      className="text-[13px] leading-snug"
+                    />
+                    {sumSource && (
+                      <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+                        via {sumSource}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -347,7 +432,9 @@ export function ThreadPanel({
                       }
                       onCopy={() => copyMessage(reply)}
                       onSaveToggle={
-                        !reply.isDeleted ? () => toggleSaveReply(reply) : undefined
+                        !reply.isDeleted
+                          ? () => toggleSaveReply(reply)
+                          : undefined
                       }
                       onForward={onForward ? () => onForward(reply) : undefined}
                       onProfile={

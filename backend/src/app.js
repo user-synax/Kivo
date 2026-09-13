@@ -22,6 +22,7 @@ import callsRoutes from "./modules/calls/calls.routes.js";
 import plusRoutes from "./modules/plus/plus.routes.js";
 import statusRoutes from "./modules/status/status.routes.js";
 import emojiRoutes from "./modules/emoji/emoji.routes.js";
+import aiRoutes from "./modules/ai/ai.routes.js";
 
 const app = express();
 
@@ -102,6 +103,7 @@ app.use("/api/v1/calls", callsRoutes);
 app.use("/api/v1/plus", plusRoutes);
 app.use("/api/v1/status", statusRoutes);
 app.use("/api/v1/emoji", emojiRoutes);
+app.use("/api/v1/ai", aiRoutes);
 
 // 404 + centralized error handler (must be registered last).
 app.use(notFoundHandler);

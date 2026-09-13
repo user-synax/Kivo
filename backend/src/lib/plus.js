@@ -40,6 +40,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollAllowAnonymous: false,
     forwardLimitPerMessage: 5,
     personalEmojiMax: 0, // free cannot create personal emoji
+    aiDailyMax: 30, // AI assist calls/day (cloud fallback; on-device is unlimited)
   }),
   plus: Object.freeze({
     messageMaxLength: 8000,
@@ -62,6 +63,7 @@ export const PLAN_LIMITS = Object.freeze({
     pollAllowAnonymous: true,
     forwardLimitPerMessage: 10,
     personalEmojiMax: 50, // Plus personal library usable everywhere
+    aiDailyMax: 100, // headroom for heavy AI users
   }),
 });
 

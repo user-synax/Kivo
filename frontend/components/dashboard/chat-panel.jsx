@@ -6,6 +6,7 @@ import {
   Ban,
   BarChart3,
   Bookmark,
+  Bot,
   CheckCheck,
   ChevronLeft,
   Clock,
@@ -27,6 +28,7 @@ import {
   Send,
   ShieldBan,
   Smile,
+  Sparkles,
   Trash,
   User,
   UserMinus,
@@ -42,6 +44,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
+import { AiAssist } from "@/components/ai/ai-assist";
 import { CallChip, parseCallChip } from "@/components/calls/call-chip";
 import { useCalls } from "@/components/calls/call-provider";
 import { UploadPreview } from "@/components/chat/attachments";
@@ -59,6 +62,9 @@ import { ProfileDrawer } from "@/components/profile/profile-drawer";
 import { useSocket } from "@/components/socket-provider";
 import { useTheme } from "@/components/theme-provider";
 import { RichEmptyState } from "@/components/ui/empty-state";
+import { StreamingText } from "@/components/ui/streaming-text";
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
+import { summarizeMessages } from "@/lib/ai";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
@@ -76,6 +82,12 @@ import {
 } from "@/lib/chat";
 import { resolveChatLook, wallpaperCss } from "@/lib/chat-style";
 import { copyText, messageText } from "@/lib/clipboard";
+import {
+  getCustomEmojis,
+  getMergedEmojis,
+  invalidateEmojiCache,
+  isCustomReaction,
+} from "@/lib/custom-emoji";
 import { clearDraft, draftsKey, loadDraft, saveDraft } from "@/lib/drafts";
 import { useLiveLastActive } from "@/lib/last-active";
 import {
@@ -90,12 +102,6 @@ import { cssVarsForColors, customIsActive, derivePalette } from "@/lib/theme";
 import { useIsDesktop } from "@/lib/use-breakpoint";
 import { uploadSingleFileObject, useFileUpload } from "@/lib/use-file-upload";
 import { usernameColorClass, usernameColorStyle } from "@/lib/username-colors";
-import {
-  getCustomEmojis,
-  getMergedEmojis,
-  invalidateEmojiCache,
-  isCustomReaction,
-} from "@/lib/custom-emoji";
 
 const TYPING_IDLE_MS = 1500;
 // Messages from the same sender within this window are visually grouped.
@@ -201,11 +207,18 @@ function SwipeToReply({ children, onReply, enabled }) {
   );
 }
 
-function CustomEmojiAutocomplete({ emojis = [], query = "", selectedIndex = 0, onSelect }) {
-  const filtered = (emojis || []).filter((e) => {
-    if (!query) return true;
-    return e.name.toLowerCase().includes(query.toLowerCase());
-  }).slice(0, 8);
+function CustomEmojiAutocomplete({
+  emojis = [],
+  query = "",
+  selectedIndex = 0,
+  onSelect,
+}) {
+  const filtered = (emojis || [])
+    .filter((e) => {
+      if (!query) return true;
+      return e.name.toLowerCase().includes(query.toLowerCase());
+    })
+    .slice(0, 8);
   if (filtered.length === 0) return null;
   return (
     <div
@@ -227,7 +240,15 @@ function CustomEmojiAutocomplete({ emojis = [], query = "", selectedIndex = 0, o
             }}
             className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-xs transition-colors ${isSelected ? "bg-[var(--accent)]/15 text-[var(--accent)] font-medium" : "text-[var(--text-primary)] hover:bg-[var(--hover)]"}`}
           >
-            <img src={e.url} alt={`:${e.name}:`} width={16} height={16} className="size-4 shrink-0 object-contain" loading="lazy" decoding="async" />
+            <img
+              src={e.url}
+              alt={`:${e.name}:`}
+              width={16}
+              height={16}
+              className="size-4 shrink-0 object-contain"
+              loading="lazy"
+              decoding="async"
+            />
             <span className="truncate font-medium">:{e.name}:</span>
           </button>
         );
@@ -478,14 +499,20 @@ const MessageRows = React.memo(function MessageRows({
       ? [
           m.content || "",
           m.poll?.question || "",
-          Array.isArray(m.poll?.options) ? m.poll.options.map((o) => o.text).join(" ") : "",
-          Array.isArray(m.attachments) ? m.attachments.map((a) => a.fileName || "").join(" ") : "",
+          Array.isArray(m.poll?.options)
+            ? m.poll.options.map((o) => o.text).join(" ")
+            : "",
+          Array.isArray(m.attachments)
+            ? m.attachments.map((a) => a.fileName || "").join(" ")
+            : "",
           m.forwardedFromName || "",
         ]
           .join(" ")
           .toLowerCase()
       : "";
-    const isSearchMatch = searchActive && searchHaystack.includes(String(searchQuery).trim().toLowerCase());
+    const isSearchMatch =
+      searchActive &&
+      searchHaystack.includes(String(searchQuery).trim().toLowerCase());
     const isActiveSearch = activeSearchId && m.id === activeSearchId;
 
     return (
@@ -541,7 +568,9 @@ const MessageRows = React.memo(function MessageRows({
                 />
               </span>
             ) : null}
-            <div className={`flex min-w-0 flex-col max-w-full w-fit ${mine ? "ml-auto items-end" : "mr-auto items-start"}`}>
+            <div
+              className={`flex min-w-0 flex-col max-w-full w-fit ${mine ? "ml-auto items-end" : "mr-auto items-start"}`}
+            >
               <SwipeToReply
                 enabled={isMobile && !selectMode}
                 onReply={() => a.handleReply(m)}
@@ -719,7 +748,9 @@ export function ChatPanel({
     ? conversation.online.some(Boolean)
     : Boolean(conversation?.online);
   const isDm = Boolean(conversation && conversation.type === "dm");
-  const isSelf = Boolean(conversation && (conversation.type === "self" || conversation.isSelf));
+  const isSelf = Boolean(
+    conversation && (conversation.type === "self" || conversation.isSelf),
+  );
   const isBlockedByMe = Boolean(conversation?.isBlockedByMe);
   const isBlockedByOther = Boolean(conversation?.isBlockedByOther);
 
@@ -776,6 +807,10 @@ export function ChatPanel({
     setMentionOpen(false);
     setEmojiAutocompleteOpen(false);
     setShowEmoji(false);
+    setAiOpen(false);
+    setCatchUpOpen(false);
+    setCatchUpText(null);
+    setCatchUpError(null);
   }, [convId]);
   useEffect(() => {
     if (!convId || !userId) return undefined;
@@ -827,6 +862,13 @@ export function ChatPanel({
   const [pollBusy, setPollBusy] = useState(false);
   const [pollVoteBusyId, setPollVoteBusyId] = useState(null);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiBtnRef = useRef(null);
+  const [catchUpOpen, setCatchUpOpen] = useState(false);
+  const [catchUpBusy, setCatchUpBusy] = useState(false);
+  const [catchUpText, setCatchUpText] = useState(null);
+  const [catchUpSource, setCatchUpSource] = useState(null);
+  const [catchUpError, setCatchUpError] = useState(null);
   const [historyFor, setHistoryFor] = useState(null);
   const [historyData, setHistoryData] = useState(null);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
@@ -871,8 +913,10 @@ export function ChatPanel({
     const parts = [];
     if (m.content) parts.push(m.content);
     if (m.poll?.question) parts.push(m.poll.question);
-    if (Array.isArray(m.poll?.options)) parts.push(m.poll.options.map((o) => o.text).join(" "));
-    if (Array.isArray(m.attachments)) parts.push(m.attachments.map((a) => a.fileName || "").join(" "));
+    if (Array.isArray(m.poll?.options))
+      parts.push(m.poll.options.map((o) => o.text).join(" "));
+    if (Array.isArray(m.attachments))
+      parts.push(m.attachments.map((a) => a.fileName || "").join(" "));
     if (m.forwardedFromName) parts.push(m.forwardedFromName);
     return parts.join(" ");
   };
@@ -902,6 +946,33 @@ export function ChatPanel({
     setInChatQuery("");
     setInChatCurrentIdx(0);
   };
+  const runCatchUp = async () => {
+    if (catchUpBusy) return;
+    if (catchUpOpen && (catchUpText || catchUpError)) {
+      setCatchUpOpen(false);
+      return;
+    }
+    setCatchUpOpen(true);
+    setCatchUpBusy(true);
+    setCatchUpError(null);
+    try {
+      const texts = messages
+        .filter((m) => m.type !== "system" && !m.isDeleted && m.content)
+        .slice(-50)
+        .map((m) => String(m.content).slice(0, 400));
+      if (texts.length < 3) {
+        setCatchUpError("Not enough messages to summarize yet.");
+        return;
+      }
+      const out = await summarizeMessages(texts, "bullets");
+      setCatchUpText(out?.text || "");
+      setCatchUpSource(out?.source || null);
+    } catch (e) {
+      setCatchUpError(e?.message || "Summary failed. Try again.");
+    } finally {
+      setCatchUpBusy(false);
+    }
+  };
   const stepInChat = (dir) => {
     if (!inChatMatches.length) return;
     setInChatCurrentIdx((prev) => {
@@ -923,7 +994,9 @@ export function ChatPanel({
     if (inChatMatches.length) {
       const firstId = inChatMatches[0].id;
       requestAnimationFrame(() => {
-        document.getElementById(`msg-${firstId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+        document
+          .getElementById(`msg-${firstId}`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
     }
   }, [inChatQuery, inChatSearchOpen, inChatMatches.length]);
@@ -1603,7 +1676,9 @@ export function ChatPanel({
     const onEmojiNew = (emoji) => {
       // Personal emoji is globally visible (included in every space/global fetch), so invalidate all
       if (emoji?.ownerId) {
-        import("@/lib/custom-emoji").then(({ invalidateAllEmojiCaches }) => invalidateAllEmojiCaches().catch(() => {}));
+        import("@/lib/custom-emoji").then(({ invalidateAllEmojiCaches }) =>
+          invalidateAllEmojiCaches().catch(() => {}),
+        );
       } else if (emoji?.spaceId) invalidateEmojiCache(emoji.spaceId);
       else invalidateEmojiCache(null);
       // Refresh current view
@@ -1621,7 +1696,9 @@ export function ChatPanel({
     };
     const onEmojiDeleted = (payload) => {
       if (payload?.ownerId) {
-        import("@/lib/custom-emoji").then(({ invalidateAllEmojiCaches }) => invalidateAllEmojiCaches().catch(() => {}));
+        import("@/lib/custom-emoji").then(({ invalidateAllEmojiCaches }) =>
+          invalidateAllEmojiCaches().catch(() => {}),
+        );
       } else {
         const sid = payload?.spaceId || null;
         if (sid) invalidateEmojiCache(sid);
@@ -1666,7 +1743,9 @@ export function ChatPanel({
   const getFilteredEmojis = (queryStr) => {
     const q = (queryStr || "").toLowerCase();
     if (!q) return usableCustomEmojis.slice(0, 8);
-    return usableCustomEmojis.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 8);
+    return usableCustomEmojis
+      .filter((e) => e.name.toLowerCase().includes(q))
+      .slice(0, 8);
   };
 
   const checkEmojiTrigger = (val, cursorPosition) => {
@@ -1685,7 +1764,12 @@ export function ChatPanel({
         }
         // Even if no match but user typed :, show empty? keep closed to avoid spam
         if (sub.length === 0 && usableCustomEmojis.length > 0) {
-          return { open: true, query: "", pos: lastColon, filtered: usableCustomEmojis.slice(0, 8) };
+          return {
+            open: true,
+            query: "",
+            pos: lastColon,
+            filtered: usableCustomEmojis.slice(0, 8),
+          };
         }
       }
     }
@@ -2366,7 +2450,13 @@ export function ChatPanel({
       if (!payload?.messageId) return;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === payload.messageId ? { ...m, forwardCount: payload.forwardCount, isFrequentlyForwarded: (payload.forwardCount || 0) >= 3 } : m,
+          m.id === payload.messageId
+            ? {
+                ...m,
+                forwardCount: payload.forwardCount,
+                isFrequentlyForwarded: (payload.forwardCount || 0) >= 3,
+              }
+            : m,
         ),
       );
     };
@@ -3248,7 +3338,9 @@ export function ChatPanel({
   // vars, so they compose with per-Space palettes automatically.
   const chatLook = resolveChatLook({
     conversationAppearance:
-      isChannel || isSelf || !conversation?.appearance ? null : conversation.appearance,
+      isChannel || isSelf || !conversation?.appearance
+        ? null
+        : conversation.appearance,
     spaceAppearance: isChannel ? spaceAppearance : null,
     personalAppearance: currentUser?.appearance,
   });
@@ -3451,6 +3543,19 @@ export function ChatPanel({
             <Search className="h-5 w-5" />
           </button>
         )}
+        {conversation && (
+          <button
+            type="button"
+            onClick={runCatchUp}
+            aria-label="Catch up with AI summary"
+            title="Catch up — summarize recent messages"
+            aria-pressed={catchUpOpen}
+            disabled={catchUpBusy}
+            className={`max-md:hidden flex size-9 items-center justify-center rounded-nav border transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)] disabled:opacity-40 ${catchUpOpen ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] text-[var(--text-muted)]"}`}
+          >
+            <Sparkles className="h-5 w-5" />
+          </button>
+        )}
         {(isGroup || isChannel) && onOpenGroupSettings && (
           <button
             type="button"
@@ -3611,13 +3716,20 @@ export function ChatPanel({
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
             animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            transition={
+              reduce
+                ? { duration: 0 }
+                : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+            }
             className="relative z-10 flex shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2"
             role="search"
             aria-label="Search in conversation"
           >
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-base)] px-3 py-1.5 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]">
-              <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
+              <Search
+                className="h-4 w-4 shrink-0 text-[var(--text-muted)]"
+                aria-hidden
+              />
               <input
                 ref={inChatSearchInputRef}
                 value={inChatQuery}
@@ -3659,7 +3771,11 @@ export function ChatPanel({
               aria-live="polite"
               className={`hidden shrink-0 text-[12px] tabular-nums sm:inline ${inChatQuery && inChatMatches.length === 0 ? "text-[var(--destructive)]" : "text-[var(--text-muted)]"}`}
             >
-              {inChatQuery ? (inChatMatches.length ? `${inChatCurrentIdx + 1} / ${inChatMatches.length}` : "No matches") : `${messages.filter((m) => m.type !== "system" && !m.isDeleted).length} messages`}
+              {inChatQuery
+                ? inChatMatches.length
+                  ? `${inChatCurrentIdx + 1} / ${inChatMatches.length}`
+                  : "No matches"
+                : `${messages.filter((m) => m.type !== "system" && !m.isDeleted).length} messages`}
             </span>
             <div className="flex shrink-0 items-center gap-1">
               <button
@@ -3688,6 +3804,70 @@ export function ChatPanel({
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI catch-up — summarize last 50 messages */}
+      <AnimatePresence>
+        {catchUpOpen && (
+          <motion.div
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={
+              reduce
+                ? { duration: 0 }
+                : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+            }
+            className="relative z-10 shrink-0 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2"
+            role="status"
+            aria-label="AI catch-up summary"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles
+                className="h-4 w-4 shrink-0 text-[var(--accent)]"
+                aria-hidden
+              />
+              <p className="flex-1 text-[13px] font-semibold text-[var(--text-primary)]">
+                Catch up
+              </p>
+              <button
+                type="button"
+                onClick={() => setCatchUpOpen(false)}
+                aria-label="Close catch-up"
+                className="flex size-7 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-2.5">
+              {catchUpBusy && (
+                <ThinkingIndicator
+                  words={["Reading recent messages…", "Summarizing…"]}
+                  className="text-[12px]"
+                />
+              )}
+              {!catchUpBusy && catchUpError && (
+                <p className="text-[12px] text-[var(--destructive)]">
+                  {catchUpError}
+                </p>
+              )}
+              {!catchUpBusy && !catchUpError && catchUpText && (
+                <>
+                  <StreamingText
+                    text={catchUpText}
+                    speed={40}
+                    className="text-[13px] leading-snug"
+                  />
+                  {catchUpSource && (
+                    <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+                      via {catchUpSource}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </motion.div>
         )}
@@ -3761,10 +3941,12 @@ export function ChatPanel({
         )}
         <div
           key={convId}
-          className="t-panel-in mx-auto flex max-w-3xl flex-col"
+          className="t-panel-in mx-auto flex max-w-4xl flex-col"
         >
           {isSelf && messages.length === 0 && !loadingHistory && (
-            <SavedSelfEmpty username={currentUser?.username || currentUser?.displayName} />
+            <SavedSelfEmpty
+              username={currentUser?.username || currentUser?.displayName}
+            />
           )}
           <MessageRows
             messages={messages}
@@ -3832,9 +4014,9 @@ export function ChatPanel({
       </AnimatePresence>
 
       {/* Composer / selection toolbar */}
-      <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
+      <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 max-sm:p-2 pb-[max(env(safe-area-inset-bottom),1rem)]">
         {selectMode && (
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
             <span className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-primary)]">
               <CheckCheck className="h-4 w-4 text-[var(--accent)]" />
               {selectedMessages.length} selected
@@ -3882,7 +4064,7 @@ export function ChatPanel({
           </div>
         )}
         <div
-          className="mx-auto max-w-3xl"
+          className="mx-auto max-w-4xl"
           style={selectMode ? { display: "none" } : undefined}
         >
           {replyingTo && !isBlockedByMe && !isBlockedByOther && canPost && (
@@ -4048,6 +4230,28 @@ export function ChatPanel({
                   }}
                 />
                 <UploadPreview files={pendingFiles} onRemove={removeFile} />
+                {aiOpen && canPost && !recording && (
+                  <div className="mb-2 flex justify-start">
+                    <AiAssist
+                      text={text}
+                      contextMessages={messages
+                        .filter(
+                          (m) =>
+                            m.type !== "system" && !m.isDeleted && m.content,
+                        )
+                        .slice(-5)
+                        .map((m) => m.content)}
+                      onInsert={(next) => {
+                        setText(next);
+                        setSendError(null);
+                        requestAnimationFrame(() =>
+                          textareaRef.current?.focus(),
+                        );
+                      }}
+                      onClose={() => setAiOpen(false)}
+                    />
+                  </div>
+                )}
                 {scheduledList.length > 0 && (
                   <div className="mb-2 flex flex-col gap-1.5">
                     <button
@@ -4071,7 +4275,9 @@ export function ChatPanel({
                               {m.content || "(empty)"}
                             </span>
                             <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
-                              {m.scheduledAt ? new Date(m.scheduledAt).toLocaleString() : ""}
+                              {m.scheduledAt
+                                ? new Date(m.scheduledAt).toLocaleString()
+                                : ""}
                             </span>
                             <button
                               type="button"
@@ -4087,7 +4293,7 @@ export function ChatPanel({
                     )}
                   </div>
                 )}
-                <div className="flex items-end gap-2">
+                <div className="flex items-end gap-2 max-sm:gap-1.5">
                   {recording ? (
                     <div className="flex w-full items-center gap-3 px-1 py-1.5">
                       <span className="relative flex size-2.5 shrink-0">
@@ -4154,40 +4360,42 @@ export function ChatPanel({
                         />
                       )}
                       {showEmoji && (
-                          <EmojiPicker
-                            customEmojis={usableCustomEmojis}
-                            onSelect={(emoji) => {
-                              const el = textareaRef.current;
-                              const start = el ? el.selectionStart : text.length;
-                              const end = el ? el.selectionEnd : text.length;
-                              const next = text.slice(0, start) + emoji + text.slice(end);
-                              setText(next);
-                              setShowEmoji(false);
-                              requestAnimationFrame(() => {
-                                if (!el) return;
-                                const pos = start + emoji.length;
-                                el.focus();
-                                el.setSelectionRange(pos, pos);
-                              });
-                            }}
-                            onSelectCustom={(ce) => {
-                              const el = textareaRef.current;
-                              const start = el ? el.selectionStart : text.length;
-                              const end = el ? el.selectionEnd : text.length;
-                              const inserted = `:${ce.name}:`;
-                              const next = text.slice(0, start) + inserted + text.slice(end);
-                              setText(next);
-                              setShowEmoji(false);
-                              requestAnimationFrame(() => {
-                                if (!el) return;
-                                const pos = start + inserted.length;
-                                el.focus();
-                                el.setSelectionRange(pos, pos);
-                              });
-                            }}
-                            onClose={() => setShowEmoji(false)}
-                            ignoreRef={emojiBtnRef}
-                          />
+                        <EmojiPicker
+                          customEmojis={usableCustomEmojis}
+                          onSelect={(emoji) => {
+                            const el = textareaRef.current;
+                            const start = el ? el.selectionStart : text.length;
+                            const end = el ? el.selectionEnd : text.length;
+                            const next =
+                              text.slice(0, start) + emoji + text.slice(end);
+                            setText(next);
+                            setShowEmoji(false);
+                            requestAnimationFrame(() => {
+                              if (!el) return;
+                              const pos = start + emoji.length;
+                              el.focus();
+                              el.setSelectionRange(pos, pos);
+                            });
+                          }}
+                          onSelectCustom={(ce) => {
+                            const el = textareaRef.current;
+                            const start = el ? el.selectionStart : text.length;
+                            const end = el ? el.selectionEnd : text.length;
+                            const inserted = `:${ce.name}:`;
+                            const next =
+                              text.slice(0, start) + inserted + text.slice(end);
+                            setText(next);
+                            setShowEmoji(false);
+                            requestAnimationFrame(() => {
+                              if (!el) return;
+                              const pos = start + inserted.length;
+                              el.focus();
+                              el.setSelectionRange(pos, pos);
+                            });
+                          }}
+                          onClose={() => setShowEmoji(false)}
+                          ignoreRef={emojiBtnRef}
+                        />
                       )}
                       <div className="relative flex shrink-0 items-center">
                         <button
@@ -4198,10 +4406,10 @@ export function ChatPanel({
                           aria-haspopup="dialog"
                           onClick={() => setComposerMenuOpen((v) => !v)}
                           disabled={!canPost}
-                          className={`flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${composerMenuOpen ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
+                          className={`flex size-9 max-sm:size-8 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${composerMenuOpen ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
                         >
                           <Plus
-                            className={`h-5 w-5 transition-transform duration-200 ${composerMenuOpen ? "rotate-45" : "rotate-0"}`}
+                            className={`h-5 w-5 max-sm:h-[18px] max-sm:w-[18px] transition-transform duration-200 ${composerMenuOpen ? "rotate-45" : "rotate-0"}`}
                           />
                         </button>
                       </div>
@@ -4213,9 +4421,22 @@ export function ChatPanel({
                         aria-label="Emoji picker"
                         title="Emoji picker"
                         disabled={!canPost}
-                        className={`flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${showEmoji ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
+                        className={`flex size-9 max-sm:size-8 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${showEmoji ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
                       >
-                        <Smile className="h-5 w-5" />
+                        <Smile className="h-5 w-5 max-sm:h-[18px] max-sm:w-[18px]" />
+                      </button>
+
+                      <button
+                        ref={aiBtnRef}
+                        type="button"
+                        onClick={() => setAiOpen((v) => !v)}
+                        aria-label="AI writing assist"
+                        title="AI assist — grammar, rewrite, translate"
+                        aria-expanded={aiOpen}
+                        disabled={!canPost}
+                        className={`flex size-9 max-sm:size-8 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${!text.trim() && !aiOpen ? "max-sm:hidden" : ""} ${aiOpen ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"} disabled:pointer-events-none disabled:opacity-40`}
+                      >
+                        <Bot className="h-5 w-5 max-sm:h-[18px] max-sm:w-[18px]" />
                       </button>
 
                       <button
@@ -4229,9 +4450,9 @@ export function ChatPanel({
                         onPointerCancel={cancelRecording}
                         onContextMenu={(e) => e.preventDefault()}
                         disabled={uploadBusy || !canPost}
-                        className="flex size-9 shrink-0 touch-none select-none items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] active:text-[var(--accent)] disabled:pointer-events-none disabled:opacity-40"
+                        className={`flex size-9 max-sm:size-8 shrink-0 touch-none select-none items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] active:text-[var(--accent)] disabled:pointer-events-none disabled:opacity-40 ${text.trim() ? "max-sm:hidden" : ""}`}
                       >
-                        <Mic className="h-5 w-5" />
+                        <Mic className="h-5 w-5 max-sm:h-[18px] max-sm:w-[18px]" />
                       </button>
 
                       <textarea
@@ -4291,14 +4512,19 @@ export function ChatPanel({
                             if (e.key === "ArrowDown") {
                               e.preventDefault();
                               setEmojiIndex((prev) =>
-                                filtered.length ? (prev + 1) % filtered.length : 0
+                                filtered.length
+                                  ? (prev + 1) % filtered.length
+                                  : 0,
                               );
                               return;
                             }
                             if (e.key === "ArrowUp") {
                               e.preventDefault();
                               setEmojiIndex((prev) =>
-                                filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0
+                                filtered.length
+                                  ? (prev - 1 + filtered.length) %
+                                    filtered.length
+                                  : 0,
                               );
                               return;
                             }
@@ -4396,7 +4622,7 @@ export function ChatPanel({
                         aria-label="Message"
                         rows={1}
                         enterKeyHint="send"
-                        className="max-h-40 min-h-[40px] w-full resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+                        className="max-h-40 min-h-[40px] min-w-0 flex-1 resize-none bg-transparent py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
                       />
                       {isOffline && (
                         <span className="absolute -top-6 right-0 whitespace-nowrap text-[11px] text-[var(--text-muted)]">
@@ -4417,7 +4643,7 @@ export function ChatPanel({
                           !pendingFiles.some((f) => f.status === "pending")
                         }
                         whileTap={reduce ? undefined : { scale: 0.96 }}
-                        className="rounded-nav bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
+                        className="shrink-0 rounded-nav bg-[var(--accent)] px-4 max-sm:px-3 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
                       >
                         <Send className="h-5 w-5" />
                       </motion.button>

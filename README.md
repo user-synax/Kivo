@@ -61,6 +61,7 @@
 - 🔐 **Security-first** — JWT access tokens + httpOnly sessions, server-side Zod validation, rate limiting on every sensitive route, never trust the client.
 - 🧵 **Optimistic UI** — messages appear instantly with sent → delivered → read states and retry on failure.
 - 🔑 **OAuth signup & login** — sign up or log in with **Google** or **GitHub** (no password needed); username comes from your Google first name or GitHub handle and your provider picture becomes your avatar; existing accounts with the same email are auto-linked; OAuth-only accounts have no password and continue through the provider; linking both providers earns the native Kivo verified badge automatically.
+- 🤖 **AI assist** — fix grammar, rewrite tone (friendly/formal/shorter/longer/confident), translate any message (English/Hindi/custom), smart replies, thread summaries & chat catch-up. On-device AI when available (private, unlimited), Groq → Gemini cloud fallback otherwise.
 
 ---
 
@@ -157,6 +158,7 @@ It's a great platform for **normal, everyday conversations** — no enterprise f
 - **Date dividers + big emoji** — Today/Yesterday/weekday/date pills; 1–3 emoji-only messages render large and chromeless
 - **Jump-to-latest pill** — floating unread-count button when scrolled off the live edge; auto-scroll only pins when already at the bottom (or for your own sends)
 - **Composer upgrades** — per-conversation drafts in localStorage (debounced, cleared on send), paste-image to attach, ↑-on-empty-composer edits your last message, **mobile swipe-to-reply**
+- **AI assist** — composer ✨ panel (Bot button, appears while typing on mobile): fix grammar, rewrite tone, translate draft, smart replies from recent chat; per-message `Translate…` (English/Hindi/custom, opaque readable card); `Summarize thread` in thread panel; header ✨ `Catch up` summarizes last 50 messages; `ThinkingIndicator` while generating + `StreamingText` previews, nothing sends automatically; on-device Chrome AI first, `POST /api/v1/ai/*` (Groq `gpt-oss-20b/120b` → Gemini fallback, 20/min burst + 30/day free / 100/day Plus, 1h cache)
 - **Kivo Plus with UPI payments** — self-serve ₹49/month via UPI, `/plus` page with pricing + claim form + status cards, `PlusRequest` model (pending/approved/rejected/expired), admin review queue (`listPlusRequests`, `approvePlusRequest`, `rejectPlusRequest`), 24h review window, 30-day grants, hourly sweep for expired claims + scrubbing Plus-only effects
 - **Custom Emoji** — `CustomEmoji` model (global/space/personal), `emoji` module (CRUD + Appwrite upload), personal emoji (Plus-only, 50 max, usable everywhere), Space emoji (Plus/admin, 100 max), global emoji (admin-only, 200 max), `:name:` shortcode parsing, `customReactionKey` for reactions, IndexedDB caching with stale-while-revalidate, `emoji:new`/`emoji:deleted` realtime events
 - **Enhanced Plus limits** — per-plan caps in `backend/src/lib/plus.js`: message length (4K→8K), attachments (10→20), file size (30MB→100MB), pins (10→50), saved (200→1K), groups owned (5→20), group members (20→100), spaces owned (3→15), space members (50→300), channels (10→30), call participants (5→25), search (5→20), poll options (5→8), poll duration (1d→7d), multi-choice + anonymous polls, forward limit (5→10), personal emoji (0→50)
@@ -240,7 +242,7 @@ kivo/
 │       │                     #   Space, Notification, PushSubscription, AdminActionLog,
 │       │                     #   Status, CustomEmoji, PlusRequest
 │       ├── modules/          # auth, users, friends, conversations, messages, spaces,
-│       │                     #   notifications, push, attachments, search, link-preview,
+│       │                     #   notifications, push, attachments, search, link-preview, ai,
 │       │                     #   admin, status, emoji, plus, calls, crypto, billing, voice
 │       ├── socket/           # Socket.IO init (presence, rooms), emit helpers
 │       └── utils/            # errors & async handlers
@@ -306,6 +308,7 @@ bun run lint  # biome check
 | `REFRESH_COOKIE_SAMESITE` | backend | `strict` (or `lax` for cross-subdomain) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | backend | Web push (VAPID) keys for offline notifications |
 | `LIVEKIT_URL` / `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | backend | LiveKit Cloud for voice & video calls (optional — call buttons stay hidden until set) |
+| `GROQ_API_KEY` / `GEMINI_API_KEY` | backend | AI assist cloud fallback (optional — `/api/v1/ai/*` reports `AI_NOT_CONFIGURED` until a key is set; Groq first, Gemini fallback; `GROQ_API_KEYS=a,b,c` rotation pool, `GROQ_FAST_MODEL` / `GROQ_QUALITY_MODEL` / `GEMINI_MODEL` / `AI_PROVIDER_ORDER` overrides) |
 | `APPWRITE_ENDPOINT` / `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` | backend | Appwrite credentials (storage) |
 | `APPWRITE_BUCKET_ID` | backend | Appwrite bucket for avatar uploads |
 | `APPWRITE_ATTACHMENTS_BUCKET_ID` | backend | Appwrite bucket for message attachments (separate from avatar bucket) |
@@ -348,7 +351,8 @@ Registration / Login
 - **Registration is instant** — no OTP or verification barrier; you land in `/app`. Sessions are server-backed (`Session` documents with a TTL index).
 - **GuestGate** redirects logged-in users away from `/login`, `/signup`, and the landing page.
 - **AuthGate** redirects unauthenticated users from `/app/*` to `/login`.
-  - **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, `user-search 30/min`, `nearby 30/min`, `location 10/min`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, link previews `30/min`, admin login `5/15min`.
+  - **Rate limits** (in-memory, per user or IP): register `5/hour` (per IP), login `10/15min`, refresh `30/60s`, forgot-password `5/5min`, reset-password `10/5min`, resend-verification `1/min`, message send `40/min`, message edit `20/min`, reactions `60/min`, friend requests `20/hour`, `user-search 30/min`, `nearby 30/min`, `location 10/min`, space/channel creation `10/hour`, attachment uploads `10/min`, global search `30/min`, link previews
+`30/min`, AI assist `20/min` burst + `30/day` free / `100/day` Plus (cache hits are free), admin login `5/15min`.
 
 ### Email verification & password reset
 
@@ -534,6 +538,7 @@ Themes share one geometry — corner radius, elevation, and layout languages are
   - Multi-choice + anonymous polls (Plus only)
   - Forward limit per message: 5 → 10
   - Personal emoji: 0 → 50
+  - AI assist cloud calls: 30/day → 100/day (on-device AI is always unlimited)
 - **Admin review queue** — admin panel lists Plus claims with approve/reject actions
 - **Hourly sweep** — expired claims and Plus-only effects on expired accounts are cleaned up automatically
 

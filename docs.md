@@ -1074,6 +1074,33 @@ Kivo Plus is a premium plan that unlocks higher limits, custom emoji, profile ef
 
 ---
 
+## 25. AI assist (grammar, rewrite, translate, replies, summaries)
+
+Kivo can polish what you type and translate what you read. Nothing AI-generated ever sends automatically — every result previews first and only enters the composer when you tap **Insert**.
+
+### Composer help (Bot button)
+
+- The **Bot button** sits in the composer next to emoji. On mobile it appears once you start typing (so the keyboard row stays roomy); on desktop it's always there.
+- Tap it with a draft typed to get: **Fix grammar**, **Friendly / Formal / Shorter / Longer / Confident** rewrites, **Translate** (target language code, default `en`), and **Replies** (3 smart replies drafted from the last few messages).
+- While generating you'll see a thinking indicator; the result streams in as animated text with **Insert** (puts it in the composer), **Copy**, and **Discard**.
+
+### Translate any message
+
+- Right-click (or long-press) any bubble → **Translate…**.
+- Pick **English**, **हिन्दी**, or **Other…** and enter any language code (`es`, `fr`, `ta`…). The translation appears inside the bubble; tap **Hide** to dismiss.
+
+### Summaries
+
+- **Summarize thread** — button under the original message in any thread panel; 3-bullet recap of the discussion.
+- **Catch up** — ✨ button in the chat header (desktop); summarizes the last 50 messages when you're returning to a busy chat.
+
+### Limits & privacy
+
+- Where supported (desktop Chrome/Edge), Kivo uses **on-device AI** — unlimited, private, nothing leaves your device (badge shows `on-device`).
+- Otherwise it uses the server fallback (Groq → Gemini, badge shows `cloud:groq`/`cloud:gemini`): **20/minute** burst, **30/day free** / **100/day Plus**. Repeated prompts are cached for an hour and cache hits don't count against your quota.
+
+---
+
 ## What is not in the product yet
 
 Do not expect these in the current MVP:
@@ -1138,6 +1165,9 @@ Do not expect these in the current MVP:
 | Composer drafts | Unsent text saved per conversation, survives switches + reloads |
 | Paste images to attach | Clipboard screenshots/photos join the attachment queue directly |
 | Up-arrow to edit | Empty composer + ↑ edits your last message |
+| AI assist (grammar/tones/translate/replies) | Composer Bot button (mobile: appears while typing) → preview → Insert |
+| Translate a message | Bubble menu → Translate… → English / हिन्दी / Other… |
+| Summarize thread / catch up | Thread panel → Summarize thread; chat header ✨ → Catch up (last 50) |
 | Chat performance | Memoized `MessageRows`, O(1) reply map, throttled like/anim, bulk notification `insertMany` |
 | Health check (ops) | `GET /health` on the API |
 | Custom emoji (global/Space/personal) | Type `:name:` in composer; Space admins create Space emoji; Plus users create personal emoji; admin creates global emoji |

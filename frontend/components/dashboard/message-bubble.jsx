@@ -11,6 +11,7 @@ import {
   Copy,
   FaceGrinning,
   Forward,
+  Languages,
   Mail,
   MessageSquare,
   Pencil,
@@ -24,7 +25,14 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   ContextMenu,
@@ -35,6 +43,9 @@ import {
   ContextMenuTrigger,
 } from "@/components/motion/context-menu";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { StreamingText } from "@/components/ui/streaming-text";
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
+import { translateText } from "@/lib/ai";
 import { formatTime, participantAvatarName, participantName } from "@/lib/chat";
 import { EASE_OUT_CSS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
@@ -55,9 +66,13 @@ import { LinkPreview } from "@/components/chat/link-preview";
 import { Avatar } from "@/components/dashboard/avatar";
 import { MentionToken } from "@/components/mentions/mention-token";
 import { PollCard } from "@/components/polls/poll-card";
+import {
+  customReactionId,
+  isCustomReaction,
+  parseCustomEmoji,
+} from "@/lib/custom-emoji";
 import { emojiCount } from "@/lib/emoji";
 import { firstUrl, normalizeUrl } from "@/lib/links";
-import { parseCustomEmoji, isCustomReaction, customReactionId } from "@/lib/custom-emoji";
 
 const URL_SPLIT_RE = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?'"`>]+$/;
@@ -180,7 +195,8 @@ function CustomEmojiImg({ emoji, size = 32 }) {
 }
 
 function getCustomBigInfo(content, customEmojiMap) {
-  if (!content || !customEmojiMap || customEmojiMap.size === 0) return { isBig: false, count: 0 };
+  if (!content || !customEmojiMap || customEmojiMap.size === 0)
+    return { isBig: false, count: 0 };
   const tokens = parseCustomEmoji(content, customEmojiMap);
   // Check if tokens are only emoji or whitespace/text that is whitespace-only
   let emojiCount = 0;
@@ -194,11 +210,18 @@ function getCustomBigInfo(content, customEmojiMap) {
       // but if it contains non-whitespace non-emoji, already returned
     }
   }
-  if (emojiCount >= 1 && emojiCount <= 3) return { isBig: true, count: emojiCount };
+  if (emojiCount >= 1 && emojiCount <= 3)
+    return { isBig: true, count: emojiCount };
   return { isBig: false, count: 0 };
 }
 
-function QuickReactionButton({ emoji, onReact, className, children, ...props }) {
+function QuickReactionButton({
+  emoji,
+  onReact,
+  className,
+  children,
+  ...props
+}) {
   const ctx = useContext(ContextMenuContext);
   return (
     <button
@@ -268,7 +291,15 @@ function MoreReactionsSection({ customs = [], onReact }) {
                 aria-label={`React with :${ce.name}:`}
                 className="rounded p-0.5 transition-colors hover:bg-[var(--hover)]"
               >
-                <img src={ce.url} alt={`:${ce.name}:`} width={22} height={22} className="size-[22px]" loading="lazy" decoding="async" />
+                <img
+                  src={ce.url}
+                  alt={`:${ce.name}:`}
+                  width={22}
+                  height={22}
+                  className="size-[22px]"
+                  loading="lazy"
+                  decoding="async"
+                />
               </button>
             ))}
           </div>
@@ -352,13 +383,25 @@ function MessageContent({
   for (const tok of emojiTokens) {
     if (tok.type === "emoji" && tok.emoji) {
       const size = isBigCustom ? bigSize : 32;
-      parts.push(<CustomEmojiImg key={`e-${key++}-${tok.name}`} emoji={tok.emoji} size={size} />);
+      parts.push(
+        <CustomEmojiImg
+          key={`e-${key++}-${tok.name}`}
+          emoji={tok.emoji}
+          size={size}
+        />,
+      );
     } else {
       if (isBigCustom) {
         // In big mode ignore whitespace-only chunks except to add a tiny gap between emojis
         const v = tok.value || "";
         if (v.trim() === "" && parts.length > 0) {
-          parts.push(<span key={`sp-${key++}`} className="inline-block w-1.5" aria-hidden="true" />);
+          parts.push(
+            <span
+              key={`sp-${key++}`}
+              className="inline-block w-1.5"
+              aria-hidden="true"
+            />,
+          );
         } else if (v.trim() !== "") {
           pushMentionChunk(v);
         }
@@ -624,6 +667,48 @@ export function MessageBubble({
   const [likeAnimKey, setLikeAnimKey] = useState(0);
   const reduceMotion = useReducedMotion();
 
+  // Reader-side translation: per-bubble local state so the memoized list
+  // never re-renders siblings. Uses lib/ai (on-device → Groq → Gemini).
+  const [translating, setTranslating] = useState(false);
+  const [translated, setTranslated] = useState(null);
+  const [transSource, setTransSource] = useState(null);
+  const [transError, setTransError] = useState(null);
+  const [transLang, setTransLang] = useState("en");
+  const [transCustom, setTransCustom] = useState(false);
+  const [transOpen, setTransOpen] = useState(false);
+  const canTranslate =
+    !deleted &&
+    !isEditing &&
+    message?.type !== "poll" &&
+    message?.type !== "system" &&
+    Boolean(message?.content?.trim());
+  const runTranslate = useCallback(
+    async (lang) => {
+      if (translating) return;
+      const target = String(lang || transLang || "en").trim() || "en";
+      setTranslating(true);
+      setTransError(null);
+      try {
+        const out = await translateText(message.content, target);
+        setTranslated(out?.text || "");
+        setTransSource(out?.source || null);
+      } catch (e) {
+        setTransError(e?.message || "Translation failed");
+      } finally {
+        setTranslating(false);
+      }
+    },
+    [translating, transLang, message?.content],
+  );
+  const handleTranslate = useCallback(() => {
+    if (transOpen) {
+      setTransOpen(false);
+      return;
+    }
+    setTransOpen(true);
+    if (!translated && !translating) runTranslate(transLang);
+  }, [transOpen, translated, translating, runTranslate, transLang]);
+
   // Read receipts ("Seen by"): the sender can open a per-message breakdown of
   // who received/read it. Needs a viewer id + participant list, so this is
   // DMs and private groups — big space channels don't surface per-user receipts.
@@ -784,7 +869,12 @@ export function MessageBubble({
 
   // Custom emoji big: 1-3 custom :name: only, no bubble
   const customBigInfo =
-    !deleted && !isEditing && !isPoll && message.content && !replyTo && customEmojiMap
+    !deleted &&
+    !isEditing &&
+    !isPoll &&
+    message.content &&
+    !replyTo &&
+    customEmojiMap
       ? getCustomBigInfo(message.content, customEmojiMap)
       : { isBig: false, count: 0 };
   const isBigCustom =
@@ -794,7 +884,8 @@ export function MessageBubble({
   const isBig = isBigEmoji || isBigCustom;
 
   // Sent messages use the primary (accent) bubble, received use the secondary.
-  const bubbleVariant = variant ?? (isBig ? "ghost" : mine ? "default" : "secondary");
+  const bubbleVariant =
+    variant ?? (isBig ? "ghost" : mine ? "default" : "secondary");
 
   // Customs available for the "More reactions" section (up to 48).
   const customReactionList =
@@ -813,8 +904,12 @@ export function MessageBubble({
             pressing && !selectMode && "scale-[0.98]",
             isReplying && "border-l-2 border-[var(--accent)]",
             selected && "ring-2 ring-[var(--accent)]",
-            isActiveSearch && "ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg-base)] shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]",
-            message?.isFrequentlyForwarded && !selected && !isActiveSearch && "ring-1 ring-amber-500/40",
+            isActiveSearch &&
+              "ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg-base)] shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]",
+            message?.isFrequentlyForwarded &&
+              !selected &&
+              !isActiveSearch &&
+              "ring-1 ring-amber-500/40",
             selectMode && "cursor-pointer",
             className,
           )}
@@ -895,9 +990,15 @@ export function MessageBubble({
                     <Forward className="h-3 w-3 shrink-0" aria-hidden />
                     <span className="truncate">
                       Forwarded
-                      {message.forwardedFromName ? ` from ${message.forwardedFromName}` : ""}
-                      {message.isFrequentlyForwarded ? " \u2022 frequently forwarded" : ""}
-                      {message.forwardCount > 1 ? ` (${message.forwardCount})` : ""}
+                      {message.forwardedFromName
+                        ? ` from ${message.forwardedFromName}`
+                        : ""}
+                      {message.isFrequentlyForwarded
+                        ? " \u2022 frequently forwarded"
+                        : ""}
+                      {message.forwardCount > 1
+                        ? ` (${message.forwardCount})`
+                        : ""}
                     </span>
                   </span>
                 )}
@@ -913,6 +1014,123 @@ export function MessageBubble({
                   isBigCustom={isBigCustom}
                   bigCustomCount={customBigInfo.count}
                 />
+                {(transOpen || translating || translated || transError) &&
+                  transOpen && (
+                    // Opaque surface card: own bubbles are bg-primary with white
+                    // text, so a translucent wash + inherited colors washes out.
+                    // Everything in here carries explicit theme colors instead.
+                    <div className="mt-1.5 rounded-lg border border-[var(--border)] border-l-2 border-l-[var(--accent)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--text-primary)]">
+                      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                        <Languages
+                          className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
+                          aria-hidden
+                        />
+                        {[
+                          { id: "en", label: "English" },
+                          { id: "hi", label: "हिन्दी" },
+                        ].map((l) => (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTransLang(l.id);
+                              setTransCustom(false);
+                              setTranslated(null);
+                              setTransError(null);
+                              runTranslate(l.id);
+                            }}
+                            disabled={translating}
+                            aria-pressed={!transCustom && transLang === l.id}
+                            className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors disabled:opacity-40 ${
+                              !transCustom && transLang === l.id
+                                ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                                : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            }`}
+                          >
+                            {l.label}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransCustom((v) => !v);
+                          }}
+                          aria-pressed={transCustom}
+                          className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                            transCustom
+                              ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                              : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          Other…
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransOpen(false);
+                          }}
+                          className="rounded-full px-1.5 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        >
+                          Hide
+                        </button>
+                      </div>
+                      {transCustom && (
+                        <div className="mb-1.5 flex items-center gap-1.5">
+                          <input
+                            value={transLang}
+                            onChange={(e) =>
+                              setTransLang(e.target.value.slice(0, 12))
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Language code (e.g. es, fr, ta)"
+                            aria-label="Custom target language code"
+                            className="w-full min-w-0 flex-1 rounded border border-[var(--border)] bg-[var(--bg-base)] px-1.5 py-0.5 text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTranslated(null);
+                              setTransError(null);
+                              runTranslate(transLang);
+                            }}
+                            disabled={translating || !transLang.trim()}
+                            className="shrink-0 rounded-full border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                          >
+                            Translate
+                          </button>
+                        </div>
+                      )}
+                      {translating && (
+                        <ThinkingIndicator
+                          words={["Translating…"]}
+                          className="text-[11px]"
+                        />
+                      )}
+                      {!translating && transError && (
+                        <span className="text-[12px] text-[var(--destructive)]">
+                          {transError}
+                        </span>
+                      )}
+                      {!translating && !transError && translated && (
+                        <>
+                          <StreamingText
+                            text={translated}
+                            speed={40}
+                            className="text-[13px] leading-snug text-[var(--text-primary)] [&_.text-foreground]:text-[var(--text-primary)]"
+                          />
+                          {transSource && (
+                            <span className="mt-1 block text-[10px] text-[var(--text-muted)]">
+                              via {transSource}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 {!deleted && !isEditing && !isBig && message.content ? (
                   <LinkPreview url={firstUrl(message.content)} />
                 ) : null}
@@ -988,7 +1206,6 @@ export function MessageBubble({
               <Check className="h-3 w-3" strokeWidth={3} />
             </span>
           )}
-
         </Bubble>
       </ContextMenuTrigger>
 
@@ -1017,6 +1234,12 @@ export function MessageBubble({
             Copy
           </ContextMenuItem>
         )}
+        {canTranslate && (
+          <ContextMenuItem onSelect={() => handleTranslate?.()}>
+            <Languages className="h-4 w-4" />
+            {transOpen ? "Hide translation" : "Translate…"}
+          </ContextMenuItem>
+        )}
         {onSaveToggle && (
           <ContextMenuItem onSelect={() => onSaveToggle?.()}>
             {message?.saved ? (
@@ -1040,7 +1263,10 @@ export function MessageBubble({
           </ContextMenuItem>
         )}
         {message.type !== "poll" && (
-          <MoreReactionsSection customs={customReactionList} onReact={onReact} />
+          <MoreReactionsSection
+            customs={customReactionList}
+            onReact={onReact}
+          />
         )}
         <ContextMenuSeparator />
         {onForward && message.type !== "poll" && (
@@ -1156,9 +1382,19 @@ export function MessageBubble({
                 >
                   {isCustom ? (
                     ce ? (
-                      <img src={ce.url} alt={`:${ce.name}:`} width={16} height={16} className="size-4 inline-block" loading="lazy" decoding="async" />
+                      <img
+                        src={ce.url}
+                        alt={`:${ce.name}:`}
+                        width={16}
+                        height={16}
+                        className="size-4 inline-block"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
-                      <span className="text-[11px]">:{emoji.slice(7, 13)}:</span>
+                      <span className="text-[11px]">
+                        :{emoji.slice(7, 13)}:
+                      </span>
                     )
                   ) : (
                     emoji

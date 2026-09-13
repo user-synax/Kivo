@@ -82,6 +82,23 @@ const env = {
   livekitApiKey: process.env.LIVEKIT_API_KEY || "",
   livekitApiSecret: process.env.LIVEKIT_API_SECRET || "",
 
+  // AI assist (translation, grammar, rewrite, suggestions, summarize).
+  // Optional like Appwrite/LiveKit — the server boots without them; POST
+  // /api/v1/ai/* reports AI_NOT_CONFIGURED until at least one key is set.
+  // Groq is primary (highest free RPD), Gemini is automatic fallback.
+  // Get keys at https://console.groq.com/keys and https://aistudio.google.com/apikey
+  groqApiKey: process.env.GROQ_API_KEY || "",
+  // Comma-separated rotation pool: GROQ_API_KEYS=a,b,c (falls back to GROQ_API_KEY).
+  groqApiKeys: (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
+  aiProviderOrder: (process.env.AI_PROVIDER_ORDER || "groq,gemini")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+
   // Admin panel — standalone credential pair, NOT a DB user account.
   adminEmail: process.env.ADMIN_EMAIL || "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",

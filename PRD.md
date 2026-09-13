@@ -2,7 +2,7 @@
 
 **Version:** 3.1
 **Last Updated:** September 11, 2026
-**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls + Nearby Discovery + Find Square Cards + Welcome Messages · Disappearing Messages Removed)
+**Status:** MVP Development (Core Messaging + Spaces + Notifications + Attachments + Email Verification/Password Reset + Link Previews + Timeline Polish + Composer Upgrades + Kivo Plus + Social/Wave + Read-Receipts Modal + Conversation Look + Media Gallery + Conversation Delete + Voice/Video Calls + Polls + Nearby Discovery + Find Square Cards + Welcome Messages + AI Assist · Disappearing Messages Removed)
 
 ---
 
@@ -122,6 +122,7 @@ Kivo
 | **Rate Limiting** | **Complete** | In-memory limiter across auth, messaging, search, uploads, admin |
 | **Two-Factor Auth (2FA)** | **Complete** | TOTP via authenticator app (QR setup in Settings), one-time backup codes, two-step login challenge |
 | **Link Previews** | **Complete** | `GET /api/v1/link-preview?url=…` unfurls og-title/description/image server-side (SSRF-guarded, 1h cache, 30/min); clickable links + first-URL preview card in bubbles (main timeline + threads) |
+| **AI Assist** | **Complete** | On-device Chrome Built-in AI first (Translator/LanguageDetector/Proofreader/Rewriter/Writer/Summarizer/Prompt, unlimited + private), `POST /api/v1/ai/*` cloud fallback (Groq `openai/gpt-oss-20b` fast + `openai/gpt-oss-120b` quality → Gemini fallback, 20/min burst + 30/day free / 100/day Plus, 1h cache, cache hits free); composer Bot panel (grammar/tones/translate/replies), per-bubble `Translate…` (English/Hindi/custom), `Summarize thread`, header `Catch up` (last 50) |
 | **Date Dividers + Big Emoji** | **Complete** | Today/Yesterday/weekday/date pills across history (grouping breaks across days); 1–3 emoji-only messages render large and chromeless (`lib/emoji.js`, grapheme-aware) |
 | **Jump-to-Latest Pill** | **Complete** | Floating "N new"/"Latest" button when scrolled off the live edge; auto-scroll only pins at the bottom (or for own sends) — history reading never yanked |
 | **Composer Upgrades** | **Complete** | Per-conversation drafts in localStorage (debounced, cleared on send, survive reloads); paste-image attaches directly; ↑ on an empty composer edits last message; **mobile swipe-to-reply** (right swipe ~45 px with direction lock, haptics) |
@@ -1216,6 +1217,21 @@ Refresh token is sent automatically via httpOnly cookie.
 | Method | Path | Auth | Body |
 |---|---|---|---|
 | GET | `/api/v1/link-preview?url=…` | Yes (rate-limited 30/min) | — (returns `{ url, siteName, title, description, image, favicon, domain, cached }`) |
+
+#### AI Assist (on-device first, Groq → Gemini cloud fallback)
+
+The server boots without AI keys; `POST /api/v1/ai/*` then reports `AI_NOT_CONFIGURED` (503). The client (`frontend/lib/ai.js`) tries Chrome Built-in AI first and only calls the backend otherwise. Nothing AI-generated ever sends automatically — results preview and insert into the composer.
+
+| Method | Path | Auth | Rate Limit | Body |
+|---|---|---|---|---|
+| GET | `/api/v1/ai/status` | Yes | — | — (returns `{ configured }`) |
+| POST | `/api/v1/ai/proofread` | Yes | 20/min + daily quota | `{ text }` → `{ text, provider, model, cached, quota }` (grammar/spelling fix, fast model) |
+| POST | `/api/v1/ai/rewrite` | Yes | 20/min + daily quota | `{ text, tone: "formal"\|"friendly"\|"shorter"\|"longer"\|"confident" }` → same envelope |
+| POST | `/api/v1/ai/translate` | Yes | 20/min + daily quota | `{ text, targetLang, sourceLang? }` → same envelope (quality model) |
+| POST | `/api/v1/ai/replies` | Yes | 20/min + daily quota | `{ messages[1..8] }` → `{ replies[3], provider, model, cached, quota }` |
+| POST | `/api/v1/ai/summarize` | Yes | 20/min + daily quota | `{ messages[1..50], style: "bullets"\|"short" }` → same envelope (quality model) |
+
+Rules: daily quota free 30 / Plus 100 (`PLAN_LIMITS.aiDailyMax`, mirrored by `aiDailyLimitFor()`); identical prompts served from a 1h in-memory cache (500-entry cap) and cache hits don't consume quota; user text is wrapped as DATA (prompt-injection guard, `@mentions`/`:emoji:` preserved); Groq 404 `model_not_found` (retired models) fails over to Gemini; never logs raw text (hash + lang + tokens only).
 
 #### Calls (LiveKit voice & video)
 
