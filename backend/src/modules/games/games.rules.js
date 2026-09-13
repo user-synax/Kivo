@@ -30,6 +30,46 @@ export const COUNTDOWN_MS = 3000;
 // can never change who won.
 export const LATE_FINISH_WINDOW_MS = 15 * 1000;
 
+// Rematch series: best-of-N. First to SERIES_WINS_NEEDED wins takes the series;
+// at most SERIES_BEST_OF games are ever played.
+export const SERIES_BEST_OF = 3;
+export const SERIES_WINS_NEEDED = 2;
+
+// Pure series standings from finished sessions. `games` are plain objects with
+// { winnerId, status }. Returns { wins: Map-ish object, finishedCount,
+// winnerId, isComplete } — winner is first to WINS_NEEDED, or whoever leads
+// after BEST_OF finished games.
+export function seriesStandings(games) {
+  const finished = (games || []).filter((g) => g?.status === "finished" && g?.winnerId);
+  const wins = {};
+  for (const g of finished) {
+    const key = String(g.winnerId);
+    wins[key] = (wins[key] || 0) + 1;
+  }
+  let winnerId = null;
+  for (const [userId, count] of Object.entries(wins)) {
+    if (count >= SERIES_WINS_NEEDED) {
+      winnerId = userId;
+      break;
+    }
+  }
+  if (!winnerId && finished.length >= SERIES_BEST_OF) {
+    let best = 0;
+    for (const [userId, count] of Object.entries(wins)) {
+      if (count > best) {
+        best = count;
+        winnerId = userId;
+      }
+    }
+  }
+  return {
+    wins,
+    finishedCount: finished.length,
+    winnerId,
+    isComplete: Boolean(winnerId) || finished.length >= SERIES_BEST_OF,
+  };
+}
+
 export const PASSAGES = [
   "The quick brown fox jumps over the lazy dog while the curious cat watches from a sunny windowsill.",
   "Every morning the city wakes slowly, first with the rumble of buses and then with the chatter of people.",

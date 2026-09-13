@@ -19,6 +19,9 @@ import {
   pickPassage,
   RACE_DEADLINE_MS,
   recordFinish,
+  SERIES_BEST_OF,
+  SERIES_WINS_NEEDED,
+  seriesStandings,
 } from "./games.rules.js";
 
 // Kivo Games — server-authoritative game sessions.
@@ -104,6 +107,11 @@ export function publicGame(session, { includePassage = false } = {}) {
     expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : null,
     winnerId: session.winnerId ? session.winnerId.toString() : null,
     countdownMs: COUNTDOWN_MS,
+    seriesId: session.seriesId ? session.seriesId.toString() : null,
+    round: session.round || 1,
+    rematchOf: session.rematchOf ? session.rematchOf.toString() : null,
+    seriesBestOf: SERIES_BEST_OF,
+    seriesWinsNeeded: SERIES_WINS_NEEDED,
   };
   if (includePassage) view.passage = session.passage || null;
   return view;
@@ -134,6 +142,8 @@ function buildCard(session, role = "invite") {
     winnerName: winner?.displayName || null,
     startedAt: session.startedAt || null,
     finishedAt: session.finishedAt || null,
+    seriesId: session.seriesId || null,
+    round: session.round || 1,
   };
 }
 
@@ -520,6 +530,165 @@ export async function getGame({ gameId, userId }) {
   await assertMembership(session.conversationId.toString(), userId);
   // Reveal the passage only while a race is actually running.
   return publicGame(session, { includePassage: session.status === "active" });
+}
+
+// All games of a best-of series in round order (root first). Accepts either the
+// root game id or any game carrying the seriesId.
+async function loadSeriesGames(seriesKey) {
+  if (!mongoose.Types.ObjectId.isValid(seriesKey)) {
+    throw badRequest("Invalid series id", "INVALID_ID");
+  }
+  const games = await GameSession.find({
+    $or: [{ _id: seriesKey }, { seriesId: seriesKey }],
+  }).sort({ round: 1, createdAt: 1 });
+  if (games.length === 0) throw notFound("Series not found", "SERIES_NOT_FOUND");
+  return games;
+}
+
+// Arena: best-of-3 series summary for a finished race's result screen.
+// Returns { seriesId, games, wins, finishedCount, winnerId, isComplete,
+// round, bestOf, winsNeeded } — wins keyed by userId string.
+export async function getSeries({ seriesId, userId }) {
+  const games = await loadSeriesGames(seriesId);
+  const first = games[0];
+  await assertMembership(first.conversationId.toString(), userId);
+  const standings = seriesStandings(
+    games.map((g) => ({
+      status: g.status,
+      winnerId: g.winnerId ? g.winnerId.toString() : null,
+    })),
+  );
+  const key = first.seriesId ? first.seriesId.toString() : first._id.toString();
+  return {
+    seriesId: key,
+    games: games.map((g) => publicGame(g)),
+    wins: standings.wins,
+    finishedCount: standings.finishedCount,
+    winnerId: standings.winnerId,
+    isComplete: standings.isComplete,
+    bestOf: SERIES_BEST_OF,
+    winsNeeded: SERIES_WINS_NEEDED,
+  };
+}
+
+// Rematch: one tap from a finished race's result screen. Creates Game N+1 in
+// the SAME conversation (same DM thread + same chip timeline), carrying the
+// series forward. Only participants of a finished/cancelled game may rematch,
+// only while the series is undecided, and only when no game is live in that
+// conversation (otherwise GAME_EXISTS — the client should open that game).
+export async function rematchGame({ gameId, userId }) {
+  const previous = await loadSession(gameId);
+  await assertMembership(previous.conversationId.toString(), userId);
+  if (previous.status !== "finished" && previous.status !== "cancelled") {
+    throw badRequest("Finish this race before a rematch", "GAME_NOT_FINISHED");
+  }
+
+  const me = previous.players.find((p) => p.userId.toString() === String(userId));
+  if (!me || (me.status !== "joined" && me.status !== "invited")) {
+    throw forbidden("You were not part of this game", "NOT_INVITED");
+  }
+  const opponentEntry = previous.players.find((p) => p.userId.toString() !== String(userId));
+  if (!opponentEntry) throw badRequest("No opponent to rematch", "NO_OPPONENT");
+
+  const seriesKey = previous.seriesId
+    ? previous.seriesId.toString()
+    : previous._id.toString();
+  const seriesGames = await GameSession.find({
+    $or: [{ _id: seriesKey }, { seriesId: seriesKey }],
+  });
+  const standings = seriesStandings(
+    seriesGames.map((g) => ({
+      status: g.status,
+      winnerId: g.winnerId ? g.winnerId.toString() : null,
+    })),
+  );
+  if (standings.isComplete) {
+    throw conflict("This series is already decided", "SERIES_COMPLETE");
+  }
+
+  const conversation = await Conversation.findById(previous.conversationId);
+  if (!conversation) throw notFound("Conversation not found", "CONVERSATION_NOT_FOUND");
+  await assertDmNotBlocked(conversation, userId);
+
+  const existing = await GameSession.findOne({
+    conversationId: conversation._id,
+    status: { $in: ["pending", "active"] },
+  });
+  if (existing) {
+    throw conflict("There's already a game going with this player", "GAME_EXISTS");
+  }
+
+  const { limits } = await getRequesterPlan(User, userId);
+  const open = await GameSession.countDocuments({
+    status: { $in: ["pending", "active"] },
+    players: { $elemMatch: { userId, status: { $in: ["invited", "joined"] } } },
+  });
+  if (open >= limits.gamesPerConversationActive) {
+    throw forbidden(
+      `You already have ${limits.gamesPerConversationActive} game${limits.gamesPerConversationActive === 1 ? "" : "s"} going — finish one first`,
+      "GAME_LIMIT",
+    );
+  }
+
+  const [meUser, opponentUser] = await Promise.all([
+    User.findById(userId).select("displayName username").lean(),
+    User.findById(opponentEntry.userId).select("displayName username").lean(),
+  ]);
+
+  const nextRound = seriesGames.length + 1;
+  const session = await GameSession.create({
+    kind: previous.kind,
+    status: "pending",
+    conversationId: conversation._id,
+    createdBy: userId,
+    players: [
+      {
+        userId,
+        displayName:
+          meUser?.displayName || meUser?.username || me?.displayName || "Player",
+        status: "joined",
+      },
+      {
+        userId: opponentEntry.userId,
+        displayName:
+          opponentUser?.displayName ||
+          opponentUser?.username ||
+          opponentEntry.displayName ||
+          "Player",
+        status: "invited",
+      },
+    ],
+    seriesId: seriesKey,
+    round: nextRound,
+    rematchOf: previous._id,
+    expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+  });
+
+  const message = await Message.create({
+    conversationId: conversation._id,
+    senderId: userId,
+    content: `${kindLabel(session.kind)} rematch · Game ${nextRound} of ${SERIES_BEST_OF}`,
+    type: "game",
+    game: buildCard(session),
+    replyToMessageId: null,
+    threadId: null,
+    mentions: [],
+    attachments: [],
+    audioDuration: null,
+  });
+  session.messageId = message._id;
+  await session.save();
+
+  await Conversation.findByIdAndUpdate(conversation._id, { lastMessageAt: message.createdAt });
+
+  emitToConversation(conversation._id.toString(), "message:new", publicMessage(message, userId));
+  emitToConversation(conversation._id.toString(), "game:updated", publicGame(session));
+  emitToUser(opponentEntry.userId.toString(), "game:invited", publicGame(session));
+  notificationsService
+    .createForMessage({ message, conversation, inThread: false })
+    .catch((err) => console.error("[games] rematch notification failed:", err?.message || err));
+
+  return publicGame(session);
 }
 
 // Arena: pending invites waiting on me.

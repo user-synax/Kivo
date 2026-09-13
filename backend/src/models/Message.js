@@ -106,6 +106,9 @@ const gameCardSchema = new mongoose.Schema(
     winnerName: { type: String, default: null },
     startedAt: { type: Date, default: null },
     finishedAt: { type: Date, default: null },
+    // Rematch series (best-of-3) — lets a chat chip render "Game 2 of 3".
+    seriesId: { type: mongoose.Schema.Types.ObjectId, ref: "GameSession", default: null },
+    round: { type: Number, default: 1, min: 1 },
   },
   { _id: false }
 );

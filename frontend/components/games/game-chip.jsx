@@ -58,9 +58,10 @@ export function GameChip({ game, viewerId }) {
   const needsAction =
     !isResult && (game.status === "active" || me?.status === "invited");
 
+  const roundSuffix = Number(game.round) > 1 ? ` · G${game.round}` : "";
   const title = isResult
-    ? `${meta.label} — ${iWon ? "you won" : `${winner?.displayName || "Someone"} won`}`
-    : meta.label;
+    ? `${meta.label}${roundSuffix} — ${iWon ? "you won" : `${winner?.displayName || "Someone"} won`}`
+    : `${meta.label}${roundSuffix}`;
 
   // A photo finish is the most interesting thing about a result, so it leads the
   // line — and it is only available when both players have a recorded time.

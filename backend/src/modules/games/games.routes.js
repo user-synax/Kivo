@@ -32,6 +32,7 @@ const gameActionLimiter = rateLimiter({
 // Static paths MUST come before "/:id" or Express would match them as ids.
 router.get("/invites", gamesController.listInvites);
 router.get("/mine", gamesController.listMyGames);
+router.get("/series/:seriesId", gamesController.getSeries);
 router.post("/invite", gameInviteLimiter, gamesController.inviteGame);
 
 router.get("/:id", gamesController.getGame);
@@ -41,5 +42,6 @@ router.post("/:id/start", gameActionLimiter, gamesController.startGame);
 router.post("/:id/progress", gameProgressLimiter, gamesController.reportProgress);
 router.post("/:id/finish", gameActionLimiter, gamesController.finishGame);
 router.post("/:id/cancel", gameActionLimiter, gamesController.cancelGame);
+router.post("/:id/rematch", gameActionLimiter, gamesController.rematchGame);
 
 export default router;

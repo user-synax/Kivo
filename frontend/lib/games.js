@@ -156,6 +156,43 @@ export function gameStatusText(game) {
   }
 }
 
+// ── Rematch series (best-of-3) ──────────────────────────────────────────
+// Server owns standings; these derive display values from the series payload
+// GET /api/v1/games/series/:seriesId returns:
+// { seriesId, games, wins, finishedCount, winnerId, isComplete, bestOf,
+//   winsNeeded } with wins keyed by userId string.
+
+export function seriesKeyFor(game) {
+  if (!game) return null;
+  return game.seriesId || game.id || null;
+}
+
+export function gameRound(game) {
+  const r = Number(game?.round);
+  return Number.isFinite(r) && r >= 1 ? Math.floor(r) : 1;
+}
+
+export function seriesWinsFor(series, userId) {
+  if (!series || !userId) return 0;
+  return Number(series?.wins?.[String(userId)] || 0);
+}
+
+// "Series 1–0 · First to 2" / "Series tied 1–1 · Decider" / "You took the series 2–1"
+export function seriesScoreText(series, viewerId, opponentId) {
+  if (!series) return null;
+  const mine = seriesWinsFor(series, viewerId);
+  const theirs = opponentId ? seriesWinsFor(series, opponentId) : 0;
+  const needed = Number(series.winsNeeded) || 2;
+  if (series.winnerId) {
+    const iWon = String(series.winnerId) === String(viewerId);
+    return iWon
+      ? `You took the series ${Math.max(mine, theirs)}–${Math.min(mine, theirs)}`
+      : `They took the series ${Math.max(mine, theirs)}–${Math.min(mine, theirs)}`;
+  }
+  if (mine === theirs) return `Series tied ${mine}–${theirs} · Decider next`;
+  return `Series ${mine}–${theirs} · First to ${needed}`;
+}
+
 // Two-letter avatar fallback from a display name.
 export function initialsFor(name) {
   const clean = String(name || "").trim();

@@ -3,6 +3,7 @@ import {
   canRecordRunnerUpFinish,
   computeWpm,
   recordFinish,
+  seriesStandings,
 } from "./games.rules.js";
 import { finishSchema, inviteGameSchema, progressSchema } from "./games.validation.js";
 
@@ -135,5 +136,53 @@ describe("canRecordRunnerUpFinish", () => {
   test("rejects a race that never finished", () => {
     expect(canRecordRunnerUpFinish({ status: "active", finishedAt: null })).toBe(false);
     expect(canRecordRunnerUpFinish({ status: "cancelled", finishedAt: new Date() })).toBe(false);
+  });
+});
+
+describe("seriesStandings", () => {
+  test("empty series is undecided", () => {
+    const s = seriesStandings([]);
+    expect(s.isComplete).toBe(false);
+    expect(s.winnerId).toBeNull();
+    expect(s.finishedCount).toBe(0);
+  });
+
+  test("first to two wins takes the series", () => {
+    const s = seriesStandings([
+      { status: "finished", winnerId: "me" },
+      { status: "finished", winnerId: "me" },
+    ]);
+    expect(s.winnerId).toBe("me");
+    expect(s.isComplete).toBe(true);
+    expect(s.wins).toEqual({ me: 2 });
+  });
+
+  test("1-1 after two games is a live decider", () => {
+    const s = seriesStandings([
+      { status: "finished", winnerId: "me" },
+      { status: "finished", winnerId: "rival" },
+    ]);
+    expect(s.isComplete).toBe(false);
+    expect(s.winnerId).toBeNull();
+    expect(s.finishedCount).toBe(2);
+  });
+
+  test("leader after three finished games takes it", () => {
+    const s = seriesStandings([
+      { status: "finished", winnerId: "me" },
+      { status: "finished", winnerId: "rival" },
+      { status: "finished", winnerId: "me" },
+    ]);
+    expect(s.winnerId).toBe("me");
+    expect(s.isComplete).toBe(true);
+  });
+
+  test("pending games do not count", () => {
+    const s = seriesStandings([
+      { status: "finished", winnerId: "me" },
+      { status: "pending", winnerId: null },
+    ]);
+    expect(s.finishedCount).toBe(1);
+    expect(s.isComplete).toBe(false);
   });
 });

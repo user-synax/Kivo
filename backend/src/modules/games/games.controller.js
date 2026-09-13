@@ -94,3 +94,22 @@ export const cancelGame = asyncHandler(async (req, res) => {
   });
   res.status(200).json({ success: true, data: game });
 });
+
+// Rematch: one tap from a finished race creates Game N+1 in the same
+// conversation, carrying the best-of series forward.
+export const rematchGame = asyncHandler(async (req, res) => {
+  const game = await gamesService.rematchGame({
+    gameId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(201).json({ success: true, data: game });
+});
+
+// Best-of series summary for a result screen.
+export const getSeries = asyncHandler(async (req, res) => {
+  const series = await gamesService.getSeries({
+    seriesId: req.params.seriesId,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: series });
+});

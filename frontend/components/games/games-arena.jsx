@@ -661,9 +661,14 @@ export function GamesArena() {
                         </div>
                         <p className="truncate text-[13.5px] font-semibold text-[var(--text-primary)]">
                           {host?.displayName || "Someone"} challenged you
+                          {Number(game.round) > 1
+                            ? ` · Game ${game.round}`
+                            : ""}
                         </p>
                         <p className="truncate text-[11px] text-[var(--text-muted)]">
-                          {meta.label} · 1v1 · tap Accept to start
+                          {meta.label} · 1v1
+                          {Number(game.round) > 1 ? ` · rematch` : ""} · tap
+                          Accept to start
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1.5">
@@ -731,9 +736,12 @@ export function GamesArena() {
                         </div>
                         <p className="truncate text-[13.5px] font-semibold text-[var(--text-primary)]">
                           vs {opponent?.displayName || "Opponent"}
+                          {Number(game.round) > 1 ? ` · G${game.round}` : ""}
                         </p>
                         <p className="truncate text-[11px] text-[var(--text-muted)]">
-                          {label}
+                          {Number(game.round) > 1
+                            ? `Rematch · ${label}`
+                            : label}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">

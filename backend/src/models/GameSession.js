@@ -78,6 +78,22 @@ const gameSessionSchema = new mongoose.Schema(
     // Abandonment guard: pending invites expire, active races end at the deadline.
     expiresAt: { type: Date, default: null },
     winnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    // Rematch series (best-of-3). The first game of a series has seriesId null;
+    // a rematch sets seriesId to the root game's id (or the existing seriesId)
+    // and round to series length + 1. rematchOf points at the game rematched
+    // from, so the arena can render "Game 2 of 3" chains.
+    seriesId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GameSession",
+      default: null,
+      index: true,
+    },
+    round: { type: Number, default: 1, min: 1 },
+    rematchOf: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GameSession",
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -87,6 +103,8 @@ gameSessionSchema.index({ conversationId: 1, status: 1, createdAt: -1 });
 // "My active games" lookup + the abandonment sweep.
 gameSessionSchema.index({ status: 1, expiresAt: 1 });
 gameSessionSchema.index({ "players.userId": 1, status: 1, updatedAt: -1 });
+// Rematch series lookup (all games of a best-of-3 in round order).
+gameSessionSchema.index({ seriesId: 1, round: 1 });
 
 export const GameSession = mongoose.model("GameSession", gameSessionSchema);
 export default GameSession;
