@@ -35,6 +35,46 @@ export const LATE_FINISH_WINDOW_MS = 15 * 1000;
 export const SERIES_BEST_OF = 3;
 export const SERIES_WINS_NEEDED = 2;
 
+// ── Solo practice vs bot ────────────────────────────────────────────────
+// Fixed bot identities: valid ObjectIds in a range real users can never hit,
+// so bots ride the normal player shape (userId/displayName/status) with an
+// explicit isBot flag — no schema fork, no special-case rendering contracts.
+export const PRACTICE_BOTS = Object.freeze({
+  easy: { userId: "0000000000000000000000a1", name: "Rookie Bot", wpm: 30 },
+  medium: { userId: "0000000000000000000000a2", name: "Dash Bot", wpm: 55 },
+  hard: { userId: "0000000000000000000000a3", name: "Blaze Bot", wpm: 80 },
+});
+
+export const PRACTICE_DIFFICULTIES = Object.freeze(["easy", "medium", "hard"]);
+
+export function practiceBotFor(difficulty) {
+  return PRACTICE_BOTS[difficulty] || null;
+}
+
+export function isPracticeBotId(userId) {
+  const key = String(userId || "");
+  return Object.values(PRACTICE_BOTS).some((b) => b.userId === key);
+}
+
+// Bot typing speed for one session: base WPM ± 4 so rematches don't feel
+// robotic. Pure except Math.random — the race clock still decides the outcome.
+export function pickPracticeBotWpm(difficulty) {
+  const bot = practiceBotFor(difficulty);
+  if (!bot) return null;
+  const jitter = Math.floor(Math.random() * 9) - 4;
+  return Math.max(10, bot.wpm + jitter);
+}
+
+// Bot progress 0..1 at `elapsedMs` after GO: linear at botWpm, clamped.
+// Linear is deliberate — difficulty must read as a constant, honest pace.
+export function botProgressAt(botWpm, passage, elapsedMs) {
+  if (!botWpm || !passage || !elapsedMs || elapsedMs <= 0) return 0;
+  const total = passage.trim().length;
+  if (!total) return 0;
+  const typed = (Number(botWpm) * 5 * elapsedMs) / 60000;
+  return Math.max(0, Math.min(1, typed / total));
+}
+
 // Pure series standings from finished sessions. `games` are plain objects with
 // { winnerId, status }. Returns { wins: Map-ish object, finishedCount,
 // winnerId, isComplete } — winner is first to WINS_NEEDED, or whoever leads

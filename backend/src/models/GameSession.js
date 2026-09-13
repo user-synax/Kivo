@@ -28,6 +28,8 @@ const gamePlayerSchema = new mongoose.Schema(
     // Lifecycle: "invited" until they accept from the arena; "joined" once in;
     // "declined" if they turn it down; "left" if they bail mid-session.
     status: { type: String, enum: ["invited", "joined", "declined", "left"], default: "joined" },
+    // True for solo-practice bot players (fixed bot ObjectIds, never real users).
+    isBot: { type: Boolean, default: false },
     // Live progress for the current round, 0..1 (typing: fraction of the
     // passage completed). Kept on the session, never written per keystroke.
     progress: { type: Number, default: 0, min: 0, max: 1 },
@@ -48,7 +50,9 @@ const gameSessionSchema = new mongoose.Schema(
     conversationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Conversation",
-      required: true,
+      // Null for solo-practice sessions: no DM thread, no chat chip — the race
+      // lives only in the arena. All practice emits go to the player directly.
+      default: null,
       index: true,
     },
     // The timeline card message representing this session in chat.
@@ -78,6 +82,11 @@ const gameSessionSchema = new mongoose.Schema(
     // Abandonment guard: pending invites expire, active races end at the deadline.
     expiresAt: { type: Date, default: null },
     winnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    // Solo practice vs bot. Human + one fixed bot player, active immediately,
+    // no conversation or chip. Excluded from series, plan caps and GAME_EXISTS.
+    isPractice: { type: Boolean, default: false, index: true },
+    botDifficulty: { type: String, enum: ["easy", "medium", "hard"], default: null },
+    botWpm: { type: Number, default: null },
     // Rematch series (best-of-3). The first game of a series has seriesId null;
     // a rematch sets seriesId to the root game's id (or the existing seriesId)
     // and round to series length + 1. rematchOf points at the game rematched

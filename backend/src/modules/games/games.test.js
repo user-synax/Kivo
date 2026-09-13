@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  botProgressAt,
   canRecordRunnerUpFinish,
   computeWpm,
+  pickPracticeBotWpm,
+  practiceBotFor,
   recordFinish,
   seriesStandings,
 } from "./games.rules.js";
@@ -184,5 +187,54 @@ describe("seriesStandings", () => {
     ]);
     expect(s.finishedCount).toBe(1);
     expect(s.isComplete).toBe(false);
+  });
+});
+
+describe("practiceBotFor", () => {
+  test("resolves all three difficulties with names and paces", () => {
+    expect(practiceBotFor("easy")).toMatchObject({ name: "Rookie Bot", wpm: 30 });
+    expect(practiceBotFor("medium")).toMatchObject({ name: "Dash Bot", wpm: 55 });
+    expect(practiceBotFor("hard")).toMatchObject({ name: "Blaze Bot", wpm: 80 });
+  });
+
+  test("rejects unknown difficulties", () => {
+    expect(practiceBotFor("grandmaster")).toBeNull();
+    expect(practiceBotFor(null)).toBeNull();
+  });
+});
+
+describe("pickPracticeBotWpm", () => {
+  test("stays within ±4 of the base pace", () => {
+    for (let i = 0; i < 50; i += 1) {
+      const wpm = pickPracticeBotWpm("medium");
+      expect(wpm).toBeGreaterThanOrEqual(51);
+      expect(wpm).toBeLessThanOrEqual(59);
+    }
+  });
+
+  test("returns null for unknown difficulties", () => {
+    expect(pickPracticeBotWpm("nope")).toBeNull();
+  });
+});
+
+describe("botProgressAt", () => {
+  // 100-char passage at 60 wpm = 20 words = 20s to finish.
+  const passage = "x".repeat(100);
+
+  test("is linear in elapsed time", () => {
+    expect(botProgressAt(60, passage, 10000)).toBeCloseTo(0.5, 5);
+    expect(botProgressAt(60, passage, 20000)).toBe(1);
+  });
+
+  test("clamps past the finish and before the start", () => {
+    expect(botProgressAt(60, passage, 60000)).toBe(1);
+    expect(botProgressAt(60, passage, 0)).toBe(0);
+    expect(botProgressAt(60, passage, -100)).toBe(0);
+  });
+
+  test("slower bots trail faster ones at the same instant", () => {
+    expect(botProgressAt(30, passage, 10000)).toBeLessThan(
+      botProgressAt(80, passage, 10000),
+    );
   });
 });

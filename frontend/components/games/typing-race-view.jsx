@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  Bot,
   Keyboard,
   Loader2,
   RotateCcw,
@@ -23,9 +24,12 @@ import {
   gameResults,
   getCountdownMs,
   initialsFor,
+  isBotPlayer,
   isInGame,
+  isPracticeGame,
   joinedPlayers,
   playerFor,
+  practiceDifficultyFor,
   progressPercent,
   RACE_DANGER_PCT,
   raceMarginMs,
@@ -107,6 +111,10 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
   const [series, setSeries] = useState(null);
   const [rematchBusy, setRematchBusy] = useState(false);
   const [rematchError, setRematchError] = useState(null);
+  // Practice difficulty selector on the practice result card.
+  const [practiceDifficulty, setPracticeDifficulty] = useState(
+    () => session?.botDifficulty || "medium",
+  );
 
   const sessionId = session?.id || null;
   const startedAt = session?.startedAt || null;
@@ -125,6 +133,8 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     lastSentRef.current = 0;
     finishedRef.current = false;
     lastStepRef.current = null;
+    setRematchError(null);
+    setPracticeDifficulty(session?.botDifficulty || "medium");
   }, [sessionId, startedAt]);
 
   useEffect(() => {
@@ -162,10 +172,11 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
   }, [session, viewerId, countdownActive]);
 
   // Best-of series: load once finished, re-poll so the opponent's rematch
-  // invite surfaces on this screen without leaving it.
+  // invite surfaces on this screen without leaving it. Practice races have no
+  // series — they poll the game itself instead (see below).
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on race identity + status; session object identity churns on every progress event.
   useEffect(() => {
-    if (!gameIsFinished(session)) {
+    if (!gameIsFinished(session) || isPracticeGame(session)) {
       setSeries(null);
       return undefined;
     }
@@ -185,6 +196,20 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
       cancelled = true;
       clearInterval(timer);
     };
+  }, [sessionId, session?.status]);
+
+  // Practice: the bot only moves when the server looks at it, so poll while
+  // the race runs — this is what settles an idle player's loss, and keeps the
+  // bot bar honest between the player's own keystroke pings.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on race identity + status; session object identity churns on every progress event.
+  useEffect(() => {
+    if (!isPracticeGame(session) || !gameIsActive(session)) return undefined;
+    const timer = setInterval(() => {
+      apiGet(`/api/v1/games/${sessionId}`)
+        .then((data) => onSession?.(data))
+        .catch(() => {});
+    }, 2000);
+    return () => clearInterval(timer);
   }, [sessionId, session?.status]);
 
   const passage = session?.passage || "";
@@ -365,6 +390,24 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
     }
   };
 
+  // Practice: instant new race at the selected difficulty — no invite, no wait.
+  const raceAgain = async () => {
+    if (rematchBusy) return;
+    setRematchBusy(true);
+    setRematchError(null);
+    try {
+      playJoin();
+      const next = await apiPost("/api/v1/games/practice", {
+        difficulty: practiceDifficulty,
+      });
+      onSession?.(next);
+    } catch (e) {
+      setRematchError(e?.message || "Could not start practice");
+    } finally {
+      setRematchBusy(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-hidden bg-[var(--bg-base)]">
       <style>{KEYFRAMES}</style>
@@ -407,6 +450,12 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
         </div>
         {active && (
           <div className="flex shrink-0 items-center gap-1.5">
+            {isPracticeGame(session) && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] font-bold text-[var(--text-muted)]">
+                <Bot className="h-3 w-3" />
+                {practiceDifficultyFor(session.botDifficulty).label}
+              </span>
+            )}
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border)] px-2.5 py-1 font-mono text-[12px] tabular-nums text-[var(--text-primary)]">
               <Zap className="h-3 w-3 text-amber-500" />
               {liveWpm}
@@ -452,112 +501,48 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                 )}
               </div>
 
-              {/* Best-of series + one-tap rematch — same DM thread. */}
-              <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                    <Swords className="h-3.5 w-3.5" /> Best of {bestOf}
-                  </p>
-                  {series && (
-                    <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]">
-                      {seriesScoreText(series, viewerId, opponentId)}
+              {/* Practice: instant race-again + difficulty switch. No series. */}
+              {isPracticeGame(session) ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                      <Bot className="h-3.5 w-3.5" /> Practice ·{" "}
+                      {practiceDifficultyFor(practiceDifficulty).label}
                     </p>
-                  )}
-                </div>
-
-                {/* Round dots: per-game winner, flat pills, icons only. */}
-                <div className="flex items-center gap-1.5">
-                  {Array.from({ length: bestOf }).map((_, i) => {
-                    const g = seriesGames[i];
-                    const w = g?.winnerId || null;
-                    const mine = w && String(w) === String(viewerId);
-                    const theirs = w && !mine;
-                    return (
-                      <span
-                        key={g?.id || `round-${i}`}
-                        title={
-                          g
-                            ? `Game ${i + 1}: ${mine ? "you won" : theirs ? `${opponent?.displayName || "opponent"} won` : "no result"}`
-                            : `Game ${i + 1}: not played`
-                        }
-                        className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-full border px-2 text-[11px] font-bold tabular-nums ${
-                          mine
-                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
-                            : theirs
-                              ? "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)]"
-                              : i === seriesGames.length
-                                ? "border-dashed border-[var(--accent)]/50 text-[var(--accent)]"
-                                : "border-[var(--border)] text-[var(--text-muted)]/50"
-                        }`}
-                      >
-                        G{i + 1} · {mine ? "W" : theirs ? "L" : "–"}
-                      </span>
-                    );
-                  })}
-                </div>
-
-                {seriesDone ? (
-                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5">
-                    <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                        {series?.winnerId &&
-                        String(series.winnerId) === String(viewerId)
-                          ? "Series yours"
-                          : "Series decided"}
-                      </p>
-                      <p className="truncate text-[11px] text-[var(--text-muted)]">
-                        Invite again from the arena for a fresh series
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playClick();
-                        onClose?.();
-                      }}
-                      className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12.5px] font-semibold text-black transition-all hover:brightness-90 active:scale-95"
-                    >
-                      Arena
-                    </button>
+                    <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]">
+                      {iWon
+                        ? `You beat ${opponent?.displayName || "the bot"}`
+                        : `${opponent?.displayName || "The bot"} won this one`}
+                    </p>
                   </div>
-                ) : liveRematch ? (
-                  <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/[0.06] px-3 py-2.5">
-                    <RotateCcw className="h-5 w-5 shrink-0 text-[var(--accent)]" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                        {liveRematchInvitesMe
-                          ? `${opponent?.displayName || "Opponent"} wants a rematch`
-                          : `Game ${liveRematch.round || nextRound} waiting`}
-                      </p>
-                      <p className="truncate text-[11px] text-[var(--text-muted)]">
-                        Same chat thread · first to{" "}
-                        {Number(series?.winsNeeded) || 2}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={
-                        liveRematchInvitesMe
-                          ? joinRematch
-                          : () => onSession?.(liveRematch)
-                      }
-                      disabled={rematchBusy}
-                      className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[12.5px] font-semibold text-black transition-all hover:brightness-90 active:scale-95 disabled:opacity-50"
-                    >
-                      {rematchBusy ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      )}
-                      {liveRematchInvitesMe ? "Accept" : "Open"}
-                    </button>
+                  <div className="flex items-center gap-1.5">
+                    {["easy", "medium", "hard"].map((id) => {
+                      const d = practiceDifficultyFor(id);
+                      const selected = practiceDifficulty === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => {
+                            playClick();
+                            setPracticeDifficulty(id);
+                          }}
+                          aria-pressed={selected}
+                          className={`h-8 flex-1 rounded-full border px-2 text-[11.5px] font-bold transition-all active:scale-95 ${
+                            selected
+                              ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-base)]"
+                              : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          {d.label} · {d.wpm}
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={requestRematch}
+                      onClick={raceAgain}
                       disabled={rematchBusy}
                       className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 py-2.5 text-[13px] font-semibold text-black transition-all hover:brightness-90 active:scale-95 disabled:opacity-50 min-h-[42px]"
                     >
@@ -566,7 +551,7 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                       ) : (
                         <RotateCcw className="h-4 w-4" />
                       )}
-                      Rematch · Game {nextRound > bestOf ? bestOf : nextRound}
+                      Race again
                     </button>
                     <button
                       type="button"
@@ -579,18 +564,153 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                       Arena
                     </button>
                   </div>
-                )}
-                {rematchError && (
-                  <p className="text-[12px] text-[var(--destructive)]">
-                    {rematchError}
-                  </p>
-                )}
-                {!series && (
-                  <p className="text-[11px] text-[var(--text-muted)]">
-                    Loading series…
-                  </p>
-                )}
-              </div>
+                  {rematchError && (
+                    <p className="text-[12px] text-[var(--destructive)]">
+                      {rematchError}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
+                  {/* Best-of series + one-tap rematch — same DM thread. */}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                      <Swords className="h-3.5 w-3.5" /> Best of {bestOf}
+                    </p>
+                    {series && (
+                      <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]">
+                        {seriesScoreText(series, viewerId, opponentId)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Round dots: per-game winner, flat pills, icons only. */}
+                  <div className="flex items-center gap-1.5">
+                    {Array.from({ length: bestOf }).map((_, i) => {
+                      const g = seriesGames[i];
+                      const w = g?.winnerId || null;
+                      const mine = w && String(w) === String(viewerId);
+                      const theirs = w && !mine;
+                      return (
+                        <span
+                          key={g?.id || `round-${i}`}
+                          title={
+                            g
+                              ? `Game ${i + 1}: ${mine ? "you won" : theirs ? `${opponent?.displayName || "opponent"} won` : "no result"}`
+                              : `Game ${i + 1}: not played`
+                          }
+                          className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-full border px-2 text-[11px] font-bold tabular-nums ${
+                            mine
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
+                              : theirs
+                                ? "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                                : i === seriesGames.length
+                                  ? "border-dashed border-[var(--accent)]/50 text-[var(--accent)]"
+                                  : "border-[var(--border)] text-[var(--text-muted)]/50"
+                          }`}
+                        >
+                          G{i + 1} · {mine ? "W" : theirs ? "L" : "–"}
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  {seriesDone ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5">
+                      <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                          {series?.winnerId &&
+                          String(series.winnerId) === String(viewerId)
+                            ? "Series yours"
+                            : "Series decided"}
+                        </p>
+                        <p className="truncate text-[11px] text-[var(--text-muted)]">
+                          Invite again from the arena for a fresh series
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playClick();
+                          onClose?.();
+                        }}
+                        className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[12.5px] font-semibold text-black transition-all hover:brightness-90 active:scale-95"
+                      >
+                        Arena
+                      </button>
+                    </div>
+                  ) : liveRematch ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/[0.06] px-3 py-2.5">
+                      <RotateCcw className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                          {liveRematchInvitesMe
+                            ? `${opponent?.displayName || "Opponent"} wants a rematch`
+                            : `Game ${liveRematch.round || nextRound} waiting`}
+                        </p>
+                        <p className="truncate text-[11px] text-[var(--text-muted)]">
+                          Same chat thread · first to{" "}
+                          {Number(series?.winsNeeded) || 2}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={
+                          liveRematchInvitesMe
+                            ? joinRematch
+                            : () => onSession?.(liveRematch)
+                        }
+                        disabled={rematchBusy}
+                        className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-[12.5px] font-semibold text-black transition-all hover:brightness-90 active:scale-95 disabled:opacity-50"
+                      >
+                        {rematchBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        )}
+                        {liveRematchInvitesMe ? "Accept" : "Open"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={requestRematch}
+                        disabled={rematchBusy}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 py-2.5 text-[13px] font-semibold text-black transition-all hover:brightness-90 active:scale-95 disabled:opacity-50 min-h-[42px]"
+                      >
+                        {rematchBusy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        Rematch · Game {nextRound > bestOf ? bestOf : nextRound}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playClick();
+                          onClose?.();
+                        }}
+                        className="shrink-0 rounded-full border border-[var(--border)] px-3.5 py-2.5 text-[12.5px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)] min-h-[42px]"
+                      >
+                        Arena
+                      </button>
+                    </div>
+                  )}
+                  {rematchError && (
+                    <p className="text-[12px] text-[var(--destructive)]">
+                      {rematchError}
+                    </p>
+                  )}
+                  {!series && (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Loading series…
+                    </p>
+                  )}
+                </div>
+              )}
               {resultRows.map((p) => {
                 const finished = p.place != null;
                 return (
@@ -630,7 +750,7 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                 className={`relative rounded-[24px] border bg-[var(--bg-surface)] p-4 transition-colors md:p-5 ${
                   countdownActive
                     ? "border-[var(--border)]"
-                    : "border-[var(--accent)]/30 shadow-[0_0_40px_-12px_rgba(106,76,245,0.5)]"
+                    : "border-[var(--accent)]/30"
                 }`}
               >
                 <div
@@ -737,7 +857,11 @@ export function TypingRaceView({ session, viewerId, onClose, onSession }) {
                       }`}
                     >
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[11px] font-bold text-[var(--accent)]">
-                        {initialsFor(p.displayName)}
+                        {isBotPlayer(p) ? (
+                          <Bot className="h-4 w-4" />
+                        ) : (
+                          initialsFor(p.displayName)
+                        )}
                       </span>
                       <span className="w-28 shrink-0 truncate text-[13px] font-medium text-[var(--text-primary)]">
                         {p.displayName || "Player"}

@@ -1,6 +1,7 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
   inviteGameSchema,
+  practiceSchema,
   progressSchema,
   finishSchema,
   parseBody,
@@ -101,6 +102,17 @@ export const rematchGame = asyncHandler(async (req, res) => {
   const game = await gamesService.rematchGame({
     gameId: req.params.id,
     userId: req.user.userId,
+  });
+  res.status(201).json({ success: true, data: game });
+});
+
+// Solo practice vs bot. Born active — the response carries the passage so the
+// arena can drop straight into the race view.
+export const startPractice = asyncHandler(async (req, res) => {
+  const { difficulty } = parseBody(practiceSchema, req.body);
+  const game = await gamesService.startPractice({
+    userId: req.user.userId,
+    difficulty,
   });
   res.status(201).json({ success: true, data: game });
 });

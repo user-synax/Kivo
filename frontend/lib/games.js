@@ -156,6 +156,50 @@ export function gameStatusText(game) {
   }
 }
 
+// ── Solo practice vs bot ──────────────────────────────────────────────
+// Mirrors PRACTICE_BOTS in backend/src/modules/games/games.rules.js (names +
+// base paces duplicated for display; the server owns the actual race pace).
+
+export const PRACTICE_DIFFICULTIES = Object.freeze([
+  {
+    id: "easy",
+    label: "Easy",
+    botName: "Rookie Bot",
+    wpm: 30,
+    blurb: "Warm up",
+  },
+  {
+    id: "medium",
+    label: "Medium",
+    botName: "Dash Bot",
+    wpm: 55,
+    blurb: "Steady race",
+  },
+  {
+    id: "hard",
+    label: "Hard",
+    botName: "Blaze Bot",
+    wpm: 80,
+    blurb: "Blistering",
+  },
+]);
+
+export function practiceDifficultyFor(id) {
+  return (
+    PRACTICE_DIFFICULTIES.find((d) => d.id === id) || PRACTICE_DIFFICULTIES[1]
+  );
+}
+
+export function isPracticeGame(game) {
+  return Boolean(game?.isPractice);
+}
+
+export function isBotPlayer(player) {
+  if (!player) return false;
+  if (player.isBot) return true;
+  return String(player.userId || "").startsWith("bot-");
+}
+
 // ── Rematch series (best-of-3) ──────────────────────────────────────────
 // Server owns standings; these derive display values from the series payload
 // GET /api/v1/games/series/:seriesId returns:

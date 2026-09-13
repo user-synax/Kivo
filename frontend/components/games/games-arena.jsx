@@ -2,7 +2,10 @@
 
 import {
   ArrowLeft,
+  Bot,
+  Flame,
   Gamepad2,
+  Gauge,
   Keyboard,
   Loader2,
   Music,
@@ -30,6 +33,7 @@ import {
   initialsFor,
   isHost,
   isInGame,
+  PRACTICE_DIFFICULTIES,
   playerFor,
 } from "@/lib/games";
 import {
@@ -460,6 +464,24 @@ export function GamesArena() {
     }
   };
 
+  // Solo practice vs bot: born active server-side, so one tap drops straight
+  // into the race — no invite, no waiting, no empty-arena dead end.
+  const startPractice = async (difficulty) => {
+    if (busyId) return;
+    setBusyId(`practice-${difficulty}`);
+    try {
+      playJoin();
+      const session = await apiPost("/api/v1/games/practice", { difficulty });
+      if (gameIsActive(session)) setRace(session);
+      else await refresh();
+    } catch (e) {
+      playClick();
+      flash(e.message || "Could not start practice");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const resultFlashNode = resultFlash ? (
     <GameResultFlash
       key={resultFlash.key}
@@ -626,6 +648,51 @@ export function GamesArena() {
                   </p>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* Practice — solo vs bot. Flat cards, lucide icons only. */}
+          <section>
+            <div className="mb-2.5 flex items-center justify-between">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                <Bot className="h-3.5 w-3.5" /> Practice
+              </h2>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                Solo vs bot · instant start
+              </span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {PRACTICE_DIFFICULTIES.map((d, i) => {
+                const Icon =
+                  d.id === "easy" ? Gauge : d.id === "hard" ? Flame : Zap;
+                const busy = busyId === `practice-${d.id}`;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => startPractice(d.id)}
+                    disabled={Boolean(busyId)}
+                    style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
+                    className="t-item-in group flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-all hover:border-[var(--text-muted)]/40 active:scale-[0.98] disabled:opacity-60"
+                  >
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
+                      {busy ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Icon className="h-5 w-5" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-semibold text-[var(--text-primary)]">
+                        {d.label}
+                      </span>
+                      <span className="block truncate text-[11px] text-[var(--text-muted)]">
+                        {d.botName} · ~{d.wpm} WPM
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
 

@@ -34,6 +34,7 @@ router.get("/invites", gamesController.listInvites);
 router.get("/mine", gamesController.listMyGames);
 router.get("/series/:seriesId", gamesController.getSeries);
 router.post("/invite", gameInviteLimiter, gamesController.inviteGame);
+router.post("/practice", gameInviteLimiter, gamesController.startPractice);
 
 router.get("/:id", gamesController.getGame);
 router.post("/:id/join", gameActionLimiter, gamesController.joinGame);

@@ -17,6 +17,13 @@ export const progressSchema = z.object({
   progress: z.number().min(0).max(1),
 });
 
+// Solo practice vs bot. No target player, no DM — just a difficulty.
+export const PRACTICE_DIFFICULTY_VALUES = ["easy", "medium", "hard"];
+
+export const practiceSchema = z.object({
+  difficulty: z.enum(PRACTICE_DIFFICULTY_VALUES).optional().default("medium"),
+});
+
 // A finisher reports how accurate they were and how long it took. WPM is derived
 // server-side from the passage and the server-observed elapsed time (never
 // trusted from the client).

@@ -11,12 +11,16 @@ import { publicMessage } from "../messages/messages.service.js";
 import { createOrGetDm } from "../conversations/conversations.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 import {
+  botProgressAt,
   canRecordRunnerUpFinish,
   COUNTDOWN_MS,
   INVITE_TTL_MS,
   kindLabel,
   MIN_PLAYERS,
   pickPassage,
+  pickPracticeBotWpm,
+  practiceBotFor,
+  PRACTICE_DIFFICULTIES,
   RACE_DEADLINE_MS,
   recordFinish,
   SERIES_BEST_OF,
@@ -72,6 +76,56 @@ async function loadSession(gameId) {
   return session;
 }
 
+// ── Solo practice helpers ─────────────────────────────────────────────
+// Practice sessions have no conversation (no DM, no chip): access means "are
+// you the human player", and delivery goes straight to that player.
+function practiceHumanId(session) {
+  const human = (session.players || []).find((p) => !p.isBot);
+  return human ? human.userId.toString() : null;
+}
+
+function assertPracticeAccess(session, userId) {
+  const player = (session.players || []).find(
+    (p) => p.userId.toString() === String(userId) && !p.isBot,
+  );
+  if (!player || (player.status !== "joined" && player.status !== "invited")) {
+    throw forbidden("You are not part of this practice race", "NOT_INVITED");
+  }
+  return player;
+}
+
+// Same event, right room: conversation rooms for 1v1, the player's own socket
+// room for practice (which has no conversation to broadcast to).
+function emitGameEvent(session, event, payload) {
+  if (session.conversationId) {
+    emitToConversation(session.conversationId.toString(), event, payload);
+  } else {
+    const humanId = practiceHumanId(session);
+    if (humanId) emitToUser(humanId, event, payload);
+  }
+}
+
+// Advance the bot to the server clock. Returns true when the bot just won.
+// Called on every practice read/write so no timer process is needed: the bot
+// only moves when the server looks at it (player ping, poll, finish), and the
+// client polls while a practice race runs so an idle player's loss still lands.
+function advancePracticeBot(session, nowMs = Date.now()) {
+  if (!session.isPractice || session.status !== "active") return false;
+  const bot = (session.players || []).find((p) => p.isBot);
+  if (!bot || bot.finishedAt) return false;
+  if (!session.startedAt || nowMs < new Date(session.startedAt).getTime()) return false;
+  const elapsed = nowMs - new Date(session.startedAt).getTime();
+  bot.progress = botProgressAt(session.botWpm, session.passage, elapsed);
+  const human = (session.players || []).find((p) => !p.isBot);
+  if (bot.progress >= 1 && !(human && human.finishedAt)) {
+    recordFinish(session, bot, elapsed, 100);
+    session.status = "finished";
+    session.finishedAt = new Date();
+    return true;
+  }
+  return false;
+}
+
 // Client-safe player list. Every emit that carries players uses this shape, so a
 // client can safely replace its local copy — a partial shape would silently drop
 // `status` and make the UI think the player had left the race.
@@ -80,6 +134,7 @@ export function publicPlayers(session) {
     userId: p.userId.toString(),
     displayName: p.displayName || null,
     status: p.status,
+    isBot: Boolean(p.isBot),
     progress: p.progress || 0,
     place: p.place ?? null,
     wpm: p.wpm ?? null,
@@ -98,8 +153,10 @@ export function publicGame(session, { includePassage = false } = {}) {
     id: session._id.toString(),
     kind: session.kind,
     status: session.status,
-    conversationId: session.conversationId.toString(),
+    conversationId: session.conversationId ? session.conversationId.toString() : null,
     messageId: session.messageId ? session.messageId.toString() : null,
+    isPractice: Boolean(session.isPractice),
+    botDifficulty: session.botDifficulty || null,
     createdBy: session.createdBy.toString(),
     players: publicPlayers(session),
     startedAt: session.startedAt ? new Date(session.startedAt).toISOString() : null,
@@ -166,7 +223,9 @@ async function syncCard(session) {
 // Share the outcome of a race as its own chat chip. This is a NEW message rather
 // than an edit of the invite card, so the conclusion lands as a fresh entry with
 // its own notification and unread badge — and never posts twice on a retry.
+// Practice races have no conversation, so there is no chip to post.
 async function postResultChip(session) {
+  if (!session.conversationId) return null;
   if (session.resultMessageId) return null;
 
   const winner = (session.players || []).find(
@@ -343,10 +402,67 @@ export async function inviteToGame({ userId, targetUserId, kind = "typing" }) {
   return publicGame(session);
 }
 
+// Solo practice vs bot. No DM, no chip, no invite handshake: the race is born
+// active (with the usual 3-2-1 countdown) and the response carries the passage
+// so the arena can drop straight into the race view. Practice is excluded from
+// plan caps, GAME_EXISTS and series — starting a new one retires any live
+// practice instead of stacking stale races.
+export async function startPractice({ userId, difficulty = "medium" }) {
+  if (!PRACTICE_DIFFICULTIES.includes(difficulty)) {
+    throw badRequest("Pick a difficulty: easy, medium or hard", "INVALID_DIFFICULTY");
+  }
+  const bot = practiceBotFor(difficulty);
+
+  const stale = await GameSession.find({
+    isPractice: true,
+    status: { $in: ["pending", "active"] },
+    "players.userId": userId,
+  });
+  for (const s of stale) {
+    s.status = "cancelled";
+    s.finishedAt = new Date();
+    await s.save();
+  }
+
+  const me = await User.findById(userId).select("displayName username").lean();
+  if (!me) throw notFound("Player not found", "USER_NOT_FOUND");
+
+  const session = await GameSession.create({
+    kind: "typing",
+    status: "active",
+    conversationId: null,
+    createdBy: userId,
+    players: [
+      {
+        userId,
+        displayName: me.displayName || me.username || "Player",
+        status: "joined",
+      },
+      {
+        userId: bot.userId,
+        displayName: bot.name,
+        status: "joined",
+        isBot: true,
+      },
+    ],
+    passage: pickPassage(),
+    startedAt: new Date(Date.now() + COUNTDOWN_MS),
+    expiresAt: new Date(Date.now() + COUNTDOWN_MS + RACE_DEADLINE_MS),
+    isPractice: true,
+    botDifficulty: difficulty,
+    botWpm: pickPracticeBotWpm(difficulty),
+  });
+  return publicGame(session, { includePassage: true });
+}
+
 // Accept an invite. A 1v1 race starts the instant both players are in, so
 // accepting is the whole handshake — no separate "start" step.
 export async function joinGame({ gameId, userId }) {
   const session = await loadSession(gameId);
+  if (session.isPractice) {
+    assertPracticeAccess(session, userId);
+    return publicGame(session, { includePassage: session.status === "active" });
+  }
   await assertMembership(session.conversationId.toString(), userId);
   if (session.status === "active") {
     return publicGame(session, { includePassage: true });
@@ -375,6 +491,10 @@ export async function joinGame({ gameId, userId }) {
 
 export async function declineGame({ gameId, userId }) {
   const session = await loadSession(gameId);
+  if (session.isPractice) {
+    assertPracticeAccess(session, userId);
+    return publicGame(session);
+  }
   await assertMembership(session.conversationId.toString(), userId);
   if (session.status !== "pending") return publicGame(session);
 
@@ -407,6 +527,10 @@ export async function declineGame({ gameId, userId }) {
 // the race has not begun (e.g. a re-opened arena).
 export async function startGame({ gameId, userId }) {
   const session = await loadSession(gameId);
+  if (session.isPractice) {
+    assertPracticeAccess(session, userId);
+    return publicGame(session, { includePassage: session.status === "active" });
+  }
   await assertMembership(session.conversationId.toString(), userId);
   if (session.createdBy.toString() !== String(userId)) {
     throw forbidden("Only the host can start the race", "NOT_HOST");
@@ -425,6 +549,34 @@ export async function startGame({ gameId, userId }) {
 // message — so typing does not hammer the database.
 export async function reportProgress({ gameId, userId, progress }) {
   const session = await loadSession(gameId);
+  if (session.isPractice) {
+    const player = assertPracticeAccess(session, userId);
+    if (session.status !== "active") throw badRequest("Race is not active", "GAME_NOT_ACTIVE");
+    if (session.startedAt && Date.now() < new Date(session.startedAt).getTime()) {
+      return { ok: true };
+    }
+    // The bot moves on the server clock; a ping that arrives after the bot
+    // crossed the line ends the race with the bot's win.
+    if (advancePracticeBot(session)) {
+      await session.save();
+      emitGameEvent(session, "game:finished", publicGame(session));
+      return { ok: true };
+    }
+    const next = Math.max(player.progress || 0, Math.min(1, Number(progress) || 0));
+    if (next === (player.progress || 0)) {
+      await session.save();
+      return { ok: true };
+    }
+    player.progress = next;
+    session.expiresAt = new Date(Date.now() + RACE_DEADLINE_MS);
+    await session.save();
+    emitGameEvent(session, "game:progress", {
+      gameId: session._id.toString(),
+      conversationId: session.conversationId ? session.conversationId.toString() : null,
+      players: publicPlayers(session),
+    });
+    return { ok: true };
+  }
   await assertMembership(session.conversationId.toString(), userId);
   if (session.status !== "active") throw badRequest("Race is not active", "GAME_NOT_ACTIVE");
 
@@ -447,7 +599,7 @@ export async function reportProgress({ gameId, userId, progress }) {
   // abandoned session, not a countdown that can cut a slow typist off mid-race.
   session.expiresAt = new Date(Date.now() + RACE_DEADLINE_MS);
   await session.save();
-  emitToConversation(session.conversationId.toString(), "game:progress", {
+  emitGameEvent(session, "game:progress", {
     gameId: session._id.toString(),
     conversationId: session.conversationId.toString(),
     // Full player shape — clients replace their copy wholesale.
@@ -458,11 +610,17 @@ export async function reportProgress({ gameId, userId, progress }) {
 
 export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
   const session = await loadSession(gameId);
-  await assertMembership(session.conversationId.toString(), userId);
+  if (session.isPractice) {
+    assertPracticeAccess(session, userId);
+  } else {
+    await assertMembership(session.conversationId.toString(), userId);
+  }
 
-  const player = session.players.find(
-    (p) => p.userId.toString() === String(userId) && p.status === "joined",
-  );
+  const player = session.isPractice
+    ? session.players.find((p) => p.userId.toString() === String(userId) && !p.isBot)
+    : session.players.find(
+        (p) => p.userId.toString() === String(userId) && p.status === "joined",
+      );
   if (!player) throw forbidden("Join the race first", "NOT_IN_GAME");
   // Idempotent — a retry must not claim two places.
   if (player.finishedAt) return publicGame(session);
@@ -480,6 +638,12 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
     ? Math.min(claimed, serverElapsed)
     : serverElapsed;
 
+  // Practice: settle the bot first — it may have crossed while this request
+  // was in flight, in which case this finish lands as the runner-up's.
+  if (session.isPractice) {
+    advancePracticeBot(session);
+  }
+
   // The race already concluded (the opponent crossed the line first). A finish
   // that was already in flight is recorded so the result can report the margin;
   // anything else just returns the authoritative result instead of erroring.
@@ -489,7 +653,7 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
     await session.save();
     // `game:updated`, never `game:finished` — the race is over, and a second
     // finish event would replay the winner/loser flash on both screens.
-    emitToConversation(session.conversationId.toString(), "game:updated", publicGame(session));
+    emitGameEvent(session, "game:updated", publicGame(session));
     return publicGame(session);
   }
 
@@ -504,13 +668,17 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
   await session.save();
   await syncCard(session);
   await postResultChip(session);
-  emitToConversation(session.conversationId.toString(), "game:finished", publicGame(session));
+  emitGameEvent(session, "game:finished", publicGame(session));
   return publicGame(session);
 }
 
 export async function cancelGame({ gameId, userId }) {
   const session = await loadSession(gameId);
-  await assertMembership(session.conversationId.toString(), userId);
+  if (session.isPractice) {
+    assertPracticeAccess(session, userId);
+  } else {
+    await assertMembership(session.conversationId.toString(), userId);
+  }
   if (session.createdBy.toString() !== String(userId)) {
     throw forbidden("Only the host can cancel this game", "NOT_HOST");
   }
@@ -521,12 +689,21 @@ export async function cancelGame({ gameId, userId }) {
   session.finishedAt = new Date();
   await session.save();
   await syncCard(session);
-  emitToConversation(session.conversationId.toString(), "game:cancelled", publicGame(session));
+  emitGameEvent(session, "game:cancelled", publicGame(session));
   return publicGame(session);
 }
 
 export async function getGame({ gameId, userId }) {
   const session = await loadSession(gameId);
+  if (session.isPractice) {
+    assertPracticeAccess(session, userId);
+    // Settle the bot on read so an idle player's loss lands on the next poll.
+    if (advancePracticeBot(session)) {
+      await session.save();
+      emitGameEvent(session, "game:finished", publicGame(session));
+    }
+    return publicGame(session, { includePassage: session.status === "active" });
+  }
   await assertMembership(session.conversationId.toString(), userId);
   // Reveal the passage only while a race is actually running.
   return publicGame(session, { includePassage: session.status === "active" });
@@ -729,11 +906,7 @@ export async function abandonStaleGames() {
     session.finishedAt = now;
     await session.save();
     await syncCard(session);
-    emitToConversation(
-      session.conversationId.toString(),
-      "game:cancelled",
-      publicGame(session),
-    );
+    emitGameEvent(session, "game:cancelled", publicGame(session));
   }
   return stale.length;
 }
