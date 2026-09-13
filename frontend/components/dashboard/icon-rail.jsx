@@ -15,7 +15,9 @@ import {
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/dashboard/avatar";
 import { clearSession, getToken } from "@/lib/auth";
+import { markArenaEntry } from "@/lib/games";
 import { isPlusUser } from "@/lib/plus";
+import { playClick } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
 const RAIL_ITEMS = [
@@ -75,9 +77,16 @@ export function IconRail({
                 type="button"
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() =>
-                  item.route ? router.push(item.route) : onTabChange?.(item.id)
-                }
+                onClick={() => {
+                  if (item.route) {
+                    // Games gets the welcome-gate transition on arrival.
+                    if (item.id === "games") markArenaEntry();
+                    playClick();
+                    router.push(item.route);
+                  } else {
+                    onTabChange?.(item.id);
+                  }
+                }}
                 className={cn(
                   "relative flex size-12 min-h-12 min-w-12 hover:cursor-pointer items-center justify-center rounded-xl transition-colors duration-200",
                   isActive

@@ -26,6 +26,7 @@ import { useSocket } from "@/components/socket-provider";
 import { apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
+  consumeArenaEntry,
   formatWpm,
   gameIsActive,
   gameKindMeta,
@@ -38,6 +39,7 @@ import {
 } from "@/lib/games";
 import {
   getSoundPrefs,
+  playArenaEnter,
   playClick,
   playInvite,
   playJoin,
@@ -53,9 +55,24 @@ import {
 // NOTE: gradient "slop" is banned in this app — do not reintroduce
 // bg-gradient-*, spotlight-*, or violet/magenta washes here.
 
+// Welcome-gate timing: long enough to read the name, short enough to never
+// feel like a loader. Tap skips it instantly.
+export const ARENA_ENTRY_MS = 1500;
+const ARENA_ENTRY_REDUCED_MS = 500;
+
 const ARENA_KEYFRAMES = `@keyframes kivo-arena-pulse {
   0%,100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.82); }
+}
+@keyframes kivo-arena-gate-in {
+  0% { opacity: 0; transform: scale(0.92) translateY(10px); filter: blur(4px); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+@keyframes kivo-arena-gate-wash {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
 }`;
 
 function StatusPill({ tone, children, live }) {
@@ -165,6 +182,15 @@ export function GamesArena() {
   const [notice, setNotice] = useState(null);
   const [resultFlash, setResultFlash] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Welcome gate: true only when we arrived via the icon rail / menu (one-shot
+  // sessionStorage flag). Direct visits and reloads skip it.
+  const [showEntry, setShowEntry] = useState(() => {
+    try {
+      return consumeArenaEntry();
+    } catch {
+      return false;
+    }
+  });
   const [musicOn, setMusicOn] = useState(() => {
     try {
       return getSoundPrefs().arenaMusic !== false;
@@ -199,6 +225,24 @@ export function GamesArena() {
     setNotice(text);
     setTimeout(() => setNotice(null), 2600);
   }, []);
+
+  // Welcome gate: chime + auto-dismiss. Reduced-motion shortens the hold and
+  // drops the pop animation (see motion-reduce classes on the overlay).
+  useEffect(() => {
+    if (!showEntry) return undefined;
+    try {
+      playArenaEnter();
+    } catch {}
+    let reduced = false;
+    try {
+      reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {}
+    const timer = setTimeout(
+      () => setShowEntry(false),
+      reduced ? ARENA_ENTRY_REDUCED_MS : ARENA_ENTRY_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [showEntry]);
 
   // Arena music: try on mount (needs a gesture on most browsers, so also arm
   // the first pointerdown). Always stop on unmount.
@@ -969,6 +1013,42 @@ export function GamesArena() {
       </div>
 
       {resultFlashNode}
+
+      {/* Welcome gate — the "you are entering somewhere" moment. Flat
+          surfaces + lucide icon only, tap skips. Shown only on rail/menu
+          entry, never on reloads or chip returns. */}
+      {showEntry && (
+        <button
+          type="button"
+          onClick={() => setShowEntry(false)}
+          aria-label="Enter the Game Arena"
+          style={{
+            animation: `kivo-arena-gate-wash ${ARENA_ENTRY_MS}ms ease both`,
+          }}
+          className="fixed inset-0 z-[110] flex cursor-pointer flex-col items-center justify-center gap-4 border-0 bg-[var(--bg-base)] px-6 motion-reduce:animate-none"
+        >
+          <span
+            aria-hidden
+            className="flex size-16 items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)] animate-[kivo-arena-gate-in_450ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none"
+          >
+            <Gamepad2 className="h-8 w-8" />
+          </span>
+          <span className="flex flex-col items-center gap-1.5 text-center animate-[kivo-arena-gate-in_450ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
+            <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--text-muted)]">
+              Welcome
+            </span>
+            <span
+              className="max-w-full truncate text-[34px] font-semibold leading-none tracking-tight text-[var(--text-primary)] md:text-[42px]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {me?.displayName || me?.username || "Player"}
+            </span>
+            <span className="text-[13px] font-medium text-[var(--text-muted)]">
+              to the Game Arena
+            </span>
+          </span>
+        </button>
+      )}
 
       {notice && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[max(env(safe-area-inset-bottom),1rem)] z-50 flex justify-center px-4">

@@ -156,6 +156,28 @@ export function gameStatusText(game) {
   }
 }
 
+// ── Arena entry transition ────────────────────────────────────────────
+// One-shot flag so /games can show the "Welcome to the Game Arena" gate only
+// when the user arrived via the icon rail / menu — direct visits and reloads
+// skip it. sessionStorage keeps it per-tab and auto-scopes it to one entry.
+const ARENA_ENTRY_KEY = "kivo:arena:enter";
+
+export function markArenaEntry() {
+  try {
+    sessionStorage.setItem(ARENA_ENTRY_KEY, "1");
+  } catch {}
+}
+
+export function consumeArenaEntry() {
+  try {
+    if (sessionStorage.getItem(ARENA_ENTRY_KEY) === "1") {
+      sessionStorage.removeItem(ARENA_ENTRY_KEY);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 // ── Solo practice vs bot ──────────────────────────────────────────────
 // Mirrors PRACTICE_BOTS in backend/src/modules/games/games.rules.js (names +
 // base paces duplicated for display; the server owns the actual race pace).

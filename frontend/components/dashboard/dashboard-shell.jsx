@@ -2,7 +2,17 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Compass, Gamepad2, MapPin, Palette, Search, Settings, Smile } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  Gamepad2,
+  MapPin,
+  Palette,
+  Search,
+  Settings,
+  Smile,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/components/socket-provider";
@@ -28,6 +38,7 @@ import { SpaceDiscoverModal } from "@/components/spaces/space-discover-modal";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { requestPermission, subscribe, syncSubscription } from "@/lib/push";
+import { markArenaEntry } from "@/lib/games";
 import { playCue } from "@/lib/sound";
 import {
   getCachedConversations,
@@ -46,7 +57,10 @@ import { UserPanel } from "./user-panel";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { CallProvider } from "@/components/calls/call-provider";
 import { IncomingCallOverlay } from "@/components/calls/incoming-call-overlay";
-import { ActiveCallView, CallEndedToast } from "@/components/calls/active-call-view";
+import {
+  ActiveCallView,
+  CallEndedToast,
+} from "@/components/calls/active-call-view";
 import { Avatar } from "./avatar";
 import { ProfileEditModal } from "./profile-edit-modal";
 import { SettingsPanel } from "./settings-panel";
@@ -55,11 +69,19 @@ import { StatusTab } from "@/components/status/status-tab";
 import { StatusCreateModal } from "@/components/status/status-create-modal";
 import { StatusViewer } from "@/components/status/status-viewer";
 import { NearbyTab } from "@/components/dashboard/nearby-tab";
-import { createStatus, fetchStatusFeed, fetchMyStatuses, viewStatus as viewStatusApi, deleteStatus as deleteStatusApi } from "@/lib/status";
+import {
+  createStatus,
+  fetchStatusFeed,
+  fetchMyStatuses,
+  viewStatus as viewStatusApi,
+  deleteStatus as deleteStatusApi,
+} from "@/lib/status";
 
 function isPlusUser(user) {
   if (!user || user.plan !== "plus") return false;
-  const exp = user.planExpiresAt ? new Date(user.planExpiresAt).getTime() : null;
+  const exp = user.planExpiresAt
+    ? new Date(user.planExpiresAt).getTime()
+    : null;
   if (exp != null && Number.isFinite(exp) && exp < Date.now()) return false;
   return true;
 }
@@ -74,7 +96,13 @@ const SELECTED_KEY = "kivo:selected-conversation";
 // GroupSettingsPanel owns the content; this wrapper only controls positioning
 // and the enter/exit transition so it works in both the mobile and desktop
 // layouts.
-function GroupSettingsOverlay({ open, conversation, onClose, onConversationUpdate, onLeft }) {
+function GroupSettingsOverlay({
+  open,
+  conversation,
+  onClose,
+  onConversationUpdate,
+  onLeft,
+}) {
   const reduce = useReducedMotion();
   const slide = reduce ? { duration: 0 } : { duration: 0.28, ease: EASE };
   return (
@@ -110,7 +138,14 @@ function GroupSettingsOverlay({ open, conversation, onClose, onConversationUpdat
     </AnimatePresence>
   );
 }
-function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLeft }) {
+function SpaceSettingsOverlay({
+  open,
+  space,
+  onClose,
+  onUpdated,
+  onDeleted,
+  onLeft,
+}) {
   const reduce = useReducedMotion();
   const slide = reduce ? { duration: 0 } : { duration: 0.28, ease: EASE };
   return (
@@ -135,19 +170,33 @@ function SpaceSettingsOverlay({ open, space, onClose, onUpdated, onDeleted, onLe
           transition={slide}
           className="fixed right-0 top-0 z-40 h-[100dvh] w-[360px] max-w-[88vw] border-l border-[var(--border)] bg-[var(--bg-elevated)] shadow-xl md:static md:z-auto md:h-full md:max-w-none md:shadow-none"
         >
-          <SpaceSettingsPanel space={space} onClose={onClose} onUpdated={onUpdated} onDeleted={onDeleted} onLeft={onLeft} />
+          <SpaceSettingsPanel
+            space={space}
+            onClose={onClose}
+            onUpdated={onUpdated}
+            onDeleted={onDeleted}
+            onLeft={onLeft}
+          />
         </motion.aside>
       )}
     </AnimatePresence>
   );
 }
 
-function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover }) {
+function MobileSpacesTab({
+  spaces,
+  channels,
+  onSelect,
+  onCreateSpace,
+  onDiscover,
+}) {
   const hasSpaces = Array.isArray(spaces) && spaces.length > 0;
   return (
     <div className="flex h-full w-full min-w-0 flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
       <div className="flex w-full min-w-0 shrink-0 items-center justify-between px-5 py-3.5">
-        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Spaces</span>
+        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+          Spaces
+        </span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -165,25 +214,44 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
           </button>
         </div>
       </div>
-      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5 no-scrollbar" style={{ overscrollBehavior: "contain" }}>
+      <div
+        className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-1.5 no-scrollbar"
+        style={{ overscrollBehavior: "contain" }}
+      >
         {!hasSpaces ? (
           <div className="px-3 py-10 text-center">
-            <p className="text-[13px] text-[var(--text-muted)]">No spaces yet</p>
-            <button type="button" onClick={onCreateSpace} className="mt-2 text-[12px] font-medium text-[#a3e635] hover:underline">
+            <p className="text-[13px] text-[var(--text-muted)]">
+              No spaces yet
+            </p>
+            <button
+              type="button"
+              onClick={onCreateSpace}
+              className="mt-2 text-[12px] font-medium text-[#a3e635] hover:underline"
+            >
               Create a space
             </button>
           </div>
         ) : (
           <div className="space-y-2">
             {spaces.map((space) => {
-              const spaceChannels = channels.filter((c) => c.spaceId === space.id);
+              const spaceChannels = channels.filter(
+                (c) => c.spaceId === space.id,
+              );
               return (
-                <div key={space.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3">
+                <div
+                  key={space.id}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3"
+                >
                   <div className="flex items-center gap-3">
                     <Avatar name={space.name} url={space.avatarUrl} size="sm" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{space.name}</p>
-                      <p className="truncate text-[11px] text-[var(--text-muted)]">{space.category} • {spaceChannels.length} channel{spaceChannels.length !== 1 ? "s" : ""}</p>
+                      <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
+                        {space.name}
+                      </p>
+                      <p className="truncate text-[11px] text-[var(--text-muted)]">
+                        {space.category} • {spaceChannels.length} channel
+                        {spaceChannels.length !== 1 ? "s" : ""}
+                      </p>
                     </div>
                   </div>
                   {spaceChannels.length > 0 && (
@@ -195,7 +263,11 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
                           onClick={() => onSelect(c.id)}
                           className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                         >
-                          <span className="truncate text-[12px]">#{c.name?.split("/").pop()?.replace(/^#/, "") || c.name}</span>
+                          <span className="truncate text-[12px]">
+                            #
+                            {c.name?.split("/").pop()?.replace(/^#/, "") ||
+                              c.name}
+                          </span>
                           {c.unread > 0 && (
                             <span className="ml-auto flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-semibold text-[var(--on-accent)]">
                               {c.unread > 9 ? "9+" : c.unread}
@@ -220,7 +292,9 @@ function MobileSpacesTab({ spaces, channels, onSelect, onCreateSpace, onDiscover
 function MobileSettingsTab({ onBack }) {
   return (
     <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
-      <div className={`flex shrink-0 items-center border-b border-[var(--border)] ${onBack ? "gap-1 px-3 py-2.5" : "px-5 py-3.5"}`}>
+      <div
+        className={`flex shrink-0 items-center border-b border-[var(--border)] ${onBack ? "gap-1 px-3 py-2.5" : "px-5 py-3.5"}`}
+      >
         {onBack && (
           <button
             type="button"
@@ -231,7 +305,9 @@ function MobileSettingsTab({ onBack }) {
             <ChevronLeft className="h-5 w-5" />
           </button>
         )}
-        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</span>
+        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+          Settings
+        </span>
       </div>
       <div
         className={`min-h-0 flex-1 overflow-hidden pt-1.5 ${onBack ? "pb-[max(env(safe-area-inset-bottom),0.75rem)]" : "pb-[calc(64px+env(safe-area-inset-bottom))]"}`}
@@ -305,7 +381,9 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
-      <div className={`flex shrink-0 items-center border-b border-[var(--border)] ${onBack ? "gap-1 px-3 py-2.5" : "px-5 py-3.5"}`}>
+      <div
+        className={`flex shrink-0 items-center border-b border-[var(--border)] ${onBack ? "gap-1 px-3 py-2.5" : "px-5 py-3.5"}`}
+      >
         {onBack && (
           <button
             type="button"
@@ -316,7 +394,9 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
             <ChevronLeft className="h-5 w-5" />
           </button>
         )}
-        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Profile</span>
+        <span className="truncate font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+          Profile
+        </span>
       </div>
       <div
         className={`min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-5 pt-6 ${onBack ? "pb-[max(env(safe-area-inset-bottom),1.25rem)]" : "pb-[calc(64px+env(safe-area-inset-bottom))]"}`}
@@ -324,16 +404,38 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
       >
         {user.banner ? (
           <div className="relative h-28 w-full overflow-hidden rounded-xl border border-[var(--border)]">
-            <Image src={user.banner} alt="" aria-hidden="true" fill unoptimized sizes="100vw" className="object-cover" />
+            <Image
+              src={user.banner}
+              alt=""
+              aria-hidden="true"
+              fill
+              unoptimized
+              sizes="100vw"
+              className="object-cover"
+            />
           </div>
         ) : null}
 
         <div className="mt-6 flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
-          <Avatar name={user.displayName || user.email || "?"} avatarStyle={user.avatarStyle} url={user.avatarUrl} size="lg" isPlus={isPlusUser(user)} />
+          <Avatar
+            name={user.displayName || user.email || "?"}
+            avatarStyle={user.avatarStyle}
+            url={user.avatarUrl}
+            size="lg"
+            isPlus={isPlusUser(user)}
+          />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-medium text-[var(--text-primary)]">{user.displayName || "—"}</p>
-            <p className="truncate text-[13px] text-[var(--text-muted)]">{user.status || user.email}</p>
-            {user.username && <p className="truncate text-[12px] text-[var(--text-muted)]">@{user.username}</p>}
+            <p className="truncate text-lg font-medium text-[var(--text-primary)]">
+              {user.displayName || "—"}
+            </p>
+            <p className="truncate text-[13px] text-[var(--text-muted)]">
+              {user.status || user.email}
+            </p>
+            {user.username && (
+              <p className="truncate text-[12px] text-[var(--text-muted)]">
+                @{user.username}
+              </p>
+            )}
           </div>
         </div>
 
@@ -346,14 +448,29 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
         </button>
 
         <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
-          {user.bio ? <p className="mb-4 text-sm text-[var(--text-primary)]">{user.bio}</p> : null}
+          {user.bio ? (
+            <p className="mb-4 text-sm text-[var(--text-primary)]">
+              {user.bio}
+            </p>
+          ) : null}
           {rows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between gap-4 border-b border-[var(--border)] py-3 last:border-b-0">
-              <span className="text-[13px] text-[var(--text-muted)]">{row.label}</span>
-              <span className="truncate text-sm font-medium text-[var(--text-primary)]">{row.value}</span>
+            <div
+              key={row.label}
+              className="flex items-center justify-between gap-4 border-b border-[var(--border)] py-3 last:border-b-0"
+            >
+              <span className="text-[13px] text-[var(--text-muted)]">
+                {row.label}
+              </span>
+              <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                {row.value}
+              </span>
             </div>
           ))}
-          {refreshing && <p className="pt-3 text-[11px] text-[var(--text-muted)]">Refreshing…</p>}
+          {refreshing && (
+            <p className="pt-3 text-[11px] text-[var(--text-muted)]">
+              Refreshing…
+            </p>
+          )}
         </div>
 
         <button
@@ -364,21 +481,40 @@ function MobileProfileTab({ currentUser, onProfileUpdate, onBack }) {
           Log out
         </button>
       </div>
-      <ProfileEditModal open={editOpen} currentUser={user} onClose={() => setEditOpen(false)} onSaved={handleSaved} />
+      <ProfileEditModal
+        open={editOpen}
+        currentUser={user}
+        onClose={() => setEditOpen(false)}
+        onSaved={handleSaved}
+      />
     </div>
   );
 }
 
 // Mobile hamburger tab: the bottom bar stays to Chats / Groups / Spaces / Menu;
 // Profile, Appearance and Settings open as pushed screens from here.
-function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSettings, onOpenSearch, onOpenEmojiFactory, onOpenNearby, onOpenDiscover }) {
+function MobileMenuTab({
+  currentUser,
+  onOpenProfile,
+  onOpenAppearance,
+  onOpenSettings,
+  onOpenSearch,
+  onOpenEmojiFactory,
+  onOpenNearby,
+  onOpenDiscover,
+}) {
   const router = useRouter();
   const displayName =
-    currentUser?.displayName || currentUser?.username || currentUser?.email || "Account";
+    currentUser?.displayName ||
+    currentUser?.username ||
+    currentUser?.email ||
+    "Account";
   return (
     <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
       <div className="shrink-0 border-b border-[var(--border)] px-5 py-3.5">
-        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Menu</span>
+        <span className="font-display text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+          Menu
+        </span>
       </div>
       <div
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[calc(64px+env(safe-area-inset-bottom))] pt-2"
@@ -390,13 +526,21 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
             onClick={onOpenProfile}
             className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
           >
-            <Avatar name={displayName} avatarStyle={currentUser?.avatarStyle} url={currentUser?.avatarUrl} size="sm" isPlus={isPlusUser(currentUser)} />
+            <Avatar
+              name={displayName}
+              avatarStyle={currentUser?.avatarStyle}
+              url={currentUser?.avatarUrl}
+              size="sm"
+              isPlus={isPlusUser(currentUser)}
+            />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">
                 {currentUser?.displayName || currentUser?.username || "Profile"}
               </span>
               <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
-                {currentUser?.username ? `@${currentUser.username}` : "Your public profile"}
+                {currentUser?.username
+                  ? `@${currentUser.username}`
+                  : "Your public profile"}
               </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
@@ -411,8 +555,12 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
               <Search className="h-4 w-4" strokeWidth={1.8} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Search</span>
-              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Messages, people & spaces</span>
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Search
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Messages, people & spaces
+              </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>
@@ -464,23 +612,34 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
               <MapPin className="h-4 w-4" strokeWidth={1.8} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Nearby users</span>
-              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Discover people near you — distance only</span>
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Nearby users
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Discover people near you — distance only
+              </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>
 
           <button
             type="button"
-            onClick={() => router.push("/games")}
+            onClick={() => {
+              markArenaEntry();
+              router.push("/games");
+            }}
             className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:bg-[var(--hover)]"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white">
               <Gamepad2 className="h-4 w-4" strokeWidth={1.8} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Kivo Games</span>
-              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Play a Typing Race with someone</span>
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Kivo Games
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Play a Typing Race with someone
+              </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>
@@ -494,8 +653,12 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
               <Compass className="h-4 w-4" strokeWidth={1.8} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">Discover spaces</span>
-              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">Find and join public communities</span>
+              <span className="block text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+                Discover spaces
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                Find and join public communities
+              </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           </button>
@@ -514,7 +677,11 @@ function MobileMenuTab({ currentUser, onOpenProfile, onOpenAppearance, onOpenSet
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                   Plus
                 </span>
-                {!isPlusUser(currentUser) && <span className="text-[10px] text-amber-600">• Plus only</span>}
+                {!isPlusUser(currentUser) && (
+                  <span className="text-[10px] text-amber-600">
+                    • Plus only
+                  </span>
+                )}
               </span>
               <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
                 Create personal emoji — use everywhere
@@ -568,7 +735,9 @@ function toListItem(c, currentUser, spaces) {
     type: c.type,
     spaceId: c.spaceId || null,
     channelId: c.channelId || null,
-    lastMessage: c.lastMessagePreview || (isGroup ? "Group conversation" : isChannel ? "Channel" : ""),
+    lastMessage:
+      c.lastMessagePreview ||
+      (isGroup ? "Group conversation" : isChannel ? "Channel" : ""),
     time: formatTime(c.lastMessageAt),
     unread: c.unreadCount || 0,
     online,
@@ -656,7 +825,9 @@ export function DashboardShell() {
       if (!uid) return new Set();
       const raw = localStorage.getItem(`kivo:pinned:${uid}`);
       return new Set(raw ? JSON.parse(raw) : []);
-    } catch { return new Set(); }
+    } catch {
+      return new Set();
+    }
   });
   const [mutedIds, setMutedIds] = useState(() => {
     if (typeof window === "undefined") return new Set();
@@ -665,7 +836,9 @@ export function DashboardShell() {
       if (!uid) return new Set();
       const raw = localStorage.getItem(`kivo:muted:${uid}`);
       return new Set(raw ? JSON.parse(raw) : []);
-    } catch { return new Set(); }
+    } catch {
+      return new Set();
+    }
   });
   // reload when user switches
   useEffect(() => {
@@ -678,83 +851,115 @@ export function DashboardShell() {
     } catch {}
   }, [currentUser?.id]);
 
-  const handlePin = useCallback((conversationId) => {
-    if (!conversationId) return;
-    setPinnedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(conversationId)) next.delete(conversationId);
-      else next.add(conversationId);
-      try {
-        const uid = currentUser?.id || getSession()?.id;
-        if (uid) localStorage.setItem(`kivo:pinned:${uid}`, JSON.stringify([...next]));
-      } catch {}
-      return next;
-    });
-  }, [currentUser?.id]);
+  const handlePin = useCallback(
+    (conversationId) => {
+      if (!conversationId) return;
+      setPinnedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(conversationId)) next.delete(conversationId);
+        else next.add(conversationId);
+        try {
+          const uid = currentUser?.id || getSession()?.id;
+          if (uid)
+            localStorage.setItem(
+              `kivo:pinned:${uid}`,
+              JSON.stringify([...next]),
+            );
+        } catch {}
+        return next;
+      });
+    },
+    [currentUser?.id],
+  );
 
-  const handleMute = useCallback((conversationId) => {
-    if (!conversationId) return;
-    setMutedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(conversationId)) next.delete(conversationId);
-      else next.add(conversationId);
-      try {
-        const uid = currentUser?.id || getSession()?.id;
-        if (uid) localStorage.setItem(`kivo:muted:${uid}`, JSON.stringify([...next]));
-      } catch {}
-      return next;
-    });
-  }, [currentUser?.id]);
+  const handleMute = useCallback(
+    (conversationId) => {
+      if (!conversationId) return;
+      setMutedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(conversationId)) next.delete(conversationId);
+        else next.add(conversationId);
+        try {
+          const uid = currentUser?.id || getSession()?.id;
+          if (uid)
+            localStorage.setItem(
+              `kivo:muted:${uid}`,
+              JSON.stringify([...next]),
+            );
+        } catch {}
+        return next;
+      });
+    },
+    [currentUser?.id],
+  );
 
-  const handleViewInfo = useCallback((conversation) => {
-    if (!conversation) return;
-    if (conversation.type === "dm") {
-      const other = otherParticipant(conversation, currentUser?.id);
-      const username = other?.username;
-      if (username) {
-        setProfileUsernameSearch(username);
-      } else {
-        const otherId = other?.id || other?._id;
-        if (otherId) {
-          apiGet(`/api/v1/users/${otherId}`).then((u) => {
-            if (u?.username) setProfileUsernameSearch(u.username);
-          }).catch(() => {});
+  const handleViewInfo = useCallback(
+    (conversation) => {
+      if (!conversation) return;
+      if (conversation.type === "dm") {
+        const other = otherParticipant(conversation, currentUser?.id);
+        const username = other?.username;
+        if (username) {
+          setProfileUsernameSearch(username);
+        } else {
+          const otherId = other?.id || other?._id;
+          if (otherId) {
+            apiGet(`/api/v1/users/${otherId}`)
+              .then((u) => {
+                if (u?.username) setProfileUsernameSearch(u.username);
+              })
+              .catch(() => {});
+          }
         }
+      } else if (conversation.type === "group") {
+        setSelectedId(conversation.id);
+        setShowGroupSettings(true);
       }
-    } else if (conversation.type === "group") {
-      setSelectedId(conversation.id);
-      setShowGroupSettings(true);
-    }
-  }, [currentUser?.id]);
+    },
+    [currentUser?.id],
+  );
 
-  const handleBlockFromList = useCallback(async (conversation) => {
-    if (!conversation || conversation.type !== "dm") return;
-    const other = otherParticipant(conversation, currentUser?.id);
-    const otherId = other?.id || other?._id || other;
-    const otherName = participantName(other);
-    if (!otherId) return;
-    const isBlocked = Boolean(conversation.isBlockedByMe);
-    const confirmMsg = isBlocked
-      ? `Unblock ${otherName}? You will again receive messages from them.`
-      : `Block ${otherName}? You won't receive messages from them and they won't see your status.`;
-    if (!window.confirm(confirmMsg)) return;
-    try {
-      if (isBlocked) {
-        await apiPost(`/api/v1/users/${otherId}/unblock`, {});
-      } else {
-        await apiPost(`/api/v1/users/${otherId}/block`, {});
+  const handleBlockFromList = useCallback(
+    async (conversation) => {
+      if (!conversation || conversation.type !== "dm") return;
+      const other = otherParticipant(conversation, currentUser?.id);
+      const otherId = other?.id || other?._id || other;
+      const otherName = participantName(other);
+      if (!otherId) return;
+      const isBlocked = Boolean(conversation.isBlockedByMe);
+      const confirmMsg = isBlocked
+        ? `Unblock ${otherName}? You will again receive messages from them.`
+        : `Block ${otherName}? You won't receive messages from them and they won't see your status.`;
+      if (!window.confirm(confirmMsg)) return;
+      try {
+        if (isBlocked) {
+          await apiPost(`/api/v1/users/${otherId}/unblock`, {});
+        } else {
+          await apiPost(`/api/v1/users/${otherId}/block`, {});
+        }
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === conversation.id ? { ...c, isBlockedByMe: !isBlocked } : c,
+          ),
+        );
+      } catch (e) {
+        window.alert(
+          e?.message || `Could not ${isBlocked ? "unblock" : "block"} user`,
+        );
       }
-      setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, isBlockedByMe: !isBlocked } : c));
-    } catch (e) {
-      window.alert(e?.message || `Could not ${isBlocked ? 'unblock' : 'block'} user`);
-    }
-  }, [currentUser?.id]);
+    },
+    [currentUser?.id],
+  );
 
   // keep refs for socket handlers (avoid stale closure)
   const pinnedIdsRef = useRef(pinnedIds);
   const mutedIdsRef = useRef(mutedIds);
-  useEffect(() => { pinnedIdsRef.current = pinnedIds; }, [pinnedIds]);
-  useEffect(() => { mutedIdsRef.current = mutedIds; }, [mutedIds]);
+  useEffect(() => {
+    pinnedIdsRef.current = pinnedIds;
+  }, [pinnedIds]);
+  useEffect(() => {
+    mutedIdsRef.current = mutedIds;
+  }, [mutedIds]);
 
   // ── Status (WhatsApp desktop-style vertical list) ──────────────────────────
   const [statusFeed, setStatusFeed] = useState([]);
@@ -816,20 +1021,30 @@ export function DashboardShell() {
       fetchStatusFeed()
         .then((d) => {
           if (!active) return;
-          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          const arr = Array.isArray(d?.data)
+            ? d.data
+            : Array.isArray(d)
+              ? d
+              : [];
           setStatusFeed(arr);
         })
         .catch(() => {});
       fetchMyStatuses()
         .then((d) => {
           if (!active) return;
-          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          const arr = Array.isArray(d?.data)
+            ? d.data
+            : Array.isArray(d)
+              ? d
+              : [];
           setMyStatuses(arr);
         })
         .catch(() => {});
     };
     load();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [currentUser, reconnectNonce]);
 
   // Live status updates
@@ -838,13 +1053,21 @@ export function DashboardShell() {
     const onNew = () => {
       fetchStatusFeed()
         .then((d) => {
-          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          const arr = Array.isArray(d?.data)
+            ? d.data
+            : Array.isArray(d)
+              ? d
+              : [];
           setStatusFeed(arr);
         })
         .catch(() => {});
       fetchMyStatuses()
         .then((d) => {
-          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
+          const arr = Array.isArray(d?.data)
+            ? d.data
+            : Array.isArray(d)
+              ? d
+              : [];
           setMyStatuses(arr);
         })
         .catch(() => {});
@@ -852,20 +1075,29 @@ export function DashboardShell() {
     const onDel = ({ statusId, userId }) => {
       if (!statusId) return;
       if (String(userId) === String(currentUser?.id)) {
-        setMyStatuses((prev) => prev.filter((s) => String(s.id || s._id) !== String(statusId)));
+        setMyStatuses((prev) =>
+          prev.filter((s) => String(s.id || s._id) !== String(statusId)),
+        );
       }
       setStatusFeed((prev) =>
         prev
-          .map((g) => ({ ...g, statuses: g.statuses.filter((s) => String(s.id || s._id) !== String(statusId)) }))
-          .filter((g) => g.statuses.length > 0)
+          .map((g) => ({
+            ...g,
+            statuses: g.statuses.filter(
+              (s) => String(s.id || s._id) !== String(statusId),
+            ),
+          }))
+          .filter((g) => g.statuses.length > 0),
       );
     };
     const onViewed = ({ statusId, viewerId }) => {
       if (String(viewerId) === String(currentUser?.id)) return;
       setMyStatuses((prev) =>
         prev.map((s) =>
-          String(s.id || s._id) === String(statusId) ? { ...s, viewers: [...(s.viewers || []), { userId: viewerId }] } : s
-        )
+          String(s.id || s._id) === String(statusId)
+            ? { ...s, viewers: [...(s.viewers || []), { userId: viewerId }] }
+            : s,
+        ),
       );
     };
     socket.on("status:new", onNew);
@@ -880,7 +1112,8 @@ export function DashboardShell() {
 
   // Service-worker push click → navigate to conversation while app is open in another tab.
   useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator))
+      return;
     function onSWMessage(event) {
       const data = event.data;
       if (data?.type === "kivo:notification-click" && data.conversationId) {
@@ -894,7 +1127,8 @@ export function DashboardShell() {
     window.addEventListener("message", (e) => {
       if (e.data?.type === "kivo:notification-click") onSWMessage(e);
     });
-    return () => navigator.serviceWorker.removeEventListener("message", onSWMessage);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", onSWMessage);
   }, []);
 
   // Initial notifications fetch: unread count + first page.
@@ -911,7 +1145,9 @@ export function DashboardShell() {
     apiGet("/api/v1/notifications?limit=20")
       .then((d) => {
         if (!active) return;
-        setNotifications(Array.isArray(d?.notifications) ? d.notifications : []);
+        setNotifications(
+          Array.isArray(d?.notifications) ? d.notifications : [],
+        );
         setNotifNextCursor(d?.nextCursor || null);
         setNotifHasMore(Boolean(d?.nextCursor));
       })
@@ -936,7 +1172,8 @@ export function DashboardShell() {
     const focusedId = selectedId && conv?.type === "dm" ? selectedId : null;
     if (focusedId !== lastFocusedRef.current) {
       lastFocusedRef.current = focusedId;
-      if (focusedId) socket.emit("conversation:focus", { conversationId: focusedId });
+      if (focusedId)
+        socket.emit("conversation:focus", { conversationId: focusedId });
       else socket.emit("conversation:blur");
     }
     return () => {
@@ -955,20 +1192,23 @@ export function DashboardShell() {
       // quiet while the notification center is open and the tab is visible.
       if (notif.type === "friend_request" || notif.type === "friend_accept") {
         const pageHidden =
-          typeof document !== "undefined" && document.visibilityState !== "visible";
+          typeof document !== "undefined" &&
+          document.visibilityState !== "visible";
         if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
       }
       // A wave is a light ping — cue it like friend activity, only when the
       // tab is hidden or the notification center isn't already open.
       if (notif.type === "wave") {
         const pageHidden =
-          typeof document !== "undefined" && document.visibilityState !== "visible";
+          typeof document !== "undefined" &&
+          document.visibilityState !== "visible";
         if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
       }
       // A missed call deserves attention — cue it like its conversation type.
       if (notif.type === "missed_call") {
         const pageHidden =
-          typeof document !== "undefined" && document.visibilityState !== "visible";
+          typeof document !== "undefined" &&
+          document.visibilityState !== "visible";
         if (pageHidden || !notifOpenRef.current) {
           const conv = (conversationsRef.current || []).find(
             (c) => c.id === notif.conversationId,
@@ -978,7 +1218,8 @@ export function DashboardShell() {
       }
       if (notif.type === "plus_granted") {
         const pageHidden =
-          typeof document !== "undefined" && document.visibilityState !== "visible";
+          typeof document !== "undefined" &&
+          document.visibilityState !== "visible";
         if (pageHidden || !notifOpenRef.current) playCue("friendRequests");
         // Refresh the session user so the Plus avatar border appears immediately.
         apiGet("/api/v1/users/me")
@@ -988,8 +1229,13 @@ export function DashboardShell() {
           })
           .catch(() => {});
       }
-      if (notif.type === "dm_message" && notif.conversationId === selectedIdRef.current) {
-        const cur = conversationsRef.current.find((c) => c.id === selectedIdRef.current);
+      if (
+        notif.type === "dm_message" &&
+        notif.conversationId === selectedIdRef.current
+      ) {
+        const cur = conversationsRef.current.find(
+          (c) => c.id === selectedIdRef.current,
+        );
         if (cur?.type === "dm") return;
       }
       setNotifications((prev) => {
@@ -1112,7 +1358,7 @@ export function DashboardShell() {
           setConversations(list);
           if (uid) setCachedConversations(uid, list).catch(() => {});
           const conv = list.find(
-            (c) => c.type === "space_channel" && c.spaceId === space.id
+            (c) => c.type === "space_channel" && c.spaceId === space.id,
           );
           if (conv) setSelectedId(conv.id);
         });
@@ -1315,7 +1561,9 @@ export function DashboardShell() {
     if (!selectedId) return undefined;
     apiPatch(`/api/v1/conversations/${selectedId}/read`, {}).catch(() => {});
     setConversations((prev) => {
-      const next = prev.map((c) => (c.id === selectedId ? { ...c, unreadCount: 0 } : c));
+      const next = prev.map((c) =>
+        c.id === selectedId ? { ...c, unreadCount: 0 } : c,
+      );
       const uid = getSession()?.id;
       if (uid) setCachedConversations(uid, next).catch(() => {});
       return next;
@@ -1342,9 +1590,14 @@ export function DashboardShell() {
           if (mutedIdsRef.current.has(msg.conversationId)) {
             // skip cue
           } else {
-            const conv = conversationsRef.current.find((c) => c.id === msg.conversationId);
+            const conv = conversationsRef.current.find(
+              (c) => c.id === msg.conversationId,
+            );
             const convType = conv ? conv.type : "dm"; // brand-new conv assumed dm
-            const isVisible = typeof document !== "undefined" ? document.visibilityState === "visible" : true;
+            const isVisible =
+              typeof document !== "undefined"
+                ? document.visibilityState === "visible"
+                : true;
             const isFocused = msg.conversationId === selectedIdRef.current;
             const mentioned = (msg.mentions || []).includes(currentUser?.id);
             if (convType === "dm") {
@@ -1407,13 +1660,18 @@ export function DashboardShell() {
         setLastActiveByUser((prev) => ({ ...prev, [userId]: lastActiveAt }));
       } else if (!online) {
         // offline without timestamp — assume now
-        setLastActiveByUser((prev) => ({ ...prev, [userId]: new Date().toISOString() }));
+        setLastActiveByUser((prev) => ({
+          ...prev,
+          [userId]: new Date().toISOString(),
+        }));
       }
       setConversations((prev) =>
         prev.map((c) => {
           let patched = c;
           // patch participants lastActiveAt if present
-          const pIdx = (c.participants || []).findIndex((p) => (p.id || p._id || p).toString() === userId.toString());
+          const pIdx = (c.participants || []).findIndex(
+            (p) => (p.id || p._id || p).toString() === userId.toString(),
+          );
           if (pIdx >= 0 && lastActiveAt) {
             const newParts = [...c.participants];
             newParts[pIdx] = { ...newParts[pIdx], lastActiveAt };
@@ -1446,14 +1704,25 @@ export function DashboardShell() {
     };
 
     const onRead = (payload) => {
-      if (!payload?.conversationId || payload.userId !== currentUser?.id) return;
-      setConversations((prev) => prev.map((c) => (c.id === payload.conversationId ? { ...c, unreadCount: 0 } : c)));
+      if (!payload?.conversationId || payload.userId !== currentUser?.id)
+        return;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === payload.conversationId ? { ...c, unreadCount: 0 } : c,
+        ),
+      );
     };
     const onUnread = (payload) => {
-      if (!payload?.conversationId || payload.userId !== currentUser?.id) return;
-      const count = typeof payload.unreadCount === "number" ? payload.unreadCount : null;
+      if (!payload?.conversationId || payload.userId !== currentUser?.id)
+        return;
+      const count =
+        typeof payload.unreadCount === "number" ? payload.unreadCount : null;
       if (count !== null) {
-        setConversations((prev) => prev.map((c) => (c.id === payload.conversationId ? { ...c, unreadCount: count } : c)));
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === payload.conversationId ? { ...c, unreadCount: count } : c,
+          ),
+        );
       } else {
         loadConversations().then((list) => setConversations(list));
       }
@@ -1515,7 +1784,9 @@ export function DashboardShell() {
     socket.on("conversation:removed", onConversationRemoved);
     socket.on("friend:removed", onFriendRemoved);
 
-    const onSpaceUpdated = ({ space }) => { if (space) upsertSpace(space); };
+    const onSpaceUpdated = ({ space }) => {
+      if (space) upsertSpace(space);
+    };
     const onSpaceChannel = ({ space }) => {
       if (space) upsertSpace(space);
       loadConversations().then((list) => {
@@ -1587,7 +1858,14 @@ export function DashboardShell() {
       socket.off("space:removed", onSpaceRemoved);
       socket.off("space:deleted", onSpaceRemoved);
     };
-  }, [socket, currentUser?.id, loadConversations, upsertConversation, loadSpaces, upsertSpace]);
+  }, [
+    socket,
+    currentUser?.id,
+    loadConversations,
+    upsertConversation,
+    loadSpaces,
+    upsertSpace,
+  ]);
 
   // All hooks above run unconditionally. Only now — after every hook has been
   // declared — is it safe to bail out of rendering when the session is gone.
@@ -1614,7 +1892,9 @@ export function DashboardShell() {
         setNotifLoading(true);
         apiGet("/api/v1/notifications?limit=20")
           .then((d) => {
-            setNotifications(Array.isArray(d?.notifications) ? d.notifications : []);
+            setNotifications(
+              Array.isArray(d?.notifications) ? d.notifications : [],
+            );
             setNotifNextCursor(d?.nextCursor || null);
             setNotifHasMore(Boolean(d?.nextCursor));
           })
@@ -1663,9 +1943,13 @@ export function DashboardShell() {
     if (!notif) return;
     // Mark single read optimistically
     if (!notif.read) {
-      setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)),
+      );
       setNotifUnread((c) => Math.max(0, c - 1));
-      apiPatch("/api/v1/notifications/read", { ids: [notif.id] }).catch(() => {});
+      apiPatch("/api/v1/notifications/read", { ids: [notif.id] }).catch(
+        () => {},
+      );
     }
     setNotifOpen(false);
     const t = notif.type;
@@ -1692,7 +1976,9 @@ export function DashboardShell() {
     }
     if (notif.conversationId) {
       // Ensure the conversation is in the local list; if not, reload once
-      const exists = conversationsRef.current.some((c) => c.id === notif.conversationId);
+      const exists = conversationsRef.current.some(
+        (c) => c.id === notif.conversationId,
+      );
       if (!exists) {
         try {
           const list = await loadConversations();
@@ -1788,10 +2074,16 @@ export function DashboardShell() {
       // optimistic append to mine; feed will also refresh via socket
       if (created?.id) setMyStatuses((prev) => [...prev, created]);
       else {
-        fetchMyStatuses().then((d) => {
-          const arr = Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
-          setMyStatuses(arr);
-        }).catch(() => {});
+        fetchMyStatuses()
+          .then((d) => {
+            const arr = Array.isArray(d?.data)
+              ? d.data
+              : Array.isArray(d)
+                ? d
+                : [];
+            setMyStatuses(arr);
+          })
+          .catch(() => {});
       }
     } catch (e) {
       window.alert(e?.message || "Could not create status");
@@ -1806,7 +2098,10 @@ export function DashboardShell() {
     setViewerOpen(true);
   };
   const handleViewMy = () => {
-    if (!myStatuses.length) { setStatusCreateOpen(true); return; }
+    if (!myStatuses.length) {
+      setStatusCreateOpen(true);
+      return;
+    }
     setViewerStatuses(myStatuses);
     setViewerIndex(0);
     setViewerOpen(true);
@@ -1818,8 +2113,10 @@ export function DashboardShell() {
     setStatusFeed((prev) =>
       prev.map((g) => ({
         ...g,
-        statuses: g.statuses.map((s) => String(s.id || s._id) === String(id) ? { ...s, isViewed: true } : s),
-      }))
+        statuses: g.statuses.map((s) =>
+          String(s.id || s._id) === String(id) ? { ...s, isViewed: true } : s,
+        ),
+      })),
     );
   };
   const handleDeleteStatus = async (id) => {
@@ -1827,7 +2124,9 @@ export function DashboardShell() {
     try {
       await deleteStatusApi(id);
       setViewerOpen(false);
-      setMyStatuses((prev) => prev.filter((s) => String(s.id || s._id) !== String(id)));
+      setMyStatuses((prev) =>
+        prev.filter((s) => String(s.id || s._id) !== String(id)),
+      );
     } catch (e) {
       window.alert(e?.message || "Could not delete status");
     }
@@ -1843,14 +2142,24 @@ export function DashboardShell() {
   const handleMarkUnread = async (conversationId, messageId) => {
     try {
       const body = messageId ? { messageId } : {};
-      const res = await apiPost(`/api/v1/conversations/${conversationId}/unread`, body);
+      const res = await apiPost(
+        `/api/v1/conversations/${conversationId}/unread`,
+        body,
+      );
       const data = res?.data || res;
-      const unreadCount = typeof data?.unreadCount === "number" ? data.unreadCount : null;
+      const unreadCount =
+        typeof data?.unreadCount === "number" ? data.unreadCount : null;
       if (typeof unreadCount === "number") {
-        setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, unreadCount } : c)));
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === conversationId ? { ...c, unreadCount } : c,
+          ),
+        );
         const uid = getSession()?.id;
         if (uid) {
-          const next = conversationsRef.current.map((c) => (c.id === conversationId ? { ...c, unreadCount } : c));
+          const next = conversationsRef.current.map((c) =>
+            c.id === conversationId ? { ...c, unreadCount } : c,
+          );
           setCachedConversations(uid, next).catch(() => {});
         }
       } else {
@@ -1920,7 +2229,7 @@ export function DashboardShell() {
   const handleSearchSpace = useCallback((space) => {
     // Find the space channel conversation in the list
     const channelConv = conversationsRef.current.find(
-      (c) => c.type === "space_channel" && c.spaceId === space.id
+      (c) => c.type === "space_channel" && c.spaceId === space.id,
     );
     if (channelConv) {
       setSelectedId(channelConv.id);
@@ -1930,7 +2239,10 @@ export function DashboardShell() {
   }, []);
 
   const selected = conversations.find((c) => c.id === selectedId) || null;
-  const selectedSpace = selected?.type === "space_channel" ? spaces.find((s) => s.id === selected.spaceId) || null : null;
+  const selectedSpace =
+    selected?.type === "space_channel"
+      ? spaces.find((s) => s.id === selected.spaceId) || null
+      : null;
   const listItems = useMemo(() => {
     const items = conversations.map((c) => {
       const base = toListItem(c, currentUser, spaces);
@@ -1955,9 +2267,15 @@ export function DashboardShell() {
     });
   }, [conversations, currentUser, spaces, pinnedIds, mutedIds]);
   const tabUnread = {
-    chats: conversations.some((c) => c.type === "dm" && (c.unreadCount || 0) > 0),
-    groups: conversations.some((c) => c.type === "group" && (c.unreadCount || 0) > 0),
-    spaces: conversations.some((c) => c.type === "space_channel" && (c.unreadCount || 0) > 0),
+    chats: conversations.some(
+      (c) => c.type === "dm" && (c.unreadCount || 0) > 0,
+    ),
+    groups: conversations.some(
+      (c) => c.type === "group" && (c.unreadCount || 0) > 0,
+    ),
+    spaces: conversations.some(
+      (c) => c.type === "space_channel" && (c.unreadCount || 0) > 0,
+    ),
     status: statusFeed.some((g) => g.statuses?.some((s) => !s.isViewed)),
     settings: false,
     profile: false,
@@ -1969,13 +2287,14 @@ export function DashboardShell() {
       ? Boolean(selected.online[0])
       : Boolean(selected.online)
     : false;
-  const selectedOtherLastActive =
-    selectedOtherId
-      ? lastActiveByUser[selectedOtherId] ||
-        selected?.participants?.find((p) => (p.id || p._id || p).toString() === selectedOtherId)?.lastActiveAt ||
-        otherProfile?.lastActiveAt ||
-        null
-      : null;
+  const selectedOtherLastActive = selectedOtherId
+    ? lastActiveByUser[selectedOtherId] ||
+      selected?.participants?.find(
+        (p) => (p.id || p._id || p).toString() === selectedOtherId,
+      )?.lastActiveAt ||
+      otherProfile?.lastActiveAt ||
+      null
+    : null;
   const showUserPanel = Boolean(
     selected && selected.type === "dm" && selectedOtherId,
   );
@@ -1983,7 +2302,11 @@ export function DashboardShell() {
   // Notification bell node — passed into Sidebar's topbar; center is anchored to bell via relative wrapper
   const notificationBellNode = (
     <div id="kivo-notification-bell-wrap" className="relative">
-      <NotificationBell unreadCount={notifUnread} onClick={handleBellClick} isOpen={notifOpen} />
+      <NotificationBell
+        unreadCount={notifUnread}
+        onClick={handleBellClick}
+        isOpen={notifOpen}
+      />
       <NotificationCenter
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
@@ -2039,583 +2362,643 @@ export function DashboardShell() {
   if (!isDesktop) {
     return (
       <CallProvider conversations={conversations}>
-      <div className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none" style={{ overscrollBehavior: "none", touchAction: "none" }}>
-        <AnimatePresence initial={false}>
-          {selected ? (
-            <motion.div
-              key="chat"
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={slide}
-              drag={reduce || panelDragDisabled ? false : "x"}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.22}
-              dragMomentum={false}
-              dragDirectionLock
-              onDragStart={(_, info) => {
-                if (chatSwipeIgnoreRef.current) return false;
-              }}
-              onDrag={(_, info) => {
-                if (chatSwipeIgnoreRef.current) return;
-                // only right swipe (positive) drives back affordance
-                const dx = info.offset.x;
-                if (dx <= 0) return;
-                const p = Math.min(dx / 90, 1);
-                setSwipeProgress(p);
-              }}
-              onDragEnd={(_, info) => {
-                const wasBubble = chatSwipeIgnoreRef.current;
-                setSwipeProgress(0);
-                chatSwipeIgnoreRef.current = false;
-                setPanelDragDisabled(false);
-                if (wasBubble) return;
-                const offset = info?.offset?.x ?? 0;
-                const velocity = info?.velocity?.x ?? 0;
-                // only right swipe should go back — left swipe is ignored
-                if ((offset > 90 || velocity > 700) && offset > 0) setSelectedId(null);
-              }}
-              onPointerDown={(e) => {
-                const target = e.target;
-                const isBubble =
-                  target.closest?.('[data-slot="bubble"]') ||
-                  target.closest?.('[data-slot="bubble-content"]') ||
-                  target.closest?.('.t-bubble');
-                if (isBubble) {
-                  chatSwipeIgnoreRef.current = true;
-                  setPanelDragDisabled(true);
-                }
-              }}
-              onTouchStart={(e) => {
-                const t = e.touches?.[0];
-                if (!t) return;
-                const target = e.target;
-                const isBubble =
-                  target.closest?.('[data-slot="bubble"]') ||
-                  target.closest?.('[data-slot="bubble-content"]') ||
-                  target.closest?.('.t-bubble') ||
-                  target.closest?.('[data-slot="bubble-group"]');
-                // back swipe is edge-only (<=32px from left); bubbles always block back
-                const isEdge = t.clientX <= 32;
-                const shouldIgnore = !!isBubble || !isEdge;
-                chatSwipeIgnoreRef.current = shouldIgnore;
-                setPanelDragDisabled(shouldIgnore);
-                chatSwipeStartRef.current = { x: t.clientX, y: t.clientY };
-                chatSwipeIsHorizontalRef.current = false;
-              }}
-              onTouchMove={(e) => {
-                if (chatSwipeIgnoreRef.current) return;
-                const t = e.touches?.[0];
-                if (!t) return;
-                const dx = t.clientX - chatSwipeStartRef.current.x;
-                const dy = t.clientY - chatSwipeStartRef.current.y;
-                if (!chatSwipeIsHorizontalRef.current && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-                  chatSwipeIsHorizontalRef.current = true;
-                }
-                if (chatSwipeIsHorizontalRef.current && dx > 12) {
-                  if (e.cancelable) e.preventDefault();
+        <div
+          className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden overscroll-none bg-[var(--bg-base)] touch-none"
+          style={{ overscrollBehavior: "none", touchAction: "none" }}
+        >
+          <AnimatePresence initial={false}>
+            {selected ? (
+              <motion.div
+                key="chat"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={slide}
+                drag={reduce || panelDragDisabled ? false : "x"}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.22}
+                dragMomentum={false}
+                dragDirectionLock
+                onDragStart={(_, info) => {
+                  if (chatSwipeIgnoreRef.current) return false;
+                }}
+                onDrag={(_, info) => {
+                  if (chatSwipeIgnoreRef.current) return;
+                  // only right swipe (positive) drives back affordance
+                  const dx = info.offset.x;
+                  if (dx <= 0) return;
                   const p = Math.min(dx / 90, 1);
                   setSwipeProgress(p);
-                } else if (chatSwipeIsHorizontalRef.current && dx < 0) {
-                  // left swipe on non-bubble edge area — don't drive back progress
+                }}
+                onDragEnd={(_, info) => {
+                  const wasBubble = chatSwipeIgnoreRef.current;
                   setSwipeProgress(0);
-                }
-              }}
-              onTouchEnd={() => {
-                chatSwipeIsHorizontalRef.current = false;
-                chatSwipeIgnoreRef.current = false;
-                setPanelDragDisabled(false);
-                setSwipeProgress(0);
-              }}
-              className="absolute inset-0 bg-[var(--bg-base)] touch-pan-y overscroll-x-contain overscroll-contain"
-              style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
-            >
-              {/* Swipe indicator — dark pill with "< Back", blur smooth (keep) */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2"
-                style={{
-                  opacity: swipeProgress,
-                  filter: reduce ? undefined : `blur(${(1 - swipeProgress) * 6}px)`,
-                  transform: `translateY(-50%) translateX(${(1 - swipeProgress) * -12}px)`,
-                  transition: "opacity 180ms cubic-bezier(0.22,1,0.36,1), filter 220ms cubic-bezier(0.22,1,0.36,1), transform 220ms cubic-bezier(0.22,1,0.36,1)",
+                  chatSwipeIgnoreRef.current = false;
+                  setPanelDragDisabled(false);
+                  if (wasBubble) return;
+                  const offset = info?.offset?.x ?? 0;
+                  const velocity = info?.velocity?.x ?? 0;
+                  // only right swipe should go back — left swipe is ignored
+                  if ((offset > 90 || velocity > 700) && offset > 0)
+                    setSelectedId(null);
                 }}
+                onPointerDown={(e) => {
+                  const target = e.target;
+                  const isBubble =
+                    target.closest?.('[data-slot="bubble"]') ||
+                    target.closest?.('[data-slot="bubble-content"]') ||
+                    target.closest?.(".t-bubble");
+                  if (isBubble) {
+                    chatSwipeIgnoreRef.current = true;
+                    setPanelDragDisabled(true);
+                  }
+                }}
+                onTouchStart={(e) => {
+                  const t = e.touches?.[0];
+                  if (!t) return;
+                  const target = e.target;
+                  const isBubble =
+                    target.closest?.('[data-slot="bubble"]') ||
+                    target.closest?.('[data-slot="bubble-content"]') ||
+                    target.closest?.(".t-bubble") ||
+                    target.closest?.('[data-slot="bubble-group"]');
+                  // back swipe is edge-only (<=32px from left); bubbles always block back
+                  const isEdge = t.clientX <= 32;
+                  const shouldIgnore = !!isBubble || !isEdge;
+                  chatSwipeIgnoreRef.current = shouldIgnore;
+                  setPanelDragDisabled(shouldIgnore);
+                  chatSwipeStartRef.current = { x: t.clientX, y: t.clientY };
+                  chatSwipeIsHorizontalRef.current = false;
+                }}
+                onTouchMove={(e) => {
+                  if (chatSwipeIgnoreRef.current) return;
+                  const t = e.touches?.[0];
+                  if (!t) return;
+                  const dx = t.clientX - chatSwipeStartRef.current.x;
+                  const dy = t.clientY - chatSwipeStartRef.current.y;
+                  if (
+                    !chatSwipeIsHorizontalRef.current &&
+                    Math.abs(dx) > 10 &&
+                    Math.abs(dx) > Math.abs(dy) * 1.2
+                  ) {
+                    chatSwipeIsHorizontalRef.current = true;
+                  }
+                  if (chatSwipeIsHorizontalRef.current && dx > 12) {
+                    if (e.cancelable) e.preventDefault();
+                    const p = Math.min(dx / 90, 1);
+                    setSwipeProgress(p);
+                  } else if (chatSwipeIsHorizontalRef.current && dx < 0) {
+                    // left swipe on non-bubble edge area — don't drive back progress
+                    setSwipeProgress(0);
+                  }
+                }}
+                onTouchEnd={() => {
+                  chatSwipeIsHorizontalRef.current = false;
+                  chatSwipeIgnoreRef.current = false;
+                  setPanelDragDisabled(false);
+                  setSwipeProgress(0);
+                }}
+                className="absolute inset-0 bg-[var(--bg-base)] touch-pan-y overscroll-x-contain overscroll-contain"
+                style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
               >
-                <div className="flex items-center gap-1.5 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] px-3 py-1.5 shadow-lg">
-                  <span className="text-[13px] font-medium text-white">&lt; Back</span>
-                </div>
-              </div>
-              <ChatPanel
-                conversation={selected}
-                space={selectedSpace}
-                onBack={() => setSelectedId(null)}
-                onOpenGroupSettings={() => {
-                  if (selected?.type === "space_channel") setShowSpaceSettings(true);
-                  else setShowGroupSettings(true);
-                }}
-                onConversationUpdate={upsertConversation}
-                isOffline={isOffline}
-                highlightMessageId={highlightMessageId}
-                onHighlightCleared={() => setHighlightMessageId(null)}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="list"
-              initial={{ x: 0 }}
-              animate={{ x: 0 }}
-              exit={{ x: "-28%" }}
-              transition={slide}
-              className="absolute inset-0 flex flex-col bg-[var(--bg-base)]"
-            >
-              <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
-                {mobileTab === "chats" && (
-                  <div className="h-full w-full min-w-0 pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
-                    <Sidebar
-                      conversations={listItems}
-                      selectedId={selectedId}
-                      onSelect={handleSelect}
-                      collapsed={false}
-                      showToggle={false}
-                      onCompose={handleCompose}
-                      onNewGroup={handleNewGroup}
-                      onCreateSpace={() => setShowSpaceCreate(true)}
-                      onDiscoverSpaces={() => setShowDiscover(true)}
-                      spaces={spaces}
-                      currentUser={currentUser}
-                      onProfileUpdate={refreshUser}
-                      notificationBell={notificationBellNode}
-                      hideSpaces
-                      hideGroups
-                      isOffline={isOffline}
-                      onSearchOpen={() => setSearchOpen(true)}
-                      onSavedOpen={() => setSavedOpen(true)}
-                      onMarkUnread={(id) => handleMarkUnread(id)}
-                      onRemoveConversation={handleRemoveConversation}
-                      onPin={handlePin}
-                      onMute={handleMute}
-                      onViewInfo={handleViewInfo}
-                      onBlock={handleBlockFromList}
-                    />
-                  </div>
-                )}
-                {mobileTab === "groups" && (
-                  <div className="h-full w-full min-w-0 pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
-                    <Sidebar
-                      conversations={listItems}
-                      selectedId={selectedId}
-                      onSelect={handleSelect}
-                      collapsed={false}
-                      showToggle={false}
-                      onCompose={handleCompose}
-                      onNewGroup={handleNewGroup}
-                      onCreateSpace={() => setShowSpaceCreate(true)}
-                      onDiscoverSpaces={() => setShowDiscover(true)}
-                      spaces={spaces}
-                      currentUser={currentUser}
-                      onProfileUpdate={refreshUser}
-                      notificationBell={notificationBellNode}
-                      hideSpaces
-                      hideDMs
-                      isOffline={isOffline}
-                      onSearchOpen={() => setSearchOpen(true)}
-                      onSavedOpen={() => setSavedOpen(true)}
-                      onMarkUnread={(id) => handleMarkUnread(id)}
-                      onRemoveConversation={handleRemoveConversation}
-                      onPin={handlePin}
-                      onMute={handleMute}
-                      onViewInfo={handleViewInfo}
-                      onBlock={handleBlockFromList}
-                    />
-                  </div>
-                )}
-                {mobileTab === "spaces" && (
-                  <MobileSpacesTab
-                    spaces={spaces}
-                    channels={listItems.filter((c) => c.type === "space_channel")}
-                    onSelect={handleSelect}
-                    onCreateSpace={() => setShowSpaceCreate(true)}
-                    onDiscover={() => setShowDiscover(true)}
-                  />
-                )}
-                {mobileTab === "menu" && (
-                  <MobileMenuTab
-                    currentUser={currentUser}
-                    onOpenProfile={() => setMobileTab("profile")}
-                    onOpenAppearance={() => setMobileTab("appearance")}
-                    onOpenSettings={() => setMobileTab("settings")}
-                    onOpenSearch={() => setSearchOpen(true)}
-                    onOpenEmojiFactory={() => setMobileTab("emoji-factory")}
-                    onOpenNearby={() => setMobileTab("nearby")}
-                    onOpenDiscover={() => setShowDiscover(true)}
-                  />
-                )}
-                {mobileTab === "nearby" && (
-                  <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
-                    <div className="flex shrink-0 items-center gap-1 border-b border-[var(--border)] px-3 py-2.5">
-                      <button type="button" onClick={() => setMobileTab("menu")} aria-label="Back to menu" className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]">
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-                      <span className="truncate font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Nearby users</span>
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-[calc(64px+env(safe-area-inset-bottom))]" style={{ overscrollBehavior: "contain" }}>
-                      <NearbyTab onStartChat={(id) => { /* Nearby handles request via API */ }} onViewProfile={(u) => u.username && window.open(`/u/${u.username}`, "_blank")} />
-                    </div>
-                  </div>
-                )}
-                {mobileTab === "settings" && (
-                  <MobileSettingsTab onBack={() => setMobileTab("menu")} />
-                )}
-                {mobileTab === "status" && (
-                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
-                    <StatusTab
-                      myStatuses={myStatuses}
-                      feed={statusFeed}
-                      currentUser={currentUser}
-                      onCreate={() => setStatusCreateOpen(true)}
-                      onViewUser={handleViewUser}
-                      onViewMy={handleViewMy}
-                      uploading={statusUploading}
-                    />
-                  </div>
-                )}
-                {mobileTab === "profile" && (
-                  <MobileProfileTab
-                    currentUser={currentUser}
-                    onProfileUpdate={refreshUser}
-                    onBack={() => setMobileTab("menu")}
-                  />
-                )}
-                {mobileTab === "emoji-factory" && (
-                  <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
-                    <EmojiFactoryPanel onClose={() => setMobileTab("menu")} />
-                  </div>
-                )}
-              </div>
-              {(mobileTab === "chats" ||
-                mobileTab === "status" ||
-                mobileTab === "groups" ||
-                mobileTab === "spaces" ||
-                mobileTab === "menu") && (
-                <BottomTabBar
-                  active={mobileTab}
-                  onChange={(id) => {
-                    setMobileTab(id);
+                {/* Swipe indicator — dark pill with "< Back", blur smooth (keep) */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2"
+                  style={{
+                    opacity: swipeProgress,
+                    filter: reduce
+                      ? undefined
+                      : `blur(${(1 - swipeProgress) * 6}px)`,
+                    transform: `translateY(-50%) translateX(${(1 - swipeProgress) * -12}px)`,
+                    transition:
+                      "opacity 180ms cubic-bezier(0.22,1,0.36,1), filter 220ms cubic-bezier(0.22,1,0.36,1), transform 220ms cubic-bezier(0.22,1,0.36,1)",
                   }}
-                  unread={tabUnread}
+                >
+                  <div className="flex items-center gap-1.5 rounded-full bg-[#1c1c1c] border border-[#2a2a2a] px-3 py-1.5 shadow-lg">
+                    <span className="text-[13px] font-medium text-white">
+                      &lt; Back
+                    </span>
+                  </div>
+                </div>
+                <ChatPanel
+                  conversation={selected}
+                  space={selectedSpace}
+                  onBack={() => setSelectedId(null)}
+                  onOpenGroupSettings={() => {
+                    if (selected?.type === "space_channel")
+                      setShowSpaceSettings(true);
+                    else setShowGroupSettings(true);
+                  }}
+                  onConversationUpdate={upsertConversation}
+                  isOffline={isOffline}
+                  highlightMessageId={highlightMessageId}
+                  onHighlightCleared={() => setHighlightMessageId(null)}
                 />
-              )}
-            </motion.div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="list"
+                initial={{ x: 0 }}
+                animate={{ x: 0 }}
+                exit={{ x: "-28%" }}
+                transition={slide}
+                className="absolute inset-0 flex flex-col bg-[var(--bg-base)]"
+              >
+                <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+                  {mobileTab === "chats" && (
+                    <div className="h-full w-full min-w-0 pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                      <Sidebar
+                        conversations={listItems}
+                        selectedId={selectedId}
+                        onSelect={handleSelect}
+                        collapsed={false}
+                        showToggle={false}
+                        onCompose={handleCompose}
+                        onNewGroup={handleNewGroup}
+                        onCreateSpace={() => setShowSpaceCreate(true)}
+                        onDiscoverSpaces={() => setShowDiscover(true)}
+                        spaces={spaces}
+                        currentUser={currentUser}
+                        onProfileUpdate={refreshUser}
+                        notificationBell={notificationBellNode}
+                        hideSpaces
+                        hideGroups
+                        isOffline={isOffline}
+                        onSearchOpen={() => setSearchOpen(true)}
+                        onSavedOpen={() => setSavedOpen(true)}
+                        onMarkUnread={(id) => handleMarkUnread(id)}
+                        onRemoveConversation={handleRemoveConversation}
+                        onPin={handlePin}
+                        onMute={handleMute}
+                        onViewInfo={handleViewInfo}
+                        onBlock={handleBlockFromList}
+                      />
+                    </div>
+                  )}
+                  {mobileTab === "groups" && (
+                    <div className="h-full w-full min-w-0 pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                      <Sidebar
+                        conversations={listItems}
+                        selectedId={selectedId}
+                        onSelect={handleSelect}
+                        collapsed={false}
+                        showToggle={false}
+                        onCompose={handleCompose}
+                        onNewGroup={handleNewGroup}
+                        onCreateSpace={() => setShowSpaceCreate(true)}
+                        onDiscoverSpaces={() => setShowDiscover(true)}
+                        spaces={spaces}
+                        currentUser={currentUser}
+                        onProfileUpdate={refreshUser}
+                        notificationBell={notificationBellNode}
+                        hideSpaces
+                        hideDMs
+                        isOffline={isOffline}
+                        onSearchOpen={() => setSearchOpen(true)}
+                        onSavedOpen={() => setSavedOpen(true)}
+                        onMarkUnread={(id) => handleMarkUnread(id)}
+                        onRemoveConversation={handleRemoveConversation}
+                        onPin={handlePin}
+                        onMute={handleMute}
+                        onViewInfo={handleViewInfo}
+                        onBlock={handleBlockFromList}
+                      />
+                    </div>
+                  )}
+                  {mobileTab === "spaces" && (
+                    <MobileSpacesTab
+                      spaces={spaces}
+                      channels={listItems.filter(
+                        (c) => c.type === "space_channel",
+                      )}
+                      onSelect={handleSelect}
+                      onCreateSpace={() => setShowSpaceCreate(true)}
+                      onDiscover={() => setShowDiscover(true)}
+                    />
+                  )}
+                  {mobileTab === "menu" && (
+                    <MobileMenuTab
+                      currentUser={currentUser}
+                      onOpenProfile={() => setMobileTab("profile")}
+                      onOpenAppearance={() => setMobileTab("appearance")}
+                      onOpenSettings={() => setMobileTab("settings")}
+                      onOpenSearch={() => setSearchOpen(true)}
+                      onOpenEmojiFactory={() => setMobileTab("emoji-factory")}
+                      onOpenNearby={() => setMobileTab("nearby")}
+                      onOpenDiscover={() => setShowDiscover(true)}
+                    />
+                  )}
+                  {mobileTab === "nearby" && (
+                    <div className="flex h-full flex-col bg-[var(--bg-elevated)] pt-[max(env(safe-area-inset-top),1rem)]">
+                      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--border)] px-3 py-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setMobileTab("menu")}
+                          aria-label="Back to menu"
+                          className="flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <span className="truncate font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+                          Nearby users
+                        </span>
+                      </div>
+                      <div
+                        className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-[calc(64px+env(safe-area-inset-bottom))]"
+                        style={{ overscrollBehavior: "contain" }}
+                      >
+                        <NearbyTab
+                          onStartChat={(id) => {
+                            /* Nearby handles request via API */
+                          }}
+                          onViewProfile={(u) =>
+                            u.username &&
+                            window.open(`/u/${u.username}`, "_blank")
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {mobileTab === "settings" && (
+                    <MobileSettingsTab onBack={() => setMobileTab("menu")} />
+                  )}
+                  {mobileTab === "status" && (
+                    <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                      <StatusTab
+                        myStatuses={myStatuses}
+                        feed={statusFeed}
+                        currentUser={currentUser}
+                        onCreate={() => setStatusCreateOpen(true)}
+                        onViewUser={handleViewUser}
+                        onViewMy={handleViewMy}
+                        uploading={statusUploading}
+                      />
+                    </div>
+                  )}
+                  {mobileTab === "profile" && (
+                    <MobileProfileTab
+                      currentUser={currentUser}
+                      onProfileUpdate={refreshUser}
+                      onBack={() => setMobileTab("menu")}
+                    />
+                  )}
+                  {mobileTab === "emoji-factory" && (
+                    <div className="h-full pb-[calc(56px+env(safe-area-inset-bottom))] overflow-hidden">
+                      <EmojiFactoryPanel onClose={() => setMobileTab("menu")} />
+                    </div>
+                  )}
+                </div>
+                {(mobileTab === "chats" ||
+                  mobileTab === "status" ||
+                  mobileTab === "groups" ||
+                  mobileTab === "spaces" ||
+                  mobileTab === "menu") && (
+                  <BottomTabBar
+                    active={mobileTab}
+                    onChange={(id) => {
+                      setMobileTab(id);
+                    }}
+                    unread={tabUnread}
+                  />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {mobileTab === "appearance" && (
+            <AppearanceScreen onClose={() => setMobileTab("menu")} />
           )}
-        </AnimatePresence>
-      {mobileTab === "appearance" && (
-        <AppearanceScreen onClose={() => setMobileTab("menu")} />
-      )}
-      <FriendsModal
-        open={showFriends}
-        onClose={() => setShowFriends(false)}
-        onStartChat={handleStartChat}
-      />
+          <FriendsModal
+            open={showFriends}
+            onClose={() => setShowFriends(false)}
+            onStartChat={handleStartChat}
+          />
 
-      {removeModalNode}
+          {removeModalNode}
 
-      <GroupCreateModal
-        open={showGroupCreate}
-        onClose={() => setShowGroupCreate(false)}
-        onCreated={handleGroupCreated}
-      />
+          <GroupCreateModal
+            open={showGroupCreate}
+            onClose={() => setShowGroupCreate(false)}
+            onCreated={handleGroupCreated}
+          />
 
-      <SpaceCreateModal
-        open={showSpaceCreate}
-        onClose={() => setShowSpaceCreate(false)}
-        onCreated={handleSpaceCreated}
-      />
+          <SpaceCreateModal
+            open={showSpaceCreate}
+            onClose={() => setShowSpaceCreate(false)}
+            onCreated={handleSpaceCreated}
+          />
 
-      <SpaceDiscoverModal
-        open={showDiscover}
-        onClose={() => {
-          setShowDiscover(false);
-          setPendingInvite(null);
-        }}
-        onJoined={handleDiscoverJoined}
-        invitePrefill={pendingInvite}
-      />
+          <SpaceDiscoverModal
+            open={showDiscover}
+            onClose={() => {
+              setShowDiscover(false);
+              setPendingInvite(null);
+            }}
+            onJoined={handleDiscoverJoined}
+            invitePrefill={pendingInvite}
+          />
 
-      <SearchOverlay
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        onSelectMessage={handleSearchMessage}
-        onSelectUser={handleSearchUser}
-        onSelectSpace={handleSearchSpace}
-      />
+          <SearchOverlay
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            onSelectMessage={handleSearchMessage}
+            onSelectUser={handleSearchUser}
+            onSelectSpace={handleSearchSpace}
+          />
 
-      <SavedMessagesModal
-        open={savedOpen}
-        onClose={() => setSavedOpen(false)}
-        onJump={handleSearchMessage}
-      />
+          <SavedMessagesModal
+            open={savedOpen}
+            onClose={() => setSavedOpen(false)}
+            onJump={handleSearchMessage}
+          />
 
-      <GroupSettingsOverlay
-        open={selected?.type === "group" && showGroupSettings}
-        conversation={selected}
-        onClose={() => setShowGroupSettings(false)}
-        onConversationUpdate={upsertConversation}
-        onLeft={() => {
-          setShowGroupSettings(false);
-          setSelectedId(null);
-        }}
-      />
-      <SpaceSettingsOverlay
-        open={selected?.type === "space_channel" && showSpaceSettings}
-        space={selectedSpace}
-        onClose={() => setShowSpaceSettings(false)}
-        onUpdated={upsertSpace}
-        onDeleted={(id) => {
-          setSpaces((prev) => {
-            const next = prev.filter((s) => s.id !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedSpaces(uid, next).catch(() => {});
-            return next;
-          });
-          setConversations((prev) => {
-            const next = prev.filter((c) => c.spaceId !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedConversations(uid, next).catch(() => {});
-            return next;
-          });
-          setSelectedId(null);
-          setShowSpaceSettings(false);
-        }}
-        onLeft={(id) => {
-          setSpaces((prev) => {
-            const next = prev.filter((s) => s.id !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedSpaces(uid, next).catch(() => {});
-            return next;
-          });
-          setConversations((prev) => {
-            const next = prev.filter((c) => c.spaceId !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedConversations(uid, next).catch(() => {});
-            return next;
-          });
-          setSelectedId(null);
-          setShowSpaceSettings(false);
-        }}
-      />
+          <GroupSettingsOverlay
+            open={selected?.type === "group" && showGroupSettings}
+            conversation={selected}
+            onClose={() => setShowGroupSettings(false)}
+            onConversationUpdate={upsertConversation}
+            onLeft={() => {
+              setShowGroupSettings(false);
+              setSelectedId(null);
+            }}
+          />
+          <SpaceSettingsOverlay
+            open={selected?.type === "space_channel" && showSpaceSettings}
+            space={selectedSpace}
+            onClose={() => setShowSpaceSettings(false)}
+            onUpdated={upsertSpace}
+            onDeleted={(id) => {
+              setSpaces((prev) => {
+                const next = prev.filter((s) => s.id !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedSpaces(uid, next).catch(() => {});
+                return next;
+              });
+              setConversations((prev) => {
+                const next = prev.filter((c) => c.spaceId !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedConversations(uid, next).catch(() => {});
+                return next;
+              });
+              setSelectedId(null);
+              setShowSpaceSettings(false);
+            }}
+            onLeft={(id) => {
+              setSpaces((prev) => {
+                const next = prev.filter((s) => s.id !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedSpaces(uid, next).catch(() => {});
+                return next;
+              });
+              setConversations((prev) => {
+                const next = prev.filter((c) => c.spaceId !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedConversations(uid, next).catch(() => {});
+                return next;
+              });
+              setSelectedId(null);
+              setShowSpaceSettings(false);
+            }}
+          />
 
-      <ProfileDrawer
-        username={profileUsernameSearch}
-        open={Boolean(profileUsernameSearch)}
-        onClose={() => setProfileUsernameSearch(null)}
-        onMessage={(conv) => {
-          setProfileUsernameSearch(null);
-          if (conv) {
-            setConversations((prev) => {
-              if (prev.some((c) => c.id === conv.id)) return prev;
-              return [conv, ...prev];
-            });
-            setSelectedId(conv.id);
-          }
-        }}
-      />
+          <ProfileDrawer
+            username={profileUsernameSearch}
+            open={Boolean(profileUsernameSearch)}
+            onClose={() => setProfileUsernameSearch(null)}
+            onMessage={(conv) => {
+              setProfileUsernameSearch(null);
+              if (conv) {
+                setConversations((prev) => {
+                  if (prev.some((c) => c.id === conv.id)) return prev;
+                  return [conv, ...prev];
+                });
+                setSelectedId(conv.id);
+              }
+            }}
+          />
 
-      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} uploading={statusUploading} />
-      <StatusViewer open={viewerOpen} statuses={viewerStatuses} initialIndex={viewerIndex} currentUserId={currentUser?.id} onClose={() => setViewerOpen(false)} onDelete={handleDeleteStatus} onViewed={handleViewed} />
+          <StatusCreateModal
+            open={statusCreateOpen}
+            onClose={() => setStatusCreateOpen(false)}
+            onSubmit={handleCreateStatus}
+            uploading={statusUploading}
+          />
+          <StatusViewer
+            open={viewerOpen}
+            statuses={viewerStatuses}
+            initialIndex={viewerIndex}
+            currentUserId={currentUser?.id}
+            onClose={() => setViewerOpen(false)}
+            onDelete={handleDeleteStatus}
+            onViewed={handleViewed}
+          />
 
-      <IncomingCallOverlay />
-      <ActiveCallView />
-      <CallEndedToast />
-    </div>
+          <IncomingCallOverlay />
+          <ActiveCallView />
+          <CallEndedToast />
+        </div>
       </CallProvider>
-  );
+    );
   }
 
   // Desktop: nested icon-rail + panel sidebar + chat side by side.
   return (
     <CallProvider conversations={conversations}>
-    <div className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)]">
-      <div className="flex min-h-0 w-full min-w-0 flex-1">
-      <div className="hidden h-full w-full min-w-0 shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
-        <NestedSidebar
-          conversations={listItems}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-          spaces={spaces}
-          currentUser={currentUser}
-          onProfileUpdate={refreshUser}
-          notificationBell={notificationBellNode}
-          isOffline={isOffline}
-          onSearchOpen={() => setSearchOpen(true)}
-          onSavedOpen={() => setSavedOpen(true)}
-          onMarkUnread={(id) => handleMarkUnread(id)}
-          onRemoveConversation={handleRemoveConversation}
-          onPin={handlePin}
-          onMute={handleMute}
-          onViewInfo={handleViewInfo}
-          onBlock={handleBlockFromList}
-          onCompose={handleCompose}
-          onNewGroup={handleNewGroup}
-          onCreateSpace={() => setShowSpaceCreate(true)}
-          onDiscoverSpaces={() => setShowDiscover(true)}
-          unread={tabUnread}
-          statusFeed={statusFeed}
-          myStatuses={myStatuses}
-          onStatusCreate={() => setStatusCreateOpen(true)}
-          onStatusViewUser={handleViewUser}
-          onStatusViewMy={handleViewMy}
-          statusUploading={statusUploading}
-        />
-      </div>
+      <div className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[var(--bg-base)]">
+        <div className="flex min-h-0 w-full min-w-0 flex-1">
+          <div className="hidden h-full w-full min-w-0 shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg-elevated)] md:flex md:w-[384px]">
+            <NestedSidebar
+              conversations={listItems}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+              spaces={spaces}
+              currentUser={currentUser}
+              onProfileUpdate={refreshUser}
+              notificationBell={notificationBellNode}
+              isOffline={isOffline}
+              onSearchOpen={() => setSearchOpen(true)}
+              onSavedOpen={() => setSavedOpen(true)}
+              onMarkUnread={(id) => handleMarkUnread(id)}
+              onRemoveConversation={handleRemoveConversation}
+              onPin={handlePin}
+              onMute={handleMute}
+              onViewInfo={handleViewInfo}
+              onBlock={handleBlockFromList}
+              onCompose={handleCompose}
+              onNewGroup={handleNewGroup}
+              onCreateSpace={() => setShowSpaceCreate(true)}
+              onDiscoverSpaces={() => setShowDiscover(true)}
+              unread={tabUnread}
+              statusFeed={statusFeed}
+              myStatuses={myStatuses}
+              onStatusCreate={() => setStatusCreateOpen(true)}
+              onStatusViewUser={handleViewUser}
+              onStatusViewMy={handleViewMy}
+              statusUploading={statusUploading}
+            />
+          </div>
 
-      <div className="flex h-full w-full min-w-0 flex-1 flex-col">
-        <ChatPanel
-          conversation={selected}
-          space={selectedSpace}
-          onOpenGroupSettings={() => {
-            if (selected?.type === "space_channel") setShowSpaceSettings(true);
-            else setShowGroupSettings(true);
-          }}
-          onConversationUpdate={upsertConversation}
-          isOffline={isOffline}
-          highlightMessageId={highlightMessageId}
-          onHighlightCleared={() => setHighlightMessageId(null)}
-        />
-      </div>
+          <div className="flex h-full w-full min-w-0 flex-1 flex-col">
+            <ChatPanel
+              conversation={selected}
+              space={selectedSpace}
+              onOpenGroupSettings={() => {
+                if (selected?.type === "space_channel")
+                  setShowSpaceSettings(true);
+                else setShowGroupSettings(true);
+              }}
+              onConversationUpdate={upsertConversation}
+              isOffline={isOffline}
+              highlightMessageId={highlightMessageId}
+              onHighlightCleared={() => setHighlightMessageId(null)}
+            />
+          </div>
 
-      <AnimatePresence mode="wait">
-        {showUserPanel ? (
-          <UserPanel
-            key={selectedOtherId}
-            profile={otherProfile}
-            loading={otherLoading}
-            online={selectedOtherOnline}
-            lastActiveAt={selectedOtherLastActive}
-            conversationCreatedAt={selected?.createdAt}
+          <AnimatePresence mode="wait">
+            {showUserPanel ? (
+              <UserPanel
+                key={selectedOtherId}
+                profile={otherProfile}
+                loading={otherLoading}
+                online={selectedOtherOnline}
+                lastActiveAt={selectedOtherLastActive}
+                conversationCreatedAt={selected?.createdAt}
+                conversation={selected}
+                onConversationUpdate={upsertConversation}
+              />
+            ) : null}
+          </AnimatePresence>
+
+          <GroupSettingsOverlay
+            open={selected?.type === "group" && showGroupSettings}
             conversation={selected}
+            onClose={() => setShowGroupSettings(false)}
             onConversationUpdate={upsertConversation}
+            onLeft={() => {
+              setShowGroupSettings(false);
+              setSelectedId(null);
+            }}
           />
-        ) : null}
-      </AnimatePresence>
+          <SpaceSettingsOverlay
+            open={selected?.type === "space_channel" && showSpaceSettings}
+            space={selectedSpace}
+            onClose={() => setShowSpaceSettings(false)}
+            onUpdated={upsertSpace}
+            onDeleted={(id) => {
+              setSpaces((prev) => {
+                const next = prev.filter((s) => s.id !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedSpaces(uid, next).catch(() => {});
+                return next;
+              });
+              setConversations((prev) => {
+                const next = prev.filter((c) => c.spaceId !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedConversations(uid, next).catch(() => {});
+                return next;
+              });
+              setSelectedId(null);
+              setShowSpaceSettings(false);
+            }}
+            onLeft={(id) => {
+              setSpaces((prev) => {
+                const next = prev.filter((s) => s.id !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedSpaces(uid, next).catch(() => {});
+                return next;
+              });
+              setConversations((prev) => {
+                const next = prev.filter((c) => c.spaceId !== id);
+                const uid = getSession()?.id;
+                if (uid) setCachedConversations(uid, next).catch(() => {});
+                return next;
+              });
+              setSelectedId(null);
+              setShowSpaceSettings(false);
+            }}
+          />
 
-      <GroupSettingsOverlay
-        open={selected?.type === "group" && showGroupSettings}
-        conversation={selected}
-        onClose={() => setShowGroupSettings(false)}
-        onConversationUpdate={upsertConversation}
-        onLeft={() => {
-          setShowGroupSettings(false);
-          setSelectedId(null);
-        }}
-      />
-      <SpaceSettingsOverlay
-        open={selected?.type === "space_channel" && showSpaceSettings}
-        space={selectedSpace}
-        onClose={() => setShowSpaceSettings(false)}
-        onUpdated={upsertSpace}
-        onDeleted={(id) => {
-          setSpaces((prev) => {
-            const next = prev.filter((s) => s.id !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedSpaces(uid, next).catch(() => {});
-            return next;
-          });
-          setConversations((prev) => {
-            const next = prev.filter((c) => c.spaceId !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedConversations(uid, next).catch(() => {});
-            return next;
-          });
-          setSelectedId(null);
-          setShowSpaceSettings(false);
-        }}
-        onLeft={(id) => {
-          setSpaces((prev) => {
-            const next = prev.filter((s) => s.id !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedSpaces(uid, next).catch(() => {});
-            return next;
-          });
-          setConversations((prev) => {
-            const next = prev.filter((c) => c.spaceId !== id);
-            const uid = getSession()?.id;
-            if (uid) setCachedConversations(uid, next).catch(() => {});
-            return next;
-          });
-          setSelectedId(null);
-          setShowSpaceSettings(false);
-        }}
-      />
+          <FriendsModal
+            open={showFriends}
+            onClose={() => setShowFriends(false)}
+            onStartChat={handleStartChat}
+          />
 
-      <FriendsModal
-        open={showFriends}
-        onClose={() => setShowFriends(false)}
-        onStartChat={handleStartChat}
-      />
+          <GroupCreateModal
+            open={showGroupCreate}
+            onClose={() => setShowGroupCreate(false)}
+            onCreated={handleGroupCreated}
+          />
 
-      <GroupCreateModal
-        open={showGroupCreate}
-        onClose={() => setShowGroupCreate(false)}
-        onCreated={handleGroupCreated}
-      />
+          <SpaceCreateModal
+            open={showSpaceCreate}
+            onClose={() => setShowSpaceCreate(false)}
+            onCreated={handleSpaceCreated}
+          />
 
-      <SpaceCreateModal
-        open={showSpaceCreate}
-        onClose={() => setShowSpaceCreate(false)}
-        onCreated={handleSpaceCreated}
-      />
+          <SpaceDiscoverModal
+            open={showDiscover}
+            onClose={() => {
+              setShowDiscover(false);
+              setPendingInvite(null);
+            }}
+            onJoined={handleDiscoverJoined}
+            invitePrefill={pendingInvite}
+          />
 
-      <SpaceDiscoverModal
-        open={showDiscover}
-        onClose={() => {
-          setShowDiscover(false);
-          setPendingInvite(null);
-        }}
-        onJoined={handleDiscoverJoined}
-        invitePrefill={pendingInvite}
-      />
+          <SearchOverlay
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            onSelectMessage={handleSearchMessage}
+            onSelectUser={handleSearchUser}
+            onSelectSpace={handleSearchSpace}
+          />
 
-      <SearchOverlay
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        onSelectMessage={handleSearchMessage}
-        onSelectUser={handleSearchUser}
-        onSelectSpace={handleSearchSpace}
-      />
+          <SavedMessagesModal
+            open={savedOpen}
+            onClose={() => setSavedOpen(false)}
+            onJump={handleSearchMessage}
+          />
 
-      <SavedMessagesModal
-        open={savedOpen}
-        onClose={() => setSavedOpen(false)}
-        onJump={handleSearchMessage}
-      />
+          <ProfileDrawer
+            username={profileUsernameSearch}
+            open={Boolean(profileUsernameSearch)}
+            onClose={() => setProfileUsernameSearch(null)}
+            onMessage={(conv) => {
+              setProfileUsernameSearch(null);
+              if (conv) {
+                setConversations((prev) => {
+                  if (prev.some((c) => c.id === conv.id)) return prev;
+                  return [conv, ...prev];
+                });
+                setSelectedId(conv.id);
+              }
+            }}
+          />
 
-      <ProfileDrawer
-        username={profileUsernameSearch}
-        open={Boolean(profileUsernameSearch)}
-        onClose={() => setProfileUsernameSearch(null)}
-        onMessage={(conv) => {
-          setProfileUsernameSearch(null);
-          if (conv) {
-            setConversations((prev) => {
-              if (prev.some((c) => c.id === conv.id)) return prev;
-              return [conv, ...prev];
-            });
-            setSelectedId(conv.id);
-          }
-        }}
-      />
+          <StatusCreateModal
+            open={statusCreateOpen}
+            onClose={() => setStatusCreateOpen(false)}
+            onSubmit={handleCreateStatus}
+            uploading={statusUploading}
+          />
+          <StatusViewer
+            open={viewerOpen}
+            statuses={viewerStatuses}
+            initialIndex={viewerIndex}
+            currentUserId={currentUser?.id}
+            onClose={() => setViewerOpen(false)}
+            onDelete={handleDeleteStatus}
+            onViewed={handleViewed}
+          />
 
-      <StatusCreateModal open={statusCreateOpen} onClose={() => setStatusCreateOpen(false)} onSubmit={handleCreateStatus} uploading={statusUploading} />
-      <StatusViewer open={viewerOpen} statuses={viewerStatuses} initialIndex={viewerIndex} currentUserId={currentUser?.id} onClose={() => setViewerOpen(false)} onDelete={handleDeleteStatus} onViewed={handleViewed} />
+          {removeModalNode}
 
-      {removeModalNode}
-
-      <IncomingCallOverlay />
-      <ActiveCallView />
-      <CallEndedToast />
-
+          <IncomingCallOverlay />
+          <ActiveCallView />
+          <CallEndedToast />
+        </div>
       </div>
-    </div>
     </CallProvider>
   );
 }

@@ -66,6 +66,14 @@ const GAME_CUES = {
   ],
   // Arena UI: tiny tactile blip for every tap — dry, ultra-short, quiet.
   click: [[1250.0, 0.0, 0.045]],
+  // Arena gate: a warm three-note welcome (E5 -> A5 -> D6) for the
+  // "Welcome to the Game Arena" entry moment. Brighter than a click,
+  // shorter than a win stinger.
+  enter: [
+    [659.25, 0.0, 0.12], // E5
+    [880.0, 0.1, 0.12], // A5
+    [1174.66, 0.2, 0.3], // D6 (held)
+  ],
   // Invite sent: warm two-note lift (C5 -> G5).
   invite: [
     [523.25, 0.0, 0.1],
@@ -348,6 +356,14 @@ export function playInvite() {
   const prefs = getSoundPrefs();
   if (!prefs.enabled || prefs.gameResults === false) return;
   playPattern(GAME_CUES.invite, { type: "triangle", peak: 0.11 });
+}
+
+// Arena gate chime for the welcome entry overlay. Same gate as every other
+// arena sound so one toggle silences the whole lobby.
+export function playArenaEnter() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  playPattern(GAME_CUES.enter, { type: "triangle", peak: 0.12 });
 }
 
 export function playJoin() {
