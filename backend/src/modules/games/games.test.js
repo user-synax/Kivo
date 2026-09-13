@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import {
+  canRecordRunnerUpFinish,
+  computeWpm,
+  recordFinish,
+} from "./games.rules.js";
 import { finishSchema, inviteGameSchema, progressSchema } from "./games.validation.js";
 
-// Kivo Games — validation contract tests.
+// Kivo Games — validation + race-rule tests.
 //
 // These run with Bun's built-in runner (the same `bun:test` pattern as
-// src/lib/totp.test.js) and are dependency-free: they only exercise the Zod
-// schemas that guard the games API, so they need no database or env vars.
+// src/lib/totp.test.js) and are dependency-free: the Zod schemas need no
+// database, and the race helpers live in games.rules.js (no Mongoose import) so
+// the rules that decide *who won* are covered without standing up MongoDB.
 
 describe("inviteGameSchema", () => {
   test("defaults kind to typing", () => {
@@ -51,5 +57,83 @@ describe("finishSchema", () => {
 
   test("rejects a non-integer elapsedMs", () => {
     expect(finishSchema.safeParse({ elapsedMs: 12.5 }).success).toBe(false);
+  });
+});
+
+// A session-shaped stand-in: enough for the pure race helpers, no Mongoose.
+function fakeSession(passage = "x".repeat(100)) {
+  return {
+    passage,
+    status: "active",
+    winnerId: null,
+    finishedAt: null,
+    players: [
+      { userId: "me", finishedAt: null, progress: 0 },
+      { userId: "rival", finishedAt: null, progress: 0 },
+    ],
+  };
+}
+
+describe("computeWpm", () => {
+  test("is characters ÷ 5 per minute from the server's clock", () => {
+    // 100 chars over exactly one minute = 20 words per minute.
+    expect(computeWpm("x".repeat(100), 60000)).toBe(20);
+  });
+
+  test("clamps an absurd rate to the sanity ceiling", () => {
+    expect(computeWpm("x".repeat(100), 1)).toBe(400);
+  });
+
+  test("returns null when there is nothing to measure", () => {
+    expect(computeWpm("", 1000)).toBeNull();
+    expect(computeWpm("abc", 0)).toBeNull();
+  });
+});
+
+describe("recordFinish", () => {
+  test("gives the first finisher place 1 and the win", () => {
+    const session = fakeSession();
+    recordFinish(session, session.players[0], 20000, 98.5);
+    expect(session.players[0].place).toBe(1);
+    expect(session.players[0].progress).toBe(1);
+    expect(session.winnerId).toBe("me");
+    // 100 chars ÷ 5 = 20 words, in a third of a minute → 60.
+    expect(session.players[0].wpm).toBe(60);
+    expect(session.players[0].accuracy).toBe(98.5);
+  });
+
+  test("a recorded runner-up can never steal the win", () => {
+    const session = fakeSession();
+    recordFinish(session, session.players[0], 20000, 98);
+    recordFinish(session, session.players[1], 20040, 97);
+    expect(session.players[1].place).toBe(2);
+    expect(session.winnerId).toBe("me");
+    expect(session.players[1].elapsedMs).toBe(20040);
+  });
+
+  test("drops a missing accuracy instead of inventing one", () => {
+    const session = fakeSession();
+    recordFinish(session, session.players[0], 20000, undefined);
+    expect(session.players[0].accuracy).toBeNull();
+  });
+});
+
+describe("canRecordRunnerUpFinish", () => {
+  test("accepts a finish request that was already in flight", () => {
+    const session = { status: "finished", finishedAt: new Date() };
+    expect(canRecordRunnerUpFinish(session)).toBe(true);
+  });
+
+  test("rejects one that arrives long after the race ended", () => {
+    const session = {
+      status: "finished",
+      finishedAt: new Date(Date.now() - 60 * 1000),
+    };
+    expect(canRecordRunnerUpFinish(session)).toBe(false);
+  });
+
+  test("rejects a race that never finished", () => {
+    expect(canRecordRunnerUpFinish({ status: "active", finishedAt: null })).toBe(false);
+    expect(canRecordRunnerUpFinish({ status: "cancelled", finishedAt: new Date() })).toBe(false);
   });
 });

@@ -4,12 +4,14 @@ import { ChevronRight, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   formatAccuracy,
+  formatGap,
   formatMs,
   formatWpm,
   gameKindMeta,
   isHost,
   isInGame,
   playerFor,
+  raceMarginMs,
 } from "@/lib/games";
 
 // Kivo Games chat chip.
@@ -60,8 +62,12 @@ export function GameChip({ game, viewerId }) {
     ? `${meta.label} — ${iWon ? "you won" : `${winner?.displayName || "Someone"} won`}`
     : meta.label;
 
+  // A photo finish is the most interesting thing about a result, so it leads the
+  // line — and it is only available when both players have a recorded time.
+  const margin = isResult ? raceMarginMs(game) : null;
   const subtitle = isResult
     ? [
+        margin != null ? `won by ${formatGap(margin)}` : null,
         Number.isFinite(winner?.wpm) ? formatWpm(winner.wpm) : null,
         Number.isFinite(winner?.accuracy)
           ? formatAccuracy(winner.accuracy)

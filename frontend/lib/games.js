@@ -4,6 +4,15 @@
 // values from the public payloads the API and socket events already send.
 // Everything is null-safe because a card can render from a partial snapshot.
 
+// Mirror of COUNTDOWN_MS in backend/src/modules/games/games.rules.js. The server
+// stamps `startedAt` this far in the future, so the countdown both players see is
+// anchored to one shared absolute moment — and the race clock only starts on
+// "GO". Kept in sync by hand because it is a race *rule*, not a display detail.
+export const RACE_COUNTDOWN_MS = 3000;
+
+// A player is "nearly done" from here on — the point where a race gets tense.
+export const RACE_DANGER_PCT = 80;
+
 export const GAME_KINDS = Object.freeze({
   typing: {
     label: "Typing Race",
@@ -70,6 +79,45 @@ export function formatWpm(wpm) {
 export function formatAccuracy(accuracy) {
   if (!Number.isFinite(accuracy)) return "—";
   return `${Math.round(accuracy * 10) / 10}%`;
+}
+
+// Gap between the winner's and the runner-up's finish times — only available on a
+// genuine photo finish, where both players completed the passage near-simultaneously
+// so the server recorded both. Null when the runner-up never crossed the line.
+export function raceMarginMs(game) {
+  const results = gameResults(game);
+  if (results.length < 2) return null;
+  const [first, second] = results;
+  if (
+    !Number.isFinite(first?.elapsedMs) ||
+    !Number.isFinite(second?.elapsedMs)
+  ) {
+    return null;
+  }
+  return Math.max(0, second.elapsedMs - first.elapsedMs);
+}
+
+// How close was it? The race ends the instant someone finishes, so the runner-up
+// usually has no finish time at all — their progress at that moment is the only
+// real evidence. Returns the furthest-along player who never crossed the line.
+export function runnerUpProgress(game) {
+  const finished = new Set(gameResults(game).map((p) => p.userId));
+  const runnerUp = joinedPlayers(game)
+    .filter((p) => !finished.has(p.userId))
+    .sort((a, b) => (Number(b.progress) || 0) - (Number(a.progress) || 0))[0];
+  if (!runnerUp) return null;
+  return {
+    player: runnerUp,
+    progress: Math.max(0, Math.min(1, Number(runnerUp.progress) || 0)),
+  };
+}
+
+// Sub-second gaps read far better as "0.4s" than as "0.0s", so anything under ten
+// seconds is expressed in seconds with a redundant trailing zero trimmed.
+export function formatGap(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  if (ms >= 10000) return formatMs(ms);
+  return `${(ms / 1000).toFixed(2).replace(/0$/, "")}s`;
 }
 
 export function formatMs(ms) {

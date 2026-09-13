@@ -38,9 +38,9 @@ export const SOUND_DEFAULTS = {
   gameResults: true,
 };
 
-// Kivo Games win/lose stingers: a bright ascending major arpeggio for a win and
-// a descending fall for a loss. Both share the single `gameResults` preference
-// so Settings keeps one toggle for game sounds.
+// Kivo Games cues: a bright ascending major arpeggio for a win, a descending fall
+// for a loss, and the pre-race 3-2-1 blips. All of them share the single
+// `gameResults` preference so Settings keeps one toggle for game sounds.
 const GAME_CUES = {
   win: [
     [523.25, 0.0, 0.13], // C5
@@ -53,6 +53,14 @@ const GAME_CUES = {
     [349.23, 0.15, 0.17], // F4
     [293.66, 0.3, 0.2], // D4
     [220.0, 0.48, 0.55], // A3 (falling tail)
+  ],
+  // One short, dry blip per countdown number — deliberately plain so it reads as
+  // a metronome rather than a melody.
+  countdown: [[660.0, 0.0, 0.08]], // E5
+  // "GO": a rising two-note stab, brighter and higher than the ticks.
+  go: [
+    [880.0, 0.0, 0.09], // A5
+    [1318.51, 0.07, 0.22], // E6
   ],
 };
 
@@ -210,4 +218,17 @@ export function playGameResult(outcome) {
     won ? GAME_CUES.win : GAME_CUES.lose,
     won ? { type: "triangle", peak: 0.18 } : { type: "triangle", peak: 0.15 },
   );
+}
+
+// Pre-race countdown blips. `kind` is "countdown" for each number and "go" when
+// typing unlocks; gated by the same master + "Game results" switch as the
+// stingers, so one Settings toggle covers every Kivo Games sound.
+export function playCountdownCue(kind) {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  const isGo = kind === "go";
+  playPattern(isGo ? GAME_CUES.go : GAME_CUES.countdown, {
+    type: "triangle",
+    peak: isGo ? 0.15 : 0.09,
+  });
 }

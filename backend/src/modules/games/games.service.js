@@ -10,6 +10,16 @@ import { emitToConversation, emitToUser } from "../../socket/io.js";
 import { publicMessage } from "../messages/messages.service.js";
 import { createOrGetDm } from "../conversations/conversations.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
+import {
+  canRecordRunnerUpFinish,
+  COUNTDOWN_MS,
+  INVITE_TTL_MS,
+  kindLabel,
+  MIN_PLAYERS,
+  pickPassage,
+  RACE_DEADLINE_MS,
+  recordFinish,
+} from "./games.rules.js";
 
 // Kivo Games — server-authoritative game sessions.
 //
@@ -22,42 +32,6 @@ import * as notificationsService from "../notifications/notifications.service.js
 // from its own clock, and assigns finish places. Clients only report "I typed
 // this far" and "I finished" — the same never-trust-the-client rule used across
 // the API.
-
-const PASSAGES = [
-  "The quick brown fox jumps over the lazy dog while the curious cat watches from a sunny windowsill.",
-  "Every morning the city wakes slowly, first with the rumble of buses and then with the chatter of people.",
-  "A good conversation is like a long walk through a familiar town, full of small turns you did not expect.",
-  "Learning to type quickly is mostly about rhythm, not speed, because steady hands beat hurried ones every time.",
-  "Rain tapped against the window as she poured another cup of tea and listened to the quiet house settle.",
-  "The best ideas rarely arrive on schedule, so it helps to keep a notebook close and your patience closer.",
-];
-
-const MIN_PLAYERS = 2;
-// Safety net for an *abandoned* race. An actively-typed race extends this on
-// every progress ping (see reportProgress), so a slow typist is never cut off —
-// only a race nobody is playing gets reaped.
-const RACE_DEADLINE_MS = 10 * 60 * 1000;
-const INVITE_TTL_MS = 30 * 60 * 1000; // a pending invite expires after 30 minutes
-const MAX_SANE_WPM = 400; // guards against absurd values from a near-zero elapsed time
-
-const KIND_LABELS = Object.freeze({ typing: "Typing Race" });
-
-function kindLabel(kind) {
-  return KIND_LABELS[kind] || "Game";
-}
-
-function pickPassage() {
-  return PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
-}
-
-// WPM = (characters / 5) / minutes, from the passage and the server's own clock.
-function computeWpm(passage, elapsedMs) {
-  if (!passage || !elapsedMs || elapsedMs <= 0) return null;
-  const minutes = elapsedMs / 60000;
-  const wpm = passage.trim().length / 5 / minutes;
-  if (!Number.isFinite(wpm)) return null;
-  return Math.min(MAX_SANE_WPM, Math.max(0, Math.round(wpm)));
-}
 
 async function assertMembership(conversationId, userId) {
   const conversation = await Conversation.findById(conversationId);
@@ -239,8 +213,10 @@ async function postResultChip(session) {
 async function activateSession(session) {
   session.status = "active";
   session.passage = pickPassage();
-  session.startedAt = new Date();
-  session.expiresAt = new Date(Date.now() + RACE_DEADLINE_MS);
+  // Typing unlocks when the countdown ends — see COUNTDOWN_MS.
+  session.startedAt = new Date(Date.now() + COUNTDOWN_MS);
+  session.finishedAt = null;
+  session.expiresAt = new Date(Date.now() + COUNTDOWN_MS + RACE_DEADLINE_MS);
   session.winnerId = null;
   for (const p of session.players) {
     p.progress = 0;
@@ -428,6 +404,12 @@ export async function reportProgress({ gameId, userId, progress }) {
   );
   if (!player) throw forbidden("Join the race first", "NOT_IN_GAME");
 
+  // Progress reported during the 3-2-1 is meaningless (typing is not unlocked
+  // yet) — ignore it silently rather than erroring at a fire-and-forget caller.
+  if (session.startedAt && Date.now() < new Date(session.startedAt).getTime()) {
+    return { ok: true };
+  }
+
   const next = Math.max(player.progress || 0, Math.min(1, Number(progress) || 0));
   if (next === (player.progress || 0)) return { ok: true };
 
@@ -455,11 +437,13 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
   if (!player) throw forbidden("Join the race first", "NOT_IN_GAME");
   // Idempotent — a retry must not claim two places.
   if (player.finishedAt) return publicGame(session);
-  // The race already concluded (the opponent crossed the line first). Return the
-  // authoritative result rather than erroring on a near-simultaneous finish.
-  if (session.status !== "active") return publicGame(session);
 
   const startedAtMs = session.startedAt ? new Date(session.startedAt).getTime() : Date.now();
+  // Nothing may finish during the 3-2-1: the clock has not started yet.
+  if (Date.now() < startedAtMs) {
+    throw badRequest("The race has not started yet", "GAME_NOT_STARTED");
+  }
+
   const serverElapsed = Math.max(0, Date.now() - startedAtMs);
   // Clamp the client's elapsed to what the server observed.
   const claimed = Number(elapsedMs);
@@ -467,16 +451,20 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
     ? Math.min(claimed, serverElapsed)
     : serverElapsed;
 
-  const finishedCount = session.players.filter((p) => p.finishedAt).length;
-  player.place = finishedCount + 1;
-  player.elapsedMs = elapsed;
-  player.wpm = computeWpm(session.passage, elapsed);
-  player.accuracy = Number.isFinite(Number(accuracy))
-    ? Math.round(Number(accuracy) * 10) / 10
-    : null;
-  player.finishedAt = new Date();
-  player.progress = 1;
-  if (player.place === 1) session.winnerId = player.userId;
+  // The race already concluded (the opponent crossed the line first). A finish
+  // that was already in flight is recorded so the result can report the margin;
+  // anything else just returns the authoritative result instead of erroring.
+  if (session.status !== "active") {
+    if (!canRecordRunnerUpFinish(session)) return publicGame(session);
+    recordFinish(session, player, elapsed, accuracy);
+    await session.save();
+    // `game:updated`, never `game:finished` — the race is over, and a second
+    // finish event would replay the winner/loser flash on both screens.
+    emitToConversation(session.conversationId.toString(), "game:updated", publicGame(session));
+    return publicGame(session);
+  }
+
+  recordFinish(session, player, elapsed, accuracy);
 
   // Crossing the line finishes the race. In a 1v1 there is nothing left to wait
   // for, so the winner is decided and the result is shared right away instead of

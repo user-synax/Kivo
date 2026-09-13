@@ -1126,21 +1126,24 @@ The arena has three lists:
 1. Find the player under **In the arena** or **Friends** and click **Invite**.
 2. Kivo resolves — or creates — your **DM** with them and posts a **chip** there (*"Typing Race invite"*).
 3. They open `/games` and hit **Accept** on the card under **Your games**.
-4. **The race starts immediately.** A 1v1 needs no separate start step, so both players drop straight into the full-screen race.
+4. **The race begins with a 3-2-1 countdown.** A 1v1 needs no separate start step, so both players drop straight into the full-screen race — the passage sits blurred behind the number and typing unlocks the instant it clears.
 
 Inviting from the arena is the only way to start a game, and there can be only one live game per pair at a time. Free accounts can have **2** games going at once; Plus accounts **10**.
 
 ### Race
 
+- **3-2-1-GO.** A countdown runs first, with a blip per number and a brighter note on **GO**. The passage appears blurred until then and typing is locked, so nobody gets a head start — and the race clock and WPM only start once you can type.
 - The **server picks** one of 6 passages. Nobody sees it until the race is active and no client can choose it.
 - Type the passage exactly — matched characters turn **accent-colored** (blue in the default theme) and a wrong character shows in **red** until you correct it.
 - Your own progress bar follows your keystrokes instantly; your opponent's bar is synced from the server.
+- **The endgame gets tense on purpose:** once a bar passes **80%** it pulses amber, and the footer line under the race warns you when your opponent is nearly there.
 - A live **WPM** readout and **accuracy** sit under the input, with a race clock in the header.
 - **The first person to finish the passage ends the race** — the winner is decided on the spot and both players get the result screen.
 
 ### Result
 
 - **You Win** flashes the screen **green** with a trophy; **You Lose** flashes it **red** with a broken heart — about a second each, with a synthesized stinger. Tap the flash to dismiss it early, and turn the sound off in **Settings → Sounds → Game Results**.
+- The result screen calls out **how close it was**. On a genuine **photo finish** — both players crossed the line at almost the same moment — it shows the real margin (*"Won by 0.4s"*) over a **Photo finish** badge. Usually only the winner has a time (the race stops the moment they finish), so in that case it reports the honest thing instead: how far the other player had got (*"Priya reached 94%"*).
 - The result screen lists **both** players: finishers with **place, WPM, accuracy and time**, and anyone who didn't cross the line with **how far they got** (`78% typed`).
 - The outcome is also shared to the chat as a **result chip** — a **new message** attributed to the winner, so it arrives with its own notification and unread badge. Tapping it opens `/games`.
 

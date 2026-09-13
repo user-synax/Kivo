@@ -840,15 +840,17 @@ export function DocsScreen() {
               <Steps
                 items={[
                   "Find someone under In the arena or Friends and tap Invite. Kivo opens (or creates) your DM with them and drops a one-line chip there.",
-                  "They open /games and tap Accept on the card under Your games — the race starts immediately, with no separate start step.",
-                  "Type the passage exactly. Matched letters turn blue, a wrong letter shows red until you fix it, your own progress bar follows your keystrokes instantly, and a live WPM readout plus race clock run alongside.",
-                  "The first person to finish ends the race. You get a green You Win or red You Lose flash, then a result screen showing both players' place, WPM, accuracy and time — and the outcome is shared back to the chat as a new result chip.",
+                  "They open /games and tap Accept on the card under Your games — the race begins with no separate start step. A 3-2-1-GO countdown runs first, with the passage blurred behind it, and typing unlocks the moment it clears.",
+                  "Type the passage exactly. Matched letters turn blue, a wrong letter shows red until you fix it, your own progress bar follows your keystrokes instantly, and a live WPM readout plus race clock run alongside. A bar past 80% pulses amber, so you can feel the endgame.",
+                  "The first person to finish ends the race. You get a green You Win or red You Lose flash, then a result screen showing both players' place, WPM, accuracy and time — plus how close it was (a real margin like \"won by 0.4s\" on a photo finish) — and the outcome is shared back to the chat as a new result chip.",
                 ]}
               />
               <ul className="mt-2 flex flex-col gap-2">
                 <Bullet>
                   The server picks the passage and times the race — nobody can
-                  choose the text or claim a WPM.
+                  choose the text or claim a WPM. The countdown is part of that:
+                  both players count down to the same instant, and your clock
+                  only starts when you can actually type.
                 </Bullet>
                 <Bullet>
                   Chat never hosts the game: the timeline only ever shows the
