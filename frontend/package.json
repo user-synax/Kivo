@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@desert-ant-labs/emo": "^3.1.0",
     "@hugeicons/core-free-icons": "^4.3.0",
     "@hugeicons/react": "^1.1.10",
+    "@litertjs/core": "^2.5.3",
     "@livekit/components-react": "^2.9.24",
     "@livekit/components-styles": "^1.2.0",
     "class-variance-authority": "^0.7.1",

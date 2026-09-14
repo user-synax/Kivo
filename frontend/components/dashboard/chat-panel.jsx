@@ -91,6 +91,7 @@ import {
   isCustomReaction,
 } from "@/lib/custom-emoji";
 import { clearDraft, draftsKey, loadDraft, saveDraft } from "@/lib/drafts";
+import { preloadEmo, suggestEmojis } from "@/lib/emo";
 import { useLiveLastActive } from "@/lib/last-active";
 import { playMessageSent } from "@/lib/sound";
 import {
@@ -952,6 +953,9 @@ export function ChatPanel({
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduledList, setScheduledList] = useState([]);
   const [showScheduledList, setShowScheduledList] = useState(false);
+  // On-device emoji suggestions (Emo): 4 emojis for the current draft.
+  const [emoSuggestions, setEmoSuggestions] = useState([]);
+  const emoRequestRef = useRef(0);
   const composerMenuRef = useRef(null);
   const plusBtnRef = useRef(null);
   // In-chat search (Ctrl+F scoped to this conversation)
@@ -2622,6 +2626,59 @@ export function ChatPanel({
       } catch {
         el.focus();
       }
+    });
+  };
+
+  // Warm the on-device emoji model while idle so the first keystroke
+  // already has suggestions. Best-effort, never throws.
+  useEffect(() => {
+    preloadEmo();
+  }, []);
+
+  // Emoji suggestion strip: debounced Emo lookup on the draft. Skipped while
+  // the emoji/mention pickers own the composer or recording is active.
+  useEffect(() => {
+    if (
+      !canPost ||
+      recording ||
+      showEmoji ||
+      emojiAutocompleteOpen ||
+      mentionOpen
+    ) {
+      setEmoSuggestions([]);
+      return;
+    }
+    const value = text;
+    if (value.trim().length < 3) {
+      setEmoSuggestions([]);
+      return;
+    }
+    const id = ++emoRequestRef.current;
+    const timer = setTimeout(async () => {
+      const emojis = await suggestEmojis(value);
+      if (emoRequestRef.current === id) setEmoSuggestions(emojis);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [text, canPost, recording, showEmoji, emojiAutocompleteOpen, mentionOpen]);
+
+  // Insert a suggested emoji at the caret (same pattern as the emoji picker).
+  const insertEmoAtCaret = (emoji) => {
+    const el = textareaRef.current;
+    const start = el ? (el.selectionStart ?? text.length) : text.length;
+    const end = el ? (el.selectionEnd ?? text.length) : text.length;
+    const before = text.slice(0, start);
+    const after = text.slice(end);
+    const needsSpace = before.length > 0 && !/\s$/.test(before);
+    setText(`${before}${needsSpace ? " " : ""}${emoji} ${after.replace(/^\s/, "")}`);
+    setSendError(null);
+    setEmoSuggestions([]);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      const pos = before.length + (needsSpace ? 1 : 0) + emoji.length + 1;
+      el.focus();
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch {}
     });
   };
 
@@ -4385,6 +4442,31 @@ export function ChatPanel({
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+                {/* On-device emoji suggestions for the draft — tap to insert. */}
+                {emoSuggestions.length > 0 && !recording && (
+                  <div
+                    className="mb-2 flex items-center gap-1"
+                    role="toolbar"
+                    aria-label="Suggested emoji"
+                  >
+                    <Sparkles
+                      className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
+                      aria-hidden="true"
+                    />
+                    {emoSuggestions.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => insertEmoAtCaret(emoji)}
+                        aria-label={`Insert ${emoji} emoji`}
+                        title={`Insert ${emoji}`}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-xl text-[22px] leading-none transition-transform duration-150 hover:scale-110 hover:bg-[var(--hover)] active:scale-95"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
                   </div>
                 )}
                 <div className="flex items-end gap-2 max-sm:gap-1.5">
