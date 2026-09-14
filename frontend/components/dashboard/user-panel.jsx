@@ -151,7 +151,7 @@ export function UserPanel({
             transition={
                 reduce ? { duration: 0 } : { duration: 0.4, ease: EASE }
             }
-            className="t-scroll hidden h-full w-[320px] shrink-0 flex-col overflow-y-auto border-l border-[var(--border)] bg-[var(--bg-elevated)] xl:flex"
+            className="t-scroll m-3 ml-0 hidden min-h-0 w-[320px] shrink-0 self-stretch flex-col overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)]/85 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--bg-elevated)]/75 xl:flex"
             aria-label="Conversation details"
         >
             {/* Cover banner — animated GIF when the user has picked one, otherwise the
@@ -181,7 +181,7 @@ export function UserPanel({
                     variants={item}
                     className="-mt-8 flex flex-col items-center text-center"
                 >
-                    <div className="rounded-[calc(var(--radius-cards)*0.5)] bg-[var(--bg-elevated)] p-1.5">
+                    <div className="rounded-full bg-[var(--bg-elevated)] p-1.5">
                         <Avatar
                             name={
                                 profile?.displayName || profile?.username || "?"
@@ -190,6 +190,7 @@ export function UserPanel({
                             avatarStyle={profile?.avatarStyle}
                             url={profile?.avatarUrl}
                             size="xl"
+                            shape="circle"
                             isPlus={Boolean(profile?.isPlus)}
                         />
                     </div>

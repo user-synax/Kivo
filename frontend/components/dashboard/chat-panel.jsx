@@ -3419,8 +3419,9 @@ export function ChatPanel({
           style={chatWallpaperCss}
         />
       )}
-      {/* Header — keep visible on mobile when keyboard opens (sticky + bg) */}
-      <div className="relative z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0 max-md:gap-2 max-md:px-3">
+      {/* Header — floating glass card on desktop, classic bar on mobile
+          (mobile keeps sticky + bg when keyboard opens) */}
+      <div className="relative z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-base)] px-4 max-md:sticky max-md:top-0 max-md:z-30 max-md:shrink-0 max-md:gap-2 max-md:px-3 md:absolute md:inset-x-4 md:top-3 md:z-30 md:rounded-2xl md:border md:bg-[var(--bg-elevated)]/70 md:px-3 md:shadow-lg md:backdrop-blur-xl md:supports-[backdrop-filter]:bg-[var(--bg-elevated)]/60">
         {onBack && (
           <button
             type="button"
@@ -3708,6 +3709,9 @@ export function ChatPanel({
         )}
       </div>
 
+      {/* Desktop spacer — clears the floating header overlay (mobile: hidden) */}
+      <div aria-hidden="true" className="hidden shrink-0 md:block md:h-[76px]" />
+
       {/* In-chat search — Ctrl+F scoped, highlight inside MessageRows without leaving panel */}
       <AnimatePresence>
         {inChatSearchOpen && (
@@ -3930,7 +3934,7 @@ export function ChatPanel({
             if (nearBottom) markConversationRead();
           }
         }}
-        className="t-scroll relative z-10 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3 md:mt-12"
+        className="t-scroll relative z-10 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 max-md:pt-3"
         style={{ overscrollBehavior: "contain" }}
       >
         {loadingHistory && (
@@ -4012,8 +4016,8 @@ export function ChatPanel({
         )}
       </AnimatePresence>
 
-      {/* Composer / selection toolbar */}
-      <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 max-sm:p-2 pb-[max(env(safe-area-inset-bottom),1rem)]">
+      {/* Composer / selection toolbar — detached floating glass on desktop */}
+      <div className="relative z-20 shrink-0 border-t border-[var(--border)] p-3 max-sm:p-2 pb-[max(env(safe-area-inset-bottom),1rem)] md:border-t-0 md:bg-transparent md:p-4">
         {selectMode && (
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2">
             <span className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-primary)]">
@@ -4215,7 +4219,7 @@ export function ChatPanel({
                         ease: [0.22, 1, 0.36, 1],
                       }
                 }
-                className="relative z-20 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)]"
+                className="relative z-20 rounded-inputs border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 shadow-[0_2px_12px_-4px_rgba(25,23,28,0.12)] md:rounded-[28px] md:bg-[var(--bg-elevated)]/70 md:px-3 md:py-2 md:shadow-xl md:backdrop-blur-xl md:supports-[backdrop-filter]:bg-[var(--bg-elevated)]/60"
               >
                 <input
                   ref={fileInputRef}
@@ -4449,7 +4453,7 @@ export function ChatPanel({
                         onPointerCancel={cancelRecording}
                         onContextMenu={(e) => e.preventDefault()}
                         disabled={uploadBusy || !canPost}
-                        className={`flex size-9 max-sm:size-8 shrink-0 touch-none select-none items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] active:text-[var(--accent)] disabled:pointer-events-none disabled:opacity-40 ${text.trim() ? "max-sm:hidden" : ""}`}
+                        className={`flex size-9 max-sm:size-8 shrink-0 touch-none select-none items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--hover)] hover:text-[var(--text-primary)] active:text-[var(--accent)] disabled:pointer-events-none disabled:opacity-40 ${text.trim() ? "max-sm:hidden md:hidden" : ""}`}
                       >
                         <Mic className="h-5 w-5 max-sm:h-[18px] max-sm:w-[18px]" />
                       </button>
@@ -4642,7 +4646,7 @@ export function ChatPanel({
                           !pendingFiles.some((f) => f.status === "pending")
                         }
                         whileTap={reduce ? undefined : { scale: 0.96 }}
-                        className="shrink-0 rounded-nav bg-[var(--accent)] px-4 max-sm:px-3 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40"
+                        className="shrink-0 rounded-nav bg-[var(--accent)] px-4 max-sm:px-3 py-2 text-[13px] font-medium text-[var(--on-accent)] transition-[filter,opacity] duration-200 hover:brightness-110 active:scale-[0.97] disabled:opacity-40 md:flex md:size-10 md:items-center md:justify-center md:rounded-full md:px-0 md:py-0"
                       >
                         <Send className="h-5 w-5" />
                       </motion.button>
