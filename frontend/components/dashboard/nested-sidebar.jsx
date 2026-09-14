@@ -4,22 +4,31 @@ import {
   Bell,
   BellOff,
   Bookmark,
+  Camera,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Compass,
-  Flag,
+  Gamepad2,
   Hash,
   Info,
   Layers,
+  LogOut,
   Mail,
+  MapPin,
   Megaphone,
+  Menu,
   MessageCircle,
+  Palette,
   Pin,
   PinOff,
   Plus,
   Search,
   SearchCode,
   SearchX,
+  Settings,
   ShieldBan,
+  Smile,
   Trash2,
   User,
   UserPlus,
@@ -28,15 +37,19 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/dashboard/avatar";
 import { ProfileEditModal } from "@/components/dashboard/profile-edit-modal";
 import { AppearanceScreen } from "@/components/dashboard/appearance-screen";
-import { IconRail } from "@/components/dashboard/icon-rail";
 import { SettingsPanel } from "@/components/dashboard/settings-panel";
 import { FounderInviteCard, RichEmptyState } from "@/components/ui/empty-state";
-import { StatusTab } from "@/components/status/status-tab";
+import { StatusRing } from "@/components/status/status-ring";
 import { EmojiFactoryPanel } from "@/components/emoji-factory-panel";
 import { NearbyScreen } from "@/components/dashboard/nearby-screen";
+import { clearSession, getToken } from "@/lib/auth";
+import { markArenaEntry } from "@/lib/games";
+import { isPlusUser } from "@/lib/plus";
+import { playClick } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -141,6 +154,7 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
               avatarStyle={conversation.avatarStyle}
               url={conversation.avatarUrl}
               isPlus={Boolean(isPlus)}
+              shape="circle"
             />
             {isPinned && (
               <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] shadow-sm ring-2 ring-[var(--bg-elevated)]">
@@ -206,8 +220,7 @@ function ConversationItem({ conversation, selected, onSelect, onMarkUnread, onRe
   );
 }
 
-function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove, onPin, onMute, onViewInfo, onBlock }) {
-  if (!items.length) return <EmptyState message="No conversations yet" />;
+function ChatRowList({ items, selectedId, onSelect, onMarkUnread, onRemove, onPin, onMute, onViewInfo, onBlock, baseIndex = 0 }) {
   return (
     <div className="w-full min-w-0 space-y-0.5">
       {items.map((c, i) => (
@@ -222,9 +235,49 @@ function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove, onPin,
           onMute={onMute}
           onViewInfo={onViewInfo}
           onBlock={onBlock}
-          index={i}
+          index={baseIndex + i}
         />
       ))}
+    </div>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div className="flex w-full min-w-0 items-center px-3 pb-1 pt-3">
+      <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        {children}
+      </span>
+    </div>
+  );
+}
+
+// Desktop chat list: pinned conversations get their own "Pinned" section on
+// top, everything else sits under the given label ("Messages" / "Groups").
+// Row design itself is unchanged — only the grouping is new.
+function ChatsList({ items, selectedId, onSelect, onMarkUnread, onRemove, onPin, onMute, onViewInfo, onBlock, restLabel = "Messages" }) {
+  if (!items.length) return <EmptyState message="No conversations yet" />;
+  const pinned = items.filter((c) => c.pinned);
+  const rest = items.filter((c) => !c.pinned);
+  const rowProps = { selectedId, onSelect, onMarkUnread, onRemove, onPin, onMute, onViewInfo, onBlock };
+  if (!pinned.length) {
+    return (
+      <div className="w-full min-w-0">
+        <SectionLabel>{restLabel}</SectionLabel>
+        <ChatRowList items={rest} {...rowProps} />
+      </div>
+    );
+  }
+  return (
+    <div className="w-full min-w-0">
+      <SectionLabel>Pinned</SectionLabel>
+      <ChatRowList items={pinned} {...rowProps} />
+      {rest.length > 0 && (
+        <>
+          <SectionLabel>{restLabel}</SectionLabel>
+          <ChatRowList items={rest} {...rowProps} baseIndex={pinned.length} />
+        </>
+      )}
     </div>
   );
 }
@@ -424,6 +477,218 @@ function NewMenu({ onFriends, onGroup, onSpace, onDiscover }) {
   );
 }
 
+// ── Desktop status strip ────────────────────────────────────────────────────
+// Status lives inline at the top of the desktop sidebar (no separate tab):
+// a horizontal row under the search header, starting with the user's own
+// status / upload affordance, then one circle per friend with updates.
+function DesktopStatusStrip({
+  myStatuses = [],
+  feed = [],
+  currentUser,
+  onCreate,
+  onViewUser,
+  onViewMy,
+  uploading = false,
+}) {
+  const hasMy = Array.isArray(myStatuses) && myStatuses.length > 0;
+  const myLabel = currentUser?.displayName || currentUser?.username || "You";
+  return (
+    <div className="w-full min-w-0 shrink-0 border-b border-[var(--border)] px-3 py-2.5">
+      <div
+        className="flex w-full min-w-0 items-start gap-3 overflow-x-auto overscroll-x-contain pb-0.5 no-scrollbar"
+        style={{ overscrollBehaviorX: "contain" }}
+      >
+        {/* Own status first — view mine, or create when empty */}
+        <button
+          type="button"
+          onClick={() => (hasMy ? onViewMy?.() : onCreate?.())}
+          disabled={uploading}
+          className="flex w-14 shrink-0 flex-col items-center gap-1 rounded-lg py-0.5 transition-colors duration-150 hover:cursor-pointer disabled:opacity-60"
+        >
+          <span className="relative">
+            <StatusRing
+              name={myLabel}
+              url={currentUser?.avatarUrl}
+              avatarStyle={currentUser?.avatarStyle}
+              isPlus={false}
+              hasUnseen={hasMy ? false : undefined}
+              isMine={!hasMy}
+              shape="circle"
+            />
+            {uploading && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40"
+              >
+                <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              </span>
+            )}
+          </span>
+          <span className="w-full truncate text-center text-[11px] leading-tight text-[var(--text-muted)]">
+            {uploading ? "Posting…" : "You"}
+          </span>
+        </button>
+
+        {(Array.isArray(feed) ? feed : []).map((group) => {
+          const user = group?.user || {};
+          const key = user._id || user.id || group?.userId;
+          const unseen = (group?.statuses || []).some((s) => !s.isViewed);
+          const label = user.displayName || user.username || "Friend";
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onViewUser?.(group)}
+              title={label}
+              className="flex w-14 shrink-0 flex-col items-center gap-1 rounded-lg py-0.5 transition-colors duration-150 hover:cursor-pointer"
+            >
+              <StatusRing
+                name={label}
+                url={user.avatarUrl}
+                avatarStyle={user.avatarStyle}
+                isPlus={false}
+                hasUnseen={unseen}
+                shape="circle"
+              />
+              <span className="w-full truncate text-center text-[11px] leading-tight text-[var(--text-muted)]">
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Desktop floating pill bar ───────────────────────────────────────────────
+// Bottom-lifted tab access: four detached pills (never touching) with their
+// own backgrounds. The active pill stretches to show its label; inactive
+// pills are icon-only. "More" is a real tab like Message/Groups/Spaces — it
+// swaps the sidebar body to the More list.
+const DESKTOP_PILL_TABS = [
+  { id: "chats", label: "Message", icon: MessageCircle },
+  { id: "groups", label: "Groups", icon: Users },
+  { id: "spaces", label: "Spaces", icon: Layers },
+  { id: "more", label: "More", icon: Menu },
+];
+
+function DesktopPillBar({ pillActive, onTabChange, unread = {} }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+      <div className="pointer-events-auto relative flex items-center gap-2.5">
+        {DESKTOP_PILL_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = pillActive === tab.id;
+          const hasUnread = Boolean(unread?.[tab.id]);
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              aria-label={tab.label}
+              aria-current={isActive ? "page" : undefined}
+              title={tab.label}
+              onClick={() => onTabChange?.(tab.id)}
+              className={cn(
+                "relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-full shadow-lg transition-[width,background-color,color,transform] duration-200 hover:cursor-pointer active:scale-95",
+                isActive
+                  ? "w-auto bg-[var(--accent)] px-5 text-[13px] font-semibold text-[var(--on-accent)]"
+                  : "size-11 border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)]",
+              )}
+            >
+              <Icon className="h-5 w-5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
+              {isActive && <span className="whitespace-nowrap">{tab.label}</span>}
+              {hasUnread && !isActive && (
+                <span
+                  className="absolute right-2 top-2 size-2.5 rounded-full bg-[#ff3b30] ring-2 ring-[var(--bg-elevated)]"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Back row for sub-panels opened from the More list (Settings, Emoji Factory).
+function SubPanelBack({ label = "More", onBack }) {
+  return (
+    <div className="w-full min-w-0 shrink-0 px-2 pb-1 pt-2">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:cursor-pointer hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+      >
+        <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+        {label}
+      </button>
+    </div>
+  );
+}
+
+// ── Desktop More list ───────────────────────────────────────────────────────
+// The "More" tab body: remaining destinations as full sidebar rows, same row
+// geometry as the chat lists (rounded-xl, px-2.5 py-2.5, hover surface).
+function MoreList({ items }) {
+  if (!items.length) return <EmptyState message="Nothing here" />;
+  return (
+    <div className="w-full min-w-0">
+      <SectionLabel>More</SectionLabel>
+      <div className="w-full min-w-0 space-y-0.5">
+        {items.map((item, i) => {
+          const Icon = item.icon;
+          const destructive = item.tone === "destructive";
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => item.action?.()}
+              style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}
+              className="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors duration-150 hover:cursor-pointer hover:bg-[var(--hover)] motion-reduce:animate-none animate-[t-item-in_0.4s_cubic-bezier(0.22,1,0.36,1)_both]"
+            >
+              {item.avatar ? (
+                <span className="shrink-0">{item.avatar}</span>
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--hover)] ring-1 ring-inset ring-[var(--border)] ${
+                    destructive ? "text-[var(--destructive)]" : "text-[var(--text-primary)]"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" strokeWidth={1.8} />
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span
+                  className={`block truncate text-sm font-medium ${
+                    destructive ? "text-[var(--destructive)]" : "text-[var(--text-primary)]"
+                  }`}
+                >
+                  {item.label}
+                </span>
+                {item.hint && (
+                  <span className="block truncate text-[13px] text-[var(--text-muted)]">
+                    {item.hint}
+                  </span>
+                )}
+              </span>
+              {item.active && (
+                <span className="size-2 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+              )}
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-[var(--text-muted)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                strokeWidth={1.8}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function NestedSidebar({
   conversations,
   selectedId,
@@ -498,137 +763,187 @@ export function NestedSidebar({
   }, [spaces, query]);
 
   const placeholderByTab = {
-    chats: "Search chats",
+    chats: "Search messages",
     groups: "Search groups",
     spaces: "Search spaces",
-    settings: "Search settings",
-    status: "Search status",
+    more: "Search more",
+    settings: "Search",
     "emoji-factory": "Search emoji",
   };
 
-  // Nearby is full-screen like Appearance — intercept rail click
-  const handleTabChange = (id) => {
-    if (id === "nearby") {
-      setNearbyOpen(true);
-      return;
-    }
-    setActiveTab(id);
-  };
+  const router = useRouter();
+  const profileLabel =
+    currentUser?.displayName || currentUser?.username || currentUser?.email || "Profile";
+
+  // Message / Groups / Spaces / More are all real tabs. Settings and the
+  // emoji factory open from the More list and keep the "More" pill expanded.
+  const pillActive =
+    activeTab === "chats" ||
+    activeTab === "groups" ||
+    activeTab === "spaces" ||
+    activeTab === "more"
+      ? activeTab
+      : "more";
+  const showStatusStrip =
+    activeTab === "chats" || activeTab === "groups" || activeTab === "spaces";
+
+  async function handleSignOut() {
+    const token = getToken();
+    try {
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        credentials: "include",
+      });
+    } catch {}
+    clearSession();
+    router.replace("/login");
+  }
+
+  function handlePillTabChange(id) {
+    if (id === "chats" || id === "groups" || id === "spaces" || id === "more") setActiveTab(id);
+  }
+
+  // Everything that isn't Message / Groups / Spaces lives behind "More".
+  const moreItems = [
+    ...(onSearchOpen
+      ? [{ id: "search", label: "Search", hint: "Messages, people & spaces", icon: SearchCode, action: onSearchOpen }]
+      : []),
+    ...(onSavedOpen
+      ? [{ id: "saved", label: "Saved messages", hint: "Your private space", icon: Bookmark, action: onSavedOpen }]
+      : []),
+    ...(onDiscoverSpaces
+      ? [{ id: "discover", label: "Discover Spaces", hint: "Find and join public communities", icon: Compass, action: onDiscoverSpaces }]
+      : []),
+    { id: "nearby", label: "Nearby users", hint: "Discover people near you", icon: MapPin, action: () => setNearbyOpen(true) },
+    {
+      id: "games",
+      label: "Kivo Games",
+      hint: "Play a Typing Race with someone",
+      icon: Gamepad2,
+      action: () => {
+        markArenaEntry();
+        playClick();
+        router.push("/games");
+      },
+    },
+    { id: "emoji-factory", label: "Emoji Factory", hint: "Create personal emoji", icon: Smile, action: () => setActiveTab("emoji-factory"), active: activeTab === "emoji-factory" },
+    { id: "settings", label: "Settings", hint: "Badge, privacy & notifications", icon: Settings, action: () => setActiveTab("settings"), active: activeTab === "settings" },
+    { id: "appearance", label: "Appearance", hint: "Theme, colors & chat look", icon: Palette, action: () => setAppearanceOpen(true) },
+    {
+      id: "profile",
+      label: profileLabel,
+      hint: currentUser?.username ? `@${currentUser.username}` : "Your public profile",
+      icon: User,
+      avatar: (
+        <Avatar
+          name={profileLabel}
+          avatarStyle={currentUser?.avatarStyle}
+          url={currentUser?.avatarUrl}
+          size="sm"
+          shape="circle"
+          isPlus={isPlusUser(currentUser)}
+        />
+      ),
+      action: () => setProfileOpen(true),
+    },
+    { id: "signout", label: "Sign out", icon: LogOut, tone: "destructive", action: handleSignOut },
+  ];
+
+  // Inline search also filters the More list.
+  const visibleMoreItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return moreItems;
+    return moreItems.filter((i) =>
+      `${i.label || ""} ${i.hint || ""}`.toLowerCase().includes(q),
+    );
+    // moreItems is rebuilt every render by design — filter on query + tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, activeTab, conversations, spaces, currentUser]);
 
   return (
-    <div className="flex h-full w-full min-w-0">
-      <IconRail
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        currentUser={currentUser}
-        onProfileClick={() => setProfileOpen(true)}
-        onAppearanceClick={() => setAppearanceOpen(true)}
-        unread={unread}
-      />
-
-      {/* Content panel */}
-      <div className="flex h-full min-w-0 w-full flex-1 flex-col bg-[var(--bg-elevated)]">
-        {/* Header with search + actions */}
-        <div className="flex w-full min-w-0 shrink-0 flex-col gap-2 border-b border-[var(--border)] px-3 py-3">
-          <div className="flex w-full min-w-0 items-center gap-2">
-            {notificationBell && <span className="shrink-0">{notificationBell}</span>}
-            {onSavedOpen && (
+    <div className="relative flex h-full w-full min-w-0 flex-col bg-[var(--bg-elevated)]">
+      {/* Top search row: inline filter + status camera + New (plus) */}
+      <div className="flex w-full min-w-0 shrink-0 flex-col gap-2 px-3 pt-3">
+        <div className="flex w-full min-w-0 items-center gap-2">
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
+            <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" strokeWidth={1.6} aria-hidden="true" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholderByTab[activeTab] || "Search"}
+              aria-label={placeholderByTab[activeTab] || "Search"}
+              className="w-full min-w-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+            />
+            {query && (
               <button
                 type="button"
-                onClick={onSavedOpen}
-                aria-label="Saved messages"
-                title="Saved messages"
-                className="kivo-focus flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
               >
-                <Bookmark className="h-5 w-5" strokeWidth={1.6} />
+                <X className="h-3 w-3" strokeWidth={2} />
               </button>
             )}
-            {onSearchOpen && (
-              <button
-                type="button"
-                onClick={onSearchOpen}
-                aria-label="Search"
-                title="Search (Ctrl+K)"
-                className="kivo-focus flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-              >
-                <SearchCode className="h-5 w-5" strokeWidth={1.6} />
-              </button>
-            )}
-            <div className="ml-auto flex items-center gap-1.5">
-              {activeTab === "chats" && onCompose && (
-                <NewMenu
-                  onFriends={onCompose}
-                  onGroup={onNewGroup}
-                  onSpace={onCreateSpace}
-                  onDiscover={onDiscoverSpaces}
-                />
-              )}
-              {activeTab === "groups" && (
-                <button
-                  type="button"
-                  onClick={onNewGroup}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90"
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-                  New group
-                </button>
-              )}
-              {activeTab === "spaces" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={onDiscoverSpaces}
-                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-                  >
-                    Discover
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onCreateSpace}
-                    className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--on-accent)] hover:opacity-90"
-                  >
-                    New
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          </label>
 
-          {/* Search bar — scoped to active tab. Hide for status full-screen. */}
-          {activeTab !== "status" && (
-            <label className="flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-inputs)] border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[var(--accent)]">
-              <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" strokeWidth={1.6} aria-hidden="true" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={placeholderByTab[activeTab] || "Search"}
-                aria-label={placeholderByTab[activeTab] || "Search"}
-                className="w-full min-w-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+          {/* Camera — jump straight into a status update */}
+          <button
+            type="button"
+            onClick={onStatusCreate}
+            aria-label="Add status"
+            title="Add status"
+            className="kivo-focus relative flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
+          >
+            <Camera className="h-[18px] w-[18px]" strokeWidth={1.8} />
+            {Boolean(unread?.status) && (
+              <span
+                className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#25D366] ring-2 ring-[var(--bg-elevated)]"
+                aria-hidden="true"
               />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  aria-label="Clear search"
-                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
-                >
-                  <X className="h-3 w-3" strokeWidth={2} />
-                </button>
-              )}
-            </label>
-          )}
+            )}
+          </button>
 
-          {isOffline && (
-            <div className="flex items-center gap-2 rounded-lg border border-[var(--destructive)]/20 bg-[var(--destructive)]/8 px-3 py-2">
-              <span className="size-2 shrink-0 animate-pulse rounded-full bg-[var(--destructive)]" />
-              <span className="text-[12px] font-medium text-[var(--destructive)]">You are offline</span>
-            </div>
+          {notificationBell && <span className="shrink-0">{notificationBell}</span>}
+
+          {/* Plus — Friends / Group / Space / Discover, same menu as before */}
+          {onCompose && (
+            <NewMenu
+              onFriends={onCompose}
+              onGroup={onNewGroup}
+              onSpace={onCreateSpace}
+              onDiscover={onDiscoverSpaces}
+            />
           )}
         </div>
 
-        {/* Panel body — exactly one context at a time, with shared easing */}
-        <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+        {isOffline && (
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--destructive)]/20 bg-[var(--destructive)]/8 px-3 py-2">
+            <span className="size-2 shrink-0 animate-pulse rounded-full bg-[var(--destructive)]" />
+            <span className="text-[12px] font-medium text-[var(--destructive)]">You are offline</span>
+          </div>
+        )}
+      </div>
+
+      {/* Status — horizontal row directly under the search header */}
+      {showStatusStrip && (
+        <div className="pt-1.5">
+          <DesktopStatusStrip
+            myStatuses={myStatuses}
+            feed={statusFeed}
+            currentUser={currentUser}
+            onCreate={onStatusCreate}
+            onViewUser={onStatusViewUser}
+            onViewMy={onStatusViewMy}
+            uploading={statusUploading}
+          />
+        </div>
+      )}
+
+        {/* Panel body — exactly one context at a time, with shared easing.
+            Bottom padding clears the lifted pill bar floating above. */}
+        <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait" initial={false}>
             {activeTab === "chats" && (
               <motion.div
@@ -637,7 +952,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 pb-24 pt-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {selfConv && (
@@ -688,6 +1003,7 @@ export function NestedSidebar({
                 ) : (
                   <ChatsList
                     items={chatsItems}
+                    restLabel="Messages"
                     selectedId={selectedId}
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}
@@ -707,7 +1023,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 pb-24 pt-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {conversations.filter((c) => c.type === "group").length === 0 ? (
@@ -723,6 +1039,7 @@ export function NestedSidebar({
                 ) : (
                   <ChatsList
                     items={groupsItems}
+                    restLabel="Groups"
                     selectedId={selectedId}
                     onSelect={onSelect}
                     onMarkUnread={onMarkUnread}
@@ -742,7 +1059,7 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 py-1.5 no-scrollbar"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 pb-24 pt-1.5 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
                 {filteredSpaces.length === 0 && query.trim() ? (
@@ -758,6 +1075,23 @@ export function NestedSidebar({
                 )}
               </motion.div>
             )}
+            {activeTab === "more" && (
+              <motion.div
+                key="more"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-2 pb-24 pt-1.5 no-scrollbar"
+                style={{ overscrollBehavior: "contain" }}
+              >
+                {visibleMoreItems.length === 0 && query.trim() ? (
+                  <EmptyState message={`No results for “${query.trim()}”`} />
+                ) : (
+                  <MoreList items={visibleMoreItems} />
+                )}
+              </motion.div>
+            )}
             {activeTab === "settings" && (
               <motion.div
                 key="settings"
@@ -765,32 +1099,11 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y no-scrollbar"
+                className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y pb-24 no-scrollbar"
                 style={{ overscrollBehavior: "contain" }}
               >
-                {/* Skip search for settings if filtered — but keep panel consistent */}
+                <SubPanelBack label="More" onBack={() => setActiveTab("more")} />
                 <SettingsPanel />
-              </motion.div>
-            )}
-            {activeTab === "status" && (
-              <motion.div
-                key="status"
-                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
-                transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full w-full min-w-0 overflow-hidden"
-                style={{ overscrollBehavior: "contain" }}
-              >
-                <StatusTab
-                  myStatuses={myStatuses}
-                  feed={statusFeed}
-                  currentUser={currentUser}
-                  onCreate={onStatusCreate}
-                  onViewUser={onStatusViewUser}
-                  onViewMy={onStatusViewMy}
-                  uploading={statusUploading}
-                />
               </motion.div>
             )}
             {activeTab === "emoji-factory" && (
@@ -800,15 +1113,24 @@ export function NestedSidebar({
                 animate={{ opacity: 1, x: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, x: -6 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
-                className="h-full w-full min-w-0 overflow-hidden"
+                className="flex h-full w-full min-w-0 flex-col overflow-hidden"
                 style={{ overscrollBehavior: "contain" }}
               >
-                <EmojiFactoryPanel />
+                <SubPanelBack label="More" onBack={() => setActiveTab("more")} />
+                <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+                  <EmojiFactoryPanel />
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Lifted pill tab bar — Message / Groups / Spaces / More */}
+          <DesktopPillBar
+            pillActive={pillActive}
+            onTabChange={handlePillTabChange}
+            unread={unread}
+          />
         </div>
-      </div>
 
       <ProfileEditModal
         open={profileOpen}

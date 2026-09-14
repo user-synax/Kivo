@@ -81,20 +81,24 @@ const SIZE = {
    border or gradient ring frame. Smooth transitions on border-color change
    (transitions skill: "transition-all with shared easing").
    ──────────────────────────────────────────────────────────────────────── */
-function AvatarSurface({ name, selected, avatarStyle, size = "md", url }) {
+function AvatarSurface({ name, selected, avatarStyle, size = "md", url, shape = "rounded" }) {
   const config = SIZE[size] || SIZE.md;
   const style = getAvatarStyle(avatarStyle);
   const isGradient = style.kind === "gradient";
+  const isCircle = shape === "circle";
+  const radius = isCircle ? "rounded-full" : config.radius;
 
   return (
     <div
       className={clsx(
         "relative flex shrink-0 items-center justify-center overflow-hidden font-medium",
         config.box,
-        config.radius,
+        radius,
         selected
           ? "bg-[var(--accent)] text-[var(--on-accent)]"
-          : "bg-[var(--bg-surface)] text-[var(--text-primary)]",
+          : isCircle
+            ? "bg-[var(--hover)] text-[var(--text-primary)] ring-1 ring-inset ring-[var(--border)]"
+            : "bg-[var(--bg-surface)] text-[var(--text-primary)]",
         /* Border: either a CSS-variable border (default) or a colored inline
            border with smooth transition on color change. */
         !isGradient &&
@@ -162,9 +166,12 @@ export function Avatar({
   badge,
   decoration,
   isPlus = false,
+  shape = "rounded",
 }) {
   const config = SIZE[size] || SIZE.md;
   const style = getAvatarStyle(avatarStyle);
+  const isCircle = shape === "circle";
+  const radius = isCircle ? "rounded-full" : config.radius;
 
   /* Gradient ring: a thin gradient wrapper with the surface avatar inset,
      so the rounded corners stay crisp. Ring thickness scales with size
@@ -174,7 +181,7 @@ export function Avatar({
       <div
         className={clsx(
           "inline-block shrink-0",
-          config.radius,
+          radius,
           config.ringPad,
         )}
         style={{ background: style.gradient }}
@@ -185,6 +192,7 @@ export function Avatar({
           size={size}
           avatarStyle={null}
           url={url}
+          shape={shape}
         />
       </div>
     ) : (
@@ -194,6 +202,7 @@ export function Avatar({
         size={size}
         avatarStyle={avatarStyle}
         url={url}
+        shape={shape}
       />
     );
 
@@ -214,7 +223,7 @@ export function Avatar({
   // the ring stays crisp at every size. Motion is disabled under
   // prefers-reduced-motion via the utility on the light span.
   const MB_RADIUS_PX = { xs: "8px", sm: "8px", md: "12px", lg: "16px", xl: "12px" };
-  const mbRadius = MB_RADIUS_PX[size] || "12px";
+  const mbRadius = isCircle ? "9999px" : MB_RADIUS_PX[size] || "12px";
   const surfaceWithPlus = isPlus ? (
     <span
       className="relative inline-flex shrink-0 overflow-hidden p-[2px]"
