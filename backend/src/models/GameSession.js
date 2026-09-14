@@ -30,6 +30,10 @@ const gamePlayerSchema = new mongoose.Schema(
     status: { type: String, enum: ["invited", "joined", "declined", "left"], default: "joined" },
     // True for solo-practice bot players (fixed bot ObjectIds, never real users).
     isBot: { type: Boolean, default: false },
+    // Whether this player's result already fed arena progression (XP/streaks).
+    // Set at decision time for both sides so a late runner-up finish can only
+    // fold its WPM into the board, never double-count the loss.
+    statsCounted: { type: Boolean, default: false },
     // Live progress for the current round, 0..1 (typing: fraction of the
     // passage completed). Kept on the session, never written per keystroke.
     progress: { type: Number, default: 0, min: 0, max: 1 },

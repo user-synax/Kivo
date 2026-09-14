@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  arenaWeekEndsAt,
+  arenaWeekKey,
   botProgressAt,
   canRecordRunnerUpFinish,
   computeWpm,
+  levelForXp,
+  nextArenaStats,
   pickPracticeBotWpm,
   practiceBotFor,
   recordFinish,
@@ -236,5 +240,102 @@ describe("botProgressAt", () => {
     expect(botProgressAt(30, passage, 10000)).toBeLessThan(
       botProgressAt(80, passage, 10000),
     );
+  });
+});
+
+describe("arenaWeekKey", () => {
+  test("keys a known Monday and Sunday into the same ISO week", () => {
+    // Monday 2026-09-07 and Sunday 2026-09-13 (UTC) are ISO week 37.
+    expect(arenaWeekKey(Date.UTC(2026, 8, 7, 12))).toBe("2026-W37");
+    expect(arenaWeekKey(Date.UTC(2026, 8, 13, 23, 59))).toBe("2026-W37");
+  });
+
+  test("rolls over on Monday", () => {
+    expect(arenaWeekKey(Date.UTC(2026, 8, 14, 0, 1))).toBe("2026-W38");
+  });
+
+  test("endsAt is the next Monday 00:00 UTC", () => {
+    expect(arenaWeekEndsAt(Date.UTC(2026, 8, 9, 12))).toBe(Date.UTC(2026, 8, 14));
+  });
+});
+
+describe("levelForXp", () => {
+  test("climbs on a root curve", () => {
+    expect(levelForXp(0)).toBe(1);
+    expect(levelForXp(99)).toBe(1);
+    expect(levelForXp(100)).toBe(2);
+    expect(levelForXp(400)).toBe(3);
+    expect(levelForXp(900)).toBe(4);
+  });
+
+  test("tolerates junk", () => {
+    expect(levelForXp(null)).toBe(1);
+    expect(levelForXp(-50)).toBe(1);
+  });
+});
+
+describe("nextArenaStats", () => {
+  const week = "2026-W37";
+
+  test("a ranked win pays XP, extends the streak and feeds the board", () => {
+    const next = nextArenaStats({}, { won: true, wpm: 82, practice: false, weekKey: week });
+    expect(next).toMatchObject({
+      xp: 100,
+      wins: 1,
+      losses: 0,
+      bestWpm: 82,
+      currentStreak: 1,
+      bestStreak: 1,
+      weekKey: week,
+      weekGames: 1,
+      weekWins: 1,
+      weekTotalWpm: 82,
+      weekBestWpm: 82,
+    });
+  });
+
+  test("a loss resets the streak but keeps the best", () => {
+    const prev = nextArenaStats({}, { won: true, wpm: 82, practice: false, weekKey: week });
+    const next = nextArenaStats(prev, { won: false, wpm: 64, practice: false, weekKey: week });
+    expect(next).toMatchObject({
+      xp: 125,
+      wins: 1,
+      losses: 1,
+      bestWpm: 82,
+      currentStreak: 0,
+      bestStreak: 1,
+      weekGames: 2,
+      weekTotalWpm: 146,
+    });
+  });
+
+  test("practice pays XP only — no streak, no board", () => {
+    const next = nextArenaStats({}, { won: true, wpm: 90, practice: true, weekKey: week });
+    expect(next.xp).toBe(30);
+    expect(next.wins).toBe(0);
+    expect(next.currentStreak).toBe(0);
+    expect(next.weekGames).toBe(0);
+    expect(next.weekBestWpm).toBeNull();
+  });
+
+  test("a new week rolls the board but keeps lifetime totals", () => {
+    const prev = nextArenaStats({}, { won: true, wpm: 82, practice: false, weekKey: week });
+    const next = nextArenaStats(prev, { won: true, wpm: 70, practice: false, weekKey: "2026-W38" });
+    expect(next.weekKey).toBe("2026-W38");
+    expect(next.weekGames).toBe(1);
+    expect(next.weekBestWpm).toBe(70);
+    expect(next.wins).toBe(2);
+    expect(next.bestWpm).toBe(82);
+    expect(next.currentStreak).toBe(2);
+  });
+
+  test("boardOnly folds WPM without touching economy", () => {
+    const prev = nextArenaStats({}, { won: false, wpm: null, practice: false, weekKey: week });
+    const next = nextArenaStats(prev, { wpm: 71, weekKey: week, boardOnly: true });
+    expect(next.xp).toBe(prev.xp);
+    expect(next.losses).toBe(prev.losses);
+    expect(next.weekGames).toBe(1);
+    expect(next.weekTotalWpm).toBe(71);
+    expect(next.bestWpm).toBe(71);
   });
 });

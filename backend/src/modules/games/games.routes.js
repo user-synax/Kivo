@@ -33,6 +33,7 @@ const gameActionLimiter = rateLimiter({
 router.get("/invites", gamesController.listInvites);
 router.get("/mine", gamesController.listMyGames);
 router.get("/series/:seriesId", gamesController.getSeries);
+router.get("/leaderboard", gamesController.getLeaderboard);
 router.post("/invite", gameInviteLimiter, gamesController.inviteGame);
 router.post("/practice", gameInviteLimiter, gamesController.startPractice);
 

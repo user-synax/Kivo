@@ -259,6 +259,18 @@ export function seriesScoreText(series, viewerId, opponentId) {
   return `Series ${mine}–${theirs} · First to ${needed}`;
 }
 
+// Weekly board reset countdown: "Ends in 2d 4h" / "Ends in 3h 12m" / "Ends in
+// 9m". Computed from the server's endsAt; refreshed on every board fetch.
+export function formatBoardReset(endsAt, nowMs = Date.now()) {
+  const ms = Number(endsAt) - Number(nowMs);
+  if (!Number.isFinite(ms) || ms <= 0) return "Resetting…";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `Ends in ${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Ends in ${hours}h ${mins % 60}m`;
+  return `Ends in ${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
 // Two-letter avatar fallback from a display name.
 export function initialsFor(name) {
   const clean = String(name || "").trim();

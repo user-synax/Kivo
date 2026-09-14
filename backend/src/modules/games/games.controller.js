@@ -117,6 +117,15 @@ export const startPractice = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: game });
 });
 
+// Weekly WPM board + my progression snapshot for the arena.
+export const getLeaderboard = asyncHandler(async (req, res) => {
+  const board = await gamesService.getLeaderboard({
+    userId: req.user.userId,
+    limit: req.query?.limit,
+  });
+  res.status(200).json({ success: true, data: board });
+});
+
 // Best-of series summary for a result screen.
 export const getSeries = asyncHandler(async (req, res) => {
   const series = await gamesService.getSeries({

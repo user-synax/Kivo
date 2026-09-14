@@ -11,12 +11,18 @@ import { publicMessage } from "../messages/messages.service.js";
 import { createOrGetDm } from "../conversations/conversations.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 import {
+  ARENA_LEADERBOARD_SIZE,
+  arenaWeekEndsAt,
+  arenaWeekKey,
   botProgressAt,
   canRecordRunnerUpFinish,
   COUNTDOWN_MS,
   INVITE_TTL_MS,
+  isPracticeBotId,
   kindLabel,
+  levelForXp,
   MIN_PLAYERS,
+  nextArenaStats,
   pickPassage,
   pickPracticeBotWpm,
   practiceBotFor,
@@ -102,6 +108,21 @@ function emitGameEvent(session, event, payload) {
   } else {
     const humanId = practiceHumanId(session);
     if (humanId) emitToUser(humanId, event, payload);
+  }
+}
+
+// Persist one player's arena progression (XP, streaks, weekly board). Never
+// throws — progression must not break the finish flow it observes.
+async function applyArenaStats({ userId, won, wpm, practice = false, boardOnly = false }) {
+  try {
+    if (!userId || isPracticeBotId(userId)) return;
+    const weekKey = arenaWeekKey();
+    const user = await User.findById(userId).select("arena").lean();
+    if (!user) return;
+    const next = nextArenaStats(user.arena || {}, { won, wpm, practice, weekKey, boardOnly });
+    await User.findByIdAndUpdate(userId, { $set: { arena: next } });
+  } catch (err) {
+    console.error("[games] arena stats failed:", err?.message || err);
   }
 }
 
@@ -650,7 +671,17 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
   if (session.status !== "active") {
     if (!canRecordRunnerUpFinish(session)) return publicGame(session);
     recordFinish(session, player, elapsed, accuracy);
+    // Counted at decision time already — fold the late WPM into the board only.
+    const boardOnly = player.statsCounted === true;
+    player.statsCounted = true;
     await session.save();
+    await applyArenaStats({
+      userId: player.userId.toString(),
+      won: false,
+      wpm: player.wpm,
+      practice: session.isPractice,
+      boardOnly,
+    });
     // `game:updated`, never `game:finished` — the race is over, and a second
     // finish event would replay the winner/loser flash on both screens.
     emitGameEvent(session, "game:updated", publicGame(session));
@@ -664,8 +695,27 @@ export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
   // leaving the finisher on a "waiting for your opponent" screen.
   session.status = "finished";
   session.finishedAt = new Date();
+  player.statsCounted = true;
+  const loserEntry = (session.players || []).find(
+    (p) => !p.isBot && p.userId.toString() !== player.userId.toString(),
+  );
+  if (loserEntry) loserEntry.statsCounted = true;
 
   await session.save();
+  await applyArenaStats({
+    userId: player.userId.toString(),
+    won: true,
+    wpm: player.wpm,
+    practice: session.isPractice,
+  });
+  if (loserEntry) {
+    await applyArenaStats({
+      userId: loserEntry.userId.toString(),
+      won: false,
+      wpm: loserEntry.wpm ?? null,
+      practice: false,
+    });
+  }
   await syncCard(session);
   await postResultChip(session);
   emitGameEvent(session, "game:finished", publicGame(session));
@@ -890,6 +940,66 @@ export async function listMyGames({ userId }) {
     .sort({ createdAt: -1 })
     .limit(20);
   return sessions.map((s) => publicGame(s));
+}
+
+// Weekly WPM board + my progression snapshot for the arena header/sidebar.
+// Ranked 1v1 finishes only (practice never touches the board). Ranked by
+// weekly best WPM; my rank counts strictly-faster boards ahead of mine.
+export async function getLeaderboard({ userId, limit = ARENA_LEADERBOARD_SIZE }) {
+  const weekKey = arenaWeekKey();
+  const size = Math.min(50, Math.max(5, Number(limit) || ARENA_LEADERBOARD_SIZE));
+  const rows = await User.find({
+    "arena.weekKey": weekKey,
+    "arena.weekGames": { $gt: 0 },
+  })
+    .select("displayName username avatarUrl arena")
+    .sort({ "arena.weekBestWpm": -1, "arena.weekTotalWpm": -1 })
+    .limit(size)
+    .lean();
+
+  const entries = rows.map((u, i) => ({
+    rank: i + 1,
+    userId: u._id.toString(),
+    displayName: u.displayName || u.username || "Player",
+    username: u.username || null,
+    avatarUrl: u.avatarUrl || null,
+    bestWpm: u.arena?.weekBestWpm ?? null,
+    avgWpm:
+      u.arena?.weekGames > 0 ? Math.round(u.arena.weekTotalWpm / u.arena.weekGames) : null,
+    games: u.arena?.weekGames || 0,
+    wins: u.arena?.weekWins || 0,
+    isMe: u._id.toString() === String(userId),
+  }));
+
+  const meDoc = await User.findById(userId).select("arena").lean();
+  const meArena = meDoc?.arena || {};
+  const inWeek = meArena.weekKey === weekKey;
+  let myRank = null;
+  if (inWeek && (meArena.weekGames || 0) > 0 && meArena.weekBestWpm != null) {
+    const ahead = await User.countDocuments({
+      "arena.weekKey": weekKey,
+      "arena.weekBestWpm": { $gt: meArena.weekBestWpm },
+    });
+    myRank = ahead + 1;
+  }
+  const xp = Math.max(0, Math.floor(Number(meArena.xp) || 0));
+  return {
+    weekKey,
+    endsAt: arenaWeekEndsAt(),
+    entries,
+    me: {
+      rank: myRank,
+      xp,
+      level: levelForXp(xp),
+      wins: meArena.wins || 0,
+      losses: meArena.losses || 0,
+      bestWpm: meArena.bestWpm ?? null,
+      currentStreak: meArena.currentStreak || 0,
+      bestStreak: meArena.bestStreak || 0,
+      weekGames: inWeek ? meArena.weekGames || 0 : 0,
+      weekBestWpm: inWeek ? (meArena.weekBestWpm ?? null) : null,
+    },
+  };
 }
 
 // Sweep: pending invites and running races past their deadline are cancelled so

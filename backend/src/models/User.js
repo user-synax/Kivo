@@ -306,6 +306,26 @@ const userSchema = new mongoose.Schema(
       announcements: { type: Boolean, default: true },
     },
 
+    // Kivo Arena progression — written server-side on every race finish (see
+    // modules/games/games.rules.js nextArenaStats). Ranked 1v1 feeds wins,
+    // streaks and the weekly WPM board; practice grants XP only so bots can't
+    // be farmed for the board. All counters default so old accounts just work.
+    arena: {
+      xp: { type: Number, default: 0, min: 0 },
+      wins: { type: Number, default: 0, min: 0 },
+      losses: { type: Number, default: 0, min: 0 },
+      bestWpm: { type: Number, default: null },
+      currentStreak: { type: Number, default: 0, min: 0 },
+      bestStreak: { type: Number, default: 0, min: 0 },
+      // Rolling weekly board bucket (ISO week UTC, e.g. "2026-W37"). A finish
+      // in a new week resets the week* counters first — no cron needed.
+      weekKey: { type: String, default: null },
+      weekGames: { type: Number, default: 0, min: 0 },
+      weekWins: { type: Number, default: 0, min: 0 },
+      weekTotalWpm: { type: Number, default: 0, min: 0 },
+      weekBestWpm: { type: Number, default: null },
+    },
+
     // Client-side appearance customization: an accent + canvas-tint overlay on
     // top of the user's active preset theme, plus a chat wallpaper pattern and
     // message-bubble style. Colors are 6-digit hex (or null = keep the
@@ -346,6 +366,8 @@ userSchema.index({ "privacyPreferences.discoverableByNearby": 1 });
 // Indexes for search lookups.
 userSchema.index({ username: 1 });
 userSchema.index({ displayName: 1 });
+// Weekly arena leaderboard: this week's racers by best WPM.
+userSchema.index({ "arena.weekKey": 1, "arena.weekBestWpm": -1 });
 // OAuth lookups — sparse so local-only accounts (null ids) don't collide.
 userSchema.index({ googleId: 1 }, { sparse: true, unique: true });
 userSchema.index({ githubId: 1 }, { sparse: true, unique: true });

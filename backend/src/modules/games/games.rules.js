@@ -35,6 +35,120 @@ export const LATE_FINISH_WINDOW_MS = 15 * 1000;
 export const SERIES_BEST_OF = 3;
 export const SERIES_WINS_NEEDED = 2;
 
+// ── Arena progression (XP, streaks, weekly board) ───────────────────────
+// All pure: nextArenaStats() computes the next stored shape from the previous
+// one plus one finished race, so the whole progression model is unit-testable
+// without MongoDB. games.service.js just loads, applies and saves.
+
+// Ranked 1v1 economy. Practice pays less and never touches streaks or the
+// weekly board, so bots can't be farmed for rank.
+export const ARENA_XP_WIN = 100;
+export const ARENA_XP_LOSS = 25;
+export const ARENA_XP_PRACTICE_WIN = 30;
+export const ARENA_XP_PRACTICE_LOSS = 10;
+export const ARENA_LEADERBOARD_SIZE = 20;
+
+// ISO week key in UTC, e.g. "2026-W37". Weeks start Monday (ISO 8601).
+export function arenaWeekKey(nowMs = Date.now()) {
+  const d = new Date(nowMs);
+  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
+  const thursday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day + 3));
+  const year = thursday.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(year, 0, 4));
+  const firstDay = (firstThursday.getUTCDay() + 6) % 7;
+  const week = 1 + Math.round((thursday - new Date(Date.UTC(year, 0, 4 - firstDay))) / 604800000);
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+
+// Next Monday 00:00 UTC after nowMs — the weekly board reset instant.
+export function arenaWeekEndsAt(nowMs = Date.now()) {
+  const d = new Date(nowMs);
+  const day = (d.getUTCDay() + 6) % 7; // days since Monday
+  const monday = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day);
+  return monday + 7 * 86400000;
+}
+
+// Level curve: L1 0–99, L2 100–399, L3 400–899, … cheap to read, slow to climb.
+export function levelForXp(xp) {
+  const safe = Math.max(0, Math.floor(Number(xp) || 0));
+  return Math.floor(Math.sqrt(safe / 100)) + 1;
+}
+
+function numOr(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// Next stored arena shape after one finished race.
+// { won, wpm, practice, weekKey, boardOnly } — wpm is the server-derived WPM
+// (may be null when there was nothing measurable; wins/losses still count,
+// board skips). boardOnly folds a late runner-up WPM into the board without
+// touching XP, wins, losses or streaks (already counted at decision time).
+export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey, boardOnly = false } = {}) {
+  const next = {
+    xp: Math.max(0, Math.floor(numOr(prev.xp, 0))),
+    wins: Math.max(0, Math.floor(numOr(prev.wins, 0))),
+    losses: Math.max(0, Math.floor(numOr(prev.losses, 0))),
+    bestWpm: Number.isFinite(Number(prev.bestWpm)) ? Math.round(Number(prev.bestWpm)) : null,
+    currentStreak: Math.max(0, Math.floor(numOr(prev.currentStreak, 0))),
+    bestStreak: Math.max(0, Math.floor(numOr(prev.bestStreak, 0))),
+    weekKey: prev.weekKey || null,
+    weekGames: Math.max(0, Math.floor(numOr(prev.weekGames, 0))),
+    weekWins: Math.max(0, Math.floor(numOr(prev.weekWins, 0))),
+    weekTotalWpm: Math.max(0, Math.floor(numOr(prev.weekTotalWpm, 0))),
+    weekBestWpm: Number.isFinite(Number(prev.weekBestWpm))
+      ? Math.round(Number(prev.weekBestWpm))
+      : null,
+  };
+
+  // New week — roll the board bucket before counting this race.
+  if (next.weekKey !== weekKey) {
+    next.weekKey = weekKey;
+    next.weekGames = 0;
+    next.weekWins = 0;
+    next.weekTotalWpm = 0;
+    next.weekBestWpm = null;
+  }
+
+  if (boardOnly) {
+    const w = Number(wpm);
+    if (Number.isFinite(w) && w > 0) {
+      const rounded = Math.round(w);
+      next.bestWpm = next.bestWpm == null ? rounded : Math.max(next.bestWpm, rounded);
+      next.weekGames += 1;
+      next.weekTotalWpm += rounded;
+      next.weekBestWpm = next.weekBestWpm == null ? rounded : Math.max(next.weekBestWpm, rounded);
+    }
+    return next;
+  }
+
+  if (practice) {
+    next.xp += won ? ARENA_XP_PRACTICE_WIN : ARENA_XP_PRACTICE_LOSS;
+    return next;
+  }
+
+  next.xp += won ? ARENA_XP_WIN : ARENA_XP_LOSS;
+  if (won) {
+    next.wins += 1;
+    next.currentStreak += 1;
+    next.bestStreak = Math.max(next.bestStreak, next.currentStreak);
+  } else {
+    next.losses += 1;
+    next.currentStreak = 0;
+  }
+
+  const w = Number(wpm);
+  if (Number.isFinite(w) && w > 0) {
+    const rounded = Math.round(w);
+    next.bestWpm = next.bestWpm == null ? rounded : Math.max(next.bestWpm, rounded);
+    next.weekGames += 1;
+    if (won) next.weekWins += 1;
+    next.weekTotalWpm += rounded;
+    next.weekBestWpm = next.weekBestWpm == null ? rounded : Math.max(next.weekBestWpm, rounded);
+  }
+  return next;
+}
+
 // ── Solo practice vs bot ────────────────────────────────────────────────
 // Fixed bot identities: valid ObjectIds in a range real users can never hit,
 // so bots ride the normal player shape (userId/displayName/status) with an
