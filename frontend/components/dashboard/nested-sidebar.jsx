@@ -576,7 +576,7 @@ const DESKTOP_PILL_TABS = [
 function DesktopPillBar({ pillActive, onTabChange, unread = {} }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
-      <div className="pointer-events-auto relative flex items-center gap-2.5">
+      <div className="pointer-events-auto relative flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)]/70 p-2 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--bg-elevated)]/60">
         {DESKTOP_PILL_TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = pillActive === tab.id;
@@ -590,7 +590,7 @@ function DesktopPillBar({ pillActive, onTabChange, unread = {} }) {
               title={tab.label}
               onClick={() => onTabChange?.(tab.id)}
               className={cn(
-                "relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-full shadow-lg transition-[width,background-color,color,transform] duration-200 hover:cursor-pointer active:scale-95",
+                "relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-full shadow-sm transition-[width,background-color,color,transform] duration-200 hover:cursor-pointer active:scale-95",
                 isActive
                   ? "w-auto bg-[var(--accent)] px-5 text-[13px] font-semibold text-[var(--on-accent)]"
                   : "size-11 border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)]",
