@@ -1,5 +1,6 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
+  chessMoveSchema,
   inviteGameSchema,
   practiceSchema,
   progressSchema,
@@ -124,6 +125,40 @@ export const getLeaderboard = asyncHandler(async (req, res) => {
     limit: req.query?.limit,
   });
   res.status(200).json({ success: true, data: board });
+});
+
+// Chess: legal moves for one square (tap-target dots). Read-only.
+export const chessMoves = asyncHandler(async (req, res) => {
+  const square = String(req.query?.square || "");
+  const moves = await gamesService.chessLegalMovesFor({
+    gameId: req.params.id,
+    userId: req.user.userId,
+    square,
+  });
+  res.status(200).json({ success: true, data: moves });
+});
+
+// Chess: play one move. Validated against the stored FEN; clocks, terminal
+// detection and flag settle happen in the service.
+export const playChessMove = asyncHandler(async (req, res) => {
+  const { from, to, promotion } = parseBody(chessMoveSchema, req.body);
+  const game = await gamesService.playChessMove({
+    gameId: req.params.id,
+    userId: req.user.userId,
+    from,
+    to,
+    promotion,
+  });
+  res.status(200).json({ success: true, data: game });
+});
+
+// Chess: resign — the other player wins immediately.
+export const resignChessGame = asyncHandler(async (req, res) => {
+  const game = await gamesService.resignChessGame({
+    gameId: req.params.id,
+    userId: req.user.userId,
+  });
+  res.status(200).json({ success: true, data: game });
 });
 
 // Best-of series summary for a result screen.

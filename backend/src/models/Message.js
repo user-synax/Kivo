@@ -91,7 +91,7 @@ const gameCardSchema = new mongoose.Schema(
       ref: "GameSession",
       required: true,
     },
-    kind: { type: String, enum: ["typing"], required: true, default: "typing" },
+    kind: { type: String, enum: ["typing", "chess"], required: true, default: "typing" },
     // "invite" is the session card created when the game is proposed (it tracks
     // waiting → in progress). "result" is the separate card posted into the chat
     // when the race concludes, so a finished game is shared with a notification.

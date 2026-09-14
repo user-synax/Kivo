@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Bot,
+  Crown,
   Flame,
   Gamepad2,
   Gauge,
@@ -20,12 +21,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChessView } from "@/components/games/chess-view";
 import { GameResultFlash } from "@/components/games/game-result-flash";
 import { TypingRaceView } from "@/components/games/typing-race-view";
 import { useSocket } from "@/components/socket-provider";
 import { apiGet, apiPost } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import {
+  chessEndReasonLabel,
   consumeArenaEntry,
   formatBoardReset,
   formatWpm,
@@ -393,17 +396,23 @@ export function GamesArena() {
     const onGameFinished = (payload) => {
       applyGameEvent("game:finished", payload);
       if (!payload || !isInGame(payload, myId)) return;
+      // Draws get no takeover — the result screen says it plainly.
+      if (payload.kind === "chess" && !payload.winnerId) return;
       const winner = gameResults(payload)[0] || null;
       const winnerId = payload.winnerId || winner?.userId || null;
       const iWon = Boolean(winnerId) && winnerId === myId;
+      const subtitle =
+        payload.kind === "chess"
+          ? chessEndReasonLabel(payload.chess?.endReason)
+          : iWon
+            ? "You crossed the line first"
+            : winner
+              ? `${winner.displayName || "Your opponent"} · ${formatWpm(winner.wpm)}`
+              : null;
       setResultFlash({
         key: Date.now(),
         outcome: iWon ? "win" : "lose",
-        subtitle: iWon
-          ? "You crossed the line first"
-          : winner
-            ? `${winner.displayName || "Your opponent"} · ${formatWpm(winner.wpm)}`
-            : null,
+        subtitle,
       });
     };
 
@@ -464,12 +473,16 @@ export function GamesArena() {
     [myGames],
   );
 
+  // Challenge game: typing race or chess. One segmented control above
+  // decides what every Invite button below sends.
+  const [inviteKind, setInviteKind] = useState("typing");
+
   const invite = async (targetUserId, name) => {
     if (!targetUserId || busyId) return;
     setBusyId(targetUserId);
     try {
       playInvite();
-      await apiPost("/api/v1/games/invite", { targetUserId, kind: "typing" });
+      await apiPost("/api/v1/games/invite", { targetUserId, kind: inviteKind });
       flash(`Invite sent to ${name || "player"}`);
       await refresh();
     } catch (e) {
@@ -561,18 +574,28 @@ export function GamesArena() {
   ) : null;
 
   if (race) {
+    const closeRace = () => {
+      playClick();
+      setRace(null);
+      refresh();
+    };
     return (
       <>
-        <TypingRaceView
-          session={race}
-          viewerId={myId}
-          onClose={() => {
-            playClick();
-            setRace(null);
-            refresh();
-          }}
-          onSession={(updated) => setRace(updated)}
-        />
+        {race.kind === "chess" ? (
+          <ChessView
+            session={race}
+            viewerId={myId}
+            onClose={closeRace}
+            onSession={(updated) => setRace(updated)}
+          />
+        ) : (
+          <TypingRaceView
+            session={race}
+            viewerId={myId}
+            onClose={closeRace}
+            onSession={(updated) => setRace(updated)}
+          />
+        )}
         {resultFlashNode}
       </>
     );
@@ -733,6 +756,40 @@ export function GamesArena() {
             </div>
           </section>
 
+          {/* Challenge game picker — what every Invite below sends. */}
+          <div
+            role="tablist"
+            aria-label="Challenge game"
+            className="flex items-center gap-1 self-start rounded-full border border-[var(--border)] bg-[var(--bg-surface)] p-1"
+          >
+            {[
+              { id: "typing", label: "Typing Race", Icon: Keyboard },
+              { id: "chess", label: "Chess", Icon: Crown },
+            ].map(({ id, label, Icon }) => {
+              const selected = inviteKind === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => {
+                    playClick();
+                    setInviteKind(id);
+                  }}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-semibold transition-all active:scale-95 ${
+                    selected
+                      ? "bg-white text-black"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Lobby + live board. Sidebar docks right on desktop, stacks below on mobile. */}
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="flex min-w-0 flex-col gap-5">
@@ -805,7 +862,11 @@ export function GamesArena() {
                           style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
                         >
                           <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
-                            <Keyboard className="h-5 w-5" />
+                            {game.kind === "chess" ? (
+                              <Crown className="h-5 w-5" />
+                            ) : (
+                              <Keyboard className="h-5 w-5" />
+                            )}
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1">
@@ -875,7 +936,11 @@ export function GamesArena() {
                           }}
                         >
                           <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
-                            <Keyboard className="h-5 w-5" />
+                            {game.kind === "chess" ? (
+                              <Crown className="h-5 w-5" />
+                            ) : (
+                              <Keyboard className="h-5 w-5" />
+                            )}
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1">
@@ -883,7 +948,12 @@ export function GamesArena() {
                                 tone={active ? "live" : "waiting"}
                                 live={active}
                               >
-                                {active ? "Live" : "Waiting"}
+                                {active
+                                  ? game.kind === "chess" &&
+                                    game.chess?.turnUserId === myId
+                                    ? "Your move"
+                                    : "Live"
+                                  : "Waiting"}
                               </StatusPill>
                             </div>
                             <p className="truncate text-[13.5px] font-semibold text-[var(--text-primary)]">

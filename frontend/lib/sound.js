@@ -87,6 +87,11 @@ const GAME_CUES = {
   ],
   // Keystroke tick: barely-there tick, caller throttles to avoid spam.
   tick: [[2093.0, 0.0, 0.025]],
+  // Chess move: a soft wooden thock — low knock plus a short body tone.
+  chessMove: [
+    [196.0, 0.0, 0.07], // G3 knock
+    [329.63, 0.015, 0.09], // E4 body
+  ],
 };
 
 // Each cue is a tiny melody: [frequency, start offset (s), duration (s)].
@@ -377,4 +382,11 @@ export function playTypeTick() {
   const prefs = getSoundPrefs();
   if (!prefs.enabled || prefs.gameResults === false) return;
   playPattern(GAME_CUES.tick, { type: "sine", peak: 0.022 });
+}
+
+// Chess move thock. Same arena gate as every other game sound.
+export function playChessMove() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.gameResults === false) return;
+  playPattern(GAME_CUES.chessMove, { type: "triangle", peak: 0.1 });
 }

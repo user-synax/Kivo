@@ -862,6 +862,14 @@ export function DocsScreen() {
                   games going, Plus accounts 10.
                 </Bullet>
                 <Bullet>
+                  Chess lives in the same arena: pick Chess on the tabs and
+                  invite the same way. Tap a piece for its legal moves, tap a
+                  dot to play it. 10 minutes each with clocks the server
+                  re-checks on every move — no timers running anywhere.
+                  Checkmate wins; stalemate, bare kings, repetition and fifty
+                  moves draw; resigning hands your opponent the win.
+                </Bullet>
+                <Bullet>
                   No rival around? Practice solo against Rookie, Dash or Blaze
                   Bot — instant start, no invite. Practice pays XP but never
                   touches streaks or the board.

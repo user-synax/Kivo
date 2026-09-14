@@ -35,6 +35,18 @@ import {
   seriesStandings,
   utcDayKey,
 } from "./games.rules.js";
+import {
+  CHESS_EXPIRE_MS,
+  CHESS_TIME_MS,
+  chessApplyMove,
+  chessCheckSquare,
+  chessFlagWinner,
+  chessGameStatus,
+  chessLegalMoves,
+  chessRemainingMs,
+  chessStart,
+  chessTurn,
+} from "./games.chess.js";
 
 // Kivo Games — server-authoritative game sessions.
 //
@@ -115,14 +127,14 @@ function emitGameEvent(session, event, payload) {
 
 // Persist one player's arena progression (XP, streaks, weekly board). Never
 // throws — progression must not break the finish flow it observes.
-async function applyArenaStats({ userId, won, wpm, practice = false, boardOnly = false }) {
+async function applyArenaStats({ userId, won, wpm, practice = false, drawn = false, boardOnly = false }) {
   try {
     if (!userId || isPracticeBotId(userId)) return;
     const weekKey = arenaWeekKey();
     const dayKey = utcDayKey();
     const user = await User.findById(userId).select("arena").lean();
     if (!user) return;
-    const next = nextArenaStats(user.arena || {}, { won, wpm, practice, weekKey, dayKey, boardOnly });
+    const next = nextArenaStats(user.arena || {}, { won, wpm, practice, drawn, weekKey, dayKey, boardOnly });
     await User.findByIdAndUpdate(userId, { $set: { arena: next } });
   } catch (err) {
     console.error("[games] arena stats failed:", err?.message || err);
@@ -195,6 +207,47 @@ export function publicGame(session, { includePassage = false } = {}) {
     seriesWinsNeeded: SERIES_WINS_NEEDED,
   };
   if (includePassage) view.passage = session.passage || null;
+  if (session.kind === "chess" && session.chess?.fen) {
+    view.chess = publicChess(session);
+  }
+  return view;
+}
+
+// Client-safe chess position. Clocks are lazy anchors re-derived at serialize
+// time — the client animates from these, the server re-checks on move/read.
+export function publicChess(session, nowMs = Date.now()) {
+  const c = session.chess || {};
+  const turn = c.fen ? chessTurn(c.fen) : "w";
+  const whiteId = c.whiteUserId ? c.whiteUserId.toString() : null;
+  const blackId = c.blackUserId ? c.blackUserId.toString() : null;
+  const anchors = {
+    whiteMs: c.whiteMs,
+    blackMs: c.blackMs,
+    turn,
+    lastMoveAt: c.lastMoveAt,
+  };
+  const view = {
+    fen: c.fen || null,
+    moves: Array.isArray(c.moves) ? c.moves : [],
+    turn,
+    turnUserId: turn === "w" ? whiteId : blackId,
+    whiteUserId: whiteId,
+    blackUserId: blackId,
+    whiteMs: chessRemainingMs(anchors, "w", nowMs),
+    blackMs: chessRemainingMs(anchors, "b", nowMs),
+    lastSan: c.moves?.length ? c.moves[c.moves.length - 1] : null,
+    inCheck: false,
+    checkSquare: null,
+    endReason: c.endReason || null,
+    // Anchors for client-side clock animation: remaining values are exact at
+    // `asOf`, and only the side to move burns after it.
+    asOf: nowMs,
+    lastMoveAt: c.lastMoveAt ? new Date(c.lastMoveAt).toISOString() : null,
+  };
+  if (c.fen && session.status === "active") {
+    view.checkSquare = chessCheckSquare(c.fen);
+    view.inCheck = view.checkSquare != null;
+  }
   return view;
 }
 
@@ -257,9 +310,11 @@ async function postResultChip(session) {
   );
   const winnerName = winner?.displayName || "Someone";
   const wpm = winner?.wpm;
-  const summary = `${kindLabel(session.kind)} — ${winnerName} won${
-    Number.isFinite(wpm) ? ` (${wpm} wpm)` : ""
-  }`;
+  const summary = session.winnerId
+    ? `${kindLabel(session.kind)} — ${winnerName} won${
+        Number.isFinite(wpm) ? ` (${wpm} wpm)` : ""
+      }`
+    : `${kindLabel(session.kind)} — draw`;
 
   const message = await Message.create({
     conversationId: session.conversationId,
@@ -307,6 +362,7 @@ async function postResultChip(session) {
 // Turn a pending session into a running race. Shared by the manual start (host)
 // and the auto-start that fires the moment a 1v1 invite is accepted.
 async function activateSession(session) {
+  if (session.kind === "chess") return activateChess(session);
   session.status = "active";
   session.passage = pickPassage();
   // Typing unlocks when the countdown ends — see COUNTDOWN_MS.
@@ -330,6 +386,190 @@ async function activateSession(session) {
     publicGame(session, { includePassage: true }),
   );
   return publicGame(session, { includePassage: true });
+}
+
+// Start a chess game: no countdown, no passage — colors are drawn randomly,
+// clocks start full, abandonment sweeps after a week of silence.
+async function activateChess(session) {
+  const { fen, moves } = chessStart();
+  const [a, b] = session.players;
+  const hostWhite = Math.random() < 0.5;
+  const now = new Date();
+  session.status = "active";
+  session.passage = null;
+  session.startedAt = now;
+  session.finishedAt = null;
+  session.expiresAt = new Date(now.getTime() + CHESS_EXPIRE_MS);
+  session.winnerId = null;
+  session.chess = {
+    fen,
+    moves,
+    whiteUserId: hostWhite ? a.userId : b.userId,
+    blackUserId: hostWhite ? b.userId : a.userId,
+    whiteMs: CHESS_TIME_MS,
+    blackMs: CHESS_TIME_MS,
+    lastMoveAt: now,
+    endReason: null,
+  };
+  await session.save();
+  await syncCard(session);
+  emitToConversation(
+    session.conversationId.toString(),
+    "game:started",
+    publicGame(session),
+  );
+  return publicGame(session);
+}
+
+// Settle one finished chess game: record, pay progression, chip, announce.
+// winnerUserId null = draw (both sides get draw XP, streaks untouched).
+async function finishChess(session, { winnerUserId = null, reason }) {
+  session.status = "finished";
+  session.finishedAt = new Date();
+  session.winnerId = winnerUserId;
+  session.chess.endReason = reason;
+  await session.save();
+  const humans = (session.players || []).filter((p) => !p.isBot);
+  if (winnerUserId) {
+    const winner = humans.find((p) => p.userId.toString() === String(winnerUserId));
+    const loser = humans.find((p) => p.userId.toString() !== String(winnerUserId));
+    if (winner) {
+      await applyArenaStats({ userId: winner.userId.toString(), won: true, wpm: null, practice: false });
+    }
+    if (loser) {
+      await applyArenaStats({ userId: loser.userId.toString(), won: false, wpm: null, practice: false });
+    }
+  } else {
+    for (const p of humans) {
+      await applyArenaStats({ userId: p.userId.toString(), won: false, wpm: null, practice: false, drawn: true });
+    }
+  }
+  await syncCard(session);
+  await postResultChip(session);
+  emitGameEvent(session, "game:finished", publicGame(session));
+  return publicGame(session);
+}
+
+// Lazy flag settle: if the side to move is out of time, the game is over.
+// Returns true when it settled something (caller must stop what it was doing).
+async function settleChessFlag(session, nowMs = Date.now()) {
+  if (session.kind !== "chess" || session.status !== "active" || !session.chess?.fen) {
+    return false;
+  }
+  const winnerColor = chessFlagWinner(
+    {
+      whiteMs: session.chess.whiteMs,
+      blackMs: session.chess.blackMs,
+      turn: chessTurn(session.chess.fen),
+      lastMoveAt: session.chess.lastMoveAt,
+    },
+    nowMs,
+  );
+  if (!winnerColor) return false;
+  const winnerUserId = (
+    winnerColor === "w" ? session.chess.whiteUserId : session.chess.blackUserId
+  )?.toString();
+  await finishChess(session, { winnerUserId, reason: "flag" });
+  return true;
+}
+
+function chessColorOf(session, userId) {
+  if (session.chess?.whiteUserId?.toString() === String(userId)) return "w";
+  if (session.chess?.blackUserId?.toString() === String(userId)) return "b";
+  return null;
+}
+
+// Play one chess move. Clock deduction, legality, terminal detection and flag
+// settle all happen here, in one DB write — the only per-move cost.
+export async function playChessMove({ gameId, userId, from, to, promotion }) {
+  const session = await loadSession(gameId);
+  if (session.kind !== "chess") {
+    throw badRequest("Moves are for chess games", "WRONG_KIND");
+  }
+  await assertMembership(session.conversationId.toString(), userId);
+  if (session.status !== "active") throw badRequest("This game is over", "GAME_OVER");
+
+  const player = session.players.find(
+    (p) => p.userId.toString() === String(userId) && p.status === "joined",
+  );
+  if (!player) throw forbidden("Join the game first", "NOT_IN_GAME");
+
+  const nowMs = Date.now();
+  if (await settleChessFlag(session, nowMs)) {
+    throw conflict("Time ran out — game over", "GAME_OVER");
+  }
+
+  const myColor = chessColorOf(session, userId);
+  const turn = chessTurn(session.chess.fen);
+  if (!myColor || myColor !== turn) {
+    throw forbidden("Wait for your turn", "NOT_YOUR_TURN");
+  }
+
+  // Deduct the mover's spent time, then validate the move itself.
+  const elapsed = Math.max(0, nowMs - new Date(session.chess.lastMoveAt).getTime());
+  if (myColor === "w") session.chess.whiteMs -= elapsed;
+  else session.chess.blackMs -= elapsed;
+
+  const applied = chessApplyMove(session.chess.fen, { from, to, promotion });
+  session.chess.fen = applied.fen;
+  session.chess.moves.push(applied.san);
+  session.chess.lastMoveAt = new Date(nowMs);
+  session.expiresAt = new Date(nowMs + CHESS_EXPIRE_MS);
+
+  const status = chessGameStatus(applied.fen);
+  if (status.over) {
+    const winnerUserId = status.winner
+      ? (status.winner === "w" ? session.chess.whiteUserId : session.chess.blackUserId)?.toString()
+      : null;
+    return finishChess(session, { winnerUserId, reason: status.reason });
+  }
+
+  await session.save();
+  emitGameEvent(session, "game:updated", publicGame(session));
+  return publicGame(session);
+}
+
+// Resign a chess game: the other human wins immediately. From a still-pending
+// invite it just cancels (nothing was ever played).
+export async function resignChessGame({ gameId, userId }) {
+  const session = await loadSession(gameId);
+  if (session.kind !== "chess") {
+    throw badRequest("Resigning is for chess games", "WRONG_KIND");
+  }
+  await assertMembership(session.conversationId.toString(), userId);
+  const player = session.players.find((p) => p.userId.toString() === String(userId));
+  if (!player) throw forbidden("You are not part of this game", "NOT_INVITED");
+  if (session.status === "finished" || session.status === "cancelled") {
+    return publicGame(session);
+  }
+  if (session.status !== "active") {
+    session.status = "cancelled";
+    session.finishedAt = new Date();
+    await session.save();
+    await syncCard(session);
+    emitGameEvent(session, "game:cancelled", publicGame(session));
+    return publicGame(session);
+  }
+  const opponent = (session.players || []).find(
+    (p) => !p.isBot && p.userId.toString() !== String(userId),
+  );
+  return finishChess(session, {
+    winnerUserId: opponent ? opponent.userId.toString() : String(userId),
+    reason: "resign",
+  });
+}
+
+// Legal moves for one square (tap-target dots). Read-only and cheap.
+export async function chessLegalMovesFor({ gameId, userId, square }) {
+  const session = await loadSession(gameId);
+  if (session.kind !== "chess" || session.status !== "active" || !session.chess?.fen) {
+    throw badRequest("No live board here", "GAME_NOT_ACTIVE");
+  }
+  await assertMembership(session.conversationId.toString(), userId);
+  if (await settleChessFlag(session)) {
+    throw conflict("Time ran out — game over", "GAME_OVER");
+  }
+  return chessLegalMoves(session.chess.fen, square);
 }
 
 // Invite someone to play. Reuses (or creates) the DM, so the resulting chat chip
@@ -573,6 +813,9 @@ export async function startGame({ gameId, userId }) {
 // message — so typing does not hammer the database.
 export async function reportProgress({ gameId, userId, progress }) {
   const session = await loadSession(gameId);
+  if (!session.isPractice && session.kind !== "typing") {
+    throw badRequest("Progress pings are for typing races", "WRONG_KIND");
+  }
   if (session.isPractice) {
     const player = assertPracticeAccess(session, userId);
     if (session.status !== "active") throw badRequest("Race is not active", "GAME_NOT_ACTIVE");
@@ -634,6 +877,9 @@ export async function reportProgress({ gameId, userId, progress }) {
 
 export async function finishGame({ gameId, userId, accuracy, elapsedMs }) {
   const session = await loadSession(gameId);
+  if (!session.isPractice && session.kind !== "typing") {
+    throw badRequest("Chess games end by checkmate, time or resign", "WRONG_KIND");
+  }
   if (session.isPractice) {
     assertPracticeAccess(session, userId);
   } else {
@@ -748,6 +994,12 @@ export async function cancelGame({ gameId, userId }) {
 
 export async function getGame({ gameId, userId }) {
   const session = await loadSession(gameId);
+  if (session.kind === "chess") {
+    await assertMembership(session.conversationId.toString(), userId);
+    // Lazy flag settle on read — an idle loss lands on the next open or poll.
+    await settleChessFlag(session);
+    return publicGame(session);
+  }
   if (session.isPractice) {
     assertPracticeAccess(session, userId);
     // Settle the bot on read so an idle player's loss lands on the next poll.

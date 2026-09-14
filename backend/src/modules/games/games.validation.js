@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Kivo Games validation. Every body/query is checked server-side — the client is
 // never trusted (same rule as the rest of the API).
-export const GAME_KIND_VALUES = ["typing"];
+export const GAME_KIND_VALUES = ["typing", "chess"];
 
 // Games start from the arena by inviting a specific player. The backend resolves
 // (or creates) the DM that hosts the chat chip.
@@ -19,6 +19,14 @@ export const progressSchema = z.object({
 
 // Solo practice vs bot. No target player, no DM — just a difficulty.
 export const PRACTICE_DIFFICULTY_VALUES = ["easy", "medium", "hard"];
+
+// One chess move in long-algebraic squares. Promotion is a single piece
+// letter; the server re-validates everything against the stored FEN.
+export const chessMoveSchema = z.object({
+  from: z.string().regex(/^[a-h][1-8]$/, "from must look like e2"),
+  to: z.string().regex(/^[a-h][1-8]$/, "to must look like e4"),
+  promotion: z.enum(["n", "b", "r", "q"]).optional(),
+});
 
 export const practiceSchema = z.object({
   difficulty: z.enum(PRACTICE_DIFFICULTY_VALUES).optional().default("medium"),

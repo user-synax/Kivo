@@ -132,7 +132,7 @@ Kivo
 | **Custom Emoji** | **Complete** | `CustomEmoji` model (global/space/personal), `emoji` module (CRUD + Appwrite upload), personal emoji (Plus-only, 50 max, usable everywhere), Space emoji (Plus/admin, 100 max), global emoji (admin-only, 200 max), `:name:` shortcode parsing, `customReactionKey` for reactions, IndexedDB caching with stale-while-revalidate, `emoji:new`/`emoji:deleted` realtime events |
 | **Kivo Plus (UPI payments)** | **Complete** | Self-serve ₹49/month via UPI, `/plus` page with pricing + claim form + status cards, `PlusRequest` model (pending/approved/rejected/expired), admin review queue, 24h review window, 30-day grants, hourly sweep for expired claims + scrubbing Plus-only effects, per-plan caps in `PLAN_LIMITS` |
 | Voice / Video Calls | **Complete** | LiveKit Cloud SFU; `POST /api/v1/calls/token` + `GET /calls/status`; Socket.IO ring coordination; incoming overlay + floating call panel; in-chat call history |
-| **Kivo Games** | **Complete** | Full-screen `/games` arena (live lobby presence `arena:enter/leave` → `arena:roster`, friend online dots, per-plan-concurrent invites, welcome gate + arena music) + 1v1 **Typing Race**: server-picked passage, server-owned clock (WPM clamped to 400) and finish places, throttled monotonic live progress, auto-start on accept, result chip posted as its own message, win/lose flash + Web Audio stinger, 30-min invite TTL / 10-min extended race deadline + 5-min `abandonStaleGames()` sweep; solo **Practice vs bots** (Easy/Medium/Hard, instant start); one-tap **Rematch best-of-3** in the same DM thread; progression on `User.arena` — **XP levels** (win +100 / loss +25, practice +30/+10; L1 0–99, L2 100, L3 400), **win streaks** (ranked-only, reset on loss), **daily play-streaks** (UTC days, any finish counts), **weekly WPM board** (`GET /leaderboard`, Monday 00:00 UTC reset) |
+| **Kivo Games** | **Complete** | Full-screen `/games` arena (live lobby presence `arena:enter/leave` → `arena:roster`, friend online dots, per-plan-concurrent invites, welcome gate + arena music) + 1v1 **Typing Race**: server-picked passage, server-owned clock (WPM clamped to 400) and finish places, throttled monotonic live progress, auto-start on accept, result chip posted as its own message, win/lose flash + Web Audio stinger, 30-min invite TTL / 10-min extended race deadline + 5-min `abandonStaleGames()` sweep; solo **Practice vs bots** (Easy/Medium/Hard, instant start); one-tap **Rematch best-of-3** in the same DM thread; progression on `User.arena` — **XP levels** (win +100 / loss +25, practice +30/+10; L1 0–99, L2 100, L3 400), **win streaks** (ranked-only, reset on loss), **daily play-streaks** (UTC days, any finish counts), **weekly WPM board** (`GET /leaderboard`, Monday 00:00 UTC reset); 1v1 **Chess** (`kind: "chess"`, `chess.js` validation, FEN + SAN history on the session, lazy 10-min clocks with zero timers, `POST /:id/move` + `GET /:id/moves` + `POST /:id/resign`, mate/draw/flag/resign endings, best-of-3 rematches, XP + streaks, typing-only board) |
 
 ---
 
@@ -1883,7 +1883,7 @@ These may be considered after the core communication experience is stable.
 ### Phase 4 — Platform
 
 - Developer platform.
-- Mini-apps — more Kivo Games (Chess, Ludo, multi-player tables, tournaments, spectators).
+- Mini-apps — more Kivo Games (Ludo, multi-player tables, tournaments, spectators; Chess 1v1 shipped).
 - Automation.
 - Marketplace themes & theme sharing.
 

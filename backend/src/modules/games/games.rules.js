@@ -104,13 +104,15 @@ function numOr(value, fallback) {
 }
 
 // Next stored arena shape after one finished race.
-// { won, wpm, practice, weekKey, dayKey, boardOnly } — wpm is the server-derived
-// WPM (may be null when there was nothing measurable; wins/losses still count,
-// board skips). boardOnly folds a late runner-up WPM into the board without
-// touching XP, wins, losses or streaks (already counted at decision time).
+// { won, wpm, practice, drawn, weekKey, dayKey, boardOnly } — wpm is the
+// server-derived WPM (may be null when there was nothing measurable, e.g. every
+// chess game; wins/losses still count, board skips). boardOnly folds a late
+// runner-up WPM into the board without touching XP, wins, losses or streaks
+// (already counted at decision time). drawn splits a chess draw: +25 XP each,
+// daily streak ticks, nothing else moves.
 // The daily play-streak ticks on dayKey for every finish — ranked or practice,
 // full or board-only — because it rewards showing up, not winning.
-export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey, dayKey, boardOnly = false } = {}) {
+export function nextArenaStats(prev = {}, { won, wpm, practice = false, drawn = false, weekKey, dayKey, boardOnly = false } = {}) {
   const next = {
     xp: Math.max(0, Math.floor(numOr(prev.xp, 0))),
     wins: Math.max(0, Math.floor(numOr(prev.wins, 0))),
@@ -158,6 +160,11 @@ export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey,
       next.weekTotalWpm += rounded;
       next.weekBestWpm = next.weekBestWpm == null ? rounded : Math.max(next.weekBestWpm, rounded);
     }
+    return next;
+  }
+
+  if (drawn) {
+    next.xp += ARENA_XP_LOSS;
     return next;
   }
 
@@ -272,7 +279,7 @@ export const PASSAGES = [
   "The best ideas rarely arrive on schedule, so it helps to keep a notebook close and your patience closer.",
 ];
 
-const KIND_LABELS = Object.freeze({ typing: "Typing Race" });
+const KIND_LABELS = Object.freeze({ typing: "Typing Race", chess: "Chess" });
 
 export function kindLabel(kind) {
   return KIND_LABELS[kind] || "Game";

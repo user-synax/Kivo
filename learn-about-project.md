@@ -300,7 +300,7 @@ For web push, generate keys with `npx web-push generate-vapid-keys`. For calls, 
 
 ## 🚧 What's *not* in Kivo (yet)
 
-Honesty is part of the design docs, so: no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. **Kivo Games ships with exactly one game today** — the 1v1 Typing Race; Chess, Ludo, tournaments and spectating are still roadmap. The roadmap in the [README](README.md) tracks everything.
+Honesty is part of the design docs, so: no E2E encryption, full offline history is limited to the last 50 messages per chat, video *attachments* aren't supported (voice is), and realtime presence assumes a single server instance (scaling out needs a shared adapter). **Disappearing messages (24h/7d auto-delete) were removed 2026-09-08** — `disappearingDuration`/`expireAt` and all timer UI deleted from frontend & backend. **Kivo Games ships with two games today** — the 1v1 Typing Race and 1v1 Chess (tap-to-move, lazy 10-min clocks, best-of-3 rematches); Ludo, tournaments and spectating are still roadmap. The roadmap in the [README](README.md) tracks everything.
 
 ---
 

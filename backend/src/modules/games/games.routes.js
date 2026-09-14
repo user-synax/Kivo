@@ -45,5 +45,8 @@ router.post("/:id/progress", gameProgressLimiter, gamesController.reportProgress
 router.post("/:id/finish", gameActionLimiter, gamesController.finishGame);
 router.post("/:id/cancel", gameActionLimiter, gamesController.cancelGame);
 router.post("/:id/rematch", gameActionLimiter, gamesController.rematchGame);
+router.get("/:id/moves", gamesController.chessMoves);
+router.post("/:id/move", gameActionLimiter, gamesController.playChessMove);
+router.post("/:id/resign", gameActionLimiter, gamesController.resignChessGame);
 
 export default router;

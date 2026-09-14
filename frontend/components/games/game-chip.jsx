@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Keyboard, Trophy } from "lucide-react";
+import { ChevronRight, Crown, Keyboard, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   formatAccuracy,
@@ -26,13 +26,14 @@ import {
 function inviteStatus(game, viewerId) {
   const opponent = (game.players || []).find((p) => p.userId !== viewerId);
   const opponentName = opponent?.displayName || "your opponent";
+  const noun = game?.kind === "chess" ? "Game" : "Race";
 
   switch (game?.status) {
     case "active":
-      return "Race in progress — tap to watch";
+      return `${noun} in progress — tap to watch`;
     case "finished":
     case "cancelled":
-      return "Race finished";
+      return `${noun} finished`;
     case "pending": {
       const me = playerFor(game, viewerId);
       if (me?.status === "invited") return "Invited you — tap to accept";
@@ -88,6 +89,8 @@ export function GameChip({ game, viewerId }) {
       <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/12 text-sm text-[var(--accent)]">
         {isResult ? (
           <Trophy className="h-4 w-4 text-amber-500" />
+        ) : game.kind === "chess" ? (
+          <Crown className="h-4 w-4" />
         ) : (
           <Keyboard className="h-4 w-4" />
         )}

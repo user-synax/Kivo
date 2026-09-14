@@ -35,9 +35,13 @@ describe("inviteGameSchema", () => {
     expect(inviteGameSchema.safeParse({}).success).toBe(false);
   });
 
-  test("rejects an unknown game kind", () => {
-    const result = inviteGameSchema.safeParse({ targetUserId: "abc", kind: "chess" });
-    expect(result.success).toBe(false);
+  test("accepts chess and rejects unknown game kinds", () => {
+    expect(
+      inviteGameSchema.safeParse({ targetUserId: "abc", kind: "chess" }).success,
+    ).toBe(true);
+    expect(
+      inviteGameSchema.safeParse({ targetUserId: "abc", kind: "checkers" }).success,
+    ).toBe(false);
   });
 });
 
@@ -405,6 +409,18 @@ describe("nextArenaStats", () => {
     expect(next.wins).toBe(2);
     expect(next.bestWpm).toBe(82);
     expect(next.currentStreak).toBe(2);
+  });
+
+  test("a draw pays a little XP and moves nothing else", () => {
+    const next = nextArenaStats(
+      { wins: 2, currentStreak: 2, bestStreak: 2 },
+      { won: false, wpm: null, practice: false, drawn: true, weekKey: week, dayKey: "2026-09-14" },
+    );
+    expect(next.xp).toBe(25);
+    expect(next.wins).toBe(2);
+    expect(next.losses).toBe(0);
+    expect(next.currentStreak).toBe(2);
+    expect(next.dailyStreak).toBe(1);
   });
 
   test("boardOnly folds WPM without touching economy", () => {

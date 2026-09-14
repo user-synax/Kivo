@@ -10,7 +10,7 @@ import mongoose from "mongoose";
 //
 // MongoDB stays authoritative: every turn/progress/finish write lands here and
 // only then is announced over Socket.IO.
-export const GAME_KINDS = ["typing"];
+export const GAME_KINDS = ["typing", "chess"];
 
 // Session statuses:
 //   pending   → invite posted, waiting for players / the creator to start
@@ -81,6 +81,19 @@ const gameSessionSchema = new mongoose.Schema(
     // Typing-race payload. The passage is chosen server-side at start so a
     // client cannot pick its own (or see it before the race begins).
     passage: { type: String, default: null },
+    // Chess payload. FEN + SAN history are tiny (a 100-move game is a few KB);
+    // clocks are lazy anchors (see games.chess.js) so idle games cost nothing
+    // between moves — no timers, ever.
+    chess: {
+      fen: { type: String, default: null },
+      moves: { type: [String], default: [] },
+      whiteUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      blackUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      whiteMs: { type: Number, default: null },
+      blackMs: { type: Number, default: null },
+      lastMoveAt: { type: Date, default: null },
+      endReason: { type: String, default: null },
+    },
     startedAt: { type: Date, default: null },
     finishedAt: { type: Date, default: null },
     // Abandonment guard: pending invites expire, active races end at the deadline.

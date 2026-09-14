@@ -18,11 +18,15 @@ export function getCountdownMs(game) {
 export const RACE_DANGER_PCT = 80;
 
 // No emojis here — game icons are lucide components at the call site
-// (Keyboard for typing, Gamepad2 fallback). Keep this metadata text-only.
+// (Keyboard for typing, Crown for chess, Gamepad2 fallback). Text-only.
 export const GAME_KINDS = Object.freeze({
   typing: {
     label: "Typing Race",
     blurb: "Type the passage fastest",
+  },
+  chess: {
+    label: "Chess",
+    blurb: "Outplay them move by move",
   },
 });
 
@@ -154,6 +158,122 @@ export function gameStatusText(game) {
     default:
       return "Game";
   }
+}
+
+// ── Chess (client board helpers) ──────────────────────────────────────
+// FEN parsing + text piece glyphs for the tap board. Glyphs are Unicode text
+// shapes (not emojis) rendered in currentColor — no assets, theme-aware.
+
+export function isChessGame(game) {
+  return game?.kind === "chess";
+}
+
+const CHESS_GLYPHS = Object.freeze({
+  wk: "♚",
+  wq: "♛",
+  wr: "♜",
+  wb: "♝",
+  wn: "♞",
+  wp: "♟",
+  bk: "♚",
+  bq: "♛",
+  br: "♜",
+  bb: "♝",
+  bn: "♞",
+  bp: "♟",
+});
+
+export function chessGlyph(color, type) {
+  return CHESS_GLYPHS[`${color}${type}`] || "";
+}
+
+// 64 squares from a FEN placement field, rank 8 first:
+// [{ square: "a8", color: "w"|"b"|null, type: "p"|...|null }]
+export function fenToBoard(fen) {
+  const placement = String(fen || "").split(" ")[0] || "";
+  const rows = placement.split("/");
+  const out = [];
+  const files = "abcdefgh";
+  for (let r = 0; r < 8; r += 1) {
+    const rank = 8 - r;
+    let file = 0;
+    for (const ch of rows[r] || "") {
+      if (/\d/.test(ch)) {
+        for (let i = 0; i < Number(ch); i += 1) {
+          out.push({
+            square: `${files[file]}${rank}`,
+            color: null,
+            type: null,
+          });
+          file += 1;
+        }
+      } else {
+        out.push({
+          square: `${files[file]}${rank}`,
+          color: ch === ch.toUpperCase() ? "w" : "b",
+          type: ch.toLowerCase(),
+        });
+        file += 1;
+      }
+    }
+    while (file < 8) {
+      out.push({ square: `${files[file]}${rank}`, color: null, type: null });
+      file += 1;
+    }
+  }
+  return out.slice(0, 64);
+}
+
+export function myChessColor(game, viewerId) {
+  if (!game?.chess || !viewerId) return null;
+  if (String(game.chess.whiteUserId) === String(viewerId)) return "w";
+  if (String(game.chess.blackUserId) === String(viewerId)) return "b";
+  return null;
+}
+
+export function isMyChessTurn(game, viewerId) {
+  if (!game?.chess || game?.status !== "active") return false;
+  return String(game.chess.turnUserId) === String(viewerId);
+}
+
+// Mirror of the server's chessReasonLabel — result + flash subtitles for chess.
+export function chessEndReasonLabel(reason) {
+  switch (reason) {
+    case "checkmate":
+      return "Checkmate";
+    case "stalemate":
+      return "Stalemate · draw";
+    case "material":
+      return "Draw · bare kings";
+    case "repetition":
+      return "Draw · repetition";
+    case "fifty":
+      return "Draw · fifty moves";
+    case "resign":
+      return "Resignation";
+    case "flag":
+      return "Won on time";
+    default:
+      return "Finished";
+  }
+}
+
+// Remaining clock for a color at `nowMs`, from the server's lazy anchors:
+// the serialized values are exact at asOf; only the side to move burns after.
+export function chessClockAt(chess, color, nowMs = Date.now()) {
+  if (!chess) return 0;
+  const base = Number(color === "w" ? chess.whiteMs : chess.blackMs);
+  const safe = Number.isFinite(base) ? base : 10 * 60 * 1000;
+  const asOf = Number(new Date(chess.asOf || Date.now()).getTime());
+  const burn = chess.turn === color ? Math.max(0, nowMs - asOf) : 0;
+  return Math.max(0, Math.round(safe - burn));
+}
+
+export function formatChessClock(ms) {
+  const total = Math.max(0, Math.ceil((Number(ms) || 0) / 1000));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
 // ── Arena entry transition ────────────────────────────────────────────
