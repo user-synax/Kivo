@@ -656,7 +656,7 @@ const MessageRows = React.memo(function MessageRows({
                   mine={mine}
                   showMeta={groupLast}
                   grouped={grouped}
-                  cozy={isCozy}
+                  bubbleStyle={bubbleStyle}
                   isEditing={editingId === m.id}
                   editText={editText}
                   onEditTextChange={a.setEditText}

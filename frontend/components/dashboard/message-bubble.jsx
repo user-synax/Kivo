@@ -659,7 +659,7 @@ export function MessageBubble({
   mine,
   showMeta = true,
   grouped = false,
-  cozy = false,
+  bubbleStyle = "rounded",
   isEditing = false,
   editText = "",
   onEditTextChange,
@@ -814,6 +814,57 @@ export function MessageBubble({
     setReceiptsOpen(true);
   };
 
+  // Ticks / receipt icons, shared by the classic below-bubble meta row and
+  // the Telegram in-bubble corner meta. Inline mode inherits the bubble text
+  // color (white on blue, etc.) and skips the reader stack (no room).
+  const renderTicks = (inline) =>
+    canShowReceipts ? (
+      anySeen ? (
+        <button
+          type="button"
+          ref={ticksRef}
+          onClick={openReceipts}
+          aria-label={allRead ? "Seen by everyone" : "View receipts"}
+          aria-expanded={receiptsOpen}
+          className={cn(
+            "flex cursor-pointer items-center gap-1 rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none",
+            receiptsOpen && "opacity-70",
+          )}
+        >
+          <CheckCheck
+            className={cn(
+              "h-3 w-3",
+              allRead && !(inline && mine) && "text-[var(--accent)]",
+            )}
+            aria-hidden
+          />
+          {!inline && !isMobile && receiptPeers.read.length > 0 && (
+            <ReadAvatars readers={receiptPeers.read} />
+          )}
+        </button>
+      ) : (
+        <Check className="h-3 w-3" aria-label="Sent" />
+      )
+    ) : (
+      <>
+        {receipt === "sent" && (
+          <Check className="h-3 w-3" aria-label="Sent" />
+        )}
+        {receipt === "delivered" && (
+          <CheckCheck className="h-3 w-3" aria-label="Delivered" />
+        )}
+        {receipt === "read" && (
+          <CheckCheck
+            className={cn(
+              "h-3 w-3",
+              !(inline && mine) && "text-[var(--accent)]",
+            )}
+            aria-label="Read"
+          />
+        )}
+      </>
+    );
+
   // --- Double-click / double-tap like — optimized ---
   const lastTapRef = useRef(0);
   const likeStartRef = useRef(null);
@@ -944,6 +995,14 @@ export function MessageBubble({
   const bubbleVariant =
     variant ?? (isBig ? "ghost" : mine ? "default" : "secondary");
 
+  const cozy = bubbleStyle === "cozy";
+  const isTelegram = bubbleStyle === "telegram";
+  const isIMessage = bubbleStyle === "imessage";
+  // Telegram tucks time + ticks inside the bubble (absolute corner meta), so
+  // the row below only survives for send-state text and card messages.
+  const telegramInline =
+    isTelegram && !isCardType && !isBig && !receiptInFlight && !isEditing && !deleted;
+
   // Customs available for the "More reactions" section (up to 48).
   const customReactionList =
     customEmojiById && customEmojiById.size > 0
@@ -979,9 +1038,42 @@ export function MessageBubble({
           onTouchStart={handleLikeTouchStart}
           onTouchEnd={handleTouchEnd}
         >
+          {/* iMessage tail — rides alongside the bottom corner, emerging from
+              behind its curve (top tucked under the bubble face, tip fully
+              outside). Never extends below the bubble, so it can't collide
+              with the meta row. Fill matches the bubble face (gradient base
+              for own, secondary for received). */}
+          {isIMessage && showMeta && !isBig && !isCardType && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute bottom-[1px] h-[13px] w-[10px]",
+                mine ? "-right-[8px]" : "-left-[8px]",
+              )}
+            >
+              <svg
+                width="10"
+                height="13"
+                viewBox="0 0 10 13"
+                className={cn("block", !mine && "-scale-x-100")}
+                aria-hidden="true"
+              >
+                <path
+                  d="M2 0h8v5.5C10 9.5 6.5 12 0 13c1.4-3 1.9-6.5 2-9.5V0z"
+                  fill={
+                    mine
+                      ? "var(--im-sent-bottom)"
+                      : "var(--secondary, #262626)"
+                  }
+                />
+              </svg>
+            </span>
+          )}
           <BubbleContent
             className={cn(
               "min-w-0",
+              // Telegram reserves an in-bubble corner for the inline time.
+              telegramInline && "relative pb-5",
               // Modern refresh (desktop): larger radius + group tails — the
               // corner facing a same-sender neighbor tightens, so stacked
               // messages read as one cluster. Mobile keeps classic radius.
@@ -1006,7 +1098,7 @@ export function MessageBubble({
             )}
           >
             {replyTo ? (
-              <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10 md:rounded-xl md:border md:border-[var(--border)] md:border-l-[3px] md:border-l-[var(--accent)] md:bg-[var(--hover)] md:px-2.5 md:py-1.5 md:dark:bg-[var(--hover)]">
+              <div data-slot="quote" className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10 md:rounded-xl md:border md:border-[var(--border)] md:border-l-[3px] md:border-l-[var(--accent)] md:bg-[var(--hover)] md:px-2.5 md:py-1.5 md:dark:bg-[var(--hover)]">
                 <span className="block truncate text-[11px] font-semibold text-[var(--accent)]">
                   {replyTo.senderName}
                 </span>
@@ -1210,6 +1302,14 @@ export function MessageBubble({
                   audioDuration={message.audioDuration}
                 />
               </>
+            )}
+            {/* Telegram corner meta — time + ticks tucked inside the bubble's
+                reserved bottom-right corner. Inherits the bubble text color. */}
+            {showMeta && telegramInline && (
+              <span className="absolute bottom-1.5 right-2.5 inline-flex items-center gap-1 text-[11px] text-current opacity-70">
+                <span>{formatTime(message.createdAt)}</span>
+                {renderTicks(true)}
+              </span>
             )}
           </BubbleContent>
 
@@ -1479,8 +1579,10 @@ export function MessageBubble({
 
       {/* Meta: time + receipt + failed retry (rendered once per group).
           Cozy shows the time next to the sender name instead, so only the
-          ticks / retry affordances stay down here. */}
-      {showMeta && (
+          ticks / retry affordances stay down here. Telegram tucks the whole
+          meta inside the bubble, so this row only survives for send-state
+          text and card messages. */}
+      {showMeta && !telegramInline && (
         <div
           className={cn(
             "mt-1 flex w-fit items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]",
@@ -1513,46 +1615,7 @@ export function MessageBubble({
               failed · retry
             </button>
           )}
-          {canShowReceipts ? (
-            anySeen ? (
-              <button
-                type="button"
-                ref={ticksRef}
-                onClick={openReceipts}
-                aria-label={allRead ? "Seen by everyone" : "View receipts"}
-                aria-expanded={receiptsOpen}
-                className={cn(
-                  "flex cursor-pointer items-center gap-1 rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none",
-                  receiptsOpen && "opacity-70",
-                )}
-              >
-                <CheckCheck
-                  className={cn("h-3 w-3", allRead && "text-[var(--accent)]")}
-                  aria-hidden
-                />
-                {!isMobile && receiptPeers.read.length > 0 && (
-                  <ReadAvatars readers={receiptPeers.read} />
-                )}
-              </button>
-            ) : (
-              <Check className="h-3 w-3" aria-label="Sent" />
-            )
-          ) : (
-            <>
-              {receipt === "sent" && (
-                <Check className="h-3 w-3" aria-label="Sent" />
-              )}
-              {receipt === "delivered" && (
-                <CheckCheck className="h-3 w-3" aria-label="Delivered" />
-              )}
-              {receipt === "read" && (
-                <CheckCheck
-                  className="h-3 w-3 text-[var(--accent)]"
-                  aria-label="Read"
-                />
-              )}
-            </>
-          )}
+          {renderTicks(false)}
         </div>
       )}
       {receiptsOpen &&

@@ -347,7 +347,7 @@ const userSchema = new mongoose.Schema(
       },
       bubbleStyle: {
         type: String,
-        enum: ["rounded", "pill", "squared", "outline", "cozy"],
+        enum: ["rounded", "pill", "squared", "outline", "cozy", "telegram", "imessage"],
         default: null,
       },
     },

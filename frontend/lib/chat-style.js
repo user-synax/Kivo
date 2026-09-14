@@ -19,11 +19,10 @@ export const WALLPAPER_OPTIONS = [
 ];
 
 export const BUBBLE_STYLE_OPTIONS = [
-  { id: "rounded", label: "Rounded", hint: "soft 12px corners — the default" },
-  { id: "pill", label: "Pill", hint: "extra-round, airier corners" },
-  { id: "squared", label: "Squared", hint: "tight, square corners" },
   { id: "outline", label: "Outlined (mine)", hint: "your messages outlined in accent" },
   { id: "cozy", label: "Cozy", hint: "Discord-style rows — avatar, name, no bubbles" },
+  { id: "telegram", label: "Telegram", hint: "tight corners, time tucked in the bubble" },
+  { id: "imessage", label: "iMessage", hint: "blue gradient bubbles with tails" },
 ];
 
 const VALID_WALLPAPERS = new Set(WALLPAPER_OPTIONS.map((o) => o.id));

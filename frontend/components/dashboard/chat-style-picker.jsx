@@ -111,6 +111,51 @@ function BubbleStyleSwatch({ id }) {
       </div>
     );
   }
+  if (id === "telegram") {
+    return (
+      <div
+        aria-hidden="true"
+        className="flex h-9 w-full flex-col justify-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-base)] px-2"
+      >
+        <span
+          className="max-w-[70%] self-start px-2 py-1 text-[8px] font-semibold leading-none"
+          style={{ borderRadius: 3, background: "var(--bubble-received)", color: "var(--text-primary)" }}
+        >
+          Hey
+        </span>
+        <span
+          className="flex max-w-[70%] items-end gap-1 self-end px-2 py-1 text-[8px] font-semibold leading-none"
+          style={{ borderRadius: 3, background: "var(--bubble-sent)", color: "var(--bubble-sent-fg)" }}
+        >
+          Hi!
+          <i className="not-italic opacity-70" style={{ fontSize: 6 }}>
+            12:30
+          </i>
+        </span>
+      </div>
+    );
+  }
+  if (id === "imessage") {
+    return (
+      <div
+        aria-hidden="true"
+        className="flex h-9 w-full flex-col justify-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-base)] px-2"
+      >
+        <span
+          className="max-w-[70%] self-start px-2 py-1 text-[8px] font-semibold leading-none"
+          style={{ borderRadius: 10, background: "var(--bubble-received)", color: "var(--text-primary)" }}
+        >
+          Hey
+        </span>
+        <span
+          className="max-w-[70%] self-end px-2 py-1 text-[8px] font-semibold leading-none"
+          style={{ borderRadius: 10, background: "linear-gradient(180deg,#3fb0f7,#0b7ae4)", color: "#fff" }}
+        >
+          Hi!
+        </span>
+      </div>
+    );
+  }
   const bubbleCls =
     "px-2 py-1 text-[8px] font-semibold leading-none";
   return (

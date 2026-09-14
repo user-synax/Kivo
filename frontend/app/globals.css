@@ -1203,6 +1203,70 @@ body {
     background: var(--hover);
 }
 
+/* Telegram: tight corners over the theme's own bubble colors; the group
+   tails compose on top. Time + ticks move inside the bubble via markup. */
+.kivo-bubbles-telegram [data-slot="bubble-content"] {
+    border-radius: 10px;
+}
+
+/* iMessage: fixed blue gradient for own bubbles, theme gray for received,
+   big round corners (beats the group-tail tweaks by cascade). Tails ride
+   as SVG behind the group-end corner. Links and quoted replies go white
+   on blue so they stay legible. */
+.kivo-bubbles-imessage {
+    --im-sent-top: #3fb0f7;
+    --im-sent-bottom: #0b7ae4;
+}
+
+.kivo-bubbles-imessage
+    [data-slot="bubble"][data-align="end"]
+    > [data-slot="bubble-content"] {
+    background: linear-gradient(
+        180deg,
+        var(--im-sent-top) 0%,
+        var(--im-sent-bottom) 100%
+    );
+    border-color: transparent;
+    border-radius: 22px;
+    color: #fff;
+}
+
+.kivo-bubbles-imessage
+    [data-slot="bubble"][data-align="start"]
+    > [data-slot="bubble-content"] {
+    border-radius: 22px;
+}
+
+.kivo-bubbles-imessage
+    [data-slot="bubble"][data-align="end"]
+    [data-slot="bubble-content"]
+    a {
+    color: #fff;
+    text-decoration: underline;
+}
+
+.kivo-bubbles-imessage
+    [data-slot="bubble"][data-align="end"]
+    [data-slot="quote"] {
+    background: rgb(255 255 255 / 0.16);
+    border-color: rgb(255 255 255 / 0.25);
+    border-left-color: #fff;
+}
+
+.kivo-bubbles-imessage
+    [data-slot="bubble"][data-align="end"]
+    [data-slot="quote"]
+    > span:first-child {
+    color: #fff;
+}
+
+.kivo-bubbles-imessage
+    [data-slot="bubble"][data-align="end"]
+    [data-slot="quote"]
+    > span:last-child {
+    color: rgb(255 255 255 / 0.82);
+}
+
 /* ── Kivo Plus profile effects ──────────────────────────────────────────────
    Applied to profile pages (public /u/, drawers, own profile). The avatar
    halo pulses a soft ring outward; the display name animates an accent
