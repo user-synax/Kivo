@@ -1155,15 +1155,6 @@ body {
    always wins, and they keep using theme tokens (per-Space palettes scope
    them automatically). Covers the main timeline and the thread panel, which
    both render inside the container. */
-.kivo-bubbles-pill [data-slot="bubble-content"] {
-    border-radius: 24px;
-    padding: 11px 18px;
-}
-
-.kivo-bubbles-squared [data-slot="bubble-content"] {
-    border-radius: 5px;
-}
-
 .kivo-bubbles-outline
     [data-slot="bubble"][data-align="end"]
     > [data-slot="bubble-content"] {

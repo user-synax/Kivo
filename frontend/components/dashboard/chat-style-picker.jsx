@@ -166,7 +166,7 @@ function BubbleStyleSwatch({ id }) {
       <span
         className={cn(bubbleCls, "self-start max-w-[70%]")}
         style={{
-          borderRadius: id === "squared" ? 3 : 8,
+          borderRadius: 8,
           background: "var(--bubble-received)",
           color: "var(--text-primary)",
         }}
@@ -184,7 +184,7 @@ function BubbleStyleSwatch({ id }) {
                 color: "var(--accent)",
               }
             : {
-                borderRadius: id === "squared" ? 3 : 8,
+                borderRadius: 8,
                 background: "var(--bubble-sent)",
                 color: "var(--bubble-sent-fg)",
               }

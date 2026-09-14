@@ -74,7 +74,8 @@ export function SpacePaletteSection({ space, onUpdated, canEdit }) {
           background: "var(--bubble-sent)",
           color: "var(--bubble-sent-fg)",
         };
-  const miniRadius = bubbleStyle === "squared" ? 4 : bubbleStyle === "rounded" ? 10 : 9;
+  const miniRadius =
+    bubbleStyle === "telegram" ? 5 : bubbleStyle === "imessage" ? 11 : 9;
 
   const save = async (values) => {
     if (!canEdit) return;
