@@ -69,7 +69,7 @@ const spaceSchema = new mongoose.Schema(
       },
       bubbleStyle: {
         type: String,
-        enum: ["rounded", "pill", "squared", "outline"],
+        enum: ["rounded", "pill", "squared", "outline", "cozy"],
         default: null,
       },
     },

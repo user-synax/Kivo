@@ -81,8 +81,36 @@ export function WallpaperPicker({ value, onChange, allowInherit = false }) {
   );
 }
 
-// Mini sent + received bubbles previewing the three styles.
+// Mini previews: classic sent + received bubbles, or flat Discord-style
+// rows (avatar dot + name + text lines) for the cozy style.
 function BubbleStyleSwatch({ id }) {
+  if (id === "cozy") {
+    return (
+      <div
+        aria-hidden="true"
+        className="flex h-9 w-full flex-col justify-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-base)] px-2"
+      >
+        {[0, 1].map((i) => (
+          <span key={i} className="flex items-center gap-1">
+            <span
+              className="size-3 shrink-0 rounded-full"
+              style={{ background: "var(--bubble-received)" }}
+            />
+            <span className="min-w-0 flex-1">
+              <span
+                className="block h-1 w-1/3 rounded-full"
+                style={{ background: "var(--accent)" }}
+              />
+              <span
+                className="mt-0.5 block h-1 w-4/5 rounded-full"
+                style={{ background: "var(--text-muted)", opacity: 0.5 }}
+              />
+            </span>
+          </span>
+        ))}
+      </div>
+    );
+  }
   const bubbleCls =
     "px-2 py-1 text-[8px] font-semibold leading-none";
   return (

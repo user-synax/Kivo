@@ -29,7 +29,7 @@ export const conversationLookSchema = z.object({
     .nullable()
     .optional(),
   bubbleStyle: z
-    .enum(["rounded", "pill", "squared", "outline"])
+    .enum(["rounded", "pill", "squared", "outline", "cozy"])
     .nullable()
     .optional(),
 });

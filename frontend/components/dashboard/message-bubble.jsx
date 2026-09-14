@@ -605,10 +605,61 @@ function ReceiptsPanel({ vars, anchor, read, delivered, others, onClose }) {
   );
 }
 
+function readerInitials(name) {
+  const clean = (name || "?").trim();
+  if (!clean || clean === "?") return "?";
+  return clean
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+// Messenger-style reader stack: tiny overlapping avatars of who read the
+// message, tucked after the ticks. Desktop only — mobile keeps ticks alone.
+function ReadAvatars({ readers, max = 3 }) {
+  if (!readers?.length) return null;
+  const shown = readers.slice(0, max);
+  const extra = readers.length - shown.length;
+  return (
+    <span aria-hidden="true" className="flex items-center">
+      <span className="flex -space-x-1">
+        {shown.map((r) =>
+          r.avatarUrl ? (
+            <img
+              key={r.pid}
+              src={r.avatarUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="size-4 rounded-full object-cover ring-1 ring-[var(--bg-base)]"
+            />
+          ) : (
+            <span
+              key={r.pid}
+              className="flex size-4 items-center justify-center rounded-full bg-[var(--hover)] text-[8px] font-semibold leading-none text-[var(--text-primary)] ring-1 ring-[var(--bg-base)]"
+            >
+              {readerInitials(r.avatarName || r.name)}
+            </span>
+          ),
+        )}
+        {extra > 0 && (
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--hover)] px-0.5 text-[8px] font-semibold leading-none text-[var(--text-muted)] ring-1 ring-[var(--bg-base)]">
+            +{extra}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
 export function MessageBubble({
   message,
   mine,
   showMeta = true,
+  grouped = false,
+  cozy = false,
   isEditing = false,
   editText = "",
   onEditTextChange,
@@ -904,7 +955,7 @@ export function MessageBubble({
       <ContextMenuTrigger disabled={deleted || isEditing || selectMode}>
         <Bubble
           variant={bubbleVariant}
-          align={mine ? "end" : "start"}
+          align={mine && !cozy ? "end" : "start"}
           className={cn(
             "group/bubble relative transition-transform will-change-transform select-text touch-manipulation",
             pressing && !selectMode && "scale-[0.98]",
@@ -931,6 +982,18 @@ export function MessageBubble({
           <BubbleContent
             className={cn(
               "min-w-0",
+              // Modern refresh (desktop): larger radius + group tails — the
+              // corner facing a same-sender neighbor tightens, so stacked
+              // messages read as one cluster. Mobile keeps classic radius.
+              bubbleVariant !== "ghost" && "md:rounded-2xl",
+              bubbleVariant !== "ghost" &&
+                (mine
+                  ? grouped && "md:rounded-tr-md"
+                  : grouped && "md:rounded-tl-md"),
+              bubbleVariant !== "ghost" &&
+                (mine
+                  ? !showMeta && "md:rounded-br-md"
+                  : !showMeta && "md:rounded-bl-md"),
               isBig &&
                 !isBigCustom &&
                 (bigEmojiCount === 1
@@ -943,7 +1006,7 @@ export function MessageBubble({
             )}
           >
             {replyTo ? (
-              <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10">
+              <div className="mb-1.5 min-w-0 overflow-hidden rounded-md border-l-2 border-[var(--accent)] bg-black/5 px-2 py-1 dark:bg-white/10 md:rounded-xl md:border md:border-[var(--border)] md:border-l-[3px] md:border-l-[var(--accent)] md:bg-[var(--hover)] md:px-2.5 md:py-1.5 md:dark:bg-[var(--hover)]">
                 <span className="block truncate text-[11px] font-semibold text-[var(--accent)]">
                   {replyTo.senderName}
                 </span>
@@ -1369,7 +1432,7 @@ export function MessageBubble({
           <div
             className={cn(
               "mt-1 flex max-w-[78%] flex-wrap gap-1",
-              mine ? "justify-end" : "justify-start",
+              mine && !cozy ? "justify-end" : "justify-start",
             )}
           >
             {Object.entries(
@@ -1414,15 +1477,17 @@ export function MessageBubble({
           </div>
         )}
 
-      {/* Meta: time + receipt + failed retry (rendered once per group) */}
+      {/* Meta: time + receipt + failed retry (rendered once per group).
+          Cozy shows the time next to the sender name instead, so only the
+          ticks / retry affordances stay down here. */}
       {showMeta && (
         <div
           className={cn(
             "mt-1 flex w-fit items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]",
-            mine ? "self-end" : "self-start",
+            mine && !cozy ? "self-end" : "self-start",
           )}
         >
-          <span>{formatTime(message.createdAt)}</span>
+          {!cozy && <span>{formatTime(message.createdAt)}</span>}
           {message.isEdited && (
             <button
               type="button"
@@ -1457,7 +1522,7 @@ export function MessageBubble({
                 aria-label={allRead ? "Seen by everyone" : "View receipts"}
                 aria-expanded={receiptsOpen}
                 className={cn(
-                  "flex cursor-pointer items-center rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none",
+                  "flex cursor-pointer items-center gap-1 rounded-sm transition-opacity hover:opacity-70 focus-visible:outline-none",
                   receiptsOpen && "opacity-70",
                 )}
               >
@@ -1465,6 +1530,9 @@ export function MessageBubble({
                   className={cn("h-3 w-3", allRead && "text-[var(--accent)]")}
                   aria-hidden
                 />
+                {!isMobile && receiptPeers.read.length > 0 && (
+                  <ReadAvatars readers={receiptPeers.read} />
+                )}
               </button>
             ) : (
               <Check className="h-3 w-3" aria-label="Sent" />

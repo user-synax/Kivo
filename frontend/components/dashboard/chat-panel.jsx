@@ -76,12 +76,14 @@ import { fetchCallStatus } from "@/lib/calls";
 import {
   dayKey,
   formatDayDivider,
+  formatTime,
   otherParticipant,
   participantAvatarName,
   participantName,
 } from "@/lib/chat";
 import { resolveChatLook, wallpaperCss } from "@/lib/chat-style";
 import { copyText, messageText } from "@/lib/clipboard";
+import { isPlusUser } from "@/lib/plus";
 import {
   getCustomEmojis,
   getMergedEmojis,
@@ -406,7 +408,8 @@ const MessageRows = React.memo(function MessageRows({
   customEmojiById,
 }) {
   const a = ctx.current;
-  const { userId, otherId, isGroup, isChannel, isDm } = a;
+  const { userId, otherId, isGroup, isChannel, isDm, bubbleStyle } = a;
+  const isCozy = bubbleStyle === "cozy";
 
   // Presence lookup from the onlineUsers prop (its identity change is what
   // triggers this list to re-render when peers come/go, refreshing rings).
@@ -485,10 +488,41 @@ const MessageRows = React.memo(function MessageRows({
       next.isDeleted ||
       new Date(next.createdAt).getTime() - new Date(m.createdAt).getTime() >
         GROUP_WINDOW_MS;
-    const showSender = (isGroup || isChannel) && !grouped && !mine;
+    // Classic sender tag stays outside the row; cozy renders its own
+    // avatar + name + time header inside the row instead.
+    const showSender =
+      !isCozy && (isGroup || isChannel) && !grouped && !mine;
     const sAvatar = senderAvatar(m.senderId);
     const senderLabel = senderName(m.senderId);
     const senderUser = a.membersById[m.senderId] || null;
+    // Cozy row identity: member index first, session user as the fallback
+    // for own messages missing from the index.
+    const cozyUser =
+      senderUser ||
+      (mine
+        ? {
+            displayName: a.cozySelfLabel,
+            avatarStyle: a.cozySelfAvatarStyle,
+            avatarUrl: a.cozySelfAvatarUrl,
+            isPlus: a.cozySelfIsPlus,
+          }
+        : null);
+    const cozyLabel = senderUser
+      ? senderLabel
+      : mine
+        ? a.cozySelfLabel
+        : "Unknown";
+    const cozyAvatar = senderUser
+      ? sAvatar
+      : mine
+        ? {
+            avatarStyle: a.cozySelfAvatarStyle,
+            avatarUrl: a.cozySelfAvatarUrl,
+            isPlus: a.cozySelfIsPlus,
+          }
+        : { avatarStyle: null, avatarUrl: null, isPlus: false };
+    const cozyNameStyle = usernameColorStyle(cozyUser);
+    const cozyNameClass = usernameColorClass(cozyUser);
     const senderStyle = usernameColorStyle(senderUser);
     const senderPillClass = usernameColorClass(senderUser);
     const hasCopy = !m.isDeleted && Boolean(m.content || m.attachments?.length);
@@ -536,50 +570,93 @@ const MessageRows = React.memo(function MessageRows({
             </span>
           )}
           <div
-            className={`flex w-fit max-w-[78%] gap-2 ${mine ? "ml-auto flex-row-reverse self-end" : "mr-auto flex-row self-start"} items-end min-w-0 sm:max-w-[62%]`}
+            className={`flex gap-2 ${isCozy ? "mr-auto w-full max-w-full flex-row self-start" : `w-fit max-w-[78%] ${mine ? "ml-auto flex-row-reverse self-end" : "mr-auto flex-row self-start"}`} items-end min-w-0 ${isCozy ? "" : "sm:max-w-[62%]"}`}
           >
-            {(isGroup || isChannel) && !mine ? (
+            {isCozy ? (
               grouped ? (
                 <span
-                  className="hidden sm:block w-7 shrink-0"
                   aria-hidden="true"
+                  className="w-9 shrink-0 sm:w-10"
                 />
               ) : (
-                <span className="hidden sm:flex shrink-0 mb-1">
+                <span className="flex w-9 shrink-0 sm:w-10">
                   <Avatar
-                    name={senderLabel}
-                    avatarStyle={sAvatar.avatarStyle}
-                    url={sAvatar.avatarUrl}
+                    name={cozyLabel}
+                    avatarStyle={cozyAvatar.avatarStyle}
+                    url={cozyAvatar.avatarUrl}
                     size="sm"
-                    isPlus={Boolean(sAvatar.isPlus)}
+                    shape="circle"
+                    isPlus={Boolean(cozyAvatar.isPlus)}
                   />
                 </span>
               )
-            ) : null}
-            {/* Mobile avatar — show only on first of group to keep clean */}
-            {(isGroup || isChannel) && !mine && !grouped ? (
-              <span className="flex sm:hidden shrink-0 mb-1">
-                <Avatar
-                  name={senderLabel}
-                  avatarStyle={sAvatar.avatarStyle}
-                  url={sAvatar.avatarUrl}
-                  size="sm"
-                  isPlus={Boolean(sAvatar.isPlus)}
-                />
-              </span>
-            ) : null}
+            ) : (
+              <>
+                {(isGroup || isChannel) && !mine ? (
+                  grouped ? (
+                    <span
+                      className="hidden sm:block w-7 shrink-0"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="hidden sm:flex shrink-0 mb-1">
+                      <Avatar
+                        name={senderLabel}
+                        avatarStyle={sAvatar.avatarStyle}
+                        url={sAvatar.avatarUrl}
+                        size="sm"
+                        isPlus={Boolean(sAvatar.isPlus)}
+                      />
+                    </span>
+                  )
+                ) : null}
+                {/* Mobile avatar — show only on first of group to keep clean */}
+                {(isGroup || isChannel) && !mine && !grouped ? (
+                  <span className="flex sm:hidden shrink-0 mb-1">
+                    <Avatar
+                      name={senderLabel}
+                      avatarStyle={sAvatar.avatarStyle}
+                      url={sAvatar.avatarUrl}
+                      size="sm"
+                      isPlus={Boolean(sAvatar.isPlus)}
+                    />
+                  </span>
+                ) : null}
+              </>
+            )}
             <div
-              className={`flex min-w-0 flex-col max-w-full w-fit ${mine ? "ml-auto items-end" : "mr-auto items-start"}`}
+              className={`flex min-w-0 flex-col max-w-full ${isCozy ? "w-full items-start" : `w-fit ${mine ? "ml-auto items-end" : "mr-auto items-start"}`}`}
             >
+              {isCozy && !grouped && (
+                <span className="mb-0.5 flex min-w-0 items-baseline gap-2">
+                  <span
+                    style={cozyNameStyle}
+                    className={`truncate text-[13px] font-semibold ${cozyNameClass ? cozyNameClass : cozyNameStyle.color ? "" : "text-[var(--text-primary)]"}`}
+                  >
+                    {cozyLabel}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+                    {formatTime(m.createdAt)}
+                  </span>
+                </span>
+              )}
               <SwipeToReply
                 enabled={isMobile && !selectMode}
                 onReply={() => a.handleReply(m)}
-                className={mine ? "w-fit ml-auto min-w-0" : "w-full min-w-0"}
+                className={
+                  isCozy
+                    ? "w-full min-w-0"
+                    : mine
+                      ? "w-fit ml-auto min-w-0"
+                      : "w-full min-w-0"
+                }
               >
                 <MessageBubble
                   message={m}
                   mine={mine}
                   showMeta={groupLast}
+                  grouped={grouped}
+                  cozy={isCozy}
                   isEditing={editingId === m.id}
                   editText={editText}
                   onEditTextChange={a.setEditText}
@@ -688,7 +765,7 @@ const MessageRows = React.memo(function MessageRows({
               type="button"
               onClick={() => a.openThread(m)}
               className={`kivo-focus mt-1 flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--hover)] ${
-                mine ? "self-end" : "self-start ml-8 sm:ml-9"
+                isCozy ? "self-start" : mine ? "self-end" : "self-start ml-8 sm:ml-9"
               }`}
             >
               <MessageSquareText className="h-3 w-3 shrink-0" aria-hidden />
@@ -3366,6 +3443,11 @@ export function ChatPanel({
   // Fresh handlers + per-conversation context for <MessageRows>. Mutated in
   // place on every render so the memo boundary sees a stable prop identity
   // while rows always call the latest closures when they do re-render.
+  // Cozy (Discord-style) identity fallback: the member index usually holds
+  // every participant, but when it doesn't (e.g. own messages in some DMs)
+  // the session user fills the name/avatar for the cozy row header.
+  const cozySelfLabel =
+    currentUser?.displayName || currentUser?.username || "You";
   rowsCtx.current = {
     userId,
     otherId,
@@ -3374,6 +3456,11 @@ export function ChatPanel({
     isChannel,
     isDm,
     membersById,
+    bubbleStyle: chatLook.bubbleStyle,
+    cozySelfLabel,
+    cozySelfAvatarStyle: currentUser?.avatarStyle || null,
+    cozySelfAvatarUrl: currentUser?.avatarUrl || null,
+    cozySelfIsPlus: isPlusUser(currentUser),
     participants: conversation?.participants || [],
     viewerId: isChannel ? undefined : userId,
     isBlockedByMe,

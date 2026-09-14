@@ -23,6 +23,7 @@ export const BUBBLE_STYLE_OPTIONS = [
   { id: "pill", label: "Pill", hint: "extra-round, airier corners" },
   { id: "squared", label: "Squared", hint: "tight, square corners" },
   { id: "outline", label: "Outlined (mine)", hint: "your messages outlined in accent" },
+  { id: "cozy", label: "Cozy", hint: "Discord-style rows — avatar, name, no bubbles" },
 ];
 
 const VALID_WALLPAPERS = new Set(WALLPAPER_OPTIONS.map((o) => o.id));
