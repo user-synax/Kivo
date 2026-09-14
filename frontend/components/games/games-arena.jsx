@@ -607,9 +607,6 @@ export function GamesArena() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
-          <Gamepad2 className="h-5 w-5" />
-        </span>
         <div className="min-w-0 flex-1">
           <h1
             className="truncate text-[16px] font-semibold leading-tight tracking-tight text-[var(--text-primary)]"
@@ -630,7 +627,7 @@ export function GamesArena() {
         </div>
         {board?.me && (
           <span
-            title={`${board.me.xp} XP · ${board.me.wins}W/${board.me.losses}L · best ${board.me.bestWpm ?? "—"} WPM`}
+            title={`${board.me.xp} XP (${board.me.xpToNext ?? "—"} to LVL ${board.me.level + 1}) · ${board.me.wins}W/${board.me.losses}L · best ${board.me.bestWpm ?? "—"} WPM · ${board.me.dailyStreak || 0}-day play streak`}
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] px-3 text-[12px] font-bold tabular-nums text-[var(--text-primary)]"
           >
             <Zap className="h-3.5 w-3.5 text-amber-500" />
@@ -761,7 +758,7 @@ export function GamesArena() {
                         onClick={() => startPractice(d.id)}
                         disabled={Boolean(busyId)}
                         style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
-                        className="t-item-in group flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 text-left transition-all hover:border-[var(--text-muted)]/40 active:scale-[0.98] disabled:opacity-60"
+                        className="t-item-in group flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] hover:cursor-pointer p-3 text-left transition-all hover:border-[var(--text-muted)]/40 active:scale-[0.98] disabled:opacity-60"
                       >
                         <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
                           {busy ? (
@@ -1144,6 +1141,9 @@ export function GamesArena() {
                         </span>{" "}
                         · {board.me.weekBestWpm} WPM best · {board.me.weekGames}{" "}
                         {board.me.weekGames === 1 ? "race" : "races"}
+                        {board.me.dailyStreak >= 2 && (
+                          <> · {board.me.dailyStreak}-day streak</>
+                        )}
                       </span>
                     ) : (
                       <span>Race once to enter the board.</span>

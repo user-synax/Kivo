@@ -22,6 +22,7 @@ import {
   kindLabel,
   levelForXp,
   MIN_PLAYERS,
+  xpToNextLevel,
   nextArenaStats,
   pickPassage,
   pickPracticeBotWpm,
@@ -32,6 +33,7 @@ import {
   SERIES_BEST_OF,
   SERIES_WINS_NEEDED,
   seriesStandings,
+  utcDayKey,
 } from "./games.rules.js";
 
 // Kivo Games — server-authoritative game sessions.
@@ -117,9 +119,10 @@ async function applyArenaStats({ userId, won, wpm, practice = false, boardOnly =
   try {
     if (!userId || isPracticeBotId(userId)) return;
     const weekKey = arenaWeekKey();
+    const dayKey = utcDayKey();
     const user = await User.findById(userId).select("arena").lean();
     if (!user) return;
-    const next = nextArenaStats(user.arena || {}, { won, wpm, practice, weekKey, boardOnly });
+    const next = nextArenaStats(user.arena || {}, { won, wpm, practice, weekKey, dayKey, boardOnly });
     await User.findByIdAndUpdate(userId, { $set: { arena: next } });
   } catch (err) {
     console.error("[games] arena stats failed:", err?.message || err);
@@ -991,11 +994,14 @@ export async function getLeaderboard({ userId, limit = ARENA_LEADERBOARD_SIZE })
       rank: myRank,
       xp,
       level: levelForXp(xp),
+      xpToNext: xpToNextLevel(xp),
       wins: meArena.wins || 0,
       losses: meArena.losses || 0,
       bestWpm: meArena.bestWpm ?? null,
       currentStreak: meArena.currentStreak || 0,
       bestStreak: meArena.bestStreak || 0,
+      dailyStreak: meArena.dailyStreak || 0,
+      bestDailyStreak: meArena.bestDailyStreak || 0,
       weekGames: inWeek ? meArena.weekGames || 0 : 0,
       weekBestWpm: inWeek ? (meArena.weekBestWpm ?? null) : null,
     },

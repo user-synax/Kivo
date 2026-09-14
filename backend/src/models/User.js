@@ -317,6 +317,11 @@ const userSchema = new mongoose.Schema(
       bestWpm: { type: Number, default: null },
       currentStreak: { type: Number, default: 0, min: 0 },
       bestStreak: { type: Number, default: 0, min: 0 },
+      // Daily play-streak: consecutive UTC days with at least one finished
+      // race (ranked or practice). lastRaceDay is "YYYY-MM-DD" UTC.
+      lastRaceDay: { type: String, default: null },
+      dailyStreak: { type: Number, default: 0, min: 0 },
+      bestDailyStreak: { type: Number, default: 0, min: 0 },
       // Rolling weekly board bucket (ISO week UTC, e.g. "2026-W37"). A finish
       // in a new week resets the week* counters first — no cron needed.
       weekKey: { type: String, default: null },

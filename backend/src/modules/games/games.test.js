@@ -9,8 +9,11 @@ import {
   nextArenaStats,
   pickPracticeBotWpm,
   practiceBotFor,
+  prevUtcDayKey,
   recordFinish,
   seriesStandings,
+  utcDayKey,
+  xpToNextLevel,
 } from "./games.rules.js";
 import { finishSchema, inviteGameSchema, progressSchema } from "./games.validation.js";
 
@@ -271,6 +274,81 @@ describe("levelForXp", () => {
   test("tolerates junk", () => {
     expect(levelForXp(null)).toBe(1);
     expect(levelForXp(-50)).toBe(1);
+  });
+});
+
+describe("utcDayKey", () => {
+  test("keys UTC calendar days", () => {
+    expect(utcDayKey(Date.UTC(2026, 8, 14, 0, 0))).toBe("2026-09-14");
+    expect(utcDayKey(Date.UTC(2026, 8, 14, 23, 59))).toBe("2026-09-14");
+  });
+
+  test("prevUtcDayKey steps back across month boundaries", () => {
+    expect(prevUtcDayKey("2026-09-14")).toBe("2026-09-13");
+    expect(prevUtcDayKey("2026-03-01")).toBe("2026-02-28");
+    expect(prevUtcDayKey("junk")).toBeNull();
+  });
+});
+
+describe("xpToNextLevel", () => {
+  test("reports the gap to the next level", () => {
+    expect(xpToNextLevel(0)).toBe(100);
+    // 100 XP just reached L2 — next stop is L3 at 400.
+    expect(xpToNextLevel(100)).toBe(300);
+    expect(xpToNextLevel(150)).toBe(250);
+  });
+});
+
+describe("daily play-streak", () => {
+  const week = "2026-W38";
+
+  test("first race starts the streak at 1", () => {
+    const next = nextArenaStats(
+      {},
+      { won: false, wpm: 60, practice: false, weekKey: week, dayKey: "2026-09-14" },
+    );
+    expect(next.dailyStreak).toBe(1);
+    expect(next.bestDailyStreak).toBe(1);
+    expect(next.lastRaceDay).toBe("2026-09-14");
+  });
+
+  test("same UTC day does not double-count", () => {
+    const prev = nextArenaStats(
+      {},
+      { won: true, wpm: 60, practice: false, weekKey: week, dayKey: "2026-09-14" },
+    );
+    const next = nextArenaStats(prev, {
+      won: false,
+      wpm: 55,
+      practice: true,
+      weekKey: week,
+      dayKey: "2026-09-14",
+    });
+    expect(next.dailyStreak).toBe(1);
+  });
+
+  test("yesterday continues, a gap restarts", () => {
+    const day1 = nextArenaStats(
+      {},
+      { won: true, wpm: 60, practice: false, weekKey: week, dayKey: "2026-09-14" },
+    );
+    const day2 = nextArenaStats(day1, {
+      won: false,
+      wpm: 50,
+      practice: true,
+      weekKey: week,
+      dayKey: "2026-09-15",
+    });
+    expect(day2.dailyStreak).toBe(2);
+    const gap = nextArenaStats(day2, {
+      won: true,
+      wpm: 70,
+      practice: false,
+      weekKey: week,
+      dayKey: "2026-09-20",
+    });
+    expect(gap.dailyStreak).toBe(1);
+    expect(gap.bestDailyStreak).toBe(2);
   });
 });
 

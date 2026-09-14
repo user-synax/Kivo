@@ -862,6 +862,23 @@ export function DocsScreen() {
                   games going, Plus accounts 10.
                 </Bullet>
                 <Bullet>
+                  No rival around? Practice solo against Rookie, Dash or Blaze
+                  Bot — instant start, no invite. Practice pays XP but never
+                  touches streaks or the board.
+                </Bullet>
+                <Bullet>
+                  A finished race offers one-tap Rematch: Game 2 (or the
+                  decider) starts in the same chat, first to 2 takes the
+                  best-of-3 series.
+                </Bullet>
+                <Bullet>
+                  Every finish earns XP — ranked win +100, loss +25 (practice
+                  +30/+10) — on a level track where your first win always
+                  reaches LVL 2. Win streaks break on any ranked loss; daily
+                  play-streaks tick on UTC days with any finished race; the
+                  weekly best-WPM board resets every Monday.
+                </Bullet>
+                <Bullet>
                   Turn the win/lose sound off (or preview it) in Settings →
                   Sounds → Game Results.
                 </Bullet>

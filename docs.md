@@ -743,7 +743,7 @@ You are never notified of your **own** messages. **System** messages (joins/leav
 
 **Notification preferences (Settings → Notification preferences):** choose which categories you receive — Direct Messages, Group Messages, Mentions, Friend Requests, Space Messages, and Announcements. Space Messages are **off by default**; `@mentions` override a muted category (but still respect your Mentions toggle). Friend requests/acceptances are gated on `friendRequests`; lightweight pings like **Waves** flow ungated with their own 20 s server cooldown. Toggles apply to both in-app (`notification:new`) and push delivery.
 
-**Sound cues (Settings → Sounds):** every category has its own audio toggle — Direct Messages, Mentions, Group Messages, Space Messages, Friend Requests, and Game Results — under a master **Notification sounds** switch, each with a **▶ preview** button so you can hear a cue before enabling it. Cues fire only when a message/request deserves attention: DMs chime when the tab is hidden or that DM isn't focused; **@mentions** chime when the conversation isn't focused (they override the group/space categories, like the server preferences); group and Space messages only chime while the tab is in the background; friend requests/acceptances chime unless the notification center is open. Cues are synthesized in-browser with the Web Audio API (no audio assets), and preferences live in `localStorage["kivo:sounds"]` — the old `kivo:sound` flag is migrated into the master switch on first read.
+**Sound cues (Settings → Sounds):** every category has its own audio toggle — Direct Messages, Mentions, Group Messages, Space Messages, Friend Requests, Game Results, and Arena Music — under a master **Notification sounds** switch, each with a **▶ preview** button so you can hear a cue before enabling it. Game Results covers every arena sound (taps, countdown, join, win/lose); Arena Music is the soft synth loop inside `/games`, also toggleable from the arena header. Cues fire only when a message/request deserves attention: DMs chime when the tab is hidden or that DM isn't focused; **@mentions** chime when the conversation isn't focused (they override the group/space categories, like the server preferences); group and Space messages only chime while the tab is in the background; friend requests/acceptances chime unless the notification center is open. Cues are synthesized in-browser with the Web Audio API (no audio assets), and preferences live in `localStorage["kivo:sounds"]` — the old `kivo:sound` flag is migrated into the master switch on first read.
 
 **Under the hood (performance):** message fan-out now groups recipients in one `insertMany` (~1 DB round-trip) instead of sequential creates, batch-loads per-recipient preferences in one query, and fire-and-forgets web-push so the sender's `POST /messages` never waits on VAPID HTTP. Offline push results are persisted asynchronously (`delivery.pushDelivered / pushError`), expired endpoints (404/410) are pruned, and DM-focused suppression (`isUserFocusedOnConversation`) still skips notifications for the DM you are actively viewing.
 
@@ -1115,11 +1115,13 @@ Kivo Games is a full-screen arena at **`/games`** — its own surface, deliberat
 
 ### See who is in the arena
 
-The arena has three lists:
+The arena has a **Practice** row, three lists, and a live **Weekly board** sidebar (docked on the right on desktop, stacked below on mobile):
 
+- **Practice** — three instant-start cards (**Easy** vs Rookie Bot ~30 WPM, **Medium** vs Dash Bot ~55 WPM, **Hard** vs Blaze Bot ~80 WPM). No invite, no waiting: one tap drops you into the countdown. Practice grants XP but never touches streaks or the board, so bots can't be farmed for rank.
 - **In the arena** — everyone with `/games` open right now, kept live over Socket.IO. Blocked users never see each other here (filtered in both directions).
 - **Friends** — your friend list with a green dot for anyone currently online.
-- **Your games** — pending invites at the top with **Accept** / **Decline**, then anything already waiting or racing.
+- **Your games** — pending invites at the top with **Accept** / **Decline**, then anything already waiting or racing (live practice races show here too, against their bot).
+- **Weekly board** — this week's top racers by best WPM with a live dot, a reset countdown, your rank pinned at the bottom, and your level/streak pill up in the arena header.
 
 ### Invite someone
 
@@ -1142,10 +1144,29 @@ Inviting from the arena is the only way to start a game, and there can be only o
 
 ### Result
 
-- **You Win** flashes the screen **green** with a trophy; **You Lose** flashes it **red** with a broken heart — about a second each, with a synthesized stinger. Tap the flash to dismiss it early, and turn the sound off in **Settings → Sounds → Game Results**.
+- **You Win** flashes the screen **green** with a trophy icon; **You Lose** flashes it **red** with a cracked-heart icon — about a second each, with a synthesized stinger. Tap the flash to dismiss it early, and turn the sound off in **Settings → Sounds → Game Results**.
 - The result screen calls out **how close it was**. On a genuine **photo finish** — both players crossed the line at almost the same moment — it shows the real margin (*"Won by 0.4s"*) over a **Photo finish** badge. Usually only the winner has a time (the race stops the moment they finish), so in that case it reports the honest thing instead: how far the other player had got (*"Priya reached 94%"*).
 - The result screen lists **both** players: finishers with **place, WPM, accuracy and time**, and anyone who didn't cross the line with **how far they got** (`78% typed`).
 - The outcome is also shared to the chat as a **result chip** — a **new message** attributed to the winner, so it arrives with its own notification and unread badge. Tapping it opens `/games`.
+
+### Rematch and best-of-3
+
+A finished race is never a dead end. The result screen carries the series with it:
+
+- **Rematch · Game 2 (or 3)** — one tap creates the next game in the **same DM thread**, so the whole series lives in one timeline. First to **2 wins** takes the series; the card shows the running score (*"Series 1–0 · First to 2"*, *"Series tied 1–1 · Decider next"*) and per-game W/L dots.
+- **If your opponent hits Rematch first**, your result screen flips to an **Accept** banner — no need to go back to the lobby (though the invite is also sitting under **Your games**).
+- **If you both tap at once**, the second tap just opens the game that already exists instead of erroring.
+- A decided series shows a trophy banner; a fresh series starts from a normal arena invite.
+
+### Levels, streaks and the weekly board
+
+Every finish feeds your progression, stored on your account and shown in the arena header pill:
+
+- **XP and levels** — a ranked 1v1 win pays **+100 XP**, a loss **+25 XP** (showing up counts). Practice pays **+30 / +10**. Levels climb on a root curve: **L1** at 0–99 XP, **L2** at 100, **L3** at 400, **L4** at 900 — so your very first win always levels you up to 2.
+- **Win streak** — consecutive ranked 1v1 wins. Any ranked loss resets it to zero; the header flame appears from a 2-streak up. Practice never touches it.
+- **Daily play-streak** — consecutive **UTC days** with at least one finished race (**ranked or practice both count** — it rewards showing up, not winning). Finishing twice in one day doesn't double-count; missing a day restarts you at 1. Your best daily streak is kept too.
+- **Weekly board** — ranked 1v1 finishes only, ranked by **best WPM** (average and race count shown alongside). It resets every **Monday 00:00 UTC** with a live countdown on the card, needs just one race to enter, and refreshes by itself about every 30 seconds plus on every finish.
+- Bots are excluded from everything except your XP: they can't appear on the board and can't break your streak.
 
 ### Rules and limits
 

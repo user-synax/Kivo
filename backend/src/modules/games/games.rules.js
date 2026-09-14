@@ -69,9 +69,33 @@ export function arenaWeekEndsAt(nowMs = Date.now()) {
 }
 
 // Level curve: L1 0–99, L2 100–399, L3 400–899, … cheap to read, slow to climb.
+// One ranked win = +100 XP, so the first win always levels you to 2.
 export function levelForXp(xp) {
   const safe = Math.max(0, Math.floor(Number(xp) || 0));
   return Math.floor(Math.sqrt(safe / 100)) + 1;
+}
+
+// XP still needed to reach the next level from xp.
+export function xpToNextLevel(xp) {
+  const level = levelForXp(xp);
+  return level * level * 100 - Math.max(0, Math.floor(Number(xp) || 0));
+}
+
+// UTC calendar day key, e.g. "2026-09-14". Daily streaks tick on UTC days so
+// every player shares one midnight.
+export function utcDayKey(nowMs = Date.now()) {
+  const d = new Date(nowMs);
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${m}-${day}`;
+}
+
+// Previous UTC day key ("yesterday") for streak continuation checks.
+export function prevUtcDayKey(dayKey) {
+  const [y, m, d] = String(dayKey || "").split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const t = Date.UTC(y, m - 1, d) - 86400000;
+  return utcDayKey(t);
 }
 
 function numOr(value, fallback) {
@@ -80,11 +104,13 @@ function numOr(value, fallback) {
 }
 
 // Next stored arena shape after one finished race.
-// { won, wpm, practice, weekKey, boardOnly } — wpm is the server-derived WPM
-// (may be null when there was nothing measurable; wins/losses still count,
+// { won, wpm, practice, weekKey, dayKey, boardOnly } — wpm is the server-derived
+// WPM (may be null when there was nothing measurable; wins/losses still count,
 // board skips). boardOnly folds a late runner-up WPM into the board without
 // touching XP, wins, losses or streaks (already counted at decision time).
-export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey, boardOnly = false } = {}) {
+// The daily play-streak ticks on dayKey for every finish — ranked or practice,
+// full or board-only — because it rewards showing up, not winning.
+export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey, dayKey, boardOnly = false } = {}) {
   const next = {
     xp: Math.max(0, Math.floor(numOr(prev.xp, 0))),
     wins: Math.max(0, Math.floor(numOr(prev.wins, 0))),
@@ -92,6 +118,9 @@ export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey,
     bestWpm: Number.isFinite(Number(prev.bestWpm)) ? Math.round(Number(prev.bestWpm)) : null,
     currentStreak: Math.max(0, Math.floor(numOr(prev.currentStreak, 0))),
     bestStreak: Math.max(0, Math.floor(numOr(prev.bestStreak, 0))),
+    lastRaceDay: prev.lastRaceDay || null,
+    dailyStreak: Math.max(0, Math.floor(numOr(prev.dailyStreak, 0))),
+    bestDailyStreak: Math.max(0, Math.floor(numOr(prev.bestDailyStreak, 0))),
     weekKey: prev.weekKey || null,
     weekGames: Math.max(0, Math.floor(numOr(prev.weekGames, 0))),
     weekWins: Math.max(0, Math.floor(numOr(prev.weekWins, 0))),
@@ -108,6 +137,16 @@ export function nextArenaStats(prev = {}, { won, wpm, practice = false, weekKey,
     next.weekWins = 0;
     next.weekTotalWpm = 0;
     next.weekBestWpm = null;
+  }
+
+  // Daily play-streak: same UTC day changes nothing, yesterday continues the
+  // streak, anything older restarts it at 1.
+  if (dayKey) {
+    if (next.lastRaceDay !== dayKey) {
+      next.dailyStreak = next.lastRaceDay === prevUtcDayKey(dayKey) ? next.dailyStreak + 1 : 1;
+      next.bestDailyStreak = Math.max(next.bestDailyStreak, next.dailyStreak);
+      next.lastRaceDay = dayKey;
+    }
   }
 
   if (boardOnly) {

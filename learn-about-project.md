@@ -52,7 +52,7 @@ Think of Kivo as one app with three kinds of conversation — plus a place to pl
 - Owners/admins can even give a Space its own colors and chat wallpaper.
 
 ### 4. Kivo Games — play instead of just chatting
-- **`/games`** is a full-screen games arena (desktop: icon rail **Games**; mobile: **Menu → Kivo Games**). It shows who is in there right now, your friends and who's online, and any invites waiting on you.
+- **`/games`** is a full-screen games arena (desktop: icon rail **Games**; mobile: **Menu → Kivo Games**). It shows who is in there right now, your friends and who's online, any invites waiting on you, solo **Practice vs bots**, and a live **weekly WPM board** — with your **level, win streak and daily play-streak** in the header.
 - Pick someone and hit **Invite** — they get a **1v1 Typing Race**, and the race starts the moment they accept.
 - Your chat only ever gets a **one-line chip** (*"Priya invited you"*, *"You won — 62 wpm"*). The game itself is played on its own screen.
 - **The server is the referee:** it picks the passage, starts the clock, and decides who won. You just type — and a green **You Win** / red **You Lose** flash tells you how it went.
@@ -170,7 +170,10 @@ That's the whole trick: *instant paint, verified truth, instant delivery, quiet 
 - **Typing itself is instant** because your own progress bar is drawn locally from your keystrokes; the server is only pinged every ~5% (at most four times a second) to keep your opponent's bar honest. Type a wrong letter and it shows **red** until you fix it.
 - **The first person to finish ends the race.** In a 1v1 there's nothing left to wait for, so the winner is decided right there and the outcome is posted back into the chat as a **new result chip** — which is why you get a notification instead of silently noticing a score.
 - **Nobody can be left stranded:** a pending invite expires after 30 minutes, and a race nobody is typing in is cancelled after 10 minutes — but every progress ping pushes that deadline back, so a slow typist is never cut off mid-race.
-- **No new infrastructure.** Games run entirely on the socket connection chat already uses — no media server (that's calls), no extra service, no polling.
+- **Rematches are one tap and series-aware:** the result screen starts Game 2 (or the decider) in the same DM thread — first to 2 takes the best-of-3 — and an opponent's rematch arrives as an Accept banner.
+- **Practice when nobody's around:** three bots (Rookie ~30, Dash ~55, Blaze ~80 WPM) with instant start and no chat thread. Practice pays XP but can't touch streaks or the board.
+- **Progression that sticks, all computed server-side:** ranked wins pay **+100 XP** (losses +25; practice +30/+10) on a level track where your first win always reaches **LVL 2**. **Win streaks** break on any ranked loss; **daily play-streaks** tick on UTC days with any finished race; the **weekly best-WPM board** resets every Monday 00:00 UTC. All of it lives on `User.arena`.
+- **No new infrastructure.** Games run entirely on the socket connection chat already uses — no media server (that's calls), no extra service (the board re-pulls on a slow poll, not a timer).
 
 ### 👤 Accounts, security & trust
 - **Passwords** are hashed with bcrypt (12 rounds) — even the database can't read them.
