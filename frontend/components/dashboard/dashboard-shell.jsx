@@ -39,7 +39,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { requestPermission, subscribe, syncSubscription } from "@/lib/push";
 import { markArenaEntry } from "@/lib/games";
-import { playCue } from "@/lib/sound";
+import { playCue, playMessageReceived } from "@/lib/sound";
 import {
   getCachedConversations,
   getCachedSpaces,
@@ -1607,6 +1607,16 @@ export function DashboardShell() {
             } else if (!isVisible && !isFocused) {
               if (convType === "group") playCue("groupMessages");
               else if (convType === "space_channel") playCue("spaceMessages");
+            }
+            // In-chat receive plup: the conversation is open and visible, so
+            // the category chimes above stayed quiet — answer with the soft
+            // pop instead. Never double-plays with them by construction.
+            if (
+              isFocused &&
+              isVisible &&
+              !mutedIdsRef.current.has(msg.conversationId)
+            ) {
+              playMessageReceived();
             }
           }
         }

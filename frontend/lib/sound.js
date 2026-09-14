@@ -5,7 +5,7 @@
 // Preferences live in localStorage["kivo:sounds"] as JSON:
 //   { enabled: true, directMessages: true, groupMessages: true,
 //     mentions: true, friendRequests: true, spaceMessages: false,
-//     gameResults: true }
+//     gameResults: true, messageSent: true, messageReceived: true }
 // The legacy single-flag key localStorage["kivo:sound"] ("off"/"false"/"0")
 // is migrated into `enabled` on first read, then ignored.
 //
@@ -27,6 +27,8 @@ export const SOUND_CATEGORY_KEYS = [
   "spaceMessages",
   "gameResults",
   "arenaMusic",
+  "messageSent",
+  "messageReceived",
 ];
 
 export const SOUND_DEFAULTS = {
@@ -38,6 +40,8 @@ export const SOUND_DEFAULTS = {
   spaceMessages: false,
   gameResults: true,
   arenaMusic: true,
+  messageSent: true,
+  messageReceived: true,
 };
 
 // Kivo Games cues: a bright ascending major arpeggio for a win, a descending fall
@@ -116,6 +120,17 @@ const CUES = {
   spaceMessages: [
     [329.63, 0.0, 0.18], // soft low E4 -> A4
     [440.0, 0.16, 0.3],
+  ],
+  // In-chat pair, WhatsApp-like in spirit but its own melody: the send cue
+  // rises (A5 -> E6 swoop) and the receive cue answers falling (E6 -> A5
+  // plup). Short, quiet, and triangular/round so they sit under speech.
+  messageSent: [
+    [880.0, 0.0, 0.07], // A5 swoop up…
+    [1318.51, 0.06, 0.13], // …to E6
+  ],
+  messageReceived: [
+    [1318.51, 0.0, 0.08], // E6 plup down…
+    [880.0, 0.07, 0.14], // …to A5
   ],
   // Representative cue for the Settings preview button; the real game sound
   // depends on win/lose (see playGameResult).
@@ -347,6 +362,23 @@ export function playCountdownCue(kind) {
     type: "triangle",
     peak: isGo ? 0.15 : 0.09,
   });
+}
+
+// In-chat send swoop — played the moment your message is accepted (text,
+// media, voice, queued offline). Gated by master + its own toggle.
+export function playMessageSent() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.messageSent === false) return;
+  playPattern(CUES.messageSent, { type: "triangle", peak: 2 });
+}
+
+// In-chat receive plup — played when a message lands in the conversation
+// you're actively reading (background arrivals keep the louder category
+// chimes). Gated by master + its own toggle.
+export function playMessageReceived() {
+  const prefs = getSoundPrefs();
+  if (!prefs.enabled || prefs.messageReceived === false) return;
+  playPattern(CUES.messageReceived, { type: "sine", peak: 2 });
 }
 
 // Arena UI taps — every button in /games. Same master + Game Results gate so

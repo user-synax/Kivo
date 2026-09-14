@@ -92,6 +92,7 @@ import {
 } from "@/lib/custom-emoji";
 import { clearDraft, draftsKey, loadDraft, saveDraft } from "@/lib/drafts";
 import { useLiveLastActive } from "@/lib/last-active";
+import { playMessageSent } from "@/lib/sound";
 import {
   enqueueOutbox,
   getOutboxSnapshot,
@@ -2677,6 +2678,7 @@ export function ChatPanel({
       keepComposerFocus();
       if (typingTimer.current) clearTimeout(typingTimer.current);
       if (socket) socket.emit("typing:stop", { conversationId: convId });
+      playMessageSent();
       return;
     }
 
@@ -2717,6 +2719,7 @@ export function ChatPanel({
     keepComposerFocus();
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (socket) socket.emit("typing:stop", { conversationId: convId });
+    playMessageSent();
     try {
       const msg = await apiPost(`/api/v1/conversations/${convId}/messages`, {
         content: content || undefined,
@@ -2983,6 +2986,7 @@ export function ChatPanel({
       status: "sending",
     };
     insertOptimistic(optimistic);
+    playMessageSent();
     try {
       const msg = await apiPost(`/api/v1/conversations/${convId}/messages`, {
         content: undefined,

@@ -588,6 +588,16 @@ function NotificationsSection() {
 
 const SOUND_CATEGORY_DEFS = [
   {
+    key: "messageSent",
+    label: "Message Sent",
+    hint: "Short swoop when your message goes out",
+  },
+  {
+    key: "messageReceived",
+    label: "Message Received",
+    hint: "Soft pop for arrivals in the open chat",
+  },
+  {
     key: "directMessages",
     label: "Direct Messages",
     hint: "New DM when you're not reading it",
